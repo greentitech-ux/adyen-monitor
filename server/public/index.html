@@ -33,6 +33,12 @@
   .kpi .val.ok{color:var(--ok);} .kpi .val.bad{color:var(--bad);} .kpi .val.warn{color:var(--warn);}
   .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
   @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  @media(max-width:1100px){.grid3{grid-template-columns:1fr 1fr;}}
+  @media(max-width:700px){.grid3{grid-template-columns:1fr;}}
+  .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;}
+  @media(max-width:1300px){.grid4{grid-template-columns:1fr 1fr;}}
+  @media(max-width:700px){.grid4{grid-template-columns:1fr;}}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
   .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
   .panel h2 .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
@@ -42,10 +48,20 @@
   .alert .sev{width:8px;height:8px;border-radius:2px;margin-top:5px;flex:none;}
   .sev.high{background:var(--bad);} .sev.med{background:var(--warn);}
   .alert .t1{font-size:13px;font-weight:600;} .alert .t2{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
-  table{width:100%;border-collapse:collapse;font-size:12px;}
-  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.04em;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);}
-  tbody td{padding:8px 10px;border-bottom:1px solid #1a1f26;white-space:nowrap;}
+  table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.02em;padding:8px 6px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tbody td{padding:6px;border-bottom:1px solid #1a1f26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  tbody td.truncate{max-width:0;}
+  tbody td.statuscell{white-space:normal;}
   tbody tr:hover{background:var(--panel2);cursor:pointer;}
+  tbody tr.row-alerta{background:var(--warn-dim);}
+  tbody tr.row-alerta:hover{background:var(--warn-dim);filter:brightness(1.15);}
+  tbody tr{transition:background-color .8s ease;}
+  tbody tr.row-novo{background:rgba(92,200,255,.22);}
+  tbody tr.row-novo:hover{background:rgba(92,200,255,.3);}
+  .alert,.order-row{transition:background-color .8s ease;}
+  .alert.item-novo,.order-row.item-novo{background:rgba(92,200,255,.14);}
+  .flag.novo{color:var(--accent);border-color:#1e4a63;background:rgba(92,200,255,.12);}
   .tablewrap{max-height:520px;overflow:auto;}
   .badge{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;display:inline-block;}
   .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
@@ -95,42 +111,53 @@
 
 <div class="kpis" id="kpis"></div>
 
-<div class="grid">
+<div class="panel">
+  <h2>Transações <span class="n" id="tx-count"></span></h2>
+  <div class="controls">
+    <select id="f-periodo">
+      <option value="1">Último dia</option>
+      <option value="7">Últimos 7 dias</option>
+      <option value="30">Últimos 30 dias</option>
+      <option value="90">Últimos 3 meses</option>
+    </select>
+    <select id="f-status"><option value="">Todos os status</option></select>
+    <select id="f-unidade"><option value="">Todas as unidades</option></select>
+    <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
+  </div>
+  <div class="tablewrap">
+    <table>
+      <colgroup>
+        <col style="width:10%"><col style="width:6%"><col style="width:13%"><col style="width:13%">
+        <col style="width:5%"><col style="width:7%"><col style="width:6%"><col style="width:11%">
+        <col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:4%">
+        <col style="width:9%">
+      </colgroup>
+      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
+      <tbody id="tx-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid4" style="margin-top:16px;">
   <div class="panel">
-    <h2>Transações <span class="n" id="tx-count"></span></h2>
-    <div class="controls">
-      <select id="f-periodo">
-        <option value="1">Último dia</option>
-        <option value="7">Últimos 7 dias</option>
-        <option value="30">Últimos 30 dias</option>
-        <option value="90">Últimos 3 meses</option>
-      </select>
-      <select id="f-status"><option value="">Todos os status</option></select>
-      <select id="f-unidade"><option value="">Todas as unidades</option></select>
-      <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Hora/Data</th><th>Unidade</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Banco</th></tr></thead>
-        <tbody id="tx-body"></tbody>
-      </table>
-    </div>
+    <h2>Pedidos que mudaram de status <span class="n" id="orders-count"></span></h2>
+    <div class="orders" id="orders"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Pedidos repetidos <span class="n" id="repetidos-count"></span></h2>
+    <div class="alerts" id="repetidos"></div>
   </div>
 
   <div class="panel">
     <h2>Alertas de falha / fraude <span class="n" id="alert-count"></span></h2>
     <div class="alerts" id="alerts"></div>
   </div>
-</div>
 
-<div class="panel" style="margin-top:16px;">
-  <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
-  <div class="orders" id="chargebacks"></div>
-</div>
-
-<div class="panel" style="margin-top:16px;">
-  <h2>Pedidos que mudaram de status <span class="n" id="orders-count"></span></h2>
-  <div class="orders" id="orders"></div>
+  <div class="panel">
+    <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
+    <div class="orders" id="chargebacks"></div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -147,9 +174,22 @@ let DATA = [];
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
 function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function clientKeyOf(t){ return t.shopperReference || `${t.cardHolder||'desconhecido'}::${t.last4||'----'}`; }
+function soNumero(unidade){ return (unidade||'').replace(/\D/g,'') || '—'; }
 
 let ORDERS_CHANGED = [];
 let CHARGEBACKS = [];
+let REPEATED_PSPS = new Set();
+
+// destaque temporario pra quem acabou de chegar via webhook - fica marcado
+// por alguns minutos pra dar tempo de notar, depois some
+const NEW_HIGHLIGHT_MS = 4 * 60 * 1000; // 4 minutos
+const NEW_ITEMS = new Map(); // chave (ex: "tx:pspRef") -> timestamp de chegada
+function marcarNovo(key){ if(key) NEW_ITEMS.set(key, Date.now()); }
+function ehNovo(key){ const t = NEW_ITEMS.get(key); return t!=null && (Date.now()-t) < NEW_HIGHLIGHT_MS; }
+function limparNovosExpirados(){
+  const limite = NEW_HIGHLIGHT_MS * 3;
+  for(const [k,t] of NEW_ITEMS) if(Date.now()-t > limite) NEW_ITEMS.delete(k);
+}
 
 async function loadAll(){
   const [tx, ordersChanged, chargebacks] = await Promise.all([
@@ -173,10 +213,12 @@ async function refreshChargebacks(){
 
 function renderChargebacks(){
   document.getElementById('chargebacks-count').textContent = CHARGEBACKS.length;
-  document.getElementById('chargebacks').innerHTML = CHARGEBACKS.length ? CHARGEBACKS.map(o=>`
-    <div class="order-row">
+  document.getElementById('chargebacks').innerHTML = CHARGEBACKS.length ? CHARGEBACKS.map(o=>{
+    const novo = ehNovo('chargeback:'+o.pedidoId);
+    return `
+    <div class="order-row ${novo?'item-novo':''}">
       <div class="top">
-        <span>${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
+        <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
         <span class="valor">${fmtMoney(o.valor)}</span>
       </div>
       <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
@@ -184,7 +226,7 @@ function renderChargebacks(){
         ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
       </div>
     </div>
-  `).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
+  `;}).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
 }
 
 // filtra pelo periodo selecionado (padrao: ultimo dia)
@@ -214,18 +256,20 @@ async function refreshOrdersChanged(){
 
 function renderOrdersChanged(){
   document.getElementById('orders-count').textContent = ORDERS_CHANGED.length;
-  document.getElementById('orders').innerHTML = ORDERS_CHANGED.length ? ORDERS_CHANGED.map(o=>`
-    <div class="order-row">
+  document.getElementById('orders').innerHTML = ORDERS_CHANGED.length ? ORDERS_CHANGED.map(o=>{
+    const novo = ehNovo('order:'+o.pedidoId);
+    return `
+    <div class="order-row ${novo?'item-novo':''}">
       <div class="top">
-        <span>${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
+        <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
         <span class="valor">${fmtMoney(o.valor)}</span>
       </div>
-      <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+      <div class="id">${o.metodo||'?'} · ${o.cliente||'cliente desconhecido'} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
       <div class="timeline">
         ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
       </div>
     </div>
-  `).join('') : '<div class="empty">Nenhum pedido mudou de status ainda.</div>';
+  `;}).join('') : '<div class="empty">Nenhum pedido mudou de status ainda.</div>';
 }
 
 function renderKpis(s){
@@ -241,22 +285,78 @@ function renderKpis(s){
   document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`).join('');
 }
 
+// pedidos aprovados do mesmo cliente em sequencia rapida - pode ser cliente
+// pedindo duas vezes por engano ou fraude (cartao clonado testando limite)
+const JANELA_REPETIDOS_MS = 30 * 60 * 1000; // 30 minutos
+const LIMIAR_REPETIDOS = 2; // a partir de quantos pedidos aprovados seguidos ja alerta
+// shopperReference vem sem o e-mail (so "unidade:") mesmo em pagamentos com
+// cartao, entao nao serve pra identificar cliente - usamos cartao/nome. Pix
+// sem nome nenhum (caso comum hoje) fica de fora da deteccao: nao da pra saber
+// se sao a mesma pessoa, e juntar tudo so pela unidade gera alerta falso.
+function chaveClienteIdentificavel(d){
+  if(d.last4) return `cartao:${d.last4}:${d.cardHolder||d.nomeCliente||''}`;
+  if(d.cardHolder) return `nome:${d.cardHolder}`;
+  if(d.nomeCliente) return `nome:${d.nomeCliente}`;
+  return null;
+}
+function detectarPedidosRepetidos(rows){
+  const aprovadas = rows.filter(d=>d.status==='APROVADO').slice()
+    .sort((a,b)=>(a.dataHora||'').localeCompare(b.dataHora||''));
+  const byClient = {};
+  aprovadas.forEach(d=>{
+    const k = chaveClienteIdentificavel(d);
+    if(!k) return;
+    (byClient[k] ||= []).push(d);
+  });
+  const grupos = [];
+  Object.values(byClient).forEach(list=>{
+    let cluster = [];
+    list.forEach(d=>{
+      const t = new Date(d.dataHora).getTime();
+      const ultimo = cluster[cluster.length-1];
+      if(ultimo && t - new Date(ultimo.dataHora).getTime() > JANELA_REPETIDOS_MS){
+        if(cluster.length>=LIMIAR_REPETIDOS) grupos.push(cluster);
+        cluster = [];
+      }
+      cluster.push(d);
+    });
+    if(cluster.length>=LIMIAR_REPETIDOS) grupos.push(cluster);
+  });
+  return grupos;
+}
+
 function renderAlerts(rows){
   const alerts = [];
   const recusadas = rows.filter(d=>d.status==='RECUSADO');
   const byClient = {};
   recusadas.forEach(d=>{ const k=clientKeyOf(d); (byClient[k] ||= []).push(d); });
   Object.entries(byClient).forEach(([k,list])=>{
-    if(list.length>=2) alerts.push({sev:'high', t1:`Tentativas repetidas recusadas — ${list[0].cardHolder||k}`, t2:`${list.length} recusas · ${list[0].motivo||'sem motivo'} · ${list[0].unidade}`, dt:list[0].dataHora});
+    if(list.length>=2) alerts.push({sev:'high', t1:`Tentativas repetidas recusadas — ${list[0].cardHolder||k}`, t2:`${list.length} recusas · ${list[0].motivo||'sem motivo'} · ${list[0].unidade}`, dt:list[0].dataHora, psp:list[list.length-1].pspReference});
   });
-  rows.filter(d=>d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Chargeback — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora}));
-  rows.filter(d=>d.fraudeSuspeita).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora}));
-  rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora}));
+  rows.filter(d=>d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Chargeback — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
+  rows.filter(d=>d.fraudeSuspeita).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
+  rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   alerts.sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
   document.getElementById('alert-count').textContent = alerts.length;
-  document.getElementById('alerts').innerHTML = alerts.length ? alerts.map(a=>`
-    <div class="alert"><div class="sev ${a.sev}"></div><div class="body"><div class="t1">${a.t1}</div><div class="t2">${a.t2} · ${fmtDT(a.dt)}</div></div></div>
-  `).join('') : '<div class="empty">Nenhum alerta no momento.</div>';
+  document.getElementById('alerts').innerHTML = alerts.length ? alerts.map(a=>{
+    const novo = ehNovo('tx:'+a.psp);
+    return `<div class="alert ${novo?'item-novo':''}"><div class="sev ${a.sev}"></div><div class="body"><div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}${a.t1}</div><div class="t2">${a.t2} · ${fmtDT(a.dt)}</div></div></div>`;
+  }).join('') : '<div class="empty">Nenhum alerta no momento.</div>';
+
+  const repetidos = [];
+  REPEATED_PSPS = new Set();
+  detectarPedidosRepetidos(rows).forEach(grupo=>{
+    grupo.forEach(d=>REPEATED_PSPS.add(d.pspReference));
+    const ultimo = grupo[grupo.length-1];
+    const minutos = Math.round((new Date(ultimo.dataHora) - new Date(grupo[0].dataHora))/60000);
+    repetidos.push({sev:'med', t1:`Pedidos repetidos em sequência — ${ultimo.cardHolder||ultimo.nomeCliente||'cliente'}`, t2:`${grupo.length} pedidos aprovados em ${minutos} min · ${ultimo.unidade} · pode ser pedido em duplicidade ou fraude`, dt:ultimo.dataHora, psp:ultimo.pspReference});
+  });
+  repetidos.sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
+  document.getElementById('repetidos-count').textContent = repetidos.length;
+  document.getElementById('repetidos').innerHTML = repetidos.length ? repetidos.map(a=>{
+    const novo = ehNovo('tx:'+a.psp);
+    return `<div class="alert ${novo?'item-novo':''}"><div class="sev ${a.sev}"></div><div class="body"><div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}${a.t1}</div><div class="t2">${a.t2} · ${fmtDT(a.dt)}</div></div></div>`;
+  }).join('') : '<div class="empty">Nenhum pedido repetido no momento.</div>';
 }
 
 function populateFilters(){
@@ -296,20 +396,41 @@ function render(){
     (!q || (d.nomeCliente||'').toLowerCase().includes(q) || (d.cardHolder||'').toLowerCase().includes(q) || (d.merchantReference||'').toLowerCase().includes(q) || (d.last4||'').includes(q))
   ).sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
 
+  // contagem historica por cliente (todo o DATA, nao so o periodo filtrado) -
+  // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc
+  const contagemClientes = {};
+  DATA.forEach(d=>{
+    const k = clientKeyOf(d);
+    const c = (contagemClientes[k] ||= {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0});
+    c.total++;
+    if(d.status==='APROVADO') c.aprovadas++;
+    if(d.status==='RECUSADO') c.recusadas++;
+    if(d.status==='ESTORNADO') c.estornadas++;
+    if(d.fraudeSuspeita) c.fraude++;
+  });
+
   document.getElementById('tx-count').textContent = rows.length+' / '+period.length;
-  document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>`
-    <tr onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
+  document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
+    const c = contagemClientes[clientKeyOf(d)] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0};
+    const novo = ehNovo('tx:'+d.pspReference);
+    return `
+    <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta':''}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
       <td>${fmtDT(d.dataHora)}</td>
-      <td>${d.unidade||'—'}</td>
-      <td>${d.nomeCliente||'—'}</td>
-      <td>${d.cardHolder||'—'}</td>
+      <td class="valor">${soNumero(d.unidade)}</td>
+      <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
+      <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
       <td>${d.metodo||'—'}</td>
       <td class="valor">${fmtMoney(d.valor)}</td>
       <td>${d.last4?('•• '+d.last4):'—'}</td>
-      <td><span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}</td>
-      <td>${d.bancoEmissor||'—'}</td>
+      <td class="statuscell">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}</td>
+      <td class="valor">${c.total}</td>
+      <td class="valor">${c.aprovadas}</td>
+      <td class="valor">${c.recusadas}</td>
+      <td class="valor">${c.estornadas}</td>
+      <td class="valor">${c.fraude}</td>
+      <td class="truncate" title="${d.bancoEmissor||''}">${d.bancoEmissor||'—'}</td>
     </tr>
-  `).join('') : '<tr><td colspan="9" class="empty">Nenhuma transação encontrada.</td></tr>';
+  `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
 }
 ['f-periodo','f-status','f-unidade','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 
@@ -321,19 +442,34 @@ function connectStream(){
   es.addEventListener('transaction', (e)=>{
     const tx = JSON.parse(e.data);
     DATA.push(tx);
+    marcarNovo('tx:'+tx.pspReference);
     populateFilters(); render();
   });
   es.addEventListener('update', (e)=>{
     const tx = JSON.parse(e.data);
     const idx = DATA.findIndex(d=>d.pspReference===tx.pspReference && d.eventCode===tx.eventCode);
     if(idx>=0) DATA[idx]=tx;
+    marcarNovo('tx:'+tx.pspReference);
     render();
   });
-  es.addEventListener('order-changed', ()=>{ refreshOrdersChanged(); });
-  es.addEventListener('chargeback', ()=>{ refreshChargebacks(); });
+  es.addEventListener('order-changed', (e)=>{
+    const order = JSON.parse(e.data);
+    marcarNovo('order:'+(order.pedidoId||''));
+    refreshOrdersChanged();
+  });
+  es.addEventListener('chargeback', (e)=>{
+    const payload = JSON.parse(e.data);
+    const key = payload.pedidoId || payload.merchantReference || payload.pspReference;
+    marcarNovo('chargeback:'+key);
+    refreshChargebacks();
+  });
 }
 
 loadAll().then(connectStream);
+
+// reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
+// tempo, mesmo quando nao chega nenhum webhook novo nesse meio tempo
+setInterval(()=>{ limparNovosExpirados(); render(); }, 2000);
 
 // ---- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----
 function urlBase64ToUint8Array(base64String) {

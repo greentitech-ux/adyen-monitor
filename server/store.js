@@ -87,6 +87,7 @@ function allOrders() {
         pedidoId: key,
         unidade: tx.unidade,
         cliente: tx.cardHolder || tx.shopperReference || null,
+        metodo: tx.metodo,
         last4: tx.last4,
         fraudeSuspeita: false,
         history: [],

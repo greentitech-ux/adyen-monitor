@@ -85,12 +85,6 @@ app.post('/webhooks/adyen', async (req, res) => {
       continue;
     }
 
-    // DEBUG TEMPORARIO: comparar o additionalData que a Adyen realmente manda pra
-    // esse webhook com o que aparece na planilha antiga - remover depois
-    if (item.eventCode === 'AUTHORISATION') {
-      console.log('DEBUG additionalData:', JSON.stringify(item.additionalData));
-    }
-
     // eventos administrativos (ex: aviso de relatorio pronto) nao sao transacoes -
     // nao devem aparecer na lista de pedidos do dashboard
     if (item.eventCode === 'REPORT_AVAILABLE') {
