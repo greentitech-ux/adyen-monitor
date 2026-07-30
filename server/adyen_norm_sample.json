@@ -1,0 +1,1902 @@
+[
+ {
+  "dt": "2026-07-30T00:50:21",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Deborah Layza",
+  "motivo": "",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-30T00:40:29",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Laura Beatriz",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-30T00:33:46",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Laura Beatriz",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T23:11:32",
+  "unidade": "DOM19911",
+  "valor": 73.8,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Erinaldo Cazuza",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T22:31:05",
+  "unidade": "DOM19911",
+  "valor": 83.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Hideraldo Jose",
+  "motivo": "",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T22:22:26",
+  "unidade": "DOM_19633",
+  "valor": 166.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Klewerton Morais",
+  "motivo": "",
+  "cartao": "19633"
+ },
+ {
+  "dt": "2026-07-29T22:14:19",
+  "unidade": "DOM_19706",
+  "valor": 117.4,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Monica Andrea",
+  "motivo": "",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T21:33:41",
+  "unidade": "DOM_19706",
+  "valor": 126.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "GABRIEL FELLET",
+  "motivo": "PTBQLU:5302:08/2029",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T21:26:39",
+  "unidade": "DOM_19633",
+  "valor": 41.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Anna Rafaella",
+  "motivo": "",
+  "cartao": "19633"
+ },
+ {
+  "dt": "2026-07-29T20:41:57",
+  "unidade": "DOM_19706",
+  "valor": 105.0,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Cássio Marcone",
+  "motivo": "",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T20:23:37",
+  "unidade": "DOM19911",
+  "valor": 58.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Anna Tereza",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T20:04:20",
+  "unidade": "DOM19940",
+  "valor": 95.3,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Júlio Césares",
+  "motivo": "418901:5252:03/2031",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T19:57:52",
+  "unidade": "DOM_19706",
+  "valor": 126.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Rafael Carvalho",
+  "motivo": "575056:7309:08/2029",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T19:56:41",
+  "unidade": "DOM19911",
+  "valor": 68.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "João Gabriel",
+  "motivo": "",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T19:47:45",
+  "unidade": "DOM_19633",
+  "valor": 160.6,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Yu ling",
+  "motivo": "",
+  "cartao": "19633"
+ },
+ {
+  "dt": "2026-07-29T19:42:38",
+  "unidade": "DOM19911",
+  "valor": 68.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "João Gabriel",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T19:41:39",
+  "unidade": "DOM_19706",
+  "valor": 105.4,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Jaqueline Alcantara",
+  "motivo": "413763:8542:07/2030",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T19:35:30",
+  "unidade": "DOM19911",
+  "valor": 68.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "João Gabriel",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T19:34:48",
+  "unidade": "DOM_19706",
+  "valor": 121.24,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Cid Pacheco",
+  "motivo": "",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T19:33:44",
+  "unidade": "DOM19940",
+  "valor": 44.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Glaucio Azevedo",
+  "motivo": "",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T18:43:02",
+  "unidade": "DOM19940",
+  "valor": 69.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Bernardo Vidal",
+  "motivo": "630110:7680:07/2032",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T18:40:32",
+  "unidade": "DOM_19706",
+  "valor": 134.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Cíntia De",
+  "motivo": "",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T18:39:18",
+  "unidade": "DOM_19706",
+  "valor": 115.0,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Robson Patricio",
+  "motivo": "055066:4827:10/2029",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T18:29:04",
+  "unidade": "DOM_19706",
+  "valor": 115.0,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "ROBSON PATRICIO",
+  "motivo": "CVC Declined",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T18:17:46",
+  "unidade": "DOM_19706",
+  "valor": 144.7,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "FELIPE GUSTAVO",
+  "motivo": "086017:3748:11/2031",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T18:04:43",
+  "unidade": "DOM_19633",
+  "valor": 87.7,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Ana Carolina",
+  "motivo": "",
+  "cartao": "19633"
+ },
+ {
+  "dt": "2026-07-29T17:53:16",
+  "unidade": "DOM19940",
+  "valor": 97.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "ALBERTO BARREIRA",
+  "motivo": "O9HLQJ:7181:07/2029",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T17:46:34",
+  "unidade": "DOM_19633",
+  "valor": 89.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Luciano Ramalho",
+  "motivo": "",
+  "cartao": "19633"
+ },
+ {
+  "dt": "2026-07-29T17:27:06",
+  "unidade": "DOM_19706",
+  "valor": 113.85,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "Marlon Filippo",
+  "motivo": "714653:0342:05/2031",
+  "cartao": "19706"
+ },
+ {
+  "dt": "2026-07-29T16:52:23",
+  "unidade": "DOM19940",
+  "valor": 69.8,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "Aldder Andrade",
+  "motivo": "686780:9975:12/2026",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T16:23:07",
+  "unidade": "DOM19940",
+  "valor": 100.2,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Vinicius Campos",
+  "motivo": "R7JK7Q:4035:05/2034",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T16:14:06",
+  "unidade": "DOM19940",
+  "valor": 100.2,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Vinicius Campos",
+  "motivo": "FRAUD",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T14:41:56",
+  "unidade": "DOM_19798",
+  "valor": 69.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Naiara Oliveira",
+  "motivo": "",
+  "cartao": "19798"
+ },
+ {
+  "dt": "2026-07-29T12:35:17",
+  "unidade": "DOM19940",
+  "valor": 56.8,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Yuri Simonini",
+  "motivo": "253221:7569:06/2031",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-29T12:06:35",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Elizabete Mendonça",
+  "motivo": "",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T11:33:33",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Elizabete Mendonça",
+  "motivo": "Acquirer Error",
+  "cartao": "19911"
+ },
+ {
+  "dt": "2026-07-29T09:56:55",
+  "unidade": "DOM19940",
+  "valor": 132.9,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "N/A",
+  "motivo": "Other Fraud-Card Absent Environment",
+  "cartao": "19940"
+ },
+ {
+  "dt": "2026-07-28T22:43:21",
+  "unidade": "DOM19940",
+  "valor": 96.4,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Ivanilson Barbosa",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T22:35:16",
+  "unidade": "DOM19940",
+  "valor": 96.4,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "N/A",
+  "motivo": "PENDING",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T22:32:16",
+  "unidade": "DOM19911",
+  "valor": 88.7,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Lucas Lima",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T22:31:42",
+  "unidade": "DOM_19798",
+  "valor": 49.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Leticia zystchy",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T22:27:53",
+  "unidade": "DOM_19633",
+  "valor": 61.9,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "GABRIEL CAJAZEIRA",
+  "motivo": "674624:9376:07/2026",
+  "cartao": "651666\\*\\*\\*\\*\\*\\*9376"
+ },
+ {
+  "dt": "2026-07-28T22:18:13",
+  "unidade": "DOM_19633",
+  "valor": 94.35,
+  "status": "RECUSADO",
+  "metodo": "elo",
+  "cliente": "Nívia Ceci",
+  "motivo": "FRAUD",
+  "cartao": "650486\\*\\*\\*\\*\\*\\*0470"
+ },
+ {
+  "dt": "2026-07-28T22:15:32",
+  "unidade": "DOM19911",
+  "valor": 68.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "arthur costa",
+  "motivo": "166946:1730:12/2033",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*1730"
+ },
+ {
+  "dt": "2026-07-28T22:10:00",
+  "unidade": "DOM_19706",
+  "valor": 76.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Laudimery Barros",
+  "motivo": "YK1RXE:5103:08/2029",
+  "cartao": "233026\\*\\*\\*\\*\\*\\*2784"
+ },
+ {
+  "dt": "2026-07-28T22:07:30",
+  "unidade": "DOM_19633",
+  "valor": 77.45,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "Nívia Ceci",
+  "motivo": "672217:0470:11/2029",
+  "cartao": "650486\\*\\*\\*\\*\\*\\*0470"
+ },
+ {
+  "dt": "2026-07-28T21:57:01",
+  "unidade": "DOM_19706",
+  "valor": 87.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Rafael guimaraes",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:56:56",
+  "unidade": "DOM_19633",
+  "valor": 77.45,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Nívia Ceci",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:52:21",
+  "unidade": "DOM_19706",
+  "valor": 84.5,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Laudimery Barros",
+  "motivo": "XJKNIM:5103:08/2029",
+  "cartao": "233026\\*\\*\\*\\*\\*\\*2784"
+ },
+ {
+  "dt": "2026-07-28T21:45:24",
+  "unidade": "DOM_19798",
+  "valor": 41.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Júlio César",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:34:07",
+  "unidade": "DOM19940",
+  "valor": 34.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Bruno Felipe",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:32:43",
+  "unidade": "DOM_19706",
+  "valor": 68.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "LEANDRO ARAÚJO",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:30:56",
+  "unidade": "DOM_19633",
+  "valor": 114.4,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Edoardo Famá",
+  "motivo": "755339:3520:03/2029",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*8465"
+ },
+ {
+  "dt": "2026-07-28T21:28:45",
+  "unidade": "DOM_19706",
+  "valor": 84.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Bruna Mota",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:25:50",
+  "unidade": "DOM19911",
+  "valor": 90.5,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "Alexandre Luders",
+  "motivo": "081334:5819:07/2036",
+  "cartao": "650507\\*\\*\\*\\*\\*\\*5819"
+ },
+ {
+  "dt": "2026-07-28T21:24:50",
+  "unidade": "DOM19940",
+  "valor": 136.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Bruno Felipe",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:24:31",
+  "unidade": "DOM_19706",
+  "valor": 106.7,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Viktor Lameirao",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:20:12",
+  "unidade": "DOM_19633",
+  "valor": 114.4,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Edoardo Famá",
+  "motivo": "Refused",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*8465"
+ },
+ {
+  "dt": "2026-07-28T21:20:04",
+  "unidade": "DOM_19706",
+  "valor": 106.7,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Viktor Lameirao",
+  "motivo": "FRAUD",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*2031"
+ },
+ {
+  "dt": "2026-07-28T21:19:31",
+  "unidade": "DOM19911",
+  "valor": 90.5,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Alexandre De",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:14:48",
+  "unidade": "DOM_19633",
+  "valor": 115.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Vanessa leal",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T21:09:03",
+  "unidade": "DOM_19706",
+  "valor": 116.7,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Bibyane Lameirao",
+  "motivo": "Refused",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*2885"
+ },
+ {
+  "dt": "2026-07-28T20:42:58",
+  "unidade": "DOM19911",
+  "valor": 58.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Breno Albuquerque",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:38:29",
+  "unidade": "DOM19911",
+  "valor": 181.0,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "henrique do",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:36:09",
+  "unidade": "DOM_19706",
+  "valor": 61.9,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Geraldo de",
+  "motivo": "660088:3289:10/2029",
+  "cartao": "406669\\*\\*\\*\\*\\*\\*3289"
+ },
+ {
+  "dt": "2026-07-28T20:35:22",
+  "unidade": "DOM_19798",
+  "valor": 97.8,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Isabelle luana",
+  "motivo": "443722:0556:06/2029",
+  "cartao": "412793\\*\\*\\*\\*\\*\\*7947"
+ },
+ {
+  "dt": "2026-07-28T20:31:23",
+  "unidade": "DOM_19706",
+  "valor": 97.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Ana Luiza",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:26:56",
+  "unidade": "DOM19911",
+  "valor": 181.0,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "henrique do",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:26:16",
+  "unidade": "DOM19911",
+  "valor": 181.0,
+  "status": "RECUSADO",
+  "metodo": "mc_applepay",
+  "cliente": "henrique do",
+  "motivo": "Not enough balance",
+  "cartao": "549289\\*\\*\\*\\*\\*\\*2131"
+ },
+ {
+  "dt": "2026-07-28T20:25:40",
+  "unidade": "DOM19911",
+  "valor": 94.95,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Jose Macena",
+  "motivo": "GU1GES:4667:02/2032",
+  "cartao": "483150\\*\\*\\*\\*\\*\\*4667"
+ },
+ {
+  "dt": "2026-07-28T20:20:54",
+  "unidade": "DOM19940",
+  "valor": 104.4,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Daniel Wong",
+  "motivo": "082558:2266:06/2029",
+  "cartao": "530034\\*\\*\\*\\*\\*\\*2266"
+ },
+ {
+  "dt": "2026-07-28T20:20:06",
+  "unidade": "DOM_19798",
+  "valor": 77.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Guilherme De",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:20:01",
+  "unidade": "DOM_19633",
+  "valor": 105.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "LÚVIA GABRIELA",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:14:08",
+  "unidade": "DOM_19633",
+  "valor": 69.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Gustavo henrique",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:09:36",
+  "unidade": "DOM_19706",
+  "valor": 105.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Telmir barros",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T20:05:38",
+  "unidade": "DOM_19706",
+  "valor": 88.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Diego Viol",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:59:05",
+  "unidade": "DOM_19706",
+  "valor": 269.8,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Raul Anderson",
+  "motivo": "IBVCCS:3944:10/2031",
+  "cartao": "459315\\*\\*\\*\\*\\*\\*1054"
+ },
+ {
+  "dt": "2026-07-28T19:58:49",
+  "unidade": "DOM19940",
+  "valor": 87.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Ping Wu",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:57:59",
+  "unidade": "DOM_19706",
+  "valor": 97.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Nina Rosas",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:57:22",
+  "unidade": "DOM19940",
+  "valor": 92.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "N/A",
+  "motivo": "PENDING",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:48:56",
+  "unidade": "DOM_19633",
+  "valor": 91.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Christopheer Pessoa",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:46:24",
+  "unidade": "DOM_19706",
+  "valor": 51.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Gabriel Cavalcanti",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:45:13",
+  "unidade": "DOM_19706",
+  "valor": 97.5,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Roberto de",
+  "motivo": "CNFYL6:3676:12/2028",
+  "cartao": "512215\\*\\*\\*\\*\\*\\*5048"
+ },
+ {
+  "dt": "2026-07-28T19:31:20",
+  "unidade": "DOM_19706",
+  "valor": 97.5,
+  "status": "RECUSADO",
+  "metodo": "visa",
+  "cliente": "Hermano Cavalcanti",
+  "motivo": "FRAUD",
+  "cartao": "498408\\*\\*\\*\\*\\*\\*3167"
+ },
+ {
+  "dt": "2026-07-28T19:29:06",
+  "unidade": "DOM19940",
+  "valor": 63.74,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Marcos Aurelio",
+  "motivo": "888771:4416:08/2029",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*5520"
+ },
+ {
+  "dt": "2026-07-28T19:27:43",
+  "unidade": "DOM_19633",
+  "valor": 115.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Savio Macedo",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:25:23",
+  "unidade": "DOM_19706",
+  "valor": 122.4,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Alan Diogo",
+  "motivo": "647239:8255:08/2029",
+  "cartao": "534696\\*\\*\\*\\*\\*\\*3558"
+ },
+ {
+  "dt": "2026-07-28T19:21:41",
+  "unidade": "DOM_19633",
+  "valor": 87.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Allen Nepomuceno",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:21:28",
+  "unidade": "DOM_19798",
+  "valor": 73.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Diego Chaves",
+  "motivo": "212359:8586:05/2029",
+  "cartao": "522840\\*\\*\\*\\*\\*\\*4092"
+ },
+ {
+  "dt": "2026-07-28T19:09:42",
+  "unidade": "DOM_19798",
+  "valor": 98.5,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Maria Clara",
+  "motivo": "774765:5145:09/2033",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*5145"
+ },
+ {
+  "dt": "2026-07-28T19:05:51",
+  "unidade": "DOM19911",
+  "valor": 77.0,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Jose Lindenberg",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:03:45",
+  "unidade": "DOM19940",
+  "valor": 169.6,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "David Junior",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T19:02:10",
+  "unidade": "DOM_19706",
+  "valor": 115.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Daniel Pereira",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:59:28",
+  "unidade": "DOM_19798",
+  "valor": 124.9,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Maria Clara",
+  "motivo": "Refused",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*5145"
+ },
+ {
+  "dt": "2026-07-28T18:53:30",
+  "unidade": "DOM_19706",
+  "valor": 105.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Matheus Vieira",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:51:38",
+  "unidade": "DOM_19706",
+  "valor": 95.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "AndrÉa Vasquez",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:49:05",
+  "unidade": "DOM_19633",
+  "valor": 41.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Pablo Anizio",
+  "motivo": "790406:0195:08/2029",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*1385"
+ },
+ {
+  "dt": "2026-07-28T18:43:49",
+  "unidade": "DOM_19706",
+  "valor": 110.7,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Tiberio Adonys",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:43:35",
+  "unidade": "DOM_19706",
+  "valor": 92.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Jhonny cleysson",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:30:41",
+  "unidade": "DOM_19706",
+  "valor": 87.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "AndrÉa Vasquez",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:27:37",
+  "unidade": "DOM_19633",
+  "valor": 185.0,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Rennan Sabino",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:22:04",
+  "unidade": "DOM19940",
+  "valor": 117.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Renato Monte",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:13:11",
+  "unidade": "DOM_19706",
+  "valor": 79.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Brunna Hipólito",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T18:10:52",
+  "unidade": "DOM19940",
+  "valor": 95.5,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "Leonardo Brandao",
+  "motivo": "148662:0000:10/2028",
+  "cartao": "651653\\*\\*\\*\\*\\*\\*0000"
+ },
+ {
+  "dt": "2026-07-28T17:56:46",
+  "unidade": "DOM_19633",
+  "valor": 221.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Kauany Maciel",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T17:38:19",
+  "unidade": "DOM_19798",
+  "valor": 116.9,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Paula Melo",
+  "motivo": "381260:5627:12/2032",
+  "cartao": "441120\\*\\*\\*\\*\\*\\*5009"
+ },
+ {
+  "dt": "2026-07-28T17:27:43",
+  "unidade": "DOM_19706",
+  "valor": 110.7,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "ALEXANDRE NUNES",
+  "motivo": "673882:8346:12/2027",
+  "cartao": "410425\\*\\*\\*\\*\\*\\*4919"
+ },
+ {
+  "dt": "2026-07-28T17:27:36",
+  "unidade": "DOM_19706",
+  "valor": 84.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Fernanda Teixeira",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T17:26:36",
+  "unidade": "DOM_19633",
+  "valor": 107.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Wagner Neri",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T16:57:08",
+  "unidade": "DOM19911",
+  "valor": 58.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "N/A",
+  "motivo": "PENDING",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T16:55:29",
+  "unidade": "DOM19940",
+  "valor": 10.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Jacqueline nascimento",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T15:50:34",
+  "unidade": "DOM19940",
+  "valor": 0.0,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Jacqueline nascimento",
+  "motivo": "905_1 Could not find an acquirer account for the provided txvariant (pix), currency (BRL), and action (AUTHORISE_ZERO).",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T15:29:05",
+  "unidade": "DOM_19798",
+  "valor": 59.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Maria Tamirys",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-28T12:50:29",
+  "unidade": "DOM19940",
+  "valor": 44.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Jamilly Romao",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T22:48:45",
+  "unidade": "DOM19940",
+  "valor": 36.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Matheus Aguiar",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T22:48:26",
+  "unidade": "DOM_19706",
+  "valor": 48.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "DANIEL DE",
+  "motivo": "882975:5892:06/2029",
+  "cartao": "534696\\*\\*\\*\\*\\*\\*2030"
+ },
+ {
+  "dt": "2026-07-27T22:40:31",
+  "unidade": "DOM_19798",
+  "valor": 44.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Leticia Franca",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T22:38:50",
+  "unidade": "DOM_19706",
+  "valor": 68.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Georgia Melo",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T22:37:46",
+  "unidade": "DOM19911",
+  "valor": 38.9,
+  "status": "APROVADO",
+  "metodo": "elo",
+  "cliente": "Daianderson da",
+  "motivo": "673965:1386:09/2029",
+  "cartao": "651660\\*\\*\\*\\*\\*\\*1386"
+ },
+ {
+  "dt": "2026-07-27T22:29:13",
+  "unidade": "DOM19911",
+  "valor": 48.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Piera Monzon",
+  "motivo": "T98514:3087:08/2029",
+  "cartao": "555507\\*\\*\\*\\*\\*\\*6155"
+ },
+ {
+  "dt": "2026-07-27T22:25:19",
+  "unidade": "DOM_19798",
+  "valor": 44.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Leticia zystchy",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T22:06:08",
+  "unidade": "DOM_19798",
+  "valor": 44.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Leticia zystchy",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T22:04:45",
+  "unidade": "DOM19911",
+  "valor": 68.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "arthur costa",
+  "motivo": "582663:1730:12/2033",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*1730"
+ },
+ {
+  "dt": "2026-07-27T21:58:45",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Aline Vasconcelos",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T21:40:27",
+  "unidade": "DOM_19798",
+  "valor": 39.3,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "N/A",
+  "motivo": "PENDING",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T21:32:37",
+  "unidade": "DOM_19633",
+  "valor": 78.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Marcelly Nascimento",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T21:23:42",
+  "unidade": "DOM_19798",
+  "valor": 151.3,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Miracy Maria",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T21:23:31",
+  "unidade": "DOM_19798",
+  "valor": 118.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Klênia Maria",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T21:22:18",
+  "unidade": "DOM_19633",
+  "valor": 79.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Mateus De",
+  "motivo": "512054:5665:08/2029",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*4167"
+ },
+ {
+  "dt": "2026-07-27T21:17:07",
+  "unidade": "DOM_19706",
+  "valor": 79.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Ana Beatriz",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:51:03",
+  "unidade": "DOM_19706",
+  "valor": 102.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Sandra Alves",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:49:10",
+  "unidade": "DOM_19798",
+  "valor": 73.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Letícia Ferreira",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:49:01",
+  "unidade": "DOM19911",
+  "valor": 106.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Agnes Barros",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:46:00",
+  "unidade": "DOM19911",
+  "valor": 83.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Eder Santana",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:41:58",
+  "unidade": "DOM19911",
+  "valor": 73.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Eder Santana",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:32:25",
+  "unidade": "DOM_19706",
+  "valor": 51.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Iris Almeida",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:22:50",
+  "unidade": "DOM19911",
+  "valor": 366.3,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Vinícius de",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:21:15",
+  "unidade": "DOM19911",
+  "valor": 254.5,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Vinícius de",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:18:41",
+  "unidade": "DOM19940",
+  "valor": 102.25,
+  "status": "CHARGEBACK",
+  "metodo": "mc",
+  "cliente": "N/A",
+  "motivo": "No Cardholder Authorisation",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:09:56",
+  "unidade": "DOM19911",
+  "valor": 254.5,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Vinícius de",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:05:57",
+  "unidade": "DOM_19798",
+  "valor": 59.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "TAINAR CAVALCANTI",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T20:04:16",
+  "unidade": "DOM19940",
+  "valor": 77.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Ramon de",
+  "motivo": "134995:4245:07/2029",
+  "cartao": "555508\\*\\*\\*\\*\\*\\*5437"
+ },
+ {
+  "dt": "2026-07-27T20:02:43",
+  "unidade": "DOM19911",
+  "valor": 24.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Leticia nogueira",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T19:59:36",
+  "unidade": "DOM19911",
+  "valor": 254.5,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Vinícius de",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T19:58:05",
+  "unidade": "DOM19911",
+  "valor": 24.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Leticia Nogueira",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T19:50:13",
+  "unidade": "DOM19940",
+  "valor": 69.8,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Hayanne kerolayne",
+  "motivo": "FRAUD",
+  "cartao": "555508\\*\\*\\*\\*\\*\\*5437"
+ },
+ {
+  "dt": "2026-07-27T19:46:46",
+  "unidade": "DOM_19706",
+  "valor": 21.54,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Carlos Diniz",
+  "motivo": "664077:0036:09/2029",
+  "cartao": "406669\\*\\*\\*\\*\\*\\*0036"
+ },
+ {
+  "dt": "2026-07-27T19:46:00",
+  "unidade": "DOM_19706",
+  "valor": 99.4,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Raul Campos",
+  "motivo": "107789:5564:08/2029",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*4682"
+ },
+ {
+  "dt": "2026-07-27T19:45:20",
+  "unidade": "DOM19911",
+  "valor": 249.7,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Vinícius De",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T19:41:39",
+  "unidade": "DOM_19633",
+  "valor": 61.9,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Rafael Willian",
+  "motivo": "9AYETZ:2287:07/2031",
+  "cartao": "422007\\*\\*\\*\\*\\*\\*2287"
+ },
+ {
+  "dt": "2026-07-27T19:32:01",
+  "unidade": "DOM19940",
+  "valor": 69.8,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Hayanne kerolayne",
+  "motivo": "FRAUD",
+  "cartao": "555508\\*\\*\\*\\*\\*\\*5437"
+ },
+ {
+  "dt": "2026-07-27T19:20:04",
+  "unidade": "DOM_19798",
+  "valor": 202.7,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Fernanda De",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T19:15:10",
+  "unidade": "DOM_19706",
+  "valor": 64.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Paulino José",
+  "motivo": "183176:9342:11/2028",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*9342"
+ },
+ {
+  "dt": "2026-07-27T19:08:28",
+  "unidade": "DOM19940",
+  "valor": 100.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Marcelle Cunha",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T18:53:08",
+  "unidade": "DOM_19798",
+  "valor": 152.7,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Alexandre Rodrigues",
+  "motivo": "T30457:1250:07/2029",
+  "cartao": "230650\\*\\*\\*\\*\\*\\*1519"
+ },
+ {
+  "dt": "2026-07-27T18:52:16",
+  "unidade": "DOM_19633",
+  "valor": 69.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Ítalo Pereira",
+  "motivo": "423811:8063:08/2029",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*4495"
+ },
+ {
+  "dt": "2026-07-27T18:45:31",
+  "unidade": "DOM19911",
+  "valor": 16.9,
+  "status": "ESTORNADO",
+  "metodo": "pix",
+  "cliente": "N/A",
+  "motivo": "N/A",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T18:42:28",
+  "unidade": "DOM_19633",
+  "valor": 117.6,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Jardani Dias",
+  "motivo": "075080:5336:10/2033",
+  "cartao": "523431\\*\\*\\*\\*\\*\\*5336"
+ },
+ {
+  "dt": "2026-07-27T18:41:26",
+  "unidade": "DOM_19798",
+  "valor": 89.8,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Fernando Lima",
+  "motivo": "346725:3014:06/2029",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*4449"
+ },
+ {
+  "dt": "2026-07-27T18:40:14",
+  "unidade": "DOM_19706",
+  "valor": 61.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Jaderson Gomes",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T18:32:30",
+  "unidade": "DOM_19706",
+  "valor": 69.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Joalison Henrique",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T18:13:27",
+  "unidade": "DOM_19706",
+  "valor": 131.35,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "ROBSON PATRICIO",
+  "motivo": "831236:4827:10/2029",
+  "cartao": "498408\\*\\*\\*\\*\\*\\*0893"
+ },
+ {
+  "dt": "2026-07-27T17:57:27",
+  "unidade": "DOM_19798",
+  "valor": 77.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "João Vinicius",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:51:17",
+  "unidade": "DOM_19633",
+  "valor": 76.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Ana Caroline",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:43:53",
+  "unidade": "DOM19911",
+  "valor": 76.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "ADRIANA DA",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:43:06",
+  "unidade": "DOM19940",
+  "valor": 77.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Lindemberg pereira",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:28:00",
+  "unidade": "DOM_19706",
+  "valor": 98.7,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Kaua Soares",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:24:23",
+  "unidade": "DOM_19706",
+  "valor": 109.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Kelvin Soares",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:19:30",
+  "unidade": "DOM_19706",
+  "valor": 193.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Kelvin Soares",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T17:00:24",
+  "unidade": "DOM_19706",
+  "valor": 224.4,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Kelvin Soares",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T16:23:16",
+  "unidade": "DOM_19633",
+  "valor": 173.85,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Dudu Villar",
+  "motivo": "289118:4220:04/2030",
+  "cartao": "516292\\*\\*\\*\\*\\*\\*4220"
+ },
+ {
+  "dt": "2026-07-27T16:13:51",
+  "unidade": "DOM19911",
+  "valor": 48.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Iasmin costa",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T15:44:59",
+  "unidade": "DOM_19798",
+  "valor": 53.85,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "eric ferraz",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T15:41:07",
+  "unidade": "DOM19940",
+  "valor": 167.6,
+  "status": "NOTIFICATION_OF_CHARGEBACK",
+  "metodo": "visa",
+  "cliente": "N/A",
+  "motivo": "Other Fraud-Card Absent Environment",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T15:15:40",
+  "unidade": "DOM_19633",
+  "valor": 449.0,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Tamirys Clemente",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T14:13:19",
+  "unidade": "DOM19911",
+  "valor": 58.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Pedro Henrique",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T13:48:43",
+  "unidade": "DOM19911",
+  "valor": 43.9,
+  "status": "RECUSADO",
+  "metodo": "pix",
+  "cliente": "Piera Monzon",
+  "motivo": "Acquirer Error",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-27T11:48:46",
+  "unidade": "DOM_19633",
+  "valor": 638.6,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Tamirys Clemente",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T22:52:40",
+  "unidade": "DOM19940",
+  "valor": 66.5,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Mateus Lima",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T22:18:41",
+  "unidade": "DOM_19633",
+  "valor": 69.8,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Leonardo Alves",
+  "motivo": "183775:8766:11/2028",
+  "cartao": "425850\\*\\*\\*\\*\\*\\*8766"
+ },
+ {
+  "dt": "2026-07-26T22:16:23",
+  "unidade": "DOM_19633",
+  "valor": 61.9,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Angelica Paixao",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T21:57:40",
+  "unidade": "DOM_19798",
+  "valor": 116.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Pedro Viana",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T21:35:06",
+  "unidade": "DOM_19633",
+  "valor": 89.8,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Gustavo Vitor",
+  "motivo": "Refused",
+  "cartao": "550209\\*\\*\\*\\*\\*\\*5204"
+ },
+ {
+  "dt": "2026-07-26T21:33:50",
+  "unidade": "DOM_19706",
+  "valor": 54.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Arthur lima",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T21:33:17",
+  "unidade": "DOM_19798",
+  "valor": 77.8,
+  "status": "APROVADO",
+  "metodo": "visa",
+  "cliente": "Lorena maria",
+  "motivo": "631372:6338:06/2034",
+  "cartao": "464127\\*\\*\\*\\*\\*\\*6338"
+ },
+ {
+  "dt": "2026-07-26T21:22:58",
+  "unidade": "DOM_19706",
+  "valor": 64.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Amanda Batista",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T21:22:00",
+  "unidade": "DOM_19798",
+  "valor": 59.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Marcos Mendes",
+  "motivo": "490480:9495:06/2029",
+  "cartao": "520048\\*\\*\\*\\*\\*\\*4622"
+ },
+ {
+  "dt": "2026-07-26T21:21:50",
+  "unidade": "DOM_19706",
+  "valor": 134.9,
+  "status": "APROVADO",
+  "metodo": "mc",
+  "cliente": "Graziela Brandão",
+  "motivo": "EKC5OT:6997:05/2034",
+  "cartao": "514945\\*\\*\\*\\*\\*\\*6997"
+ },
+ {
+  "dt": "2026-07-26T21:18:25",
+  "unidade": "DOM_19706",
+  "valor": 64.8,
+  "status": "APROVADO",
+  "metodo": "pix",
+  "cliente": "Amanda Batista",
+  "motivo": "APPROVED",
+  "cartao": "N/A"
+ },
+ {
+  "dt": "2026-07-26T21:10:40",
+  "unidade": "DOM_19706",
+  "valor": 134.9,
+  "status": "RECUSADO",
+  "metodo": "mc",
+  "cliente": "Graziela Brandão",
+  "motivo": "Refused",
+  "cartao": "514945\\*\\*\\*\\*\\*\\*6997"
+ }
+]

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Monitor Adyen · ao vivo</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px;}
+  .pulse{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);}
+  .pulse.off{background:var(--bad-dim);color:var(--bad);border-color:#4a2323;}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 rgba(61,220,151,.6);animation:p 2s infinite;}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(61,220,151,.5);}70%{box-shadow:0 0 0 6px rgba(61,220,151,0);}100%{box-shadow:0 0 0 0 rgba(61,220,151,0);}}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);}
+  .kpi .val{font-family:var(--mono);font-size:26px;font-weight:600;margin-top:6px;}
+  .kpi .val.ok{color:var(--ok);} .kpi .val.bad{color:var(--bad);} .kpi .val.warn{color:var(--warn);}
+  .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .panel h2 .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
+  .alerts{max-height:520px;overflow-y:auto;}
+  .alert{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;}
+  .alert:last-child{border-bottom:none;}
+  .alert .sev{width:8px;height:8px;border-radius:2px;margin-top:5px;flex:none;}
+  .sev.high{background:var(--bad);} .sev.med{background:var(--warn);}
+  .alert .t1{font-size:13px;font-weight:600;} .alert .t2{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.04em;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);}
+  tbody td{padding:8px 10px;border-bottom:1px solid #1a1f26;white-space:nowrap;}
+  tbody tr:hover{background:var(--panel2);cursor:pointer;}
+  .tablewrap{max-height:520px;overflow:auto;}
+  .badge{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;display:inline-block;}
+  .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
+  .badge.RECUSADO{background:var(--bad-dim);color:var(--bad);}
+  .badge.CHARGEBACK,.badge.NOTIFICATION_OF_CHARGEBACK{background:var(--bad-dim);color:var(--bad);}
+  .badge.ESTORNADO,.badge.FALHA_ESTORNO,.badge.ESTORNO_AGENDADO{background:var(--warn-dim);color:var(--warn);}
+  .badge.DISPUTE_DEFENSE_PERIOD_ENDED{background:#1e2733;color:var(--accent);}
+  .btn-notif{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .btn-notif.on{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
+  .flag{font-family:var(--mono);font-size:10px;color:var(--bad);border:1px solid #4a2323;padding:1px 6px;border-radius:4px;margin-left:6px;}
+  .valor{font-family:var(--mono);}
+  .controls{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .controls select,.controls input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);}
+  .controls input{flex:1;min-width:120px;}
+  .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
+  /* modal de historico do cliente */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(420px,90vw);padding:20px;}
+  .modal h3{margin:0 0 12px;font-size:14px;}
+  .modal .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a1f26;font-size:13px;}
+  .modal .close{margin-top:14px;width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font-family:var(--sans);font-size:12.5px;}
+  .orders{max-height:340px;overflow-y:auto;}
+  .order-row{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px;}
+  .order-row:last-child{border-bottom:none;}
+  .order-row .top{display:flex;justify-content:space-between;align-items:center;font-size:13px;}
+  .order-row .id{font-family:var(--mono);color:var(--muted);font-size:11px;}
+  .timeline{display:flex;align-items:center;flex-wrap:wrap;gap:4px;font-family:var(--mono);font-size:10.5px;}
+  .timeline .arrow{color:var(--muted);}
+  .timeline .step{display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .timeline .step .ts{color:var(--muted);font-size:9.5px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+    <h1>Monitor de transações — ao vivo</h1>
+    <div class="sub">Alimentado direto pelos webhooks da Adyen</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()">🔔 Ativar notificações</button>
+    <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
+  </div>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Transações <span class="n" id="tx-count"></span></h2>
+    <div class="controls">
+      <select id="f-periodo">
+        <option value="1">Último dia</option>
+        <option value="7">Últimos 7 dias</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="90">Últimos 3 meses</option>
+      </select>
+      <select id="f-status"><option value="">Todos os status</option></select>
+      <select id="f-unidade"><option value="">Todas as unidades</option></select>
+      <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Hora/Data</th><th>Unidade</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Banco</th></tr></thead>
+        <tbody id="tx-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Alertas de falha / fraude <span class="n" id="alert-count"></span></h2>
+    <div class="alerts" id="alerts"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:16px;">
+  <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
+  <div class="orders" id="chargebacks"></div>
+</div>
+
+<div class="panel" style="margin-top:16px;">
+  <h2>Pedidos que mudaram de status <span class="n" id="orders-count"></span></h2>
+  <div class="orders" id="orders"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modal-title">Histórico do cliente</h3>
+    <div id="modal-body"></div>
+    <button class="close" onclick="document.getElementById('overlay').classList.remove('show')">Fechar</button>
+  </div>
+</div>
+
+<script>
+let DATA = [];
+
+function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
+function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+function clientKeyOf(t){ return t.shopperReference || `${t.cardHolder||'desconhecido'}::${t.last4||'----'}`; }
+
+let ORDERS_CHANGED = [];
+let CHARGEBACKS = [];
+
+async function loadAll(){
+  const [tx, ordersChanged, chargebacks] = await Promise.all([
+    fetch('/api/transactions').then(r=>r.json()),
+    fetch('/api/orders/changed').then(r=>r.json()),
+    fetch('/api/chargebacks').then(r=>r.json()),
+  ]);
+  DATA = tx;
+  ORDERS_CHANGED = ordersChanged;
+  CHARGEBACKS = chargebacks;
+  populateFilters();
+  render();
+  renderOrdersChanged();
+  renderChargebacks();
+}
+
+async function refreshChargebacks(){
+  CHARGEBACKS = await fetch('/api/chargebacks').then(r=>r.json());
+  renderChargebacks();
+}
+
+function renderChargebacks(){
+  document.getElementById('chargebacks-count').textContent = CHARGEBACKS.length;
+  document.getElementById('chargebacks').innerHTML = CHARGEBACKS.length ? CHARGEBACKS.map(o=>`
+    <div class="order-row">
+      <div class="top">
+        <span>${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
+        <span class="valor">${fmtMoney(o.valor)}</span>
+      </div>
+      <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+      <div class="timeline">
+        ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
+      </div>
+    </div>
+  `).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
+}
+
+// filtra pelo periodo selecionado (padrao: ultimo dia)
+function periodFiltered(){
+  const days = Number(document.getElementById('f-periodo').value) || 1;
+  const cutoff = Date.now() - days*24*60*60*1000;
+  return DATA.filter(d => d.dataHora && new Date(d.dataHora).getTime() >= cutoff);
+}
+
+function computeSummary(rows){
+  const aprovadas = rows.filter(t=>t.status==='APROVADO');
+  const recusadas = rows.filter(t=>t.status==='RECUSADO');
+  return {
+    total: rows.length,
+    aprovadas: aprovadas.length,
+    recusadas: recusadas.length,
+    volumeAprovado: +aprovadas.reduce((s,t)=>s+t.valor,0).toFixed(2),
+    chargebacks: rows.filter(t=>(t.status||'').includes('CHARGEBACK')).length,
+    fraudeSuspeita: rows.filter(t=>t.fraudeSuspeita).length,
+  };
+}
+
+async function refreshOrdersChanged(){
+  ORDERS_CHANGED = await fetch('/api/orders/changed').then(r=>r.json());
+  renderOrdersChanged();
+}
+
+function renderOrdersChanged(){
+  document.getElementById('orders-count').textContent = ORDERS_CHANGED.length;
+  document.getElementById('orders').innerHTML = ORDERS_CHANGED.length ? ORDERS_CHANGED.map(o=>`
+    <div class="order-row">
+      <div class="top">
+        <span>${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
+        <span class="valor">${fmtMoney(o.valor)}</span>
+      </div>
+      <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+      <div class="timeline">
+        ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
+      </div>
+    </div>
+  `).join('') : '<div class="empty">Nenhum pedido mudou de status ainda.</div>';
+}
+
+function renderKpis(s){
+  const taxa = s.total? (s.aprovadas/s.total*100):0;
+  const kpis = [
+    {lbl:'Transações', val:s.total, cls:''},
+    {lbl:'Taxa de aprovação', val:taxa.toFixed(1)+'%', cls: taxa>85?'ok':(taxa>70?'warn':'bad')},
+    {lbl:'Volume aprovado', val:fmtMoney(s.volumeAprovado), cls:'ok'},
+    {lbl:'Recusadas', val:s.recusadas, cls: s.recusadas>0?'warn':''},
+    {lbl:'Chargebacks', val:s.chargebacks, cls: s.chargebacks>0?'bad':''},
+    {lbl:'Fraude suspeita', val:s.fraudeSuspeita, cls: s.fraudeSuspeita>0?'bad':''},
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`).join('');
+}
+
+function renderAlerts(rows){
+  const alerts = [];
+  const recusadas = rows.filter(d=>d.status==='RECUSADO');
+  const byClient = {};
+  recusadas.forEach(d=>{ const k=clientKeyOf(d); (byClient[k] ||= []).push(d); });
+  Object.entries(byClient).forEach(([k,list])=>{
+    if(list.length>=2) alerts.push({sev:'high', t1:`Tentativas repetidas recusadas — ${list[0].cardHolder||k}`, t2:`${list.length} recusas · ${list[0].motivo||'sem motivo'} · ${list[0].unidade}`, dt:list[0].dataHora});
+  });
+  rows.filter(d=>d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Chargeback — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora}));
+  rows.filter(d=>d.fraudeSuspeita).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora}));
+  rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora}));
+  alerts.sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
+  document.getElementById('alert-count').textContent = alerts.length;
+  document.getElementById('alerts').innerHTML = alerts.length ? alerts.map(a=>`
+    <div class="alert"><div class="sev ${a.sev}"></div><div class="body"><div class="t1">${a.t1}</div><div class="t2">${a.t2} · ${fmtDT(a.dt)}</div></div></div>
+  `).join('') : '<div class="empty">Nenhum alerta no momento.</div>';
+}
+
+function populateFilters(){
+  const statusSel = document.getElementById('f-status');
+  const unidadeSel = document.getElementById('f-unidade');
+  const curS = statusSel.value, curU = unidadeSel.value;
+  const statuses = [...new Set(DATA.map(d=>d.status))].sort();
+  const unidades = [...new Set(DATA.map(d=>d.unidade))].sort();
+  statusSel.innerHTML = '<option value="">Todos os status</option>' + statuses.map(s=>`<option value="${s}">${s}</option>`).join('');
+  unidadeSel.innerHTML = '<option value="">Todas as unidades</option>' + unidades.map(u=>`<option value="${u}">${u}</option>`).join('');
+  statusSel.value = curS; unidadeSel.value = curU;
+}
+
+async function showClient(key){
+  const stats = await fetch('/api/clients/'+encodeURIComponent(key)).then(r=>r.json());
+  document.getElementById('modal-title').textContent = 'Histórico — ' + key;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="row"><span>Total de transações</span><b>${stats.total}</b></div>
+    <div class="row"><span>Aprovadas</span><b style="color:var(--ok)">${stats.aprovadas}</b></div>
+    <div class="row"><span>Recusadas</span><b style="color:var(--bad)">${stats.recusadas}</b></div>
+    <div class="row"><span>Fraude suspeita</span><b style="color:var(--bad)">${stats.fraude}</b></div>
+    <div class="row"><span>Taxa de aprovação</span><b>${stats.taxaAprovacao}%</b></div>
+  `;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function render(){
+  const period = periodFiltered();
+  renderKpis(computeSummary(period));
+  renderAlerts(period);
+
+  const fs = document.getElementById('f-status').value;
+  const fu = document.getElementById('f-unidade').value;
+  const q = document.getElementById('f-search').value.toLowerCase();
+  const rows = period.filter(d=>
+    (!fs || d.status===fs) && (!fu || d.unidade===fu) &&
+    (!q || (d.nomeCliente||'').toLowerCase().includes(q) || (d.cardHolder||'').toLowerCase().includes(q) || (d.merchantReference||'').toLowerCase().includes(q) || (d.last4||'').includes(q))
+  ).sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+
+  document.getElementById('tx-count').textContent = rows.length+' / '+period.length;
+  document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>`
+    <tr onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
+      <td>${fmtDT(d.dataHora)}</td>
+      <td>${d.unidade||'—'}</td>
+      <td>${d.nomeCliente||'—'}</td>
+      <td>${d.cardHolder||'—'}</td>
+      <td>${d.metodo||'—'}</td>
+      <td class="valor">${fmtMoney(d.valor)}</td>
+      <td>${d.last4?('•• '+d.last4):'—'}</td>
+      <td><span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}</td>
+      <td>${d.bancoEmissor||'—'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="9" class="empty">Nenhuma transação encontrada.</td></tr>';
+}
+['f-periodo','f-status','f-unidade','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+
+// ---- SSE: atualizacoes ao vivo ----
+function connectStream(){
+  const es = new EventSource('/api/stream');
+  es.onopen = () => { document.getElementById('conn').classList.remove('off'); document.getElementById('conn-txt').textContent='ao vivo'; };
+  es.onerror = () => { document.getElementById('conn').classList.add('off'); document.getElementById('conn-txt').textContent='reconectando...'; };
+  es.addEventListener('transaction', (e)=>{
+    const tx = JSON.parse(e.data);
+    DATA.push(tx);
+    populateFilters(); render();
+  });
+  es.addEventListener('update', (e)=>{
+    const tx = JSON.parse(e.data);
+    const idx = DATA.findIndex(d=>d.pspReference===tx.pspReference && d.eventCode===tx.eventCode);
+    if(idx>=0) DATA[idx]=tx;
+    render();
+  });
+  es.addEventListener('order-changed', ()=>{ refreshOrdersChanged(); });
+  es.addEventListener('chargeback', ()=>{ refreshChargebacks(); });
+}
+
+loadAll().then(connectStream);
+
+// ---- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+function updateNotifBtn(on){
+  const btn = document.getElementById('btn-notif');
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? '🔔 Notificações ativadas' : '🔔 Ativar notificações';
+}
+
+async function toggleNotifications(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Seu navegador não suporta notificações push.');
+    return;
+  }
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  const existing = await reg.pushManager.getSubscription();
+
+  if (existing) {
+    await fetch('/api/push/unsubscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: existing.endpoint }) });
+    await existing.unsubscribe();
+    updateNotifBtn(false);
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') { alert('Permissão de notificação negada.'); return; }
+
+  const { publicKey } = await fetch('/api/push/vapid-public-key').then(r=>r.json());
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
+  await fetch('/api/push/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(sub) });
+  updateNotifBtn(true);
+}
+
+(async function initNotifBtn(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    const sub = reg && await reg.pushManager.getSubscription();
+    updateNotifBtn(!!sub);
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
