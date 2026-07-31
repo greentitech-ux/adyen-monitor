@@ -1,47 +1,44 @@
 // store.js
-// Armazenamento simples em arquivo JSON (sem dependencias nativas de banco).
-// Para volumes grandes (dezenas de milhares de transacoes/dia), trocar por
-// Postgres/SQLite depois é uma boa evolução - a interface (get/all/save) fica igual.
+// Armazenamento em Cloud Firestore: mantem um cache em memoria (para as
+// consultas sincronas que o resto do app espera) e persiste cada transacao
+// como um documento na colecao "transactions", em segundo plano.
 
-const fs = require('fs');
-const path = require('path');
+const db = require('./firestore');
+const COLLECTION = db.collection('transactions');
 
-const DATA_DIR = path.join(__dirname, 'data');
-const FILE = path.join(DATA_DIR, 'transactions.json');
+let cache = [];
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(FILE)) fs.writeFileSync(FILE, '[]');
-
-let cache = null;
-
-function load() {
-  if (cache) return cache;
-  try {
-    cache = JSON.parse(fs.readFileSync(FILE, 'utf-8'));
-  } catch (e) {
-    cache = [];
-  }
-  return cache;
+function docId(tx) {
+  return `${tx.pspReference}__${tx.eventCode}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
-function persist() {
-  fs.writeFileSync(FILE, JSON.stringify(cache, null, 1));
+async function init() {
+  const snap = await COLLECTION.get();
+  cache = snap.docs.map((d) => d.data());
+}
+
+function load() {
+  return cache;
 }
 
 // retencao: mantem sempre os ultimos 3 meses de historico, descarta o resto
 const RETENTION_DAYS = 90;
-function pruneOld() {
+async function pruneOld() {
   const all = load();
   const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  const kept = all.filter((t) => {
+  const kept = [];
+  const removed = [];
+  for (const t of all) {
     const ts = t.dataHora ? new Date(t.dataHora).getTime() : Date.now();
-    return ts >= cutoff;
-  });
-  if (kept.length !== all.length) {
-    cache = kept;
-    persist();
+    (ts >= cutoff ? kept : removed).push(t);
   }
-  return all.length - kept.length; // quantos foram removidos
+  if (removed.length) {
+    cache = kept;
+    const batch = db.batch();
+    for (const t of removed) batch.delete(COLLECTION.doc(docId(t)));
+    await batch.commit();
+  }
+  return removed.length;
 }
 
 // chave de identidade do cliente: usa shopperReference se existir,
@@ -56,13 +53,18 @@ function addOrUpdate(tx) {
   const existingIdx = all.findIndex(
     (t) => t.pspReference === tx.pspReference && t.eventCode === tx.eventCode
   );
+  let merged;
   if (existingIdx >= 0) {
-    all[existingIdx] = { ...all[existingIdx], ...tx };
+    merged = { ...all[existingIdx], ...tx };
+    cache[existingIdx] = merged;
   } else {
-    all.push(tx);
+    merged = tx;
+    cache.push(merged);
   }
-  persist();
-  return tx;
+  COLLECTION.doc(docId(merged))
+    .set(merged, { merge: true })
+    .catch((err) => console.error('Erro ao salvar transacao no Firestore:', err.message));
+  return merged;
 }
 
 function allTransactions() {
@@ -153,6 +155,7 @@ function clientStats(key) {
 }
 
 module.exports = {
+  init,
   addOrUpdate,
   allTransactions,
   clientStats,

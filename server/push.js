@@ -1,12 +1,14 @@
 // push.js
 // Notificacoes push (navegador/celular) para eventos criticos: estorno,
 // estorno agendado, chargeback e fraude suspeita.
-const fs = require('fs');
-const path = require('path');
 const webpush = require('web-push');
+const db = require('./firestore');
 
-const FILE = path.join(__dirname, 'data', 'subscriptions.json');
-if (!fs.existsSync(FILE)) fs.writeFileSync(FILE, '[]');
+const COLLECTION = db.collection('push_subscriptions');
+
+function subDocId(endpoint) {
+  return Buffer.from(endpoint).toString('base64').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 400);
+}
 
 const PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
@@ -16,29 +18,17 @@ if (PUBLIC_KEY && PRIVATE_KEY) {
   webpush.setVapidDetails(SUBJECT, PUBLIC_KEY, PRIVATE_KEY);
 }
 
-function loadSubs() {
-  try {
-    return JSON.parse(fs.readFileSync(FILE, 'utf-8'));
-  } catch (e) {
-    return [];
-  }
+async function loadSubs() {
+  const snap = await COLLECTION.get();
+  return snap.docs.map((d) => d.data());
 }
 
-function saveSubs(subs) {
-  fs.writeFileSync(FILE, JSON.stringify(subs, null, 1));
+async function addSubscription(sub) {
+  await COLLECTION.doc(subDocId(sub.endpoint)).set(sub, { merge: true });
 }
 
-function addSubscription(sub) {
-  const subs = loadSubs();
-  if (!subs.find((s) => s.endpoint === sub.endpoint)) {
-    subs.push(sub);
-    saveSubs(subs);
-  }
-}
-
-function removeSubscription(endpoint) {
-  const subs = loadSubs().filter((s) => s.endpoint !== endpoint);
-  saveSubs(subs);
+async function removeSubscription(endpoint) {
+  await COLLECTION.doc(subDocId(endpoint)).delete();
 }
 
 // eventos que merecem notificacao push (estorno, estorno agendado,
@@ -72,14 +62,14 @@ function titleFor(tx) {
 async function sendToAll(data) {
   if (!PUBLIC_KEY || !PRIVATE_KEY) return;
   const payload = JSON.stringify(data);
-  const subs = loadSubs();
+  const subs = await loadSubs();
   for (const sub of subs) {
     try {
       await webpush.sendNotification(sub, payload);
     } catch (err) {
       // inscricao expirada/invalida - remove
       if (err.statusCode === 404 || err.statusCode === 410) {
-        removeSubscription(sub.endpoint);
+        await removeSubscription(sub.endpoint);
       } else {
         console.error('Erro ao enviar push:', err.message);
       }

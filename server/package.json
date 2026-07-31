@@ -12,6 +12,7 @@
     "csv-parse": "^7.0.1",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
+    "firebase-admin": "^12.7.0",
     "web-push": "^3.6.7"
   }
 }

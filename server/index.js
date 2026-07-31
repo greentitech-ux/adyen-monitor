@@ -163,13 +163,13 @@ app.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: push.PUBLIC_KEY });
 });
 
-app.post('/api/push/subscribe', (req, res) => {
-  push.addSubscription(req.body);
+app.post('/api/push/subscribe', async (req, res) => {
+  await push.addSubscription(req.body);
   res.json({ ok: true });
 });
 
-app.post('/api/push/unsubscribe', (req, res) => {
-  push.removeSubscription(req.body.endpoint);
+app.post('/api/push/unsubscribe', async (req, res) => {
+  await push.removeSubscription(req.body.endpoint);
   res.json({ ok: true });
 });
 
@@ -189,15 +189,21 @@ app.get('/api/summary', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => {
-  console.log(`Monitor Adyen rodando em http://localhost:${PORT}`);
-  console.log(`Webhook: POST http://localhost:${PORT}/webhooks/adyen`);
-  const contas = Object.keys(HMAC_KEYS);
-  if (contas.length) console.log(`HMAC configurada para: ${contas.join(', ')}`);
-  else if (!LEGACY_HMAC_KEY) console.warn('AVISO: nenhuma ADYEN_HMAC_KEYS/ADYEN_HMAC_KEY configurada - assinatura nao esta sendo verificada.');
+(async () => {
+  await store.init(); // carrega o historico do Firestore antes de aceitar trafego
 
-  // mantem sempre os ultimos 3 meses de historico (roda no start e depois 1x/dia)
-  const removidos = store.pruneOld();
-  if (removidos) console.log(`Retencao: removidas ${removidos} transacoes com mais de 90 dias.`);
-  setInterval(() => store.pruneOld(), 24 * 60 * 60 * 1000);
-});
+  app.listen(PORT, async () => {
+    console.log(`Monitor Adyen rodando em http://localhost:${PORT}`);
+    console.log(`Webhook: POST http://localhost:${PORT}/webhooks/adyen`);
+    const contas = Object.keys(HMAC_KEYS);
+    if (contas.length) console.log(`HMAC configurada para: ${contas.join(', ')}`);
+    else if (!LEGACY_HMAC_KEY) console.warn('AVISO: nenhuma ADYEN_HMAC_KEYS/ADYEN_HMAC_KEY configurada - assinatura nao esta sendo verificada.');
+
+    // mantem sempre os ultimos 3 meses de historico (roda no start e depois 1x/dia)
+    const removidos = await store.pruneOld();
+    if (removidos) console.log(`Retencao: removidas ${removidos} transacoes com mais de 90 dias.`);
+    setInterval(() => {
+      store.pruneOld().catch((err) => console.error('Erro na limpeza de retencao:', err.message));
+    }, 24 * 60 * 60 * 1000);
+  });
+})();
