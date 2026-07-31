@@ -48,10 +48,9 @@
   .alert .sev{width:8px;height:8px;border-radius:2px;margin-top:5px;flex:none;}
   .sev.high{background:var(--bad);} .sev.med{background:var(--warn);}
   .alert .t1{font-size:13px;font-weight:600;} .alert .t2{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
-  table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;}
-  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.02em;padding:8px 6px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  tbody td{padding:6px;border-bottom:1px solid #1a1f26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  tbody td.truncate{max-width:0;}
+  table{border-collapse:collapse;font-size:11px;white-space:nowrap;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);white-space:nowrap;}
+  tbody td{padding:6px 10px;border-bottom:1px solid #1a1f26;white-space:nowrap;}
   tbody td.statuscell{white-space:normal;}
   tbody tr:hover{background:var(--panel2);cursor:pointer;}
   tbody tr.row-alerta{background:var(--warn-dim);}
@@ -59,6 +58,10 @@
   tbody tr{transition:background-color .8s ease;}
   tbody tr.row-novo{background:rgba(92,200,255,.22);}
   tbody tr.row-novo:hover{background:rgba(92,200,255,.3);}
+  tbody tr.row-recusado{background:rgba(255,92,92,.16);}
+  tbody tr.row-recusado:hover{background:rgba(255,92,92,.24);}
+  tbody tr.row-recusado-fraude{background:rgba(255,92,92,.34);}
+  tbody tr.row-recusado-fraude:hover{background:rgba(255,92,92,.42);}
   .alert,.order-row{transition:background-color .8s ease;}
   .alert.item-novo,.order-row.item-novo{background:rgba(92,200,255,.14);}
   .flag.novo{color:var(--accent);border-color:#1e4a63;background:rgba(92,200,255,.12);}
@@ -76,6 +79,17 @@
   .controls{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
   .controls select,.controls input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);}
   .controls input{flex:1;min-width:120px;}
+  .multiselect{position:relative;}
+  .multiselect-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;white-space:nowrap;}
+  .multiselect-btn:hover{border-color:var(--accent);}
+  .multiselect.open .multiselect-btn{border-color:var(--accent);}
+  .multiselect-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:var(--panel2);border:1px solid var(--line);border-radius:8px;min-width:200px;max-height:260px;overflow-y:auto;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .multiselect.open .multiselect-panel{display:block;}
+  .multiselect-panel label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;font-size:12px;border-radius:5px;cursor:pointer;white-space:nowrap;}
+  .multiselect-panel label:hover{background:var(--panel);}
+  .multiselect-panel label span{overflow:hidden;text-overflow:ellipsis;}
+  .multiselect-panel label.all-option{font-weight:600;border-bottom:1px solid var(--line);border-radius:0;margin-bottom:2px;padding-bottom:8px;}
+  .multiselect-panel input[type=checkbox]{accent-color:var(--accent);}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
   /* modal de historico do cliente */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;}
@@ -120,18 +134,18 @@
       <option value="30">Últimos 30 dias</option>
       <option value="90">Últimos 3 meses</option>
     </select>
-    <select id="f-status"><option value="">Todos os status</option></select>
-    <select id="f-unidade"><option value="">Todas as unidades</option></select>
+    <div class="multiselect" id="ms-status">
+      <button type="button" class="multiselect-btn" id="ms-status-btn">Todos os status</button>
+      <div class="multiselect-panel" id="ms-status-panel"></div>
+    </div>
+    <div class="multiselect" id="ms-unidade">
+      <button type="button" class="multiselect-btn" id="ms-unidade-btn">Todas as unidades</button>
+      <div class="multiselect-panel" id="ms-unidade-panel"></div>
+    </div>
     <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
   </div>
   <div class="tablewrap">
     <table>
-      <colgroup>
-        <col style="width:10%"><col style="width:6%"><col style="width:13%"><col style="width:13%">
-        <col style="width:5%"><col style="width:7%"><col style="width:6%"><col style="width:11%">
-        <col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:4%">
-        <col style="width:9%">
-      </colgroup>
       <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
       <tbody id="tx-body"></tbody>
     </table>
@@ -183,11 +197,15 @@ let REPEATED_PSPS = new Set();
 // destaque temporario pra quem acabou de chegar via webhook - fica marcado
 // por alguns minutos pra dar tempo de notar, depois some
 const NEW_HIGHLIGHT_MS = 4 * 60 * 1000; // 4 minutos
+// recusados ficam destacados por mais tempo (cor do status), pra dar tempo
+// de notar e agir - usa o mesmo timestamp de chegada, so que com janela maior
+const DECLINE_HIGHLIGHT_MS = 10 * 60 * 1000; // 10 minutos
 const NEW_ITEMS = new Map(); // chave (ex: "tx:pspRef") -> timestamp de chegada
 function marcarNovo(key){ if(key) NEW_ITEMS.set(key, Date.now()); }
-function ehNovo(key){ const t = NEW_ITEMS.get(key); return t!=null && (Date.now()-t) < NEW_HIGHLIGHT_MS; }
+function tempoDesdeChegada(key){ const t = NEW_ITEMS.get(key); return t==null ? Infinity : Date.now()-t; }
+function ehNovo(key){ return tempoDesdeChegada(key) < NEW_HIGHLIGHT_MS; }
 function limparNovosExpirados(){
-  const limite = NEW_HIGHLIGHT_MS * 3;
+  const limite = Math.max(NEW_HIGHLIGHT_MS, DECLINE_HIGHLIGHT_MS) + NEW_HIGHLIGHT_MS;
   for(const [k,t] of NEW_ITEMS) if(Date.now()-t > limite) NEW_ITEMS.delete(k);
 }
 
@@ -211,9 +229,18 @@ async function refreshChargebacks(){
   renderChargebacks();
 }
 
+// unidade(s) selecionada(s) no filtro de Transacoes vale pra tudo no
+// dashboard - KPIs, alertas, pedidos repetidos, pedidos que mudaram de
+// status e chargebacks sempre refletem a mesma selecao
+function filtraPorUnidade(lista){
+  if(SEL_UNIDADE.size===0) return lista;
+  return lista.filter(o=>SEL_UNIDADE.has(o.unidade));
+}
+
 function renderChargebacks(){
-  document.getElementById('chargebacks-count').textContent = CHARGEBACKS.length;
-  document.getElementById('chargebacks').innerHTML = CHARGEBACKS.length ? CHARGEBACKS.map(o=>{
+  const lista = filtraPorUnidade(CHARGEBACKS);
+  document.getElementById('chargebacks-count').textContent = lista.length;
+  document.getElementById('chargebacks').innerHTML = lista.length ? lista.map(o=>{
     const novo = ehNovo('chargeback:'+o.pedidoId);
     return `
     <div class="order-row ${novo?'item-novo':''}">
@@ -244,6 +271,7 @@ function computeSummary(rows){
     aprovadas: aprovadas.length,
     recusadas: recusadas.length,
     volumeAprovado: +aprovadas.reduce((s,t)=>s+t.valor,0).toFixed(2),
+    estornos: rows.filter(t=>t.status==='ESTORNADO').length,
     chargebacks: rows.filter(t=>(t.status||'').includes('CHARGEBACK')).length,
     fraudeSuspeita: rows.filter(t=>t.fraudeSuspeita).length,
   };
@@ -255,8 +283,9 @@ async function refreshOrdersChanged(){
 }
 
 function renderOrdersChanged(){
-  document.getElementById('orders-count').textContent = ORDERS_CHANGED.length;
-  document.getElementById('orders').innerHTML = ORDERS_CHANGED.length ? ORDERS_CHANGED.map(o=>{
+  const lista = filtraPorUnidade(ORDERS_CHANGED);
+  document.getElementById('orders-count').textContent = lista.length;
+  document.getElementById('orders').innerHTML = lista.length ? lista.map(o=>{
     const novo = ehNovo('order:'+o.pedidoId);
     return `
     <div class="order-row ${novo?'item-novo':''}">
@@ -279,8 +308,9 @@ function renderKpis(s){
     {lbl:'Taxa de aprovação', val:taxa.toFixed(1)+'%', cls: taxa>85?'ok':(taxa>70?'warn':'bad')},
     {lbl:'Volume aprovado', val:fmtMoney(s.volumeAprovado), cls:'ok'},
     {lbl:'Recusadas', val:s.recusadas, cls: s.recusadas>0?'warn':''},
-    {lbl:'Chargebacks', val:s.chargebacks, cls: s.chargebacks>0?'bad':''},
+    {lbl:'Estornos', val:s.estornos, cls: s.estornos>0?'warn':''},
     {lbl:'Fraude suspeita', val:s.fraudeSuspeita, cls: s.fraudeSuspeita>0?'bad':''},
+    {lbl:'Chargebacks', val:s.chargebacks, cls: s.chargebacks>0?'bad':''},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`).join('');
 }
@@ -333,6 +363,10 @@ function renderAlerts(rows){
   Object.entries(byClient).forEach(([k,list])=>{
     if(list.length>=2) alerts.push({sev:'high', t1:`Tentativas repetidas recusadas — ${list[0].cardHolder||k}`, t2:`${list.length} recusas · ${list[0].motivo||'sem motivo'} · ${list[0].unidade}`, dt:list[0].dataHora, psp:list[list.length-1].pspReference});
   });
+  // Amex pedido pra ser monitorado de perto: toda tentativa recusada gera
+  // alerta individual, mesmo sem repetir (diferente das outras bandeiras,
+  // que so alertam a partir de 2 recusas seguidas do mesmo cliente)
+  recusadas.filter(d=>d.metodo==='amex').forEach(d=>alerts.push({sev:'high', t1:`Tentativa de venda Amex recusada — ${d.cardHolder||d.nomeCliente||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.motivo||'sem motivo'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   rows.filter(d=>d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Chargeback — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   rows.filter(d=>d.fraudeSuspeita).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
@@ -359,15 +393,57 @@ function renderAlerts(rows){
   }).join('') : '<div class="empty">Nenhum pedido repetido no momento.</div>';
 }
 
+// filtros de status/unidade permitem escolher varias opcoes (nao so
+// "todas" ou uma unica) - guardamos os selecionados num Set; Set vazio = todas
+const SEL_STATUS = new Set();
+const SEL_UNIDADE = new Set();
+
+function setupMultiselect(key, allLabel, selectedSet){
+  const wrap = document.getElementById('ms-'+key);
+  const btn = document.getElementById('ms-'+key+'-btn');
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    document.querySelectorAll('.multiselect.open').forEach(el=>{ if(el!==wrap) el.classList.remove('open'); });
+    wrap.classList.toggle('open');
+  });
+  document.addEventListener('click', (e)=>{
+    if(!wrap.contains(e.target)) wrap.classList.remove('open');
+  });
+}
+setupMultiselect('status');
+setupMultiselect('unidade');
+
+function renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel){
+  const panel = document.getElementById('ms-'+key+'-panel');
+  const btn = document.getElementById('ms-'+key+'-btn');
+  // remove selecoes de opcoes que nao existem mais nos dados
+  for(const v of [...selectedSet]) if(!options.includes(v)) selectedSet.delete(v);
+  panel.innerHTML = `
+    <label class="all-option"><span>${allLabel}</span><input type="checkbox" data-all ${selectedSet.size===0?'checked':''}></label>
+    ${options.map(o=>`<label><span>${o}</span><input type="checkbox" value="${o}" ${selectedSet.has(o)?'checked':''}></label>`).join('')}
+  `;
+  panel.querySelector('[data-all]').addEventListener('change', ()=>{
+    selectedSet.clear();
+    renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel);
+    render();
+  });
+  panel.querySelectorAll('input[type=checkbox]:not([data-all])').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) selectedSet.add(cb.value); else selectedSet.delete(cb.value);
+      renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel);
+      render();
+    });
+  });
+  btn.textContent = selectedSet.size===0 ? allLabel
+    : selectedSet.size===1 ? [...selectedSet][0]
+    : `${selectedSet.size} ${singularLabel} selecionados`;
+}
+
 function populateFilters(){
-  const statusSel = document.getElementById('f-status');
-  const unidadeSel = document.getElementById('f-unidade');
-  const curS = statusSel.value, curU = unidadeSel.value;
   const statuses = [...new Set(DATA.map(d=>d.status))].sort();
   const unidades = [...new Set(DATA.map(d=>d.unidade))].sort();
-  statusSel.innerHTML = '<option value="">Todos os status</option>' + statuses.map(s=>`<option value="${s}">${s}</option>`).join('');
-  unidadeSel.innerHTML = '<option value="">Todas as unidades</option>' + unidades.map(u=>`<option value="${u}">${u}</option>`).join('');
-  statusSel.value = curS; unidadeSel.value = curU;
+  renderMultiselectOptions('status', statuses, SEL_STATUS, 'Todos os status', 'status');
+  renderMultiselectOptions('unidade', unidades, SEL_UNIDADE, 'Todas as unidades', 'unidades');
 }
 
 async function showClient(key){
@@ -385,14 +461,15 @@ async function showClient(key){
 
 function render(){
   const period = periodFiltered();
-  renderKpis(computeSummary(period));
-  renderAlerts(period);
+  const periodUnidade = filtraPorUnidade(period);
+  renderKpis(computeSummary(periodUnidade));
+  renderAlerts(periodUnidade);
+  renderOrdersChanged();
+  renderChargebacks();
 
-  const fs = document.getElementById('f-status').value;
-  const fu = document.getElementById('f-unidade').value;
   const q = document.getElementById('f-search').value.toLowerCase();
-  const rows = period.filter(d=>
-    (!fs || d.status===fs) && (!fu || d.unidade===fu) &&
+  const rows = periodUnidade.filter(d=>
+    (SEL_STATUS.size===0 || SEL_STATUS.has(d.status)) &&
     (!q || (d.nomeCliente||'').toLowerCase().includes(q) || (d.cardHolder||'').toLowerCase().includes(q) || (d.merchantReference||'').toLowerCase().includes(q) || (d.last4||'').includes(q))
   ).sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
 
@@ -412,9 +489,13 @@ function render(){
   document.getElementById('tx-count').textContent = rows.length+' / '+period.length;
   document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
     const c = contagemClientes[clientKeyOf(d)] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0};
-    const novo = ehNovo('tx:'+d.pspReference);
+    const chave = 'tx:'+d.pspReference;
+    const desde = tempoDesdeChegada(chave);
+    const novo = desde < NEW_HIGHLIGHT_MS;
+    const recusadoRecente = d.status==='RECUSADO' && desde < DECLINE_HIGHLIGHT_MS;
+    const recusadoCls = recusadoRecente ? (d.fraudeSuspeita ? 'row-recusado-fraude' : 'row-recusado') : '';
     return `
-    <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta':''}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
+    <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${recusadoCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
       <td>${fmtDT(d.dataHora)}</td>
       <td class="valor">${soNumero(d.unidade)}</td>
       <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
@@ -432,7 +513,7 @@ function render(){
     </tr>
   `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
 }
-['f-periodo','f-status','f-unidade','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+['f-periodo','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 
 // ---- SSE: atualizacoes ao vivo ----
 function connectStream(){
