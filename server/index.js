@@ -190,7 +190,12 @@ app.get('/api/summary', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 (async () => {
-  await store.init(); // carrega o historico do Firestore antes de aceitar trafego
+  try {
+    await store.init(); // carrega o historico do Firestore antes de aceitar trafego
+  } catch (err) {
+    console.error('Falha ao conectar no Firestore, encerrando:', err.message);
+    process.exit(1);
+  }
 
   app.listen(PORT, async () => {
     console.log(`Monitor Adyen rodando em http://localhost:${PORT}`);

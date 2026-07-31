@@ -129,7 +129,8 @@
   <h2>Transações <span class="n" id="tx-count"></span></h2>
   <div class="controls">
     <select id="f-periodo">
-      <option value="1">Último dia</option>
+      <option value="1">Hoje</option>
+      <option value="yesterday">Ontem</option>
       <option value="7">Últimos 7 dias</option>
       <option value="30">Últimos 30 dias</option>
       <option value="90">Últimos 3 meses</option>
@@ -209,19 +210,33 @@ function limparNovosExpirados(){
   for(const [k,t] of NEW_ITEMS) if(Date.now()-t > limite) NEW_ITEMS.delete(k);
 }
 
+async function fetchJson(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error(`${url} -> HTTP ${r.status}`);
+  return r.json();
+}
+
 async function loadAll(){
-  const [tx, ordersChanged, chargebacks] = await Promise.all([
-    fetch('/api/transactions').then(r=>r.json()),
-    fetch('/api/orders/changed').then(r=>r.json()),
-    fetch('/api/chargebacks').then(r=>r.json()),
-  ]);
-  DATA = tx;
-  ORDERS_CHANGED = ordersChanged;
-  CHARGEBACKS = chargebacks;
-  populateFilters();
-  render();
-  renderOrdersChanged();
-  renderChargebacks();
+  try{
+    const [tx, ordersChanged, chargebacks] = await Promise.all([
+      fetchJson('/api/transactions'),
+      fetchJson('/api/orders/changed'),
+      fetchJson('/api/chargebacks'),
+    ]);
+    DATA = tx;
+    ORDERS_CHANGED = ordersChanged;
+    CHARGEBACKS = chargebacks;
+    populateFilters();
+    render();
+    renderOrdersChanged();
+    renderChargebacks();
+  }catch(err){
+    console.error('Falha ao carregar dados do painel:', err);
+    const msg = `<div class="empty">Erro ao carregar dados: ${err.message}. <a href="#" onclick="location.reload();return false;">Tentar novamente</a></div>`;
+    document.getElementById('orders').innerHTML = msg;
+    document.getElementById('chargebacks').innerHTML = msg;
+    document.getElementById('alerts').innerHTML = msg;
+  }
 }
 
 async function refreshChargebacks(){
@@ -256,10 +271,21 @@ function renderChargebacks(){
   `;}).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
 }
 
-// filtra pelo periodo selecionado (padrao: ultimo dia)
+// filtra pelo periodo selecionado (padrao: ultimo dia) - usa limite de
+// dia de calendario (meia-noite local), nao janela rolante de 24h, senao
+// pedidos de "ontem" somem do filtro assim que passa o horario atual de hoje
 function periodFiltered(){
-  const days = Number(document.getElementById('f-periodo').value) || 1;
-  const cutoff = Date.now() - days*24*60*60*1000;
+  const val = document.getElementById('f-periodo').value;
+  if(val === 'yesterday'){
+    const inicio = new Date(); inicio.setHours(0,0,0,0); inicio.setDate(inicio.getDate()-1);
+    const fim = new Date(inicio); fim.setDate(fim.getDate()+1);
+    return DATA.filter(d => d.dataHora && new Date(d.dataHora).getTime() >= inicio.getTime() && new Date(d.dataHora).getTime() < fim.getTime());
+  }
+  const days = Number(val) || 1;
+  const inicio = new Date();
+  inicio.setHours(0,0,0,0);
+  inicio.setDate(inicio.getDate() - (days - 1));
+  const cutoff = inicio.getTime();
   return DATA.filter(d => d.dataHora && new Date(d.dataHora).getTime() >= cutoff);
 }
 
