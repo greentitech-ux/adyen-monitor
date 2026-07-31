@@ -103,8 +103,7 @@ function normalize(item) {
     dataHora: new Date().toISOString(), // Adyen nao manda timestamp do evento; usamos hora de recebimento
     disputeStatus: additional.disputeStatus || null,
     bancoEmissor: null, // preenchido depois via BIN lookup (assincrono)
-    raw: undefined, // nunca guardamos o payload cru completo (evita reter dados sensiveis desnecessarios)
-  };
+  };  
 }
 
 module.exports = { normalize };
