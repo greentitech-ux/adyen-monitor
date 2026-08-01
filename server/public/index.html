@@ -23,7 +23,14 @@
   @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  header{margin-bottom:20px;}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   .pulse{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);}
   .pulse.off{background:var(--bad-dim);color:var(--bad);border-color:#4a2323;}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 rgba(61,220,151,.6);animation:p 2s infinite;}
@@ -208,21 +215,27 @@
 <div id="app-root" class="hidden">
 
 <header>
-  <div>
-    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
-    <h1>Monitor de transações</h1>
-  </div>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
-    <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
-    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
-    <button class="btn-notif" id="btn-som" onclick="toggleSom()" title="Som/vibração de alerta">🔊</button>
-    <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
-    <button class="back" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪 Sair</button>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+      <h1>Monitor de transações</h1>
+    </div>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-links">
+      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+      <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+      <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+      <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
+      <button class="btn-notif" id="btn-som" onclick="toggleSom()" title="Som/vibração de alerta">🔊</button>
+      <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <button class="btn-notif btn-sair" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
   </div>
 </header>
 
