@@ -97,6 +97,8 @@
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
   .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
   .btn-disputa:hover{border-color:var(--accent);}
+  a.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);}
+  a.back:hover{color:var(--text);border-color:var(--accent);}
   .dispute-item{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;}
   .dispute-item .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
   .dispute-item .notas{font-size:12.5px;margin-top:6px;white-space:pre-wrap;}
@@ -162,6 +164,7 @@
     <h1>Monitor de transações</h1>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back" href="/relatorios.html">📊 Relatórios</a>
     <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
     <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
@@ -213,9 +216,7 @@
   </div>
 
   <div class="panel">
-    <h2><span>Chargebacks <span class="n" id="chargebacks-count"></span></span>
-      <button type="button" class="btn-disputa" onclick="window.location.href='/relatorios.html'">📊 Relatórios</button>
-    </h2>
+    <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
     <div class="alerts" id="chargebacks"></div>
   </div>
 </div>
