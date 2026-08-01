@@ -626,14 +626,19 @@ function periodFiltered(){
 }
 
 function computeSummary(rows){
-  const aprovadas = rows.filter(t=>t.status==='APROVADO');
-  const recusadas = rows.filter(t=>t.status==='RECUSADO');
-  const estornos = rows.filter(t=>t.status==='ESTORNADO');
+  // chargeback e um evento de acompanhamento de um pedido que ja foi contado
+  // antes (aprovado/recusado) - nao deve inflar o total de transacoes, a taxa
+  // de aprovacao nem as contagens de falha/fraude; ele so entra na propria
+  // metrica de Chargebacks
+  const semChargeback = rows.filter(t=>!(t.status||'').includes('CHARGEBACK'));
+  const aprovadas = semChargeback.filter(t=>t.status==='APROVADO');
+  const recusadas = semChargeback.filter(t=>t.status==='RECUSADO');
+  const estornos = semChargeback.filter(t=>t.status==='ESTORNADO');
   const chargebacksRows = rows.filter(t=>(t.status||'').includes('CHARGEBACK'));
-  const fraudeRows = rows.filter(t=>t.fraudeSuspeita);
+  const fraudeRows = semChargeback.filter(t=>t.fraudeSuspeita);
   const soma = list=>+list.reduce((s,t)=>s+(t.valor||0),0).toFixed(2);
   return {
-    total: rows.length,
+    total: semChargeback.length,
     aprovadas: aprovadas.length,
     recusadas: recusadas.length,
     volumeAprovado: soma(aprovadas),
@@ -851,8 +856,9 @@ function renderAlerts(rows){
   // alerta individual, mesmo sem repetir (diferente das outras bandeiras,
   // que so alertam a partir de 2 recusas seguidas do mesmo cliente)
   recusadas.filter(d=>d.metodo==='amex').forEach(d=>alerts.push({sev:'high', t1:`Tentativa de venda Amex recusada — ${d.cardHolder||d.nomeCliente||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.motivo||'sem motivo'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
-  rows.filter(d=>d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Chargeback — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
-  rows.filter(d=>d.fraudeSuspeita).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
+  // chargeback tem painel proprio (com prazo de recorrer, evidencias etc.) -
+  // nao entra aqui pra nao duplicar/inflar os alertas de falha/fraude
+  rows.filter(d=>d.fraudeSuspeita && !d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   alerts.sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
   document.getElementById('alert-count').textContent = alerts.length;
