@@ -98,6 +98,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
     <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
@@ -189,9 +190,10 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   const isMaster = ME.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);

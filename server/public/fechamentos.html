@@ -110,6 +110,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
     <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
     <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
@@ -122,6 +123,11 @@
 <div id="root" class="hidden">
 
 <div class="kpis" id="kpis"></div>
+
+<div class="panel hidden" id="edicoes-panel">
+  <h2><div class="title-group"><span>Pedidos de correção de fechamento</span><span class="n" id="edicoes-count"></span></div></h2>
+  <div id="edicoes-lista" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
+</div>
 
 <div class="panel">
   <div class="controls">
@@ -248,6 +254,34 @@ async function carregar(){
   setupPresets(datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10));
   setupMultiselect();
   render();
+}
+
+// ---------- pedidos de correção de fechamento (so o Master decide) ----------
+async function carregarEdicoes(){
+  const edicoes = await fetch('/api/fechamentos/edicoes').then(r=>r.json());
+  const pendentes = edicoes.filter(e=>e.status==='PENDENTE');
+  document.getElementById('edicoes-panel').classList.toggle('hidden', pendentes.length===0);
+  document.getElementById('edicoes-count').textContent = pendentes.length;
+  document.getElementById('edicoes-lista').innerHTML = pendentes.map(p=>`
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;">
+      <div style="font-size:12.5px;font-weight:600;">${escapeHtml(p.unidadeNome||p.unidade)} · ${fmtData(p.data)}</div>
+      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR')}</div>
+      <div style="font-size:12px;margin-bottom:6px;">${Object.entries(p.mudancas).map(([campo,valor])=>`<div>${campo}: <b>${fmtMoney(valor)}</b></div>`).join('')}</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:8px;white-space:pre-wrap;">${escapeHtml(p.motivo)}</div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="preset-btn" style="color:var(--ok);border-color:var(--ok-dim);" onclick="decidirEdicaoFechamento('${p.id}','APROVADO')">✓ Aprovar</button>
+        <button type="button" class="preset-btn" style="color:var(--bad);border-color:var(--bad-dim);" onclick="decidirEdicaoFechamento('${p.id}','REJEITADO')">✕ Rejeitar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function decidirEdicaoFechamento(id, status){
+  let motivoDecisao = '';
+  if(status==='REJEITADO'){ motivoDecisao = prompt('Motivo da rejeição (opcional):') || ''; }
+  await fetch(`/api/fechamentos/edicoes/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
+  await carregarEdicoes();
+  await carregar();
 }
 
 // ---- presets de periodo (7/30/90 dias, mes atual) - lista de botoes, o
@@ -719,9 +753,10 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (me.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
@@ -732,6 +767,7 @@ async function boot(){
   }
   document.getElementById('root').classList.remove('hidden');
   await carregar();
+  if(isMaster) await carregarEdicoes();
 }
 
 boot();

@@ -210,6 +210,7 @@
     <h1>Monitor de transações</h1>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
@@ -375,6 +376,7 @@ function podeSecao(secao){
 }
 
 function aplicarNav(){
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !podeSecao('lancamento'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !podeSecao('fechamentos'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));

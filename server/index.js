@@ -18,6 +18,8 @@ const vaultGroups = require('./vaultGroups');
 const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
 const refunds = require('./refunds');
+const fechamentosLive = require('./fechamentosLive');
+const backup = require('./backup');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -580,6 +582,23 @@ app.delete('/api/users/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
+// ---------- backup do banco (so o Master ve/aciona) ----------
+app.get('/api/backups', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await backup.listarBackups());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await backup.rodarBackup());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------- fechamentos de caixa ARCFOOD (secao "fechamentos") ----------
 // snapshot importado manualmente da planilha do Google Drive "FECHAMENTO
 // ARCFOOD" (aba BD) - atualizado sob demanda, nao ao vivo via webhook. As
@@ -587,8 +606,80 @@ app.delete('/api/users/:id', auth.requireMaster, async (req, res) => {
 // nao o merchantAccountCode da Adyen, entao nao da pra reaproveitar
 // auth.filterByUnidade - o acesso e por secao inteira, como o cofre.
 const fechamentosData = require('./fechamentos-snapshot.json');
-app.get('/api/fechamentos', requireSection('fechamentos'), (req, res) => {
-  res.json(fechamentosData);
+app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
+  const lancados = await fechamentosLive.listAll();
+  res.json([...fechamentosData, ...lancados]);
+});
+
+// ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
+// substitui o AppSheet: a loja loga com um usuario proprio (papel "Fechamento",
+// limitado a sua(s) unidade(s)) e lanca o fechamento do dia direto no banco.
+// Depois de lancado o registro e imutavel - qualquer correcao vira um pedido
+// que so o Master pode aprovar (fechamentosLive.js guarda o historico).
+app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, grupo, data, gerente, campos, observacao } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await fechamentosLive.create({
+      unidade, unidadeNome, grupo, data, gerente, campos, observacao,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-lancado', registro, 'lancamento');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) => {
+  if (req.isMaster) return res.json(await fechamentosLive.listAll());
+  res.json(await fechamentosLive.listByUnidades(req.permissions.unidades || []));
+});
+
+app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {
+  try {
+    const atual = await fechamentosLive.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Fechamento não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const pedido = await fechamentosLive.solicitarEdicao({
+      fechamentoId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      solicitadoPorId: req.user.id,
+      solicitadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// fila de pedidos de correcao - so o Master decide (aprova/rejeita), mas quem
+// pediu pode acompanhar o status do proprio pedido
+app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {
+  const todas = await fechamentosLive.listarEdicoes();
+  if (req.isMaster) return res.json(todas);
+  res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
+});
+
+app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const pedido = await fechamentosLive.decidirEdicao(req.params.id, req.body.status, {
+      decididoPorEmail: req.user.email,
+      motivoDecisao: req.body.motivoDecisao,
+    });
+    broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
+    broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -623,6 +714,13 @@ app.use((err, req, res, next) => {
     if (removidos) console.log(`Retencao: removidas ${removidos} transacoes com mais de 90 dias.`);
     setInterval(() => {
       store.pruneOld().catch((err) => console.error('Erro na limpeza de retencao:', err.message));
+    }, 24 * 60 * 60 * 1000);
+
+    // backup automatico do banco: roda no start e depois 1x/dia (o Master
+    // tambem pode acionar na hora pela tela de Usuarios/Backup)
+    backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
+    setInterval(() => {
+      backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
     }, 24 * 60 * 60 * 1000);
   });
 })();

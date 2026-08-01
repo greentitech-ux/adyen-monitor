@@ -71,6 +71,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
     <a class="back" href="/">📈 Monitor</a>
+    <a class="back" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back" href="/relatorios.html">📊 Relatórios</a>
     <a class="back" href="/cofre.html">🔐 Cofre</a>
@@ -114,6 +115,17 @@
       <button type="submit" class="primary">Criar acesso</button>
     </form>
   </div>
+
+  <div class="panel">
+    <h2>Backup do banco de dados</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Backup automático todo dia, guardado no Storage por 30 dias. Use "Fazer backup agora" antes de qualquer mudança grande, por segurança.</p>
+    <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
+    <p class="ok-msg hidden" id="backup-msg" style="margin-top:10px;"></p>
+    <table style="margin-top:14px;">
+      <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
+      <tbody id="backups-body"></tbody>
+    </table>
+  </div>
 </div>
 
 <div class="overlay" id="perm-overlay">
@@ -152,7 +164,7 @@ window.fetch = (url, opts = {}) => {
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (ARCFOOD)'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'] ];
 let UNIDADES = [];
 let VAULT_GROUPS = [];
 let VAULT_SUBGROUPS = [];
@@ -208,11 +220,46 @@ async function boot(){
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
 
   await carregarUsuarios();
+  await carregarBackups();
 }
 
 async function carregarUsuarios(){
   USERS = await fetch('/api/users').then(r=>r.json());
   renderUsers();
+}
+
+function fmtBytes(n){
+  if(!n) return '—';
+  if(n<1024) return n+' B';
+  if(n<1024*1024) return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(1)+' MB';
+}
+
+async function carregarBackups(){
+  const backups = await fetch('/api/backups').then(r=>r.json());
+  document.getElementById('backups-body').innerHTML = backups.length ? backups.map(b=>`
+    <tr><td>${escapeHtml(b.nome)}</td><td>${new Date(b.criadoEm).toLocaleString('pt-BR')}</td><td>${fmtBytes(b.tamanhoBytes)}</td></tr>
+  `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum backup ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+async function rodarBackupAgora(){
+  const btn = document.getElementById('btn-backup-run');
+  const msg = document.getElementById('backup-msg');
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/backups/run', { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao fazer backup');
+    msg.textContent = `Backup criado: ${data.registros} registros em ${data.colecoes} coleções.`;
+    msg.className = 'ok-msg';
+    await carregarBackups();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
 }
 
 function tagList(items){
