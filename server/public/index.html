@@ -81,6 +81,9 @@
   .controls{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
   .controls select,.controls input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);}
   .controls input{flex:1;min-width:120px;}
+  .daterange{display:flex;align-items:center;gap:6px;}
+  .daterange input{flex:none;min-width:0;color-scheme:dark;}
+  .daterange .sep{color:var(--muted);font-size:12px;}
   .multiselect{position:relative;}
   .multiselect-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;white-space:nowrap;}
   .multiselect-btn:hover{border-color:var(--accent);}
@@ -91,6 +94,8 @@
   .multiselect-panel label:hover{background:var(--panel);}
   .multiselect-panel label span{overflow:hidden;text-overflow:ellipsis;}
   .multiselect-panel label.all-option{font-weight:600;border-bottom:1px solid var(--line);border-radius:0;margin-bottom:2px;padding-bottom:8px;}
+  .multiselect-panel label.group-option{font-weight:600;color:var(--accent);}
+  .multiselect-panel .group-sep{border-bottom:1px solid var(--line);margin-bottom:2px;padding-bottom:6px;}
   .multiselect-panel input[type=checkbox]{accent-color:var(--accent);}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
   /* modal de historico do cliente */
@@ -121,6 +126,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
     <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()">🔔 Ativar notificações</button>
+    <button class="btn-notif" id="btn-refresh" onclick="location.reload()">🔄 Atualizar página</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
   </div>
 </header>
@@ -130,12 +136,11 @@
 <div class="panel">
   <h2>Transações <span class="n" id="tx-count"></span></h2>
   <div class="controls">
-    <select id="f-periodo">
-      <option value="1">Último dia</option>
-      <option value="7">Últimos 7 dias</option>
-      <option value="30">Últimos 30 dias</option>
-      <option value="90">Últimos 3 meses</option>
-    </select>
+    <div class="daterange">
+      <input type="date" id="f-date-start" title="Data inicial">
+      <span class="sep">até</span>
+      <input type="date" id="f-date-end" title="Data final">
+    </div>
     <div class="multiselect" id="ms-status">
       <button type="button" class="multiselect-btn" id="ms-status-btn">Todos os status</button>
       <div class="multiselect-panel" id="ms-status-panel"></div>
@@ -258,11 +263,17 @@ function renderChargebacks(){
   `;}).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
 }
 
-// filtra pelo periodo selecionado (padrao: ultimo dia)
+// filtra pelo intervalo de datas selecionado (data inicial e data final)
 function periodFiltered(){
-  const days = Number(document.getElementById('f-periodo').value) || 1;
-  const cutoff = Date.now() - days*24*60*60*1000;
-  return DATA.filter(d => d.dataHora && new Date(d.dataHora).getTime() >= cutoff);
+  const startVal = document.getElementById('f-date-start').value;
+  const endVal = document.getElementById('f-date-end').value;
+  const start = startVal ? new Date(startVal+'T00:00:00').getTime() : -Infinity;
+  const end = endVal ? new Date(endVal+'T23:59:59.999').getTime() : Infinity;
+  return DATA.filter(d => {
+    if(!d.dataHora) return false;
+    const t = new Date(d.dataHora).getTime();
+    return t>=start && t<=end;
+  });
 }
 
 function computeSummary(rows){
@@ -415,24 +426,49 @@ function setupMultiselect(key, allLabel, selectedSet){
 setupMultiselect('status');
 setupMultiselect('unidade');
 
-function renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel){
+// grupos de unidades: clicar no grupo seleciona de uma vez todas as
+// unidades daquele grupo (identificadas pelos digitos do codigo da unidade)
+const UNIDADE_GROUPS = {
+  ARCFOOD: ['19888','19889','19855','19821'],
+  GBE: ['19911','19940','19633','19706','19798'],
+};
+function digitsOf(s){ return (s||'').replace(/\D/g,''); }
+
+function renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel, groups){
   const panel = document.getElementById('ms-'+key+'-panel');
   const btn = document.getElementById('ms-'+key+'-btn');
   // remove selecoes de opcoes que nao existem mais nos dados
   for(const v of [...selectedSet]) if(!options.includes(v)) selectedSet.delete(v);
+  const groupsHtml = groups ? '<div class="group-sep">' + Object.entries(groups).map(([nome, nums])=>{
+    const membros = options.filter(o=>nums.includes(digitsOf(o)));
+    const marcado = membros.length>0 && membros.every(o=>selectedSet.has(o));
+    return `<label class="group-option" data-group="${nome}"><span>${nome}</span><input type="checkbox" data-group-cb value="${nome}" ${marcado?'checked':''}></label>`;
+  }).join('') + '</div>' : '';
   panel.innerHTML = `
     <label class="all-option"><span>${allLabel}</span><input type="checkbox" data-all ${selectedSet.size===0?'checked':''}></label>
+    ${groupsHtml}
     ${options.map(o=>`<label><span>${o}</span><input type="checkbox" value="${o}" ${selectedSet.has(o)?'checked':''}></label>`).join('')}
   `;
   panel.querySelector('[data-all]').addEventListener('change', ()=>{
     selectedSet.clear();
-    renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel);
+    renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel, groups);
     render();
   });
-  panel.querySelectorAll('input[type=checkbox]:not([data-all])').forEach(cb=>{
+  if(groups){
+    panel.querySelectorAll('[data-group-cb]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const membros = options.filter(o=>groups[cb.value].includes(digitsOf(o)));
+        if(cb.checked) membros.forEach(o=>selectedSet.add(o));
+        else membros.forEach(o=>selectedSet.delete(o));
+        renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel, groups);
+        render();
+      });
+    });
+  }
+  panel.querySelectorAll('input[type=checkbox]:not([data-all]):not([data-group-cb])').forEach(cb=>{
     cb.addEventListener('change', ()=>{
       if(cb.checked) selectedSet.add(cb.value); else selectedSet.delete(cb.value);
-      renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel);
+      renderMultiselectOptions(key, options, selectedSet, allLabel, singularLabel, groups);
       render();
     });
   });
@@ -445,7 +481,7 @@ function populateFilters(){
   const statuses = [...new Set(DATA.map(d=>d.status))].sort();
   const unidades = [...new Set(DATA.map(d=>d.unidade))].sort();
   renderMultiselectOptions('status', statuses, SEL_STATUS, 'Todos os status', 'status');
-  renderMultiselectOptions('unidade', unidades, SEL_UNIDADE, 'Todas as unidades', 'unidades');
+  renderMultiselectOptions('unidade', unidades, SEL_UNIDADE, 'Todas as unidades', 'unidades', UNIDADE_GROUPS);
 }
 
 async function showClient(key){
@@ -541,7 +577,14 @@ function orderKeyOf(t){ return t.merchantReference || t.pspReference; }
                                                                                                         </tr>
                                                                                                           `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
   }
-['f-periodo','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+['f-date-start','f-date-end','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+
+// padrao: ultimo dia (data inicial = data final = hoje)
+(function initDateRange(){
+  const hoje = new Date().toISOString().slice(0,10);
+  document.getElementById('f-date-start').value = hoje;
+  document.getElementById('f-date-end').value = hoje;
+})();
 
 // ---- SSE: atualizacoes ao vivo ----
 function connectStream(){
