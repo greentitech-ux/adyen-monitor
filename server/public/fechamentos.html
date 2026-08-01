@@ -228,11 +228,15 @@ Object.keys(UNIDADES_NOMES).forEach((u,i)=>{ CORES_UNIDADE[u] = PALETA_CATEGORIC
 const LIMIAR_SMALL_MULTIPLES = 6; // acima disso, facet em vez de multi-linha
 
 const SEL_UNIDADE = new Set();
+let UNIDADES_PERMITIDAS = null; // null = sem restrição (Master); senao, Set das unidades liberadas pro usuario
 
 function codigosDoGrupo(){
   const grupo = document.getElementById('f-grupo').value;
-  if(!grupo) return Object.keys(UNIDADES_NOMES);
-  return GRUPOS[grupo] || [];
+  const base = grupo ? (GRUPOS[grupo] || []) : Object.keys(UNIDADES_NOMES);
+  // so mostra unidades que o usuario realmente tem acesso (o backend ja
+  // filtra os dados, mas o seletor tambem nao deve oferecer as outras)
+  if(!UNIDADES_PERMITIDAS) return base;
+  return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
 }
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
@@ -758,6 +762,7 @@ async function boot(){
   const me = await res.json();
   const isMaster = me.role==='master';
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (me.permissions?.sections||[]);
+  UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));

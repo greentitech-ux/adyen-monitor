@@ -608,7 +608,7 @@ app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
 const fechamentosData = require('./fechamentos-snapshot.json');
 app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   const lancados = await fechamentosLive.listAll();
-  res.json([...fechamentosData, ...lancados]);
+  res.json(auth.filterByUnidade(req, [...fechamentosData, ...lancados]));
 });
 
 // ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
