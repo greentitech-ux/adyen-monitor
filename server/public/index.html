@@ -63,12 +63,19 @@
   tbody tr{transition:background-color .8s ease;}
   tbody tr.row-novo{background:rgba(92,200,255,.22);}
   tbody tr.row-novo:hover{background:rgba(92,200,255,.3);}
-  tbody tr.row-recusado{background:rgba(255,92,92,.16);}
-  tbody tr.row-recusado:hover{background:rgba(255,92,92,.24);}
-  tbody tr.row-recusado-fraude{background:rgba(255,92,92,.34);}
-  tbody tr.row-recusado-fraude:hover{background:rgba(255,92,92,.42);}
+  /* recusado agora fica vermelho de forma permanente (nao so nos primeiros
+     minutos), igual a intensidade que o fraude tinha antes */
+  tbody tr.row-recusado{background:rgba(255,92,92,.34);}
+  tbody tr.row-recusado:hover{background:rgba(255,92,92,.42);}
+  tbody tr.row-chargeback{background:rgba(255,92,92,.34);}
+  tbody tr.row-chargeback:hover{background:rgba(255,92,92,.42);}
+  /* teste: fraude suspeita em preto em vez de vermelho, pra distinguir de recusado/chargeback */
+  tbody tr.row-fraude{background:rgba(0,0,0,.55);}
+  tbody tr.row-fraude:hover{background:rgba(0,0,0,.68);}
   tbody tr.row-estornado{background:rgba(242,179,61,.16);}
   tbody tr.row-estornado:hover{background:rgba(242,179,61,.24);}
+  .tx-comentario{font-size:10px;color:var(--accent);margin-top:2px;cursor:pointer;font-family:var(--sans);}
+  .tx-comentario:hover{text-decoration:underline;}
   .alert,.order-row{transition:background-color .8s ease;}
   .alert.item-novo,.order-row.item-novo{background:rgba(92,200,255,.14);}
   .flag.novo{color:var(--accent);border-color:#1e4a63;background:rgba(92,200,255,.12);}
@@ -200,15 +207,23 @@
   </div>
 
   <div class="panel">
-    <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
-    <div class="orders" id="chargebacks"></div>
+    <h2><span>Chargebacks <span class="n" id="chargebacks-count"></span></span>
+      <button type="button" class="btn-disputa" onclick="alert('Em breve: aqui vai abrir o relatório de disputas (vencidos, perdidos, chargeback e chargeback revertido).')">📊 Relatórios</button>
+    </h2>
+    <div class="alerts" id="chargebacks"></div>
   </div>
 </div>
 
 <div class="grid" style="margin-top:16px;">
   <div class="panel">
-    <h2>Tendência de aprovação <span class="n" id="trend-info"></span></h2>
+    <h2>Transações por dia <span class="n" id="trend-info"></span></h2>
     <div style="padding:14px 16px;">
+      <div style="display:flex;gap:14px;margin-bottom:8px;font-family:var(--mono);font-size:10.5px;color:var(--muted);">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3ddc97;margin-right:4px;"></span>Aprovadas</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#ff5c5c;margin-right:4px;"></span>Recusadas</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#f2b33d;margin-right:4px;"></span>Estornos</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#5a6472;margin-right:4px;"></span>Outros</span>
+      </div>
       <svg id="trend-chart" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:220px;display:block;"></svg>
     </div>
   </div>
@@ -216,7 +231,7 @@
     <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
     <div class="tablewrap" style="max-height:260px;">
       <table>
-        <thead><tr><th>Unid.</th><th>Transações</th><th>Taxa aprov.</th><th>Volume aprovado</th><th>Recusadas</th><th>Estornos</th><th>Chargebacks</th></tr></thead>
+        <thead><tr><th>Unid.</th><th>Transações</th><th>Taxa aprov.</th><th>Volume aprovado</th><th>Recusadas</th><th>Estornos</th><th>Fraudes</th><th>Chargebacks</th></tr></thead>
         <tbody id="unidades-body"></tbody>
       </table>
     </div>
@@ -257,17 +272,16 @@ let CHARGEBACKS = [];
 let REPEATED_PSPS = new Set();
 
 // destaque temporario pra quem acabou de chegar via webhook - fica marcado
-// por alguns minutos pra dar tempo de notar, depois some
+// por alguns minutos pra dar tempo de notar, depois some (recusado/fraude/
+// chargeback ficam com a cor do status de forma permanente, isso aqui e so
+// o flash azul de "chegou agora")
 const NEW_HIGHLIGHT_MS = 4 * 60 * 1000; // 4 minutos
-// recusados ficam destacados por mais tempo (cor do status), pra dar tempo
-// de notar e agir - usa o mesmo timestamp de chegada, so que com janela maior
-const DECLINE_HIGHLIGHT_MS = 10 * 60 * 1000; // 10 minutos
 const NEW_ITEMS = new Map(); // chave (ex: "tx:pspRef") -> timestamp de chegada
 function marcarNovo(key){ if(key) NEW_ITEMS.set(key, Date.now()); }
 function tempoDesdeChegada(key){ const t = NEW_ITEMS.get(key); return t==null ? Infinity : Date.now()-t; }
 function ehNovo(key){ return tempoDesdeChegada(key) < NEW_HIGHLIGHT_MS; }
 function limparNovosExpirados(){
-  const limite = Math.max(NEW_HIGHLIGHT_MS, DECLINE_HIGHLIGHT_MS) + NEW_HIGHLIGHT_MS;
+  const limite = NEW_HIGHLIGHT_MS * 2;
   for(const [k,t] of NEW_ITEMS) if(Date.now()-t > limite) NEW_ITEMS.delete(k);
 }
 
@@ -316,32 +330,49 @@ function dentroDoIntervalo(iso){
   const t = new Date(iso).getTime();
   return t>=start && t<=end;
 }
-// pedidos (orders-changed/chargebacks) tem status atual + data da ultima
-// atualizacao - aplica os 3 filtros pra eles ficarem em harmonia com o resto
-function filtrarPedidos(lista){
+// pedidos (orders-changed/chargebacks) tem status atual + datas de referencia -
+// aplica os 3 filtros pra eles ficarem em harmonia com o resto. "dataField"
+// deixa escolher qual data usar no filtro de periodo (chargebacks usa a data
+// em que o chargeback abriu, nao a ultima atualizacao do pedido)
+function filtrarPedidos(lista, dataField){
+  const campo = dataField || 'ultimaAtualizacao';
   return lista.filter(o=>
     (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(o.unidade)) &&
     (SEL_STATUS.size===0 || SEL_STATUS.has(o.statusAtual)) &&
-    dentroDoIntervalo(o.ultimaAtualizacao)
+    dentroDoIntervalo(o[campo] || o.ultimaAtualizacao)
   );
 }
 
+// quanto falta (ou ha quanto venceu) o prazo de defesa do chargeback -
+// texto + cor de urgencia, pra saber o que precisa de atencao primeiro
+function prazoDefesaInfo(prazoISO){
+  if(!prazoISO) return { texto:'sem prazo informado', cor:'var(--muted)', ordem: Infinity };
+  const ms = new Date(prazoISO).getTime() - Date.now();
+  const dias = Math.ceil(ms/(24*60*60*1000));
+  if(ms<=0) return { texto:`prazo encerrado (${fmtDT(prazoISO)})`, cor:'var(--bad)', ordem: ms };
+  const cor = dias<=2 ? 'var(--bad)' : (dias<=5 ? 'var(--warn)' : 'var(--ok)');
+  return { texto:`recorrer até ${fmtDT(prazoISO)} (${dias}d)`, cor, ordem: ms };
+}
+
 function renderChargebacks(){
-  const lista = filtrarPedidos(CHARGEBACKS);
+  // do mais urgente (prazo mais proximo de acabar / ja vencido) pro que ainda
+  // tem mais tempo; sem prazo informado fica por ultimo
+  const lista = filtrarPedidos(CHARGEBACKS, 'dataChargeback')
+    .slice()
+    .sort((a,b)=>prazoDefesaInfo(a.prazoDefesa).ordem - prazoDefesaInfo(b.prazoDefesa).ordem);
   document.getElementById('chargebacks-count').textContent = lista.length;
   document.getElementById('chargebacks').innerHTML = lista.length ? lista.map(o=>{
     const novo = ehNovo('chargeback:'+o.pedidoId);
+    const prazo = prazoDefesaInfo(o.prazoDefesa);
     return `
-    <div class="order-row ${novo?'item-novo':''}">
-      <div class="top">
-        <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
-        <span class="valor">${fmtMoney(o.valor)}</span>
-      </div>
-      <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}
-        <button type="button" class="btn-disputa" onclick="event.stopPropagation(); abrirDisputa('${String(o.pedidoId).replace(/'/g,"\\'")}','${(o.unidade||'').replace(/'/g,"\\'")}')">📎 Disputa</button>
-      </div>
-      <div class="timeline">
-        ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
+    <div class="alert ${novo?'item-novo':''}">
+      <div class="sev high"></div>
+      <div class="body" style="flex:1;">
+        <div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}•• ${o.last4||'????'} · ${o.unidade||'—'} · ${fmtDT(o.dataCompra)} · ${fmtMoney(o.valor)} · ${o.cliente||'cliente desconhecido'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+        <div class="t2">Pedido ${o.pedidoId} · <span style="color:${prazo.cor}">${prazo.texto}</span></div>
+        <div style="margin-top:8px;">
+          <button type="button" class="btn-disputa" onclick="abrirDisputa('${String(o.pedidoId).replace(/'/g,"\\'")}','${(o.unidade||'').replace(/'/g,"\\'")}')">📎 Registrar disputa</button>
+        </div>
       </div>
     </div>
   `;}).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
@@ -459,51 +490,63 @@ function diasNoIntervalo(){
 
 // grafico de linha (SVG puro, sem lib externa) da taxa de aprovacao dia a dia,
 // dentro do periodo/unidade/status selecionados
+// grafico de barras empilhadas (aprovadas/recusadas/estornos) por dia - SVG
+// puro, sem lib externa. Trocado do grafico de linha por ser mais facil de
+// ler volume + composicao por dia de uma vez so
 function renderTrendChart(rows){
   const svg = document.getElementById('trend-chart');
   const dias = diasNoIntervalo();
   if(!dias.length){ svg.innerHTML = ''; return; }
 
   const porDia = {};
-  dias.forEach(d=>{ porDia[d] = {total:0, aprovadas:0}; });
+  dias.forEach(d=>{ porDia[d] = {aprovadas:0, recusadas:0, estornos:0, outros:0, total:0}; });
   rows.forEach(t=>{
     const dia = (t.dataHora||'').slice(0,10);
     if(!porDia[dia]) return;
     porDia[dia].total++;
     if(t.status==='APROVADO') porDia[dia].aprovadas++;
+    else if(t.status==='RECUSADO') porDia[dia].recusadas++;
+    else if(t.status==='ESTORNADO') porDia[dia].estornos++;
+    else porDia[dia].outros++;
   });
 
-  const W=600, H=220, padL=34, padR=10, padT=10, padB=22;
+  const W=600, H=220, padL=30, padR=10, padT=10, padB=22;
   const innerW = W-padL-padR, innerH = H-padT-padB;
   const n = dias.length;
-  const pts = dias.map((dia,i)=>{
-    const info = porDia[dia];
-    const x = padL + (n===1 ? innerW/2 : innerW*i/(n-1));
-    const taxa = info.total ? (info.aprovadas/info.total*100) : null;
-    const y = taxa==null ? null : padT + innerH - (taxa/100*innerH);
-    return {x,y,taxa,dia,total:info.total};
-  });
+  const maxTotal = Math.max(1, ...dias.map(d=>porDia[d].total));
+  const passo = innerW/n;
+  const larguraBarra = Math.min(28, passo*0.62);
 
-  const grid = [0,50,100].map(v=>{
-    const y = padT+innerH-(v/100*innerH);
+  const cores = { aprovadas:'#3ddc97', recusadas:'#ff5c5c', estornos:'#f2b33d', outros:'#5a6472' };
+
+  const grid = [0,0.5,1].map(f=>{
+    const y = padT + innerH*(1-f);
+    const rotulo = Math.round(maxTotal*f);
     return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#232a33" stroke-width="1"/>` +
-           `<text x="2" y="${(y+3).toFixed(1)}" font-size="9" fill="#7d8896" font-family="monospace">${v}%</text>`;
+           `<text x="2" y="${(y+3).toFixed(1)}" font-size="9" fill="#7d8896" font-family="monospace">${rotulo}</text>`;
   }).join('');
 
   const passoRotulo = Math.max(1, Math.ceil(n/7));
-  const rotulos = pts.filter((p,i)=>i%passoRotulo===0 || i===n-1).map(p=>
-    `<text x="${p.x.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${p.dia.slice(8,10)}/${p.dia.slice(5,7)}</text>`
-  ).join('');
+  let barras = '';
+  let rotulosX = '';
+  dias.forEach((dia,i)=>{
+    const info = porDia[dia];
+    const cx = padL + passo*i + passo/2;
+    const x = cx - larguraBarra/2;
+    let yTopo = padT + innerH;
+    ['aprovadas','recusadas','estornos','outros'].forEach(campo=>{
+      const valor = info[campo];
+      if(!valor) return;
+      const altura = (valor/maxTotal)*innerH;
+      yTopo -= altura;
+      barras += `<rect x="${x.toFixed(1)}" y="${yTopo.toFixed(1)}" width="${larguraBarra.toFixed(1)}" height="${altura.toFixed(1)}" fill="${cores[campo]}"><title>${dia}: ${campo} = ${valor}</title></rect>`;
+    });
+    if(i%passoRotulo===0 || i===n-1){
+      rotulosX += `<text x="${cx.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${dia.slice(8,10)}/${dia.slice(5,7)}</text>`;
+    }
+  });
 
-  const comDado = pts.filter(p=>p.y!=null);
-  const linha = comDado.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const pontos = comDado.map(p=>
-    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#5cc8ff"><title>${p.dia}: ${p.taxa.toFixed(1)}% (${p.total} transações)</title></circle>`
-  ).join('');
-
-  svg.innerHTML = comDado.length
-    ? `${grid}${rotulos}<polyline points="${linha}" fill="none" stroke="#5cc8ff" stroke-width="2"/>${pontos}`
-    : `${grid}${rotulos}<text x="${W/2}" y="${H/2}" font-size="12" fill="#7d8896" font-family="monospace" text-anchor="middle">Sem transações no período</text>`;
+  svg.innerHTML = `${grid}${rotulosX}${barras}`;
 
   const label = dias.length===1 ? dias[0] : `${dias[0]} → ${dias[dias.length-1]}`;
   document.getElementById('trend-info').textContent = label;
@@ -515,11 +558,12 @@ function renderUnidadesTable(rows){
   const porUnidade = {};
   rows.forEach(t=>{
     const u = t.unidade || '—';
-    const c = (porUnidade[u] ||= {total:0, aprovadas:0, recusadas:0, estornos:0, chargebacks:0, volumeAprovado:0});
+    const c = (porUnidade[u] ||= {total:0, aprovadas:0, recusadas:0, estornos:0, fraudes:0, chargebacks:0, volumeAprovado:0});
     c.total++;
     if(t.status==='APROVADO'){ c.aprovadas++; c.volumeAprovado += t.valor||0; }
     if(t.status==='RECUSADO') c.recusadas++;
     if(t.status==='ESTORNADO') c.estornos++;
+    if(t.fraudeSuspeita) c.fraudes++;
     if((t.status||'').includes('CHARGEBACK')) c.chargebacks++;
   });
   const linhas = Object.entries(porUnidade).sort((a,b)=>b[1].total-a[1].total);
@@ -534,9 +578,10 @@ function renderUnidadesTable(rows){
       <td class="valor">${fmtMoney(c.volumeAprovado)}</td>
       <td class="valor">${c.recusadas}</td>
       <td class="valor">${c.estornos}</td>
+      <td class="valor">${c.fraudes}</td>
       <td class="valor">${c.chargebacks}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
 }
 
 async function refreshOrdersChanged(){
@@ -552,10 +597,10 @@ function renderOrdersChanged(){
     return `
     <div class="order-row ${novo?'item-novo':''}">
       <div class="top">
-        <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
+        <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.unidade||'—'}</span>
         <span class="valor">${fmtMoney(o.valor)}</span>
       </div>
-      <div class="id">${o.metodo||'?'} · ${o.cliente||'cliente desconhecido'} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+      <div class="id">${o.metodo||'?'} · ${o.cliente||'cliente desconhecido'} · ${o.last4?('•• '+o.last4):'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
       <div class="timeline">
         ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
       </div>
@@ -769,6 +814,25 @@ async function showClient(key){
   document.getElementById('overlay').classList.add('show');
 }
 
+// comentario manual num estorno (ex: "estornei eu mesmo pelo painel da
+// Adyen, motivo X") - fica salvo junto da transacao e aparece abaixo da
+// data/hora na tabela
+async function editarComentario(pspReferenceEnc, eventCodeEnc){
+  const pspReference = decodeURIComponent(pspReferenceEnc);
+  const eventCode = decodeURIComponent(eventCodeEnc);
+  const tx = DATA.find(d=>d.pspReference===pspReference && d.eventCode===eventCode);
+  const texto = prompt('Comentário sobre este estorno:', (tx && tx.comentario) || '');
+  if(texto===null) return;
+  const resp = await fetch(`/api/transactions/${pspReferenceEnc}/${eventCodeEnc}/comentario`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({comentario:texto})
+  });
+  if(!resp.ok) { alert('Não foi possível salvar o comentário.'); return; }
+  const atualizado = await resp.json();
+  const idx = DATA.findIndex(d=>d.pspReference===atualizado.pspReference && d.eventCode===atualizado.eventCode);
+  if(idx>=0) DATA[idx] = atualizado;
+  render();
+}
+
 // mesma logica de agrupamento do backend (store.js orderKey): merchantReference
 // primeiro, depois originalReference (pra pedidos cujo evento anterior, ex.
 // OFFER_CLOSED, chegou sem merchantReference), so entao o proprio pspReference
@@ -806,10 +870,12 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
       const pedidosPeriodo = [...porPedido.values()];
 
       const q = document.getElementById('f-search').value.toLowerCase();
-      const rows = pedidosPeriodo.filter(d=>
+      const filtradas = pedidosPeriodo.filter(d=>
             (SEL_STATUS.size===0 || SEL_STATUS.has(d.status)) &&
             (!q || (d.nomeCliente||'').toLowerCase().includes(q) || (d.cardHolder||'').toLowerCase().includes(q) || (d.merchantReference||'').toLowerCase().includes(q) || (d.last4||'').includes(q))
                                            ).sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+      const LINHAS_VISIVEIS = 10;
+      const rows = filtradas.slice(0, LINHAS_VISIVEIS);
 
       // contagem historica por cliente (todo o DATA, nao so o periodo filtrado) -
       // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc
@@ -824,21 +890,22 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             if(d.fraudeSuspeita) c.fraude++;
       });
 
-      document.getElementById('tx-count').textContent = rows.length+' / '+pedidosPeriodo.length;
+      document.getElementById('tx-count').textContent = rows.length+' de '+filtradas.length+' ('+pedidosPeriodo.length+' no período)';
       document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
             const c = contagemClientes[clientKeyOf(d)] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0};
             const chave = 'tx:'+d.pspReference;
             const desde = tempoDesdeChegada(chave);
             const novo = desde < NEW_HIGHLIGHT_MS;
-            const recusadoRecente = d.status==='RECUSADO' && desde < DECLINE_HIGHLIGHT_MS;
             const ESTORNO_STATUSES = ['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','ESTORNO_REVERTIDO'];
             let statusCls = '';
-            if(d.fraudeSuspeita || (d.status||'').includes('CHARGEBACK')) statusCls = 'row-recusado-fraude';
+            if(d.fraudeSuspeita) statusCls = 'row-fraude';
+            else if((d.status||'').includes('CHARGEBACK')) statusCls = 'row-chargeback';
             else if(ESTORNO_STATUSES.includes(d.status)) statusCls = 'row-estornado';
-            else if(recusadoRecente) statusCls = 'row-recusado';
+            else if(d.status==='RECUSADO') statusCls = 'row-recusado';
+            const podeComentar = ESTORNO_STATUSES.includes(d.status);
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}</td>
+                      <td>${fmtDT(d.dataHora)}${podeComentar?`<div class="tx-comentario" onclick="event.stopPropagation(); editarComentario('${encodeURIComponent(d.pspReference)}','${encodeURIComponent(d.eventCode)}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`:''}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
                                         <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>

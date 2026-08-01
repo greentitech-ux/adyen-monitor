@@ -71,6 +71,21 @@ function allTransactions() {
   return load();
 }
 
+// comentario manual sobre um estorno especifico (ex: "estornei eu mesmo pelo
+// painel da Adyen") - identificado pelo mesmo par pspReference+eventCode
+// usado no resto do store
+function setComentario(pspReference, eventCode, comentario) {
+  const all = load();
+  const idx = all.findIndex((t) => t.pspReference === pspReference && t.eventCode === eventCode);
+  if (idx < 0) return null;
+  const atualizado = { ...cache[idx], comentario, comentarioEm: new Date().toISOString() };
+  cache[idx] = atualizado;
+  COLLECTION.doc(docId(atualizado))
+    .set(atualizado, { merge: true })
+    .catch((err) => console.error('Erro ao salvar comentario no Firestore:', err.message));
+  return atualizado;
+}
+
 // agrupa os eventos de um mesmo pedido (merchantReference) em uma linha do tempo -
 // e assim conseguimos ver quando um pedido aprovado depois foi estornado, virou
 // chargeback, etc. Alguns eventos (ex: OFFER_CLOSED) podem chegar sem
@@ -80,6 +95,20 @@ function allTransactions() {
 function orderKey(tx) {
   return tx.merchantReference || tx.originalReference || tx.pspReference;
 }
+
+// pedidos que em algum momento entraram em chargeback (ou disputa relacionada) -
+// mostra o pedido inteiro (nao so o evento de chargeback isolado), pra dar
+// contexto: quando foi aprovado, quando virou chargeback, se foi revertido etc.
+const CHARGEBACK_STATUSES = [
+  'CHARGEBACK',
+  'CHARGEBACK_REVERTIDO',
+  'NOTIFICATION_OF_CHARGEBACK',
+  'DISPUTE_DEFENSE_PERIOD_ENDED',
+  'RETRIEVAL_REQUEST',
+];
+// so os eventos que marcam a abertura do chargeback em si (nao a reversao/fim
+// de prazo) contam como "data do chargeback" pro filtro de periodo do painel
+const ABERTURA_CHARGEBACK_STATUSES = ['CHARGEBACK', 'NOTIFICATION_OF_CHARGEBACK'];
 
 function allOrders() {
   const all = load();
@@ -95,6 +124,9 @@ function allOrders() {
         metodo: tx.metodo,
         last4: tx.last4,
         fraudeSuspeita: false,
+        dataCompra: null,
+        dataChargeback: null,
+        prazoDefesa: null,
         history: [],
       });
     }
@@ -110,6 +142,13 @@ function allOrders() {
     order.ultimaAtualizacao = tx.dataHora;
     order.valor = tx.valor;
     order.fraudeSuspeita = order.fraudeSuspeita || !!tx.fraudeSuspeita;
+    if (!order.last4 && tx.last4) order.last4 = tx.last4;
+    if ((!order.cliente || order.cliente === order.unidade + ':') && (tx.cardHolder || tx.nomeCliente)) {
+      order.cliente = tx.cardHolder || tx.nomeCliente;
+    }
+    if (tx.status === 'APROVADO' && !order.dataCompra) order.dataCompra = tx.dataHora;
+    if (ABERTURA_CHARGEBACK_STATUSES.includes(tx.status) && !order.dataChargeback) order.dataChargeback = tx.dataHora;
+    if (tx.prazoDefesa) order.prazoDefesa = tx.prazoDefesa;
   }
   return [...map.values()];
 }
@@ -124,16 +163,6 @@ function ordersChanged() {
     .sort((a, b) => (b.ultimaAtualizacao || '').localeCompare(a.ultimaAtualizacao || ''));
 }
 
-// pedidos que em algum momento entraram em chargeback (ou disputa relacionada) -
-// mostra o pedido inteiro (nao so o evento de chargeback isolado), pra dar
-// contexto: quando foi aprovado, quando virou chargeback, se foi revertido etc.
-const CHARGEBACK_STATUSES = [
-  'CHARGEBACK',
-  'CHARGEBACK_REVERTIDO',
-  'NOTIFICATION_OF_CHARGEBACK',
-  'DISPUTE_DEFENSE_PERIOD_ENDED',
-  'RETRIEVAL_REQUEST',
-];
 function chargebacks() {
   return allOrders()
     .filter((o) => o.history.some((h) => CHARGEBACK_STATUSES.includes(h.status)))
@@ -161,6 +190,7 @@ module.exports = {
   init,
   addOrUpdate,
   allTransactions,
+  setComentario,
   clientStats,
   clientKey,
   pruneOld,

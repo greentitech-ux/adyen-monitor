@@ -160,6 +160,14 @@ app.get('/api/clients/:key', (req, res) => {
   res.json(store.clientStats(decodeURIComponent(req.params.key)));
 });
 
+// comentario manual sobre um estorno (ex: "estornei eu mesmo pelo painel da Adyen")
+app.patch('/api/transactions/:pspReference/:eventCode/comentario', (req, res) => {
+  const tx = store.setComentario(req.params.pspReference, decodeURIComponent(req.params.eventCode), req.body.comentario || '');
+  if (!tx) return res.sendStatus(404);
+  broadcast('update', tx);
+  res.json(tx);
+});
+
 app.get('/api/orders', (req, res) => {
   res.json(store.allOrders());
 });

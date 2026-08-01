@@ -103,8 +103,11 @@ function normalize(item) {
     unidade: item.merchantAccountCode,
     dataHora: new Date().toISOString(), // Adyen nao manda timestamp do evento; usamos hora de recebimento
     disputeStatus: additional.disputeStatus || null,
+    // prazo final pra enviar defesa/recorrer do chargeback - a Adyen manda
+    // esse campo nos eventos CHARGEBACK/NOTIFICATION_OF_CHARGEBACK
+    prazoDefesa: additional.defensePeriodEndsAt || additional.defenseperiodendsat || null,
     bancoEmissor: null, // preenchido depois via BIN lookup (assincrono)
-  };  
+  };
 }
 
 module.exports = { normalize };
