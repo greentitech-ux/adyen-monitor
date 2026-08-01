@@ -20,6 +20,7 @@ const vaultEntries = require('./vaultEntries');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
 const backup = require('./backup');
+const sheetsSync = require('./sheetsSync');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -640,17 +641,61 @@ app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
 });
 
 // ---------- fechamentos de caixa (secao "fechamentos") ----------
-// combina o snapshot importado manualmente do Google Drive (ARCFOOD + Grupo
-// Bravo) com os fechamentos lançados ao vivo pelas lojas. As unidades aqui
-// (19821/19855/19888/19889, ou o nome da loja no Grupo Bravo) sao codigos
-// proprios da planilha, num espaco diferente do merchantAccountCode da
-// Adyen usado em Monitor/Disputas - mas o mesmo campo permissions.unidades
-// e reaproveitado pra filtrar as duas coisas (o Master escolhe os codigos
-// certos pelo seletor de /api/meta/unidades, que junta os dois espacos).
-const fechamentosData = require('./fechamentos-snapshot.json');
+// combina os fechamentos das planilhas do Google Sheets (ARCFOOD + Grupo
+// Bravo, aba "BD") com os fechamentos lançados ao vivo pelas lojas. As
+// unidades aqui (19821/19855/19888/19889, ou o nome da loja no Grupo Bravo)
+// sao codigos proprios da planilha, num espaco diferente do
+// merchantAccountCode da Adyen usado em Monitor/Disputas - mas o mesmo campo
+// permissions.unidades e reaproveitado pra filtrar as duas coisas (o Master
+// escolhe os codigos certos pelo seletor de /api/meta/unidades, que junta os
+// dois espacos).
+//
+// fechamentosData comeca com o snapshot estatico (fallback pro caso da 1a
+// sincronizacao ainda nao ter rodado, ou de a API do Sheets estar fora do
+// ar) e e substituido pelos dados frescos da planilha assim que
+// sincronizarPlanilhasFechamento roda com sucesso (no boot e a cada
+// SHEETS_SYNC_INTERVAL_MS).
+let fechamentosData = require('./fechamentos-snapshot.json');
+let statusSincronizacaoPlanilhas = { ultimaEm: null, ultimoErro: null, sincronizando: false };
+
+async function sincronizarPlanilhasFechamento() {
+  if (statusSincronizacaoPlanilhas.sincronizando) return statusSincronizacaoPlanilhas;
+  statusSincronizacaoPlanilhas.sincronizando = true;
+  try {
+    const dados = await sheetsSync.sincronizar();
+    if (dados.length) {
+      fechamentosData = dados;
+      statusSincronizacaoPlanilhas.ultimaEm = new Date().toISOString();
+      statusSincronizacaoPlanilhas.ultimoErro = null;
+      console.log(`Fechamentos: sincronizados ${dados.length} registros das planilhas do Google Sheets.`);
+    } else {
+      statusSincronizacaoPlanilhas.ultimoErro = 'A sincronização rodou mas não retornou nenhuma linha - planilhas continuam com os dados anteriores.';
+      console.warn(statusSincronizacaoPlanilhas.ultimoErro);
+    }
+  } catch (err) {
+    statusSincronizacaoPlanilhas.ultimoErro = err.message;
+    console.error('Erro ao sincronizar planilhas de fechamento:', err.message);
+  } finally {
+    statusSincronizacaoPlanilhas.sincronizando = false;
+  }
+  return statusSincronizacaoPlanilhas;
+}
+
 app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   const lancados = await fechamentosLive.listAll();
   res.json(auth.filterByUnidade(req, [...fechamentosData, ...lancados]));
+});
+
+app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
+  res.json(statusSincronizacaoPlanilhas);
+});
+
+// forca uma sincronizacao imediata com as planilhas - so o Master (evita
+// disparar chamadas extras na API do Google sem necessidade)
+app.post('/api/fechamentos/sincronizar-planilhas', auth.requireMaster, async (req, res) => {
+  const status = await sincronizarPlanilhasFechamento();
+  if (status.ultimoErro) return res.status(502).json(status);
+  res.json(status);
 });
 
 // ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
@@ -783,5 +828,12 @@ app.use((err, req, res, next) => {
     setInterval(() => {
       backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
     }, 24 * 60 * 60 * 1000);
+
+    // sincroniza os fechamentos com as planilhas do Google Sheets: roda no
+    // start e depois periodicamente (15min por padrao - ajustavel via
+    // SHEETS_SYNC_INTERVAL_MS). O Master tambem pode forçar pela tela.
+    sincronizarPlanilhasFechamento();
+    const intervaloSync = Number(process.env.SHEETS_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
+    setInterval(sincronizarPlanilhasFechamento, intervaloSync);
   });
 })();
