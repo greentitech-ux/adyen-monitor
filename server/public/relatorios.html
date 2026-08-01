@@ -170,6 +170,7 @@ function render(){
             <span class="badge ${d.status}">${d.status}</span>
             <select onchange="atualizarStatus('${d.id}', this.value)">
               ${STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+              <option value="__REMOVER__">Remover</option>
             </select>
           </div>
           ${(d.nomeContato||d.telefoneContato)?`<div class="notas">${d.nomeContato||'—'}${d.telefoneContato?(' · '+d.telefoneContato):''}</div>`:''}
@@ -185,7 +186,15 @@ function render(){
 }
 
 async function atualizarStatus(id, status){
-  await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  if(status === '__REMOVER__'){
+    if(!confirm('Remover este registro? A tag de acompanhamento some e o pedido sai deste relatório.')){
+      await carregar(); // desfaz a selecao no <select>
+      return;
+    }
+    await fetch('/api/disputes/'+id, { method:'DELETE' });
+  } else {
+    await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  }
   await carregar();
 }
 

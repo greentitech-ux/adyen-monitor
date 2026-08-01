@@ -112,6 +112,7 @@
     <div class="sub" id="sync-info">carregando...</div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+    <button class="back hidden" id="btn-sincronizar-planilhas" onclick="sincronizarPlanilhas()" style="cursor:pointer;">🔄 Sincronizar agora</button>
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
     <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
@@ -278,16 +279,50 @@ function fmtMoneyEixo(v){
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
+// texto de "última sincronização" a partir do status que o backend guarda
+// (a sincronizacao com as planilhas do Sheets roda sozinha no servidor)
+async function carregarStatusSincronizacao(){
+  try{
+    const status = await fetch('/api/fechamentos/sincronizacao').then(r=>r.json());
+    if(status.ultimaEm){
+      const dt = new Date(status.ultimaEm);
+      SYNC_INFO_SUFIXO = ` · planilhas sincronizadas automaticamente (última vez ${dt.toLocaleString('pt-BR')})`;
+    } else {
+      SYNC_INFO_SUFIXO = ' · aguardando a 1ª sincronização automática com as planilhas';
+    }
+    if(status.ultimoErro) SYNC_INFO_SUFIXO += ` — ⚠️ falha na última tentativa: ${status.ultimoErro}`;
+  }catch(e){
+    SYNC_INFO_SUFIXO = '';
+  }
+}
+
+async function sincronizarPlanilhas(){
+  const btn = document.getElementById('btn-sincronizar-planilhas');
+  btn.disabled = true; btn.textContent = '🔄 Sincronizando...';
+  try{
+    const resp = await fetch('/api/fechamentos/sincronizar-planilhas', { method:'POST' });
+    const status = await resp.json();
+    if(!resp.ok) throw new Error(status.ultimoErro || 'Erro ao sincronizar.');
+    await carregar();
+  }catch(err){
+    alert('Não foi possível sincronizar as planilhas: ' + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
+  }
+}
+
+let SYNC_INFO_SUFIXO = '';
 async function carregar(){
   const resp = await fetch('/api/fechamentos');
   DATA = await resp.json();
+  await carregarStatusSincronizacao();
   const datas = DATA.map(d=>d.data).filter(Boolean).sort();
   const partesGrupo = [];
   if(GRUPO_VISIVEL.ARCFOOD) partesGrupo.push(`${DATA.filter(d=>d.grupo==='ARCFOOD').length} ARCFOOD`);
   if(GRUPO_VISIVEL.BRAVO) partesGrupo.push(`${DATA.filter(d=>d.grupo==='BRAVO').length} Grupo Bravo`);
   const sufixoGrupo = partesGrupo.length ? ` (${partesGrupo.join(' · ')})` : '';
   document.getElementById('sync-info').textContent = datas.length
-    ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · sincronizado manualmente da planilha`
+    ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
     : 'nenhum fechamento importado ainda';
   const ontem = new Date(); ontem.setDate(ontem.getDate()-1);
   setupPresets(isoLocal(ontem)); // por padrao, referencia e sempre "ontem" (dia -1)
@@ -903,6 +938,7 @@ async function boot(){
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('btn-sincronizar-planilhas').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('fechamentos')){
     document.getElementById('sem-acesso').classList.remove('hidden');

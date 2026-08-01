@@ -261,7 +261,7 @@
   </div>
   <div class="tablewrap" style="max-height:360px;">
     <table>
-      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
+      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th>Status</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
       <tbody id="tx-body"></tbody>
     </table>
   </div>
@@ -717,14 +717,24 @@ async function carregarHistoricoDisputas(pedidoId){
       </div>
       <select onchange="atualizarStatusDisputa('${d.id}', this.value)">
         ${DISPUTE_STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+        <option value="__REMOVER__">Remover</option>
       </select>
     </div>
   `).join('') : '<div class="empty">Nenhum registro ainda.</div>';
 }
 
 async function atualizarStatusDisputa(id, status){
-  await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
-  if(DISPUTE_PEDIDO) carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
+  if(status === '__REMOVER__'){
+    if(!confirm('Remover este registro? A tag de acompanhamento some e o pedido sai do relatório de disputas.')) {
+      if(DISPUTE_PEDIDO) carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId); // desfaz a selecao no <select>
+      return;
+    }
+    await fetch('/api/disputes/'+id, { method:'DELETE' });
+  } else {
+    await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  }
+  if(DISPUTE_PEDIDO) await carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
+  if(podeSecao('disputas')) refreshDisputeMarkers();
 }
 
 document.getElementById('dispute-form').addEventListener('submit', async (e)=>{
@@ -1266,21 +1276,47 @@ function removerOfferClosedSuperado(pedidos){
       const rows = filtradas;
 
       // contagem historica por cliente (todo o DATA, nao so o periodo filtrado) -
-      // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc
+      // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc.
+      //
+      // duas correcoes importantes aqui (numeros idênticos e inflados em pedidos
+      // Pix diferentes eram o sintoma):
+      // 1. DATA tem um registro por EVENTO da Adyen (autorizacao, estorno,
+      //    chargeback...), entao um mesmo pedido conta varias vezes se so
+      //    somarmos direto - agrupamos por pedido primeiro (mesma logica de
+      //    orderKeyOf usada no resto da tela) e usamos so o status mais recente.
+      // 2. clientKeyOf cai pra shopperReference (que em Pix sem
+      //    e-mail cadastrado vira so "<unidade>:", igual pra QUALQUER cliente
+      //    daquela unidade) - isso juntava clientes diferentes na mesma conta.
+      //    chaveClienteIdentificavel (mesma usada na deteccao de repetidos)
+      //    exige cartao ou nome pra contar; sem nenhum dos dois, retorna null
+      //    e a linha mostra "—" em vez de emprestar a contagem de outro cliente.
+      const pedidosHistorico = new Map();
+      DATA.forEach(t=>{
+            const key = orderKeyOf(t);
+            const atual = pedidosHistorico.get(key);
+            if(!atual || (t.dataHora||'') >= (atual.dataHora||'')) pedidosHistorico.set(key, t);
+      });
+      const ESTORNO_STATUSES_HIST = ['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','ESTORNO_REVERTIDO'];
       const contagemClientes = {};
-      DATA.forEach(d=>{
-            const k = clientKeyOf(d);
+      pedidosHistorico.forEach(d=>{
+            const k = chaveClienteIdentificavel(d);
+            if(!k) return;
             const c = (contagemClientes[k] ||= {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0});
             c.total++;
             if(d.status==='APROVADO') c.aprovadas++;
             if(d.status==='RECUSADO') c.recusadas++;
-            if(d.status==='ESTORNADO') c.estornadas++;
+            if(ESTORNO_STATUSES_HIST.includes(d.status)) c.estornadas++;
             if(d.fraudeSuspeita) c.fraude++;
       });
 
       document.getElementById('tx-count').textContent = rows.length+' / '+pedidosPeriodo.length;
       document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
-            const c = contagemClientes[clientKeyOf(d)] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0};
+            // null quando o pedido nao tem cartao nem nome pra identificar o
+            // cliente com segurança (Pix anonimo, comum hoje) - nesse caso as
+            // colunas de contagem mostram "—" em vez de emprestar o numero de
+            // outro cliente qualquer
+            const chaveCliente = chaveClienteIdentificavel(d);
+            const c = chaveCliente ? (contagemClientes[chaveCliente] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0}) : null;
             const chave = 'tx:'+d.pspReference;
             const desde = tempoDesdeChegada(chave);
             const novo = desde < NEW_HIGHLIGHT_MS;
@@ -1307,16 +1343,16 @@ function removerOfferClosedSuperado(pedidos){
                       <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
-                                        <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
-                                              <td>${d.metodo||'—'}</td>
-                                                    <td class="valor">${fmtMoney(d.valor)}</td>
-                                                          <td>${d.last4?('•• '+d.last4):'—'}</td>
-                                                                <td class="statuscell">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
-                                                                      <td class="valor">${c.total}</td>
-                                                                            <td class="valor">${c.aprovadas}</td>
-                                                                                  <td class="valor">${c.recusadas}</td>
-                                                                                        <td class="valor">${c.estornadas}</td>
-                                                                                              <td class="valor">${c.fraude}</td>
+                                        <td class="statuscell">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
+                                              <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
+                                                    <td>${d.metodo||'—'}</td>
+                                                          <td class="valor">${fmtMoney(d.valor)}</td>
+                                                                <td>${d.last4?('•• '+d.last4):'—'}</td>
+                                                                      <td class="valor">${c?c.total:'—'}</td>
+                                                                            <td class="valor">${c?c.aprovadas:'—'}</td>
+                                                                                  <td class="valor">${c?c.recusadas:'—'}</td>
+                                                                                        <td class="valor">${c?c.estornadas:'—'}</td>
+                                                                                              <td class="valor">${c?c.fraude:'—'}</td>
                                                                                                     <td class="truncate" title="${d.bancoEmissor||''}">${d.bancoEmissor||'—'}</td>
                                                                                                         </tr>
                                                                                                           `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
