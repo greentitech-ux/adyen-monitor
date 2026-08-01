@@ -58,6 +58,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
     <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
@@ -189,9 +190,10 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos'] : (me.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
 

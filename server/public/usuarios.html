@@ -71,6 +71,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
     <a class="back" href="/">📈 Monitor</a>
+    <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back" href="/relatorios.html">📊 Relatórios</a>
     <a class="back" href="/cofre.html">🔐 Cofre</a>
     <button class="back" onclick="logout()">🚪 Sair</button>
@@ -151,7 +152,7 @@ window.fetch = (url, opts = {}) => {
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (ARCFOOD)'] ];
 let UNIDADES = [];
 let VAULT_GROUPS = [];
 let VAULT_SUBGROUPS = [];

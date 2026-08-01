@@ -20,8 +20,9 @@
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-  a.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);}
-  a.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  .hidden{display:none!important;}
   .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -66,8 +67,18 @@
     <h1>Fechamentos de caixa</h1>
     <div class="sub" id="sync-info">carregando...</div>
   </div>
-  <a class="back" href="/">← Voltar ao monitor</a>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
+  </div>
 </header>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso aos Fechamentos. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
 
 <div class="kpis" id="kpis"></div>
 
@@ -126,7 +137,21 @@
   </div>
 </div>
 
+</div><!-- /#root -->
+
 <script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+
 let DATA = [];
 const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
 const CORES_UNIDADE = { '19821':'#5cc8ff', '19855':'#f2b33d', '19888':'#3ddc97', '19889':'#ff8fd6' };
@@ -381,7 +406,27 @@ function render(){
 
 ['f-date-start','f-date-end'].forEach(id=>document.getElementById(id).addEventListener('input', render));
 
-carregar();
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  const me = await res.json();
+  const isMaster = me.role==='master';
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos'] : (me.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+
+  if(!secoes.includes('fechamentos')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+}
+
+boot();
 </script>
 </body>
 </html>
