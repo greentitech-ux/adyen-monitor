@@ -119,6 +119,7 @@
   <main class="main">
     <div class="toolbar">
       <input type="search" id="search" placeholder="Buscar por título, URL ou usuário...">
+      <button class="back hidden" id="export-open-btn" style="cursor:pointer;">⬇ Exportar</button>
       <button class="primary" id="new-entry-btn">+ Nova senha</button>
     </div>
     <p id="current-path"></p>
@@ -162,6 +163,30 @@
   </form>
 </div>
 
+<div class="overlay" id="export-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h3>Exportar cofre</h3>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:-8px;">A senha vai em texto puro no arquivo - guarde com cuidado.</p>
+    <label>Escopo
+      <select id="export-scope">
+        <option value="all">Tudo (todos os grupos)</option>
+        <option value="group">Um grupo específico</option>
+        <option value="subgroup">Um subgrupo específico</option>
+      </select>
+    </label>
+    <label class="hidden" id="export-group-wrap">Grupo<select id="export-group"></select></label>
+    <label class="hidden" id="export-subgroup-wrap">Subgrupo<select id="export-subgroup"></select></label>
+    <p class="err hidden" id="export-err"></p>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button type="button" id="export-cancel">Cancelar</button>
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="export-csv-btn">⬇ Planilha (CSV)</button>
+        <button type="button" id="export-pdf-btn" class="primary">⬇ PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ---- sessao (mesmo token usado no monitor - se nao tiver, volta pro login) ----
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
@@ -199,6 +224,7 @@ async function boot(){
     return;
   }
   document.getElementById('new-group-form').classList.toggle('hidden', !isMaster);
+  document.getElementById('export-open-btn').classList.toggle('hidden', !isMaster);
   document.getElementById('root').classList.remove('hidden');
   await carregarTudo();
 }
@@ -474,6 +500,52 @@ document.getElementById('gen-btn').addEventListener('click', ()=>{
   pwInput.value = out;
   pwInput.type = 'text';
 });
+
+// ---- exportar (CSV/PDF) - so o Master ve o botao, mas o backend tambem exige ----
+const exportOverlay = document.getElementById('export-overlay');
+const exportScopeSel = document.getElementById('export-scope');
+
+function popularSelectExport(select, options){
+  select.innerHTML = options.map(o=>`<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('');
+}
+
+document.getElementById('export-open-btn').addEventListener('click', ()=>{
+  document.getElementById('export-err').classList.add('hidden');
+  popularSelectExport(document.getElementById('export-group'), GROUPS.map(g=>({id:g.id, label:g.name})));
+  popularSelectExport(document.getElementById('export-subgroup'), SUBGROUPS.map(s=>{
+    const g = GROUPS.find(x=>x.id===s.groupId);
+    return { id: s.id, label: (g?g.name+' / ':'')+s.name };
+  }));
+  // pre-seleciona o que estiver sendo visto no momento
+  exportScopeSel.value = SELECTED_SUBGROUP==='all' ? 'all' : 'subgroup';
+  if(SELECTED_SUBGROUP!=='all') document.getElementById('export-subgroup').value = SELECTED_SUBGROUP;
+  atualizarCamposExport();
+  exportOverlay.classList.add('show');
+});
+document.getElementById('export-cancel').addEventListener('click', ()=>exportOverlay.classList.remove('show'));
+exportOverlay.addEventListener('click', (e)=>{ if(e.target===exportOverlay) exportOverlay.classList.remove('show'); });
+
+function atualizarCamposExport(){
+  const scope = exportScopeSel.value;
+  document.getElementById('export-group-wrap').classList.toggle('hidden', scope!=='group');
+  document.getElementById('export-subgroup-wrap').classList.toggle('hidden', scope!=='subgroup');
+}
+exportScopeSel.addEventListener('change', atualizarCamposExport);
+
+function baixarExportacao(formato){
+  const errEl = document.getElementById('export-err');
+  errEl.classList.add('hidden');
+  const scope = exportScopeSel.value;
+  let id = '';
+  if(scope==='group') id = document.getElementById('export-group').value;
+  if(scope==='subgroup') id = document.getElementById('export-subgroup').value;
+  if(scope!=='all' && !id){ errEl.textContent='Nenhum grupo/subgrupo disponível pra exportar.'; errEl.classList.remove('hidden'); return; }
+  const params = new URLSearchParams({ scope, token: AUTH_TOKEN });
+  if(id) params.set('id', id);
+  window.location.href = `/api/vault/export.${formato}?${params.toString()}`;
+}
+document.getElementById('export-csv-btn').addEventListener('click', ()=>baixarExportacao('csv'));
+document.getElementById('export-pdf-btn').addEventListener('click', ()=>baixarExportacao('pdf'));
 
 boot();
 </script>

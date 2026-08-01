@@ -17,6 +17,7 @@ const users = require('./users');
 const vaultGroups = require('./vaultGroups');
 const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
+const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
 
 const upload = multer({
@@ -486,6 +487,73 @@ app.delete('/api/vault/entries/:id', requireSection('cofre'), async (req, res) =
     if (permitidos && (!atual.subgroupId || !permitidos.has(atual.subgroupId))) return res.sendStatus(404);
     await vaultEntries.remove(req.params.id);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// exporta o cofre (tudo, um grupo ou um subgrupo) em CSV ou PDF - so o Master
+// (a senha vai em texto puro no arquivo, de proposito - e pra servir como
+// inventario/backup). ?scope=all|group|subgroup&id=<groupId|subgroupId>
+async function resolverEscopoExportacao(req) {
+  const scope = ['group', 'subgroup'].includes(req.query.scope) ? req.query.scope : 'all';
+  const id = req.query.id || null;
+  const [groups, subgroups] = await Promise.all([vaultGroups.list(), vaultSubgroups.listAll()]);
+  const groupById = new Map(groups.map((g) => [g.id, g]));
+  const subgroupById = new Map(subgroups.map((s) => [s.id, s]));
+
+  let subgroupIds = null; // null = tudo
+  let titulo = 'Cofre de senhas · Todas as senhas';
+  if (scope === 'subgroup') {
+    const sub = subgroupById.get(id);
+    if (!sub) throw new Error('Subgrupo não encontrado.');
+    const grp = groupById.get(sub.groupId);
+    subgroupIds = [sub.id];
+    titulo = `Cofre de senhas · ${grp ? grp.name + ' / ' : ''}${sub.name}`;
+  } else if (scope === 'group') {
+    const grp = groupById.get(id);
+    if (!grp) throw new Error('Grupo não encontrado.');
+    subgroupIds = subgroups.filter((s) => s.groupId === id).map((s) => s.id);
+    titulo = `Cofre de senhas · ${grp.name}`;
+  }
+
+  const entries = await vaultEntries.listBySubgroups(subgroupIds);
+  const rows = entries
+    .map((e) => {
+      const sub = e.subgroupId ? subgroupById.get(e.subgroupId) : null;
+      const grp = sub ? groupById.get(sub.groupId) : null;
+      return {
+        grupo: grp ? grp.name : '',
+        subgrupo: sub ? sub.name : '',
+        titulo: e.title,
+        url: e.url,
+        usuario: e.username,
+        senha: e.password,
+        observacao: e.note,
+        atualizadoEm: e.updatedAt,
+      };
+    })
+    .sort((a, b) => (a.grupo + a.subgrupo + a.titulo).localeCompare(b.grupo + b.subgrupo + b.titulo, 'pt-BR'));
+
+  return { titulo, rows };
+}
+
+app.get('/api/vault/export.csv', auth.requireMaster, async (req, res) => {
+  try {
+    const { titulo, rows } = await resolverEscopoExportacao(req);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${vaultExport.slugify(titulo)}.csv"`);
+    res.send(vaultExport.toCSV(rows));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
+  try {
+    const { titulo, rows } = await resolverEscopoExportacao(req);
+    const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')} · ${rows.length} senha(s)`;
+    vaultExport.writePDF(res, { titulo, subtitulo, rows });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
