@@ -21,7 +21,6 @@
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-  .sub{color:var(--muted);font-size:13px;margin-top:4px;}
   .pulse{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);}
   .pulse.off{background:var(--bad-dim);color:var(--bad);border-color:#4a2323;}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 rgba(61,220,151,.6);animation:p 2s infinite;}
@@ -41,8 +40,13 @@
   @media(max-width:1300px){.grid4{grid-template-columns:1fr 1fr;}}
   @media(max-width:700px){.grid4{grid-template-columns:1fr;}}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
-  .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:none;}
   .panel h2 .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
+  /* os 4 paineis da grid4 tem a mesma altura fixa e o corpo (orders/alerts)
+     ocupa o espaco restante via flex - assim o scroll sempre preenche o
+     container certinho, sem sobra em branco nem cortar a barra de rolagem */
+  .grid4 .panel{display:flex;flex-direction:column;height:520px;}
+  .grid4 .orders,.grid4 .alerts{flex:1;min-height:0;max-height:none;overflow-y:auto;}
   .alerts{max-height:520px;overflow-y:auto;}
   .alert{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;}
   .alert:last-child{border-bottom:none;}
@@ -75,7 +79,8 @@
   .badge.CHARGEBACK,.badge.NOTIFICATION_OF_CHARGEBACK{background:var(--bad-dim);color:var(--bad);}
   .badge.ESTORNADO,.badge.FALHA_ESTORNO,.badge.ESTORNO_AGENDADO{background:var(--warn-dim);color:var(--warn);}
   .badge.DISPUTE_DEFENSE_PERIOD_ENDED{background:#1e2733;color:var(--accent);}
-  .btn-notif{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-notif.on{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
   .flag{font-family:var(--mono);font-size:10px;color:var(--bad);border:1px solid #4a2323;padding:1px 6px;border-radius:4px;margin-left:6px;}
   .valor{font-family:var(--mono);}
@@ -125,12 +130,11 @@
 <header>
   <div>
     <div class="eyebrow">Solutions Ti Tech · Adyen</div>
-    <h1>Monitor de transações — ao vivo</h1>
-    <div class="sub">Alimentado direto pelos webhooks da Adyen</div>
+    <h1>Monitor de transações</h1>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()">🔔 Ativar notificações</button>
-    <button class="btn-notif" id="btn-refresh" onclick="location.reload()">🔄 Atualizar página</button>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
+    <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
   </div>
 </header>
@@ -182,6 +186,24 @@
   <div class="panel">
     <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
     <div class="orders" id="chargebacks"></div>
+  </div>
+</div>
+
+<div class="grid" style="margin-top:16px;">
+  <div class="panel">
+    <h2>Tendência de aprovação <span class="n" id="trend-info"></span></h2>
+    <div style="padding:14px 16px;">
+      <svg id="trend-chart" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:220px;display:block;"></svg>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
+    <div class="tablewrap" style="max-height:260px;">
+      <table>
+        <thead><tr><th>Unid.</th><th>Transações</th><th>Taxa aprov.</th><th>Volume aprovado</th><th>Recusadas</th><th>Estornos</th><th>Chargebacks</th></tr></thead>
+        <tbody id="unidades-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -324,6 +346,106 @@ function computeSummary(rows){
     fraudeSuspeita: fraudeRows.length,
     valorFraude: soma(fraudeRows),
   };
+}
+
+// lista de dias (YYYY-MM-DD) dentro do intervalo de datas selecionado - usada
+// pra desenhar o grafico de tendencia dia a dia
+function diasNoIntervalo(){
+  const {start,end} = getDateRange();
+  const dias = [];
+  if(!isFinite(start) || !isFinite(end)) return dias;
+  const cursor = new Date(start);
+  cursor.setHours(0,0,0,0);
+  const limite = new Date(end);
+  let i = 0;
+  while(cursor.getTime() <= limite.getTime() && i < 366){
+    dias.push(cursor.toISOString().slice(0,10));
+    cursor.setDate(cursor.getDate()+1);
+    i++;
+  }
+  return dias;
+}
+
+// grafico de linha (SVG puro, sem lib externa) da taxa de aprovacao dia a dia,
+// dentro do periodo/unidade/status selecionados
+function renderTrendChart(rows){
+  const svg = document.getElementById('trend-chart');
+  const dias = diasNoIntervalo();
+  if(!dias.length){ svg.innerHTML = ''; return; }
+
+  const porDia = {};
+  dias.forEach(d=>{ porDia[d] = {total:0, aprovadas:0}; });
+  rows.forEach(t=>{
+    const dia = (t.dataHora||'').slice(0,10);
+    if(!porDia[dia]) return;
+    porDia[dia].total++;
+    if(t.status==='APROVADO') porDia[dia].aprovadas++;
+  });
+
+  const W=600, H=220, padL=34, padR=10, padT=10, padB=22;
+  const innerW = W-padL-padR, innerH = H-padT-padB;
+  const n = dias.length;
+  const pts = dias.map((dia,i)=>{
+    const info = porDia[dia];
+    const x = padL + (n===1 ? innerW/2 : innerW*i/(n-1));
+    const taxa = info.total ? (info.aprovadas/info.total*100) : null;
+    const y = taxa==null ? null : padT + innerH - (taxa/100*innerH);
+    return {x,y,taxa,dia,total:info.total};
+  });
+
+  const grid = [0,50,100].map(v=>{
+    const y = padT+innerH-(v/100*innerH);
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#232a33" stroke-width="1"/>` +
+           `<text x="2" y="${(y+3).toFixed(1)}" font-size="9" fill="#7d8896" font-family="monospace">${v}%</text>`;
+  }).join('');
+
+  const passoRotulo = Math.max(1, Math.ceil(n/7));
+  const rotulos = pts.filter((p,i)=>i%passoRotulo===0 || i===n-1).map(p=>
+    `<text x="${p.x.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${p.dia.slice(8,10)}/${p.dia.slice(5,7)}</text>`
+  ).join('');
+
+  const comDado = pts.filter(p=>p.y!=null);
+  const linha = comDado.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const pontos = comDado.map(p=>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#5cc8ff"><title>${p.dia}: ${p.taxa.toFixed(1)}% (${p.total} transações)</title></circle>`
+  ).join('');
+
+  svg.innerHTML = comDado.length
+    ? `${grid}${rotulos}<polyline points="${linha}" fill="none" stroke="#5cc8ff" stroke-width="2"/>${pontos}`
+    : `${grid}${rotulos}<text x="${W/2}" y="${H/2}" font-size="12" fill="#7d8896" font-family="monospace" text-anchor="middle">Sem transações no período</text>`;
+
+  const label = dias.length===1 ? dias[0] : `${dias[0]} → ${dias[dias.length-1]}`;
+  document.getElementById('trend-info').textContent = label;
+}
+
+// tabela comparativa por unidade, respeitando os mesmos 3 filtros (periodo,
+// unidade, status) do resto do dashboard
+function renderUnidadesTable(rows){
+  const porUnidade = {};
+  rows.forEach(t=>{
+    const u = t.unidade || '—';
+    const c = (porUnidade[u] ||= {total:0, aprovadas:0, recusadas:0, estornos:0, chargebacks:0, volumeAprovado:0});
+    c.total++;
+    if(t.status==='APROVADO'){ c.aprovadas++; c.volumeAprovado += t.valor||0; }
+    if(t.status==='RECUSADO') c.recusadas++;
+    if(t.status==='ESTORNADO') c.estornos++;
+    if((t.status||'').includes('CHARGEBACK')) c.chargebacks++;
+  });
+  const linhas = Object.entries(porUnidade).sort((a,b)=>b[1].total-a[1].total);
+  document.getElementById('unidades-count').textContent = linhas.length;
+  document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>{
+    const taxa = c.total ? (c.aprovadas/c.total*100) : 0;
+    const cor = taxa>85 ? 'var(--ok)' : (taxa>70 ? 'var(--warn)' : 'var(--bad)');
+    return `<tr>
+      <td class="valor">${soNumero(u)}</td>
+      <td class="valor">${c.total}</td>
+      <td class="valor" style="color:${cor}">${taxa.toFixed(1)}%</td>
+      <td class="valor">${fmtMoney(c.volumeAprovado)}</td>
+      <td class="valor">${c.recusadas}</td>
+      <td class="valor">${c.estornos}</td>
+      <td class="valor">${c.chargebacks}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
 }
 
 async function refreshOrdersChanged(){
@@ -567,6 +689,8 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
       const periodUnidadeStatus = filtraPorStatusEvento(periodUnidade);
       renderKpis(computeSummary(periodUnidadeStatus));
       renderAlerts(periodUnidadeStatus);
+      renderTrendChart(periodUnidadeStatus);
+      renderUnidadesTable(periodUnidadeStatus);
       renderOrdersChanged();
       renderChargebacks();
 
@@ -650,10 +774,21 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
 })();
 
 // ---- SSE: atualizacoes ao vivo ----
+// identificador da versao do servidor atualmente conectada - quando um deploy
+// acontece o processo reinicia com um BOOT_ID novo; ao reconectar (o
+// EventSource reconecta sozinho), detectamos a mudanca e recarregamos a
+// pagina automaticamente, sem precisar que alguem clique em "atualizar"
+let BOOT_ID = null;
+
 function connectStream(){
   const es = new EventSource('/api/stream');
   es.onopen = () => { document.getElementById('conn').classList.remove('off'); document.getElementById('conn-txt').textContent='ao vivo'; };
   es.onerror = () => { document.getElementById('conn').classList.add('off'); document.getElementById('conn-txt').textContent='reconectando...'; };
+  es.addEventListener('hello', (e)=>{
+    const { bootId } = JSON.parse(e.data);
+    if(BOOT_ID===null){ BOOT_ID = bootId; }
+    else if(BOOT_ID!==bootId){ location.reload(); }
+  });
   es.addEventListener('transaction', (e)=>{
     const tx = JSON.parse(e.data);
     DATA.push(tx);
@@ -697,7 +832,7 @@ function urlBase64ToUint8Array(base64String) {
 function updateNotifBtn(on){
   const btn = document.getElementById('btn-notif');
   btn.classList.toggle('on', on);
-  btn.textContent = on ? '🔔 Notificações ativadas' : '🔔 Ativar notificações';
+  btn.title = on ? 'Notificações ativadas' : 'Ativar notificações push';
 }
 
 async function toggleNotifications(){

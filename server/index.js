@@ -15,6 +15,11 @@ app.use(express.json({ limit: '2mb' }));
 
 const PORT = process.env.PORT || 3000;
 
+// identificador unico deste processo - muda a cada deploy/restart. O
+// dashboard usa isso pra recarregar sozinho quando detecta que o servidor
+// subiu uma versao nova, sem precisar que alguem aperte "atualizar".
+const BOOT_ID = crypto.randomUUID();
+
 // chaves HMAC por merchant account (cada webhook na Adyen tem a sua propria chave).
 // aceita tanto o formato novo (ADYEN_HMAC_KEYS, um JSON) quanto o antigo
 // (ADYEN_HMAC_KEY, uma unica chave usada para qualquer conta) para nao quebrar
@@ -43,6 +48,7 @@ app.get('/api/stream', (req, res) => {
     Connection: 'keep-alive',
   });
   res.flushHeaders();
+  res.write(`event: hello\ndata: ${JSON.stringify({ bootId: BOOT_ID })}\n\n`);
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
 });
