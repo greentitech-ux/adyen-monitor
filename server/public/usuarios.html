@@ -34,6 +34,9 @@
   .badge.user{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
   .badge.on{background:var(--ok-dim);color:var(--ok);}
   .badge.off{background:var(--bad-dim);color:var(--bad);}
+  .badge.locked{background:var(--bad-dim);color:var(--bad);}
+  .checks .group-heading{width:100%;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
+  .checks .group-heading:first-child{margin-top:0;}
   .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:280px;}
   .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
   .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
@@ -80,7 +83,7 @@
   <div class="panel">
     <h2>Acessos cadastrados</h2>
     <table>
-      <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Grupos do cofre</th><th></th></tr></thead>
+      <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
       <tbody id="users-body"></tbody>
     </table>
   </div>
@@ -102,7 +105,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Grupos do cofre</legend>
+        <legend>Cofre (subgrupos)</legend>
         <div class="checks" id="c-groups"></div>
       </fieldset>
 
@@ -124,7 +127,7 @@
       <div class="checks" id="p-unidades"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Grupos do cofre</legend>
+      <legend>Cofre (subgrupos)</legend>
       <div class="checks" id="p-groups"></div>
     </fieldset>
     <p class="err hidden" id="perm-err"></p>
@@ -151,6 +154,7 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'] ];
 let UNIDADES = [];
 let VAULT_GROUPS = [];
+let VAULT_SUBGROUPS = [];
 let USERS = [];
 let EDITING_USER = null;
 
@@ -161,8 +165,27 @@ function checksHtml(name, options, valueFn, labelFn, checkedSet){
     return `<label><input type="checkbox" name="${name}" value="${value}" ${checked}> ${label}</label>`;
   }).join('') || `<span style="color:var(--muted);font-size:11.5px;">Nenhuma opção disponível ainda.</span>`;
 }
+// subgrupos do cofre agrupados visualmente pelo grupo pai (ex: GBE > DOM_BESSA)
+function subgroupChecksHtml(checkedSet){
+  const html = VAULT_GROUPS.map(g=>{
+    const filhos = VAULT_SUBGROUPS.filter(s=>s.groupId===g.id);
+    if(!filhos.length) return '';
+    const itens = filhos.map(s=>{
+      const checked = checkedSet.has(s.id) ? 'checked' : '';
+      return `<label><input type="checkbox" value="${s.id}" ${checked}> ${escapeHtml(s.name)}</label>`;
+    }).join('');
+    return `<div class="group-heading">${escapeHtml(g.name)}</div>${itens}`;
+  }).join('');
+  return html || `<span style="color:var(--muted);font-size:11.5px;">Nenhum subgrupo criado ainda no Cofre.</span>`;
+}
 function readChecked(container){
   return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+}
+function caminhoSubgrupo(id){
+  const s = VAULT_SUBGROUPS.find(x=>x.id===id);
+  if(!s) return id;
+  const g = VAULT_GROUPS.find(x=>x.id===s.groupId);
+  return (g?g.name+' / ':'')+s.name;
 }
 
 async function boot(){
@@ -172,15 +195,16 @@ async function boot(){
   if(me.role!=='master'){ document.getElementById('sem-acesso').classList.remove('hidden'); return; }
   document.getElementById('root').classList.remove('hidden');
 
-  const [unidades, groups] = await Promise.all([
+  const [unidades, groups, subgroups] = await Promise.all([
     fetch('/api/meta/unidades').then(r=>r.json()),
     fetch('/api/vault/groups').then(r=>r.json()),
+    fetch('/api/vault/subgroups').then(r=>r.json()),
   ]);
-  UNIDADES = unidades; VAULT_GROUPS = groups;
+  UNIDADES = unidades; VAULT_GROUPS = groups; VAULT_SUBGROUPS = subgroups;
 
   document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
   document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
-  document.getElementById('c-groups').innerHTML = checksHtml('groups', VAULT_GROUPS, g=>g.id, g=>g.name, new Set());
+  document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
 
   await carregarUsuarios();
 }
@@ -199,17 +223,20 @@ function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;
 function renderUsers(){
   const tbody = document.getElementById('users-body');
   tbody.innerHTML = USERS.map(u=>{
-    const perms = u.permissions || {sections:[],unidades:[],vaultGroups:[]};
-    const groupNames = (perms.vaultGroups||[]).map(id => VAULT_GROUPS.find(g=>g.id===id)?.name || id);
+    const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
+    const subgroupNames = (perms.vaultSubgroups||[]).map(caminhoSubgrupo);
     const isMaster = u.role==='master';
+    const statusBadges = u.locked
+      ? `<span class="badge locked" title="Bloqueado após 3 tentativas de senha erradas - use \"Nova senha\" pra destravar">bloqueado</span>`
+      : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`;
     return `
     <tr>
       <td>${escapeHtml(u.email)}</td>
       <td><span class="badge ${u.role}">${u.role}</span></td>
-      <td><span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span></td>
+      <td>${statusBadges}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades)}</td>
-      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(groupNames)}</td>
+      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
       <td>
         ${isMaster ? '' : `
         <div class="rowacts">
@@ -233,7 +260,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     permissions: {
       sections: readChecked(document.getElementById('c-sections')),
       unidades: readChecked(document.getElementById('c-unidades')),
-      vaultGroups: readChecked(document.getElementById('c-groups')),
+      vaultSubgroups: readChecked(document.getElementById('c-groups')),
     },
   };
   try{
@@ -243,7 +270,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     document.getElementById('create-form').reset();
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
     document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
-    document.getElementById('c-groups').innerHTML = checksHtml('groups', VAULT_GROUPS, g=>g.id, g=>g.name, new Set());
+    document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
 });
@@ -254,10 +281,10 @@ function editarPermissoes(id){
   if(!u) return;
   EDITING_USER = id;
   document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
-  const perms = u.permissions || {sections:[],unidades:[],vaultGroups:[]};
+  const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
   document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
   document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x, x=>x, new Set(perms.unidades));
-  document.getElementById('p-groups').innerHTML = checksHtml('groups', VAULT_GROUPS, g=>g.id, g=>g.name, new Set(perms.vaultGroups));
+  document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');
 }
@@ -270,7 +297,7 @@ document.getElementById('perm-form').addEventListener('submit', async (e)=>{
   const permissions = {
     sections: readChecked(document.getElementById('p-sections')),
     unidades: readChecked(document.getElementById('p-unidades')),
-    vaultGroups: readChecked(document.getElementById('p-groups')),
+    vaultSubgroups: readChecked(document.getElementById('p-groups')),
   };
   try{
     const res = await fetch('/api/users/'+EDITING_USER+'/permissions', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({permissions})});
@@ -282,12 +309,13 @@ document.getElementById('perm-form').addEventListener('submit', async (e)=>{
 });
 
 async function resetarSenha(id){
-  const nova = prompt('Nova senha temporária (mín. 8 caracteres):');
+  const nova = prompt('Nova senha temporária (mín. 8 caracteres) - isso também desbloqueia o acesso, se estiver bloqueado:');
   if(!nova) return;
   const res = await fetch('/api/users/'+id+'/reset-password', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:nova})});
   const data = await res.json();
   if(!res.ok){ alert(data.error||'Erro ao trocar senha.'); return; }
   alert('Senha atualizada.');
+  await carregarUsuarios();
 }
 
 async function alternarAtivo(id, active){

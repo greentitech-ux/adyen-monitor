@@ -75,6 +75,7 @@
   tbody tr.row-estornado{background:rgba(242,179,61,.16);}
   tbody tr.row-estornado:hover{background:rgba(242,179,61,.24);}
   .tx-comentario{font-size:10px;color:var(--accent);margin-top:2px;cursor:pointer;font-family:var(--sans);}
+  .tx-status-info{font-size:10px;color:var(--accent);margin-top:2px;font-family:var(--sans);}
   .tx-comentario:hover{text-decoration:underline;}
   .tx-comentario-edit{display:flex;gap:4px;margin-top:3px;align-items:center;}
   .tx-comentario-edit input{width:120px;font-size:10.5px;padding:2px 5px;border-radius:4px;border:1px solid var(--accent);background:var(--panel2);color:var(--text);font-family:var(--sans);}
@@ -110,6 +111,20 @@
   #dispute-form input[type=file]{font-size:12px;color:var(--muted);}
   #dispute-form button[type=submit]{width:100%;padding:8px;border-radius:8px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);cursor:pointer;font-family:var(--sans);font-size:12.5px;}
   #dispute-form button[type=submit]:disabled{opacity:.6;cursor:default;}
+  #refund-form textarea,#refund-form input[type=password]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px;font-family:var(--sans);font-size:12.5px;}
+  #refund-form textarea{resize:vertical;}
+  #refund-form label{display:block;font-size:11px;color:var(--muted);margin-top:10px;margin-bottom:4px;}
+  #refund-form button[type=submit]{width:100%;padding:8px;border-radius:8px;border:1px solid #4a3a14;background:var(--warn-dim);color:var(--warn);cursor:pointer;font-family:var(--sans);font-size:12.5px;margin-top:12px;}
+  #refund-form button[type=submit]:disabled{opacity:.6;cursor:default;}
+  .refund-item{padding:12px 16px;border-bottom:1px solid var(--line);}
+  .refund-item:last-child{border-bottom:none;}
+  .refund-item .t1{font-size:13px;font-weight:600;}
+  .refund-item .t2{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
+  .refund-item .obs{font-size:12px;margin-top:6px;white-space:pre-wrap;}
+  .refund-item .acts{display:flex;gap:6px;margin-top:8px;}
+  .refund-item .acts button{font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font-family:var(--sans);}
+  .refund-item .acts button.aprovar{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
+  .refund-item .acts button.rejeitar{border-color:#4a2323;background:var(--bad-dim);color:var(--bad);}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-notif.on{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
@@ -255,6 +270,11 @@
   </div>
 </div>
 
+<div class="panel hidden" id="refund-panel" style="margin-top:16px;">
+  <h2>Solicitações de estorno <span class="n" id="refund-count"></span></h2>
+  <div class="alerts" id="refund-requests" style="max-height:320px;"></div>
+</div>
+
 <div class="grid" style="margin-top:16px;">
   <div class="panel">
     <h2>Transações por dia <span class="n" id="trend-info"></span></h2>
@@ -305,6 +325,22 @@
   </div>
 </div>
 
+<div class="overlay" id="refund-overlay">
+  <div class="modal" style="width:min(420px,92vw);">
+    <h3>Solicitar estorno</h3>
+    <div id="refund-pedido-info" style="font-size:12px;color:var(--muted);"></div>
+    <form id="refund-form">
+      <label>Motivo do estorno</label>
+      <textarea id="refund-observacao" rows="3" placeholder="Descreva o motivo (o que o cliente pediu, o que aconteceu, etc.)" required></textarea>
+      <label>Confirme sua senha</label>
+      <input type="password" id="refund-password" required autocomplete="current-password">
+      <p id="refund-error" class="hidden" style="color:var(--bad);font-size:11.5px;margin-top:8px;"></p>
+      <button type="submit">Enviar solicitação</button>
+    </form>
+    <button class="close" onclick="document.getElementById('refund-overlay').classList.remove('show')">Cancelar</button>
+  </div>
+</div>
+
 </div><!-- /#app-root -->
 
 <script>
@@ -341,6 +377,9 @@ function aplicarNav(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
+  // a fila de solicitacoes de estorno e coisa do Master acompanhar - o usuario
+  // que solicitou ve o status direto na linha do pedido dele
+  document.getElementById('refund-panel').classList.toggle('hidden', ME.role!=='master');
 }
 
 async function tentarEntrar(){
@@ -429,7 +468,8 @@ async function loadAll(){
   render();
   renderOrdersChanged();
   renderChargebacks();
-  refreshDisputeMarkers();
+  if(podeSecao('disputas')) refreshDisputeMarkers();
+  refreshRefundRequests();
 }
 
 // pedidoId -> status do registro de disputa/monitoramento mais recente -
@@ -451,6 +491,86 @@ function marcadorDisputa(pedidoId){
   if(!d) return '';
   return `<span class="badge ${d.status}" title="Registro de acompanhamento: ${d.status}" style="margin-left:4px;">📎 ${d.status}</span>`;
 }
+
+// pedidoId -> solicitacao de estorno mais recente (usuario Leitor pede,
+// Master aprova/rejeita) - usada tanto pra marcar a linha do pedido quanto
+// pra montar a fila que o Master acompanha
+let REFUND_MARKERS = {};
+let REFUND_REQUESTS = [];
+async function refreshRefundRequests(){
+  REFUND_REQUESTS = await fetch('/api/refund-requests').then(r=>r.json());
+  const mapa = {};
+  REFUND_REQUESTS.forEach(r=>{
+    const atual = mapa[r.pedidoId];
+    if(!atual || (r.criadoEm||'') > (atual.criadoEm||'')) mapa[r.pedidoId] = r;
+  });
+  REFUND_MARKERS = mapa;
+  renderRefundPanel();
+  render();
+}
+
+function renderRefundPanel(){
+  if(ME.role!=='master') return;
+  const pendentes = REFUND_REQUESTS.filter(r=>r.status==='PENDENTE');
+  document.getElementById('refund-count').textContent = pendentes.length;
+  document.getElementById('refund-requests').innerHTML = pendentes.length ? pendentes.map(r=>`
+    <div class="refund-item">
+      <div class="t1">Pedido ${r.pedidoId} · ${r.unidade||'—'}</div>
+      <div class="t2">Solicitado por ${r.requestedByEmail} em ${fmtDT(r.criadoEm)}</div>
+      <div class="obs">${(r.observacao||'').replace(/</g,'&lt;')}</div>
+      <div class="acts">
+        <button type="button" class="aprovar" onclick="decidirEstorno('${r.id}','APROVADO')">✓ Aprovar</button>
+        <button type="button" class="rejeitar" onclick="decidirEstorno('${r.id}','REJEITADO')">✕ Rejeitar</button>
+      </div>
+    </div>
+  `).join('') : '<div class="empty">Nenhuma solicitação pendente.</div>';
+}
+
+async function decidirEstorno(id, status){
+  let motivoDecisao = '';
+  if(status==='REJEITADO'){
+    motivoDecisao = prompt('Motivo da rejeição (opcional):') || '';
+  }
+  await fetch('/api/refund-requests/'+id+'/status', {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao})
+  });
+  await refreshRefundRequests();
+}
+
+// modal de solicitar estorno - so aparece pra pedidos Aprovados; pede uma
+// observacao (motivo) e a propria senha, como confirmacao antes de entrar na
+// fila que o Master acompanha
+let REFUND_PEDIDO = null;
+function abrirEstorno(pedidoId, unidade){
+  REFUND_PEDIDO = { pedidoId, unidade };
+  document.getElementById('refund-pedido-info').textContent = `Pedido ${pedidoId} · ${unidade||'—'}`;
+  document.getElementById('refund-form').reset();
+  document.getElementById('refund-error').classList.add('hidden');
+  document.getElementById('refund-overlay').classList.add('show');
+}
+document.getElementById('refund-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('refund-error');
+  errEl.classList.add('hidden');
+  try{
+    const res = await fetch('/api/refund-requests', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        pedidoId: REFUND_PEDIDO.pedidoId,
+        unidade: REFUND_PEDIDO.unidade,
+        observacao: document.getElementById('refund-observacao').value,
+        password: document.getElementById('refund-password').value,
+      }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível enviar a solicitação.');
+    document.getElementById('refund-overlay').classList.remove('show');
+    await refreshRefundRequests();
+  }catch(err){
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  }
+});
 
 async function refreshChargebacks(){
   CHARGEBACKS = await fetch('/api/chargebacks').then(r=>r.json());
@@ -653,7 +773,7 @@ function computeSummary(rows){
 }
 
 // lista de dias (YYYY-MM-DD) dentro do intervalo de datas selecionado - usada
-// pra desenhar o grafico de tendencia dia a dia
+// pelas tabelas/paineis que ainda seguem o filtro de periodo
 function diasNoIntervalo(){
   const {start,end} = getDateRange();
   const dias = [];
@@ -670,14 +790,29 @@ function diasNoIntervalo(){
   return dias;
 }
 
-// grafico de linha (SVG puro, sem lib externa) da taxa de aprovacao dia a dia,
-// dentro do periodo/unidade/status selecionados
+// janela fixa dos ultimos N dias (hoje incluso) - o grafico de tendencia usa
+// isso em vez do filtro de periodo, pra sempre mostrar uma tendencia recente
+// util mesmo quando alguem filtra a tabela de transacoes por um unico dia
+const TREND_DIAS = 14;
+function diasUltimos(n){
+  const dias = [];
+  const cursor = new Date();
+  cursor.setHours(0,0,0,0);
+  cursor.setDate(cursor.getDate() - (n-1));
+  for(let i=0;i<n;i++){
+    dias.push(cursor.toISOString().slice(0,10));
+    cursor.setDate(cursor.getDate()+1);
+  }
+  return dias;
+}
+
 // grafico de barras empilhadas (aprovadas/recusadas/estornos) por dia - SVG
-// puro, sem lib externa. Trocado do grafico de linha por ser mais facil de
-// ler volume + composicao por dia de uma vez so
+// puro, sem lib externa. Segue so o filtro de unidade (nao o de periodo/data
+// nem o de status) - senao vira um grafico de 1 barra so quando alguem filtra
+// a tabela por um unico dia, o que nao ajuda a ver tendencia nenhuma
 function renderTrendChart(rows){
   const svg = document.getElementById('trend-chart');
-  const dias = diasNoIntervalo();
+  const dias = diasUltimos(TREND_DIAS);
   if(!dias.length){ svg.innerHTML = ''; return; }
 
   const porDia = {};
@@ -1054,7 +1189,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
       const periodUnidadeStatus = filtraPorStatusEvento(periodUnidade);
       renderKpis(computeSummary(periodUnidadeStatus));
       renderAlerts(periodUnidadeStatus);
-      renderTrendChart(periodUnidadeStatus);
+      renderTrendChart(filtraPorUnidade(DATA));
       renderUnidadesTable(periodUnidadeStatus);
       renderOrdersChanged();
       renderChargebacks();
@@ -1111,15 +1246,21 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             else if((d.status||'').includes('CHARGEBACK')) statusCls = 'row-chargeback';
             else if(ESTORNO_STATUSES.includes(d.status)) statusCls = 'row-estornado';
             else if(d.status==='RECUSADO') statusCls = 'row-recusado';
-            const podeComentar = ESTORNO_STATUSES.includes(d.status);
+            // comentario livre em qualquer pedido, exceto Aprovado - um pedido
+            // Aprovado ganha a acao de Solicitar Estorno no lugar
+            const podeComentar = d.status !== 'APROVADO';
             const pspEnc = encodeURIComponent(d.pspReference), eventEnc = encodeURIComponent(d.eventCode);
             const editandoEsteComentario = COMENTARIO_EM_EDICAO && COMENTARIO_EM_EDICAO.pspRefEnc===pspEnc && COMENTARIO_EM_EDICAO.eventCodeEnc===eventEnc;
             const comentarioHtml = !podeComentar ? '' : editandoEsteComentario
               ? `<div class="tx-comentario-edit" onclick="event.stopPropagation()"><input type="text" id="comentario-input" value="${(d.comentario||'').replace(/"/g,'&quot;')}" placeholder="Comentário..." onkeydown="comentarioKeydown(event,'${pspEnc}','${eventEnc}')"><button type="button" onclick="salvarComentario('${pspEnc}','${eventEnc}')">✓</button><button type="button" onclick="cancelarEdicaoComentario()">✕</button></div>`
               : `<div class="tx-comentario" onclick="event.stopPropagation(); iniciarEdicaoComentario('${pspEnc}','${eventEnc}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`;
+            const refundReq = d.status==='APROVADO' ? REFUND_MARKERS[orderKeyOf(d)] : null;
+            const estornoHtml = d.status!=='APROVADO' ? '' : refundReq
+              ? `<div class="tx-status-info" title="${(refundReq.observacao||'').replace(/"/g,'&quot;')}">💸 Estorno: ${refundReq.status}</div>`
+              : `<div class="tx-comentario" onclick="event.stopPropagation(); abrirEstorno('${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">💸 Solicitar estorno</div>`;
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}${comentarioHtml}</td>
+                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
                                         <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
@@ -1190,7 +1331,13 @@ function connectStream(){
     refreshChargebacks();
   });
   es.addEventListener('dispute-changed', ()=>{
-    refreshDisputeMarkers();
+    if(podeSecao('disputas')) refreshDisputeMarkers();
+  });
+  es.addEventListener('refund-requested', ()=>{
+    refreshRefundRequests();
+  });
+  es.addEventListener('refund-request-changed', ()=>{
+    refreshRefundRequests();
   });
 }
 

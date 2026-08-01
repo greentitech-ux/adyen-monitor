@@ -15,7 +15,7 @@ function sanitizePermissions(input) {
   return {
     sections: Array.isArray(p.sections) ? p.sections.filter((s) => VALID_SECTIONS.includes(s)) : [],
     unidades: Array.isArray(p.unidades) ? p.unidades.map(String) : [],
-    vaultGroups: Array.isArray(p.vaultGroups) ? p.vaultGroups.map(String) : [],
+    vaultSubgroups: Array.isArray(p.vaultSubgroups) ? p.vaultSubgroups.map(String) : [],
   };
 }
 
@@ -68,7 +68,8 @@ async function resetPassword(id, password) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   const passwordHash = await bcrypt.hash(password, 12);
-  await ref.update({ passwordHash });
+  // o Master trocando a senha tambem desbloqueia o acesso (ex: apos 3 tentativas erradas)
+  await ref.update({ passwordHash, locked: false, failedAttempts: 0 });
   return { ok: true };
 }
 
@@ -87,6 +88,7 @@ function toPublic(doc) {
     email: data.email,
     role: data.role,
     active: data.active !== false,
+    locked: !!data.locked,
     permissions: data.role === 'master' ? null : data.permissions || emptyPermissions(),
     createdAt: data.createdAt,
   };

@@ -24,22 +24,38 @@
   .back:hover{color:var(--text);border-color:var(--accent);}
   .hidden{display:none!important;}
   .layout{display:flex;gap:16px;align-items:flex-start;}
-  .sidebar{width:220px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;}
+  .sidebar{width:240px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;}
   .sidebar h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;font-family:var(--mono);font-weight:500;}
-  .group-list{list-style:none;margin:0;padding:0;}
-  .group-list li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;}
-  .group-list li:hover{background:var(--panel2);}
-  .group-list li.active{background:var(--accent);color:#06121a;font-weight:600;}
-  .group-list li .gname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .group-list li .gactions{display:none;gap:4px;}
-  .group-list li:hover .gactions{display:flex;}
-  .group-list li .gactions button{background:none;border:none;cursor:pointer;color:inherit;opacity:.7;font-size:11px;}
-  .new-group{display:flex;gap:6px;margin-top:10px;}
+  .item-list{list-style:none;margin:0 0 10px;padding:0;}
+  .item-list li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;}
+  .item-list li:hover{background:var(--panel2);}
+  .item-list li.active{background:var(--accent);color:#06121a;font-weight:600;}
+  .item-list li .iname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item-list li .iactions{display:none;gap:4px;}
+  .item-list li:hover .iactions{display:flex;}
+  .item-list li .iactions button{background:none;border:none;cursor:pointer;color:inherit;opacity:.7;font-size:11px;}
+  .group-block{margin-bottom:6px;}
+  .group-block-header{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--muted);text-transform:uppercase;font-family:var(--mono);}
+  .group-block-header .gactions{display:none;gap:4px;}
+  .group-block-header:hover .gactions{display:flex;}
+  .group-block-header .gactions button{background:none;border:none;cursor:pointer;color:var(--muted);opacity:.85;font-size:11px;}
+  .group-block-header .gactions button:hover{color:var(--text);}
+  .subgroup-list{list-style:none;margin:0;padding:0;}
+  .subgroup-list li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px 6px 18px;border-radius:8px;cursor:pointer;font-size:12px;}
+  .subgroup-list li:hover{background:var(--panel2);}
+  .subgroup-list li.active{background:var(--accent);color:#06121a;font-weight:600;}
+  .subgroup-list li .sname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .subgroup-list li .sactions{display:none;gap:4px;}
+  .subgroup-list li:hover .sactions{display:flex;}
+  .subgroup-list li .sactions button{background:none;border:none;cursor:pointer;color:inherit;opacity:.7;font-size:11px;}
+  .subgroup-empty{padding:4px 8px 4px 18px;font-size:11px;color:var(--muted);}
+  .new-group{display:flex;gap:6px;margin-top:4px;}
   .new-group input{flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:11.5px;}
   .main{flex:1;min-width:0;}
   .toolbar{display:flex;gap:10px;margin-bottom:12px;}
   .toolbar input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
   button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;white-space:nowrap;}
+  #current-path{font-size:12px;color:var(--muted);margin:0 0 12px;}
   .entries{display:flex;flex-direction:column;gap:8px;}
   .entry{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
   .entry .info{flex:1;min-width:0;}
@@ -93,9 +109,10 @@
 <div id="root" class="layout hidden">
   <aside class="sidebar">
     <h2>Grupos</h2>
-    <ul class="group-list" id="group-list"></ul>
+    <ul class="item-list" id="all-item"></ul>
+    <div id="group-tree"></div>
     <form class="new-group hidden" id="new-group-form">
-      <input type="text" id="new-group-name" placeholder="Novo grupo" required>
+      <input type="text" id="new-group-name" placeholder="Novo grupo (ex: GBE)" required>
       <button type="submit" class="back" style="cursor:pointer;">+</button>
     </form>
   </aside>
@@ -104,6 +121,7 @@
       <input type="search" id="search" placeholder="Buscar por título, URL ou usuário...">
       <button class="primary" id="new-entry-btn">+ Nova senha</button>
     </div>
+    <p id="current-path"></p>
     <div class="entries" id="entries"></div>
     <div class="empty hidden" id="empty-msg">Nenhuma senha aqui ainda.</div>
   </main>
@@ -113,7 +131,7 @@
   <form class="modal" id="entry-form">
     <h3 id="entry-title-h">Nova senha</h3>
     <label>Título<input type="text" id="f-title" required></label>
-    <label>Grupo<select id="f-group"></select></label>
+    <label>Subgrupo (unidade)<select id="f-subgroup"></select></label>
     <label>URL<input type="url" id="f-url" placeholder="https://..."></label>
     <label>Usuário / login<input type="text" id="f-username"></label>
     <label>Senha
@@ -160,8 +178,9 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
 let ME = null;
 let GROUPS = [];
+let SUBGROUPS = [];
 let ENTRIES = [];
-let SELECTED_GROUP = 'all'; // 'all' | groupId
+let SELECTED_SUBGROUP = 'all'; // 'all' | subgroupId
 let EDITING_ID = null;
 
 async function boot(){
@@ -185,55 +204,117 @@ async function boot(){
 }
 
 async function carregarTudo(){
-  const [groups, entries] = await Promise.all([
+  const [groups, subgroups, entries] = await Promise.all([
     fetch('/api/vault/groups').then(r=>r.json()),
+    fetch('/api/vault/subgroups').then(r=>r.json()),
     fetch('/api/vault/entries').then(r=>r.json()),
   ]);
-  GROUPS = groups; ENTRIES = entries;
-  renderGroups(); renderEntries();
+  GROUPS = groups; SUBGROUPS = subgroups; ENTRIES = entries;
+  renderSidebar(); renderEntries();
 }
 
-function renderGroups(){
-  const ul = document.getElementById('group-list');
-  ul.innerHTML = '';
-  ul.appendChild(groupItem({id:'all', name:'Todas as senhas'}, false));
-  for(const g of GROUPS) ul.appendChild(groupItem(g, ME.role==='master'));
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  const sel = document.getElementById('f-group');
-  sel.innerHTML = GROUPS.map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+function renderSidebar(){
+  const isMaster = ME.role==='master';
+
+  const allLi = document.createElement('li');
+  allLi.className = SELECTED_SUBGROUP==='all' ? 'active' : '';
+  allLi.innerHTML = `<span class="iname">Todas as senhas</span>`;
+  allLi.addEventListener('click', ()=>{ SELECTED_SUBGROUP='all'; renderSidebar(); renderEntries(); });
+  const allUl = document.getElementById('all-item');
+  allUl.innerHTML = '';
+  allUl.appendChild(allLi);
+
+  const tree = document.getElementById('group-tree');
+  tree.innerHTML = '';
+  for(const g of GROUPS){
+    const filhos = SUBGROUPS.filter(s=>s.groupId===g.id);
+    if(!isMaster && !filhos.length) continue; // grupo sem nenhum subgrupo liberado - nao mostra
+
+    const block = document.createElement('div');
+    block.className = 'group-block';
+
+    const header = document.createElement('div');
+    header.className = 'group-block-header';
+    header.innerHTML = `<span>${escapeHtml(g.name)}</span>`;
+    if(isMaster){
+      const acts = document.createElement('span');
+      acts.className = 'gactions';
+      acts.appendChild(mkIconBtn('+', 'Novo subgrupo', async ()=>{
+        const nome = prompt(`Novo subgrupo dentro de "${g.name}":`);
+        if(!nome || !nome.trim()) return;
+        await fetch('/api/vault/subgroups', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({groupId:g.id, name:nome})});
+        await carregarTudo();
+      }));
+      acts.appendChild(mkIconBtn('✎', 'Renomear grupo', async ()=>{
+        const novo = prompt('Novo nome do grupo:', g.name);
+        if(!novo || !novo.trim()) return;
+        await fetch('/api/vault/groups/'+g.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:novo})});
+        await carregarTudo();
+      }));
+      acts.appendChild(mkIconBtn('🗑', 'Excluir grupo', async ()=>{
+        if(!confirm(`Excluir o grupo "${g.name}" e todos os subgrupos dele? As senhas ficam sem subgrupo.`)) return;
+        await fetch('/api/vault/groups/'+g.id, {method:'DELETE'});
+        if(SUBGROUPS.some(s=>s.groupId===g.id && s.id===SELECTED_SUBGROUP)) SELECTED_SUBGROUP='all';
+        await carregarTudo();
+      }));
+      header.appendChild(acts);
+    }
+    block.appendChild(header);
+
+    const ul = document.createElement('ul');
+    ul.className = 'subgroup-list';
+    if(!filhos.length){
+      const vazio = document.createElement('div');
+      vazio.className = 'subgroup-empty';
+      vazio.textContent = 'Nenhum subgrupo ainda.';
+      block.appendChild(vazio);
+    }
+    for(const s of filhos) ul.appendChild(subgroupItem(s, isMaster));
+    block.appendChild(ul);
+    tree.appendChild(block);
+  }
+
+  const sel = document.getElementById('f-subgroup');
+  sel.innerHTML = GROUPS.map(g=>{
+    const filhos = SUBGROUPS.filter(s=>s.groupId===g.id);
+    if(!filhos.length) return '';
+    return `<optgroup label="${escapeHtml(g.name)}">${filhos.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</optgroup>`;
+  }).join('');
 }
 
-function groupItem(g, editable){
+function mkIconBtn(txt, title, onClick){
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = txt; b.title = title;
+  b.addEventListener('click', (e)=>{ e.stopPropagation(); onClick(); });
+  return b;
+}
+
+function subgroupItem(s, isMaster){
   const li = document.createElement('li');
-  li.className = g.id===SELECTED_GROUP ? 'active' : '';
+  li.className = s.id===SELECTED_SUBGROUP ? 'active' : '';
   const name = document.createElement('span');
-  name.className = 'gname';
-  name.textContent = g.name;
+  name.className = 'sname';
+  name.textContent = s.name;
   li.appendChild(name);
-  li.addEventListener('click', ()=>{ SELECTED_GROUP = g.id; renderGroups(); renderEntries(); });
+  li.addEventListener('click', ()=>{ SELECTED_SUBGROUP = s.id; renderSidebar(); renderEntries(); });
 
-  if(editable){
+  if(isMaster){
     const acts = document.createElement('span');
-    acts.className = 'gactions';
-    const ren = document.createElement('button');
-    ren.textContent = '✎'; ren.title = 'Renomear';
-    ren.addEventListener('click', async (e)=>{
-      e.stopPropagation();
-      const novo = prompt('Novo nome do grupo:', g.name);
+    acts.className = 'sactions';
+    acts.appendChild(mkIconBtn('✎', 'Renomear', async ()=>{
+      const novo = prompt('Novo nome do subgrupo:', s.name);
       if(!novo || !novo.trim()) return;
-      await fetch('/api/vault/groups/'+g.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:novo})});
+      await fetch('/api/vault/subgroups/'+s.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:novo})});
       await carregarTudo();
-    });
-    const del = document.createElement('button');
-    del.textContent = '🗑'; del.title = 'Excluir grupo';
-    del.addEventListener('click', async (e)=>{
-      e.stopPropagation();
-      if(!confirm(`Excluir o grupo "${g.name}"? As senhas dele ficam sem grupo.`)) return;
-      await fetch('/api/vault/groups/'+g.id, {method:'DELETE'});
-      if(SELECTED_GROUP===g.id) SELECTED_GROUP='all';
+    }));
+    acts.appendChild(mkIconBtn('🗑', 'Excluir', async ()=>{
+      if(!confirm(`Excluir o subgrupo "${s.name}"? As senhas dele ficam sem subgrupo.`)) return;
+      await fetch('/api/vault/subgroups/'+s.id, {method:'DELETE'});
+      if(SELECTED_SUBGROUP===s.id) SELECTED_SUBGROUP='all';
       await carregarTudo();
-    });
-    acts.append(ren, del);
+    }));
     li.appendChild(acts);
   }
   return li;
@@ -248,13 +329,18 @@ document.getElementById('new-group-form').addEventListener('submit', async (e)=>
   await carregarTudo();
 });
 
-function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
 document.getElementById('search').addEventListener('input', renderEntries);
+
+function caminhoDoSubgrupo(subgroupId){
+  const s = SUBGROUPS.find(x=>x.id===subgroupId);
+  if(!s) return '';
+  const g = GROUPS.find(x=>x.id===s.groupId);
+  return (g?g.name+' / ':'')+s.name;
+}
 
 function visibleEntries(){
   let list = ENTRIES;
-  if(SELECTED_GROUP!=='all') list = list.filter(e=>e.groupId===SELECTED_GROUP);
+  if(SELECTED_SUBGROUP!=='all') list = list.filter(e=>e.subgroupId===SELECTED_SUBGROUP);
   const termo = document.getElementById('search').value.trim().toLowerCase();
   if(termo) list = list.filter(e =>
     e.title.toLowerCase().includes(termo) || (e.url||'').toLowerCase().includes(termo) || (e.username||'').toLowerCase().includes(termo)
@@ -263,6 +349,7 @@ function visibleEntries(){
 }
 
 function renderEntries(){
+  document.getElementById('current-path').textContent = SELECTED_SUBGROUP==='all' ? 'Todas as senhas' : caminhoDoSubgrupo(SELECTED_SUBGROUP);
   const list = visibleEntries();
   const wrap = document.getElementById('entries');
   wrap.innerHTML = '';
@@ -279,6 +366,7 @@ function entryCard(entry){
   const t = document.createElement('div'); t.className='title'; t.textContent = entry.title;
   const sub = document.createElement('div'); sub.className='sub';
   const bits = [];
+  if(SELECTED_SUBGROUP==='all') bits.push(escapeHtml(caminhoDoSubgrupo(entry.subgroupId) || 'sem subgrupo'));
   if(entry.username) bits.push(escapeHtml(entry.username));
   if(entry.url) bits.push(`<a href="${entry.url.startsWith('http')?entry.url:'https://'+entry.url}" target="_blank" rel="noopener">${escapeHtml(entry.url)}</a>`);
   sub.innerHTML = bits.join(' · ') || '—';
@@ -326,12 +414,12 @@ function openModal(entry){
   document.getElementById('f-username').value = entry ? entry.username : '';
   pwInput.value = entry ? entry.password : '';
   document.getElementById('f-note').value = entry ? entry.note : '';
-  document.getElementById('f-group').value = entry ? (entry.groupId||'') : (SELECTED_GROUP!=='all' ? SELECTED_GROUP : (GROUPS[0]?.id||''));
+  document.getElementById('f-subgroup').value = entry ? (entry.subgroupId||'') : (SELECTED_SUBGROUP!=='all' ? SELECTED_SUBGROUP : (SUBGROUPS[0]?.id||''));
   pwInput.type = 'password';
   overlay.classList.add('show');
 }
 document.getElementById('new-entry-btn').addEventListener('click', ()=>{
-  if(!GROUPS.length){ alert('Peça pro Master criar um grupo antes de cadastrar uma senha.'); return; }
+  if(!SUBGROUPS.length){ alert('Peça pro Master criar um grupo e subgrupo antes de cadastrar uma senha.'); return; }
   openModal(null);
 });
 document.getElementById('entry-cancel').addEventListener('click', ()=>overlay.classList.remove('show'));
@@ -347,7 +435,7 @@ form.addEventListener('submit', async (e)=>{
     username: document.getElementById('f-username').value,
     password: pwInput.value,
     note: document.getElementById('f-note').value,
-    groupId: document.getElementById('f-group').value || null,
+    subgroupId: document.getElementById('f-subgroup').value || null,
   };
   try{
     const res = EDITING_ID

@@ -1,13 +1,15 @@
 // vaultGroups.js
-// Grupos do cofre de senhas (uma unidade, ex: "Loja Centro"). Os grupos sao
-// da organizacao inteira (nao por usuario) - o Master decide quem enxerga
-// qual grupo atraves de permissions.vaultGroups (veja auth.js/users.js).
-// Criar/renomear/excluir grupo e restrito ao Master (index.js aplica
-// auth.requireMaster nessas rotas).
+// Grupos do cofre de senhas (nivel superior, ex: "GBE", "ARCFOOD") - da
+// organizacao inteira, nao por usuario. Dentro de cada grupo existem
+// subgrupos (unidades, ex: "DOM_BESSA", "SPO_TACARUNA" dentro de "GBE" - veja
+// vaultSubgroups.js), e e nos subgrupos que as senhas de fato ficam. O Master
+// decide quem enxerga qual subgrupo atraves de permissions.vaultSubgroups
+// (veja auth.js/users.js). Criar/renomear/excluir grupo e restrito ao Master
+// (index.js aplica auth.requireMaster nessas rotas).
 const db = require('./firestore');
+const subgroups = require('./vaultSubgroups');
 
 const groupsRef = db.collection('vaultGroups');
-const entriesRef = db.collection('vaultEntries');
 
 async function list() {
   const snap = await groupsRef.get();
@@ -39,9 +41,10 @@ async function remove(id) {
   if (!snap.exists) throw new Error('Grupo não encontrado.');
   await ref.delete();
 
-  // as senhas que estavam nesse grupo ficam "sem grupo" em vez de serem apagadas
-  const orphaned = await entriesRef.where('groupId', '==', id).get();
-  await Promise.all(orphaned.docs.map((d) => d.ref.update({ groupId: null })));
+  // exclui em cascata os subgrupos desse grupo - as senhas deles ficam "sem
+  // subgrupo" em vez de serem apagadas (mesma logica de vaultSubgroups.remove)
+  const filhos = await subgroups.listByGroup(id);
+  await Promise.all(filhos.map((s) => subgroups.remove(s.id)));
 }
 
 function toGroup(doc) {
