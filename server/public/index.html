@@ -76,6 +76,10 @@
   tbody tr.row-estornado:hover{background:rgba(242,179,61,.24);}
   .tx-comentario{font-size:10px;color:var(--accent);margin-top:2px;cursor:pointer;font-family:var(--sans);}
   .tx-comentario:hover{text-decoration:underline;}
+  .tx-comentario-edit{display:flex;gap:4px;margin-top:3px;align-items:center;}
+  .tx-comentario-edit input{width:120px;font-size:10.5px;padding:2px 5px;border-radius:4px;border:1px solid var(--accent);background:var(--panel2);color:var(--text);font-family:var(--sans);}
+  .tx-comentario-edit button{font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;line-height:1.4;}
+  .tx-comentario-edit button:hover{border-color:var(--accent);}
   .alert,.order-row{transition:background-color .8s ease;}
   .alert.item-novo,.order-row.item-novo{background:rgba(92,200,255,.14);}
   .flag.novo{color:var(--accent);border-color:#1e4a63;background:rgba(92,200,255,.12);}
@@ -305,6 +309,27 @@ async function loadAll(){
   render();
   renderOrdersChanged();
   renderChargebacks();
+  refreshDisputeMarkers();
+}
+
+// pedidoId -> status do registro de disputa/monitoramento mais recente -
+// usado pra marcar visualmente, nas listas, os pedidos que ja tem algum
+// registro (sem precisar abrir cada um pra saber)
+let DISPUTE_MARKERS = {};
+async function refreshDisputeMarkers(){
+  const lista = await fetch('/api/disputes').then(r=>r.json());
+  const mapa = {};
+  lista.forEach(d=>{
+    const atual = mapa[d.pedidoId];
+    if(!atual || (d.atualizadoEm||'') > (atual.atualizadoEm||'')) mapa[d.pedidoId] = d;
+  });
+  DISPUTE_MARKERS = mapa;
+  render();
+}
+function marcadorDisputa(pedidoId){
+  const d = DISPUTE_MARKERS[pedidoId];
+  if(!d) return '';
+  return `<span class="badge ${d.status}" title="Registro de acompanhamento: ${d.status}" style="margin-left:4px;">📎 ${d.status}</span>`;
 }
 
 async function refreshChargebacks(){
@@ -376,7 +401,7 @@ function renderChargebacks(){
       <div class="sev high"></div>
       <div class="body" style="flex:1;">
         <div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}•• ${o.last4||'????'} · ${o.unidade||'—'} · ${fmtDT(o.dataCompra)} · ${fmtMoney(o.valor)} · ${o.cliente||'cliente desconhecido'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
-        <div class="t2">Pedido ${o.pedidoId} · <span style="color:${prazo.cor}">${prazo.texto}</span></div>
+        <div class="t2">Pedido ${o.pedidoId} · <span style="color:${prazo.cor}">${prazo.texto}</span>${marcadorDisputa(o.pedidoId)}</div>
         <div style="margin-top:8px;">
           <button type="button" class="btn-disputa" onclick="abrirDisputa('${String(o.pedidoId).replace(/'/g,"\\'")}','${(o.unidade||'').replace(/'/g,"\\'")}')">📎 Registrar disputa</button>
         </div>
@@ -454,14 +479,17 @@ document.getElementById('dispute-form').addEventListener('submit', async (e)=>{
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     const resp = await fetch('/api/disputes', { method:'POST', body: fd });
-    if(!resp.ok) throw new Error('falha ao salvar');
+    if(!resp.ok){
+      const corpo = await resp.json().catch(()=>null);
+      throw new Error((corpo && corpo.error) || 'Não foi possível salvar o registro. Tente novamente.');
+    }
     document.getElementById('dispute-nome').value = '';
     document.getElementById('dispute-telefone').value = '';
     document.getElementById('dispute-notas').value = '';
     document.getElementById('dispute-anexos').value = '';
     await carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
   } catch(err) {
-    alert('Não foi possível salvar o registro. Tente novamente.');
+    alert(err.message);
   } finally {
     btn.disabled = false; btn.textContent = 'Salvar registro';
   }
@@ -629,7 +657,7 @@ function renderOrdersChanged(){
         <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.unidade||'—'}</span>
         <span class="valor">${fmtMoney(o.valor)}</span>
       </div>
-      <div class="id">${o.metodo||'?'} · ${o.cliente||'cliente desconhecido'} · ${o.last4?('•• '+o.last4):'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+      <div class="id">${o.metodo||'?'} · ${o.cliente||'cliente desconhecido'} · ${o.last4?('•• '+o.last4):'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}${marcadorDisputa(o.pedidoId)}</div>
       <div class="timeline">
         ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
       </div>
@@ -858,18 +886,32 @@ function abrirDisputaDoModal(){
 
 // comentario manual num estorno (ex: "estornei eu mesmo pelo painel da
 // Adyen, motivo X") - fica salvo junto da transacao e aparece abaixo da
-// data/hora na tabela
-async function editarComentario(pspReferenceEnc, eventCodeEnc){
-  const pspReference = decodeURIComponent(pspReferenceEnc);
-  const eventCode = decodeURIComponent(eventCodeEnc);
-  const tx = DATA.find(d=>d.pspReference===pspReference && d.eventCode===eventCode);
-  const texto = prompt('Comentário sobre este estorno:', (tx && tx.comentario) || '');
-  if(texto===null) return;
-  const resp = await fetch(`/api/transactions/${pspReferenceEnc}/${eventCodeEnc}/comentario`, {
+// data/hora na tabela. Edicao inline (sem prompt() do navegador); enquanto
+// alguem esta editando, o re-render periodico (setInterval mais abaixo) fica
+// pausado pra nao apagar o que a pessoa esta digitando.
+let COMENTARIO_EM_EDICAO = null; // {pspRefEnc, eventCodeEnc}
+
+function iniciarEdicaoComentario(pspRefEnc, eventCodeEnc){
+  COMENTARIO_EM_EDICAO = { pspRefEnc, eventCodeEnc };
+  render();
+}
+function cancelarEdicaoComentario(){
+  COMENTARIO_EM_EDICAO = null;
+  render();
+}
+function comentarioKeydown(e, pspRefEnc, eventCodeEnc){
+  if(e.key==='Enter') salvarComentario(pspRefEnc, eventCodeEnc);
+  else if(e.key==='Escape') cancelarEdicaoComentario();
+}
+async function salvarComentario(pspRefEnc, eventCodeEnc){
+  const input = document.getElementById('comentario-input');
+  const texto = input ? input.value : '';
+  const resp = await fetch(`/api/transactions/${pspRefEnc}/${eventCodeEnc}/comentario`, {
     method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({comentario:texto})
   });
   if(!resp.ok) { alert('Não foi possível salvar o comentário.'); return; }
   const atualizado = await resp.json();
+  COMENTARIO_EM_EDICAO = null;
   const idx = DATA.findIndex(d=>d.pspReference===atualizado.pspReference && d.eventCode===atualizado.eventCode);
   if(idx>=0) DATA[idx] = atualizado;
   render();
@@ -944,16 +986,21 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             else if(ESTORNO_STATUSES.includes(d.status)) statusCls = 'row-estornado';
             else if(d.status==='RECUSADO') statusCls = 'row-recusado';
             const podeComentar = ESTORNO_STATUSES.includes(d.status);
+            const pspEnc = encodeURIComponent(d.pspReference), eventEnc = encodeURIComponent(d.eventCode);
+            const editandoEsteComentario = COMENTARIO_EM_EDICAO && COMENTARIO_EM_EDICAO.pspRefEnc===pspEnc && COMENTARIO_EM_EDICAO.eventCodeEnc===eventEnc;
+            const comentarioHtml = !podeComentar ? '' : editandoEsteComentario
+              ? `<div class="tx-comentario-edit" onclick="event.stopPropagation()"><input type="text" id="comentario-input" value="${(d.comentario||'').replace(/"/g,'&quot;')}" placeholder="Comentário..." onkeydown="comentarioKeydown(event,'${pspEnc}','${eventEnc}')"><button type="button" onclick="salvarComentario('${pspEnc}','${eventEnc}')">✓</button><button type="button" onclick="cancelarEdicaoComentario()">✕</button></div>`
+              : `<div class="tx-comentario" onclick="event.stopPropagation(); iniciarEdicaoComentario('${pspEnc}','${eventEnc}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`;
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}${podeComentar?`<div class="tx-comentario" onclick="event.stopPropagation(); editarComentario('${encodeURIComponent(d.pspReference)}','${encodeURIComponent(d.eventCode)}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`:''}</td>
+                      <td>${fmtDT(d.dataHora)}${comentarioHtml}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
                                         <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
                                               <td>${d.metodo||'—'}</td>
                                                     <td class="valor">${fmtMoney(d.valor)}</td>
                                                           <td>${d.last4?('•• '+d.last4):'—'}</td>
-                                                                <td class="statuscell">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}</td>
+                                                                <td class="statuscell">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
                                                                       <td class="valor">${c.total}</td>
                                                                             <td class="valor">${c.aprovadas}</td>
                                                                                   <td class="valor">${c.recusadas}</td>
@@ -962,6 +1009,10 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
                                                                                                     <td class="truncate" title="${d.bancoEmissor||''}">${d.bancoEmissor||'—'}</td>
                                                                                                         </tr>
                                                                                                           `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
+      if(COMENTARIO_EM_EDICAO){
+        const input = document.getElementById('comentario-input');
+        if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      }
   }
 ['f-date-start','f-date-end','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 
@@ -1012,13 +1063,16 @@ function connectStream(){
     marcarNovo('chargeback:'+key);
     refreshChargebacks();
   });
+  es.addEventListener('dispute-changed', ()=>{
+    refreshDisputeMarkers();
+  });
 }
 
 loadAll().then(connectStream);
 
 // reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
 // tempo, mesmo quando nao chega nenhum webhook novo nesse meio tempo
-setInterval(()=>{ limparNovosExpirados(); render(); }, 2000);
+setInterval(()=>{ limparNovosExpirados(); if(!COMENTARIO_EM_EDICAO) render(); }, 2000);
 
 // ---- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----
 function urlBase64ToUint8Array(base64String) {

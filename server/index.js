@@ -21,6 +21,37 @@ const upload = multer({
 });
 
 const app = express();
+
+// ---------- autenticacao basica pro dashboard/API ----------
+// protege tudo (dashboard, APIs, imagens/videos anexados) atras de usuario e
+// senha - o webhook da Adyen fica de fora (ja e verificado por assinatura
+// HMAC, e a Adyen nao manda esse header). Sem DASHBOARD_USER/PASSWORD
+// configurados, o site fica aberto (so pra facilitar teste local).
+const DASHBOARD_USER = process.env.DASHBOARD_USER || '';
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || '';
+function senhasIguais(a, b) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
+  app.use((req, res, next) => {
+    if (req.path === '/webhooks/adyen') return next();
+    const header = req.headers.authorization || '';
+    const [scheme, encoded] = header.split(' ');
+    if (scheme === 'Basic' && encoded) {
+      const [user, ...rest] = Buffer.from(encoded, 'base64').toString('utf8').split(':');
+      const pass = rest.join(':');
+      if (senhasIguais(user, DASHBOARD_USER) && senhasIguais(pass, DASHBOARD_PASSWORD)) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Monitor Adyen"');
+    res.status(401).send('Autenticação necessária.');
+  });
+} else {
+  console.warn('AVISO: DASHBOARD_USER/DASHBOARD_PASSWORD nao configurados - o dashboard esta acessivel sem senha.');
+}
+
 app.use(express.json({ limit: '2mb' }));
 
 const PORT = process.env.PORT || 3000;
@@ -195,6 +226,7 @@ app.post('/api/disputes', upload.array('anexos', 8), async (req, res) => {
     }
 
     const registro = await disputes.create({ pedidoId, unidade, nomeContato, telefoneContato, notas, anexos });
+    broadcast('dispute-changed', { pedidoId: registro.pedidoId, status: registro.status });
     res.json(registro);
   } catch (err) {
     console.error('Erro ao criar disputa:', err.message);
@@ -213,6 +245,7 @@ app.get('/api/disputes/:pedidoId', async (req, res) => {
 app.patch('/api/disputes/:id/status', async (req, res) => {
   try {
     const registro = await disputes.updateStatus(req.params.id, req.body.status);
+    broadcast('dispute-changed', { pedidoId: registro.pedidoId, status: registro.status });
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -261,6 +294,20 @@ app.get('/api/summary', (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// mensagens amigaveis pros erros mais comuns de upload (arquivo grande demais,
+// anexos demais) em vez de estourar uma pagina de erro generica do Express
+app.use((err, req, res, next) => {
+  if (err && err.name === 'MulterError') {
+    const mensagens = {
+      LIMIT_FILE_SIZE: 'Arquivo muito grande (máximo 50MB por anexo).',
+      LIMIT_FILE_COUNT: 'Muitos arquivos de uma vez (máximo 8 anexos por registro).',
+      LIMIT_UNEXPECTED_FILE: 'Campo de arquivo inesperado no envio.',
+    };
+    return res.status(400).json({ error: mensagens[err.code] || 'Erro ao enviar anexo: ' + err.message });
+  }
+  next(err);
+});
 
 (async () => {
   await store.init(); // carrega o historico do Firestore antes de aceitar trafego
