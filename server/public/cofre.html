@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Cofre de senhas · Monitor Adyen</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;}
+  .back:hover{color:var(--text);border-color:var(--accent);}
+  .hidden{display:none!important;}
+  .layout{display:flex;gap:16px;align-items:flex-start;}
+  .sidebar{width:240px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;}
+  .sidebar h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;font-family:var(--mono);font-weight:500;}
+  .item-list{list-style:none;margin:0 0 10px;padding:0;}
+  .item-list li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;}
+  .item-list li:hover{background:var(--panel2);}
+  .item-list li.active{background:var(--accent);color:#06121a;font-weight:600;}
+  .item-list li .iname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item-list li .iactions{display:none;gap:4px;}
+  .item-list li:hover .iactions{display:flex;}
+  .item-list li .iactions button{background:none;border:none;cursor:pointer;color:inherit;opacity:.7;font-size:11px;}
+  .group-block{margin-bottom:6px;}
+  .group-block-header{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--muted);text-transform:uppercase;font-family:var(--mono);}
+  .group-block-header .gactions{display:none;gap:4px;}
+  .group-block-header:hover .gactions{display:flex;}
+  .group-block-header .gactions button{background:none;border:none;cursor:pointer;color:var(--muted);opacity:.85;font-size:11px;}
+  .group-block-header .gactions button:hover{color:var(--text);}
+  .subgroup-list{list-style:none;margin:0;padding:0;}
+  .subgroup-list li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px 6px 18px;border-radius:8px;cursor:pointer;font-size:12px;}
+  .subgroup-list li:hover{background:var(--panel2);}
+  .subgroup-list li.active{background:var(--accent);color:#06121a;font-weight:600;}
+  .subgroup-list li .sname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .subgroup-list li .sactions{display:none;gap:4px;}
+  .subgroup-list li:hover .sactions{display:flex;}
+  .subgroup-list li .sactions button{background:none;border:none;cursor:pointer;color:inherit;opacity:.7;font-size:11px;}
+  .subgroup-empty{padding:4px 8px 4px 18px;font-size:11px;color:var(--muted);}
+  .new-group{display:flex;gap:6px;margin-top:4px;}
+  .new-group input{flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:11.5px;}
+  .main{flex:1;min-width:0;}
+  .toolbar{display:flex;gap:10px;margin-bottom:12px;}
+  .toolbar input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
+  button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;white-space:nowrap;}
+  #current-path{font-size:12px;color:var(--muted);margin:0 0 12px;}
+  .entries{display:flex;flex-direction:column;gap:8px;}
+  .entry{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+  .entry .info{flex:1;min-width:0;}
+  .entry .title{font-weight:600;font-size:13px;}
+  .entry .sub{font-size:11.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);}
+  .entry .sub a{color:var(--accent);text-decoration:none;}
+  .entry .pw{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-size:12px;min-width:120px;text-align:center;}
+  .entry .acts{display:flex;gap:4px;}
+  .entry .acts button{font-family:var(--sans);font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .entry .acts button:hover{border-color:var(--accent);}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:440px;}
+  .modal h3{margin:0 0 14px;font-size:14px;}
+  .modal label{display:block;font-size:11.5px;color:var(--muted);margin-top:12px;}
+  .modal input, .modal select, .modal textarea{width:100%;margin-top:5px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:var(--sans);font-size:12.5px;}
+  .modal .pwrow{display:flex;gap:6px;}
+  .modal .pwrow input{font-family:var(--mono);}
+  .modal .pwrow button{flex:none;padding:0 10px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .genpanel{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:12px;}
+  .genpanel summary{cursor:pointer;font-size:12px;font-weight:600;}
+  .genpanel label{display:flex;align-items:center;gap:6px;font-size:11.5px;margin-top:8px;color:var(--text);}
+  .genpanel label.range{display:block;}
+  .genpanel input[type=checkbox]{width:auto;margin:0;}
+  .genpanel button{width:100%;margin-top:8px;padding:8px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--accent);cursor:pointer;font-size:12px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+  .err{color:var(--bad);font-size:11.5px;margin-top:8px;}
+  @media(max-width:760px){.layout{flex-direction:column;} .sidebar{width:100%;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+    <h1>Cofre de senhas</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    <button class="back" onclick="logout()">🚪 Sair</button>
+  </div>
+</header>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao Cofre de Senhas. Fale com o administrador (Master).</div>
+
+<div id="root" class="layout hidden">
+  <aside class="sidebar">
+    <h2>Grupos</h2>
+    <ul class="item-list" id="all-item"></ul>
+    <div id="group-tree"></div>
+    <form class="new-group hidden" id="new-group-form">
+      <input type="text" id="new-group-name" placeholder="Novo grupo (ex: GBE)" required>
+      <button type="submit" class="back" style="cursor:pointer;">+</button>
+    </form>
+  </aside>
+  <main class="main">
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar por título, URL ou usuário...">
+      <button class="primary" id="new-entry-btn">+ Nova senha</button>
+    </div>
+    <p id="current-path"></p>
+    <div class="entries" id="entries"></div>
+    <div class="empty hidden" id="empty-msg">Nenhuma senha aqui ainda.</div>
+  </main>
+</div>
+
+<div class="overlay" id="entry-overlay">
+  <form class="modal" id="entry-form">
+    <h3 id="entry-title-h">Nova senha</h3>
+    <label>Título<input type="text" id="f-title" required></label>
+    <label>Subgrupo (unidade)<select id="f-subgroup"></select></label>
+    <label>URL<input type="url" id="f-url" placeholder="https://..."></label>
+    <label>Usuário / login<input type="text" id="f-username"></label>
+    <label>Senha
+      <div class="pwrow">
+        <input type="text" id="f-password" required autocomplete="new-password">
+        <button type="button" id="toggle-pw" title="Mostrar/ocultar">👁</button>
+        <button type="button" id="copy-pw" title="Copiar">📋</button>
+      </div>
+    </label>
+    <details class="genpanel">
+      <summary>🎲 Gerador de senha aleatória</summary>
+      <label class="range">Tamanho: <span id="gen-len-val">16</span>
+        <input type="range" id="gen-len" min="6" max="64" value="16" style="width:100%;">
+      </label>
+      <label><input type="checkbox" id="gen-upper" checked> Maiúsculas (A-Z)</label>
+      <label><input type="checkbox" id="gen-lower" checked> Minúsculas (a-z)</label>
+      <label><input type="checkbox" id="gen-numbers" checked> Números (0-9)</label>
+      <label><input type="checkbox" id="gen-symbols" checked> Símbolos (!@#$...)</label>
+      <label><input type="checkbox" id="gen-exclude"> Excluir ambíguos (l,1,O,0...)</label>
+      <button type="button" id="gen-btn">Gerar senha</button>
+    </details>
+    <label>Observação<textarea id="f-note" rows="3"></textarea></label>
+    <p class="err hidden" id="entry-err"></p>
+    <div class="modal-actions">
+      <button type="button" id="entry-cancel">Cancelar</button>
+      <button type="submit" class="primary">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<script>
+// ---- sessao (mesmo token usado no monitor - se nao tiver, volta pro login) ----
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+
+let ME = null;
+let GROUPS = [];
+let SUBGROUPS = [];
+let ENTRIES = [];
+let SELECTED_SUBGROUP = 'all'; // 'all' | subgroupId
+let EDITING_ID = null;
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  const isMaster = ME.role==='master';
+  const secoes = isMaster ? ['monitor','disputas','cofre'] : (ME.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+
+  if(!secoes.includes('cofre')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('new-group-form').classList.toggle('hidden', !isMaster);
+  document.getElementById('root').classList.remove('hidden');
+  await carregarTudo();
+}
+
+async function carregarTudo(){
+  const [groups, subgroups, entries] = await Promise.all([
+    fetch('/api/vault/groups').then(r=>r.json()),
+    fetch('/api/vault/subgroups').then(r=>r.json()),
+    fetch('/api/vault/entries').then(r=>r.json()),
+  ]);
+  GROUPS = groups; SUBGROUPS = subgroups; ENTRIES = entries;
+  renderSidebar(); renderEntries();
+}
+
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderSidebar(){
+  const isMaster = ME.role==='master';
+
+  const allLi = document.createElement('li');
+  allLi.className = SELECTED_SUBGROUP==='all' ? 'active' : '';
+  allLi.innerHTML = `<span class="iname">Todas as senhas</span>`;
+  allLi.addEventListener('click', ()=>{ SELECTED_SUBGROUP='all'; renderSidebar(); renderEntries(); });
+  const allUl = document.getElementById('all-item');
+  allUl.innerHTML = '';
+  allUl.appendChild(allLi);
+
+  const tree = document.getElementById('group-tree');
+  tree.innerHTML = '';
+  for(const g of GROUPS){
+    const filhos = SUBGROUPS.filter(s=>s.groupId===g.id);
+    if(!isMaster && !filhos.length) continue; // grupo sem nenhum subgrupo liberado - nao mostra
+
+    const block = document.createElement('div');
+    block.className = 'group-block';
+
+    const header = document.createElement('div');
+    header.className = 'group-block-header';
+    header.innerHTML = `<span>${escapeHtml(g.name)}</span>`;
+    if(isMaster){
+      const acts = document.createElement('span');
+      acts.className = 'gactions';
+      acts.appendChild(mkIconBtn('+', 'Novo subgrupo', async ()=>{
+        const nome = prompt(`Novo subgrupo dentro de "${g.name}":`);
+        if(!nome || !nome.trim()) return;
+        await fetch('/api/vault/subgroups', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({groupId:g.id, name:nome})});
+        await carregarTudo();
+      }));
+      acts.appendChild(mkIconBtn('✎', 'Renomear grupo', async ()=>{
+        const novo = prompt('Novo nome do grupo:', g.name);
+        if(!novo || !novo.trim()) return;
+        await fetch('/api/vault/groups/'+g.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:novo})});
+        await carregarTudo();
+      }));
+      acts.appendChild(mkIconBtn('🗑', 'Excluir grupo', async ()=>{
+        if(!confirm(`Excluir o grupo "${g.name}" e todos os subgrupos dele? As senhas ficam sem subgrupo.`)) return;
+        await fetch('/api/vault/groups/'+g.id, {method:'DELETE'});
+        if(SUBGROUPS.some(s=>s.groupId===g.id && s.id===SELECTED_SUBGROUP)) SELECTED_SUBGROUP='all';
+        await carregarTudo();
+      }));
+      header.appendChild(acts);
+    }
+    block.appendChild(header);
+
+    const ul = document.createElement('ul');
+    ul.className = 'subgroup-list';
+    if(!filhos.length){
+      const vazio = document.createElement('div');
+      vazio.className = 'subgroup-empty';
+      vazio.textContent = 'Nenhum subgrupo ainda.';
+      block.appendChild(vazio);
+    }
+    for(const s of filhos) ul.appendChild(subgroupItem(s, isMaster));
+    block.appendChild(ul);
+    tree.appendChild(block);
+  }
+
+  const sel = document.getElementById('f-subgroup');
+  sel.innerHTML = GROUPS.map(g=>{
+    const filhos = SUBGROUPS.filter(s=>s.groupId===g.id);
+    if(!filhos.length) return '';
+    return `<optgroup label="${escapeHtml(g.name)}">${filhos.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</optgroup>`;
+  }).join('');
+}
+
+function mkIconBtn(txt, title, onClick){
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = txt; b.title = title;
+  b.addEventListener('click', (e)=>{ e.stopPropagation(); onClick(); });
+  return b;
+}
+
+function subgroupItem(s, isMaster){
+  const li = document.createElement('li');
+  li.className = s.id===SELECTED_SUBGROUP ? 'active' : '';
+  const name = document.createElement('span');
+  name.className = 'sname';
+  name.textContent = s.name;
+  li.appendChild(name);
+  li.addEventListener('click', ()=>{ SELECTED_SUBGROUP = s.id; renderSidebar(); renderEntries(); });
+
+  if(isMaster){
+    const acts = document.createElement('span');
+    acts.className = 'sactions';
+    acts.appendChild(mkIconBtn('✎', 'Renomear', async ()=>{
+      const novo = prompt('Novo nome do subgrupo:', s.name);
+      if(!novo || !novo.trim()) return;
+      await fetch('/api/vault/subgroups/'+s.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:novo})});
+      await carregarTudo();
+    }));
+    acts.appendChild(mkIconBtn('🗑', 'Excluir', async ()=>{
+      if(!confirm(`Excluir o subgrupo "${s.name}"? As senhas dele ficam sem subgrupo.`)) return;
+      await fetch('/api/vault/subgroups/'+s.id, {method:'DELETE'});
+      if(SELECTED_SUBGROUP===s.id) SELECTED_SUBGROUP='all';
+      await carregarTudo();
+    }));
+    li.appendChild(acts);
+  }
+  return li;
+}
+
+document.getElementById('new-group-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const input = document.getElementById('new-group-name');
+  if(!input.value.trim()) return;
+  await fetch('/api/vault/groups', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:input.value})});
+  input.value='';
+  await carregarTudo();
+});
+
+document.getElementById('search').addEventListener('input', renderEntries);
+
+function caminhoDoSubgrupo(subgroupId){
+  const s = SUBGROUPS.find(x=>x.id===subgroupId);
+  if(!s) return '';
+  const g = GROUPS.find(x=>x.id===s.groupId);
+  return (g?g.name+' / ':'')+s.name;
+}
+
+function visibleEntries(){
+  let list = ENTRIES;
+  if(SELECTED_SUBGROUP!=='all') list = list.filter(e=>e.subgroupId===SELECTED_SUBGROUP);
+  const termo = document.getElementById('search').value.trim().toLowerCase();
+  if(termo) list = list.filter(e =>
+    e.title.toLowerCase().includes(termo) || (e.url||'').toLowerCase().includes(termo) || (e.username||'').toLowerCase().includes(termo)
+  );
+  return list;
+}
+
+function renderEntries(){
+  document.getElementById('current-path').textContent = SELECTED_SUBGROUP==='all' ? 'Todas as senhas' : caminhoDoSubgrupo(SELECTED_SUBGROUP);
+  const list = visibleEntries();
+  const wrap = document.getElementById('entries');
+  wrap.innerHTML = '';
+  document.getElementById('empty-msg').classList.toggle('hidden', list.length>0);
+  for(const entry of list) wrap.appendChild(entryCard(entry));
+}
+
+function entryCard(entry){
+  const div = document.createElement('div');
+  div.className = 'entry';
+
+  const info = document.createElement('div');
+  info.className = 'info';
+  const t = document.createElement('div'); t.className='title'; t.textContent = entry.title;
+  const sub = document.createElement('div'); sub.className='sub';
+  const bits = [];
+  if(SELECTED_SUBGROUP==='all') bits.push(escapeHtml(caminhoDoSubgrupo(entry.subgroupId) || 'sem subgrupo'));
+  if(entry.username) bits.push(escapeHtml(entry.username));
+  if(entry.url) bits.push(`<a href="${entry.url.startsWith('http')?entry.url:'https://'+entry.url}" target="_blank" rel="noopener">${escapeHtml(entry.url)}</a>`);
+  sub.innerHTML = bits.join(' · ') || '—';
+  info.append(t, sub);
+
+  const pw = document.createElement('span');
+  pw.className = 'pw';
+  pw.textContent = '••••••••';
+  let visible = false;
+
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const toggle = mkBtn('👁', ()=>{ visible=!visible; pw.textContent = visible ? entry.password : '••••••••'; });
+  const copy = mkBtn('📋', ()=>copyText(entry.password, copy));
+  const edit = mkBtn('✏', ()=>openModal(entry));
+  const del = mkBtn('🗑', async ()=>{
+    if(!confirm(`Excluir "${entry.title}"?`)) return;
+    await fetch('/api/vault/entries/'+entry.id, {method:'DELETE'});
+    await carregarTudo();
+  });
+  acts.append(toggle, copy, edit, del);
+
+  div.append(info, pw, acts);
+  return div;
+}
+function mkBtn(txt, onClick){ const b=document.createElement('button'); b.type='button'; b.textContent=txt; b.addEventListener('click', onClick); return b; }
+
+async function copyText(text, btn){
+  try{ await navigator.clipboard.writeText(text); const o=btn.textContent; btn.textContent='✓'; setTimeout(()=>btn.textContent=o,1200); }
+  catch(e){ alert('Não foi possível copiar automaticamente.'); }
+}
+
+// ---- modal de criar/editar ----
+const overlay = document.getElementById('entry-overlay');
+const form = document.getElementById('entry-form');
+const pwInput = document.getElementById('f-password');
+
+function openModal(entry){
+  document.getElementById('entry-err').classList.add('hidden');
+  form.reset();
+  EDITING_ID = entry ? entry.id : null;
+  document.getElementById('entry-title-h').textContent = entry ? 'Editar senha' : 'Nova senha';
+  document.getElementById('f-title').value = entry ? entry.title : '';
+  document.getElementById('f-url').value = entry ? entry.url : '';
+  document.getElementById('f-username').value = entry ? entry.username : '';
+  pwInput.value = entry ? entry.password : '';
+  document.getElementById('f-note').value = entry ? entry.note : '';
+  document.getElementById('f-subgroup').value = entry ? (entry.subgroupId||'') : (SELECTED_SUBGROUP!=='all' ? SELECTED_SUBGROUP : (SUBGROUPS[0]?.id||''));
+  pwInput.type = 'password';
+  overlay.classList.add('show');
+}
+document.getElementById('new-entry-btn').addEventListener('click', ()=>{
+  if(!SUBGROUPS.length){ alert('Peça pro Master criar um grupo e subgrupo antes de cadastrar uma senha.'); return; }
+  openModal(null);
+});
+document.getElementById('entry-cancel').addEventListener('click', ()=>overlay.classList.remove('show'));
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) overlay.classList.remove('show'); });
+
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('entry-err');
+  errEl.classList.add('hidden');
+  const payload = {
+    title: document.getElementById('f-title').value,
+    url: document.getElementById('f-url').value,
+    username: document.getElementById('f-username').value,
+    password: pwInput.value,
+    note: document.getElementById('f-note').value,
+    subgroupId: document.getElementById('f-subgroup').value || null,
+  };
+  try{
+    const res = EDITING_ID
+      ? await fetch('/api/vault/entries/'+EDITING_ID, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+      : await fetch('/api/vault/entries', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+    overlay.classList.remove('show');
+    await carregarTudo();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+document.getElementById('toggle-pw').addEventListener('click', ()=>{ pwInput.type = pwInput.type==='password' ? 'text' : 'password'; });
+document.getElementById('copy-pw').addEventListener('click', (e)=>copyText(pwInput.value, e.currentTarget));
+
+// ---- gerador ----
+const CHARSETS = { upper:'ABCDEFGHIJKLMNOPQRSTUVWXYZ', lower:'abcdefghijklmnopqrstuvwxyz', numbers:'0123456789', symbols:'!@#$%^&*()-_=+[]{}<>?' };
+const AMBIGUOUS = /[Il1O0]/;
+const genLen = document.getElementById('gen-len');
+genLen.addEventListener('input', ()=> document.getElementById('gen-len-val').textContent = genLen.value);
+document.getElementById('gen-btn').addEventListener('click', ()=>{
+  let pool = '';
+  if(document.getElementById('gen-upper').checked) pool += CHARSETS.upper;
+  if(document.getElementById('gen-lower').checked) pool += CHARSETS.lower;
+  if(document.getElementById('gen-numbers').checked) pool += CHARSETS.numbers;
+  if(document.getElementById('gen-symbols').checked) pool += CHARSETS.symbols;
+  if(document.getElementById('gen-exclude').checked) pool = pool.replace(AMBIGUOUS, '');
+  const errEl = document.getElementById('entry-err');
+  if(!pool){ errEl.textContent='Selecione ao menos um tipo de caractere.'; errEl.classList.remove('hidden'); return; }
+  errEl.classList.add('hidden');
+  const len = Number(genLen.value);
+  const bytes = new Uint32Array(len);
+  crypto.getRandomValues(bytes);
+  let out = '';
+  for(let i=0;i<len;i++) out += pool[bytes[i]%pool.length];
+  pwInput.value = out;
+  pwInput.type = 'text';
+});
+
+boot();
+</script>
+</body>
+</html>

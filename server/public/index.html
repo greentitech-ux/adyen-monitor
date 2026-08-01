@@ -22,8 +22,6 @@
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
   .pulse{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);}
-  a.link-relatorios{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);white-space:nowrap;}
-  a.link-relatorios:hover{color:var(--text);border-color:var(--accent);}
   .pulse.off{background:var(--bad-dim);color:var(--bad);border-color:#4a2323;}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 rgba(61,220,151,.6);animation:p 2s infinite;}
   @keyframes p{0%{box-shadow:0 0 0 0 rgba(61,220,151,.5);}70%{box-shadow:0 0 0 6px rgba(61,220,151,0);}100%{box-shadow:0 0 0 0 rgba(61,220,151,0);}}
@@ -77,6 +75,7 @@
   tbody tr.row-estornado{background:rgba(242,179,61,.16);}
   tbody tr.row-estornado:hover{background:rgba(242,179,61,.24);}
   .tx-comentario{font-size:10px;color:var(--accent);margin-top:2px;cursor:pointer;font-family:var(--sans);}
+  .tx-status-info{font-size:10px;color:var(--accent);margin-top:2px;font-family:var(--sans);}
   .tx-comentario:hover{text-decoration:underline;}
   .tx-comentario-edit{display:flex;gap:4px;margin-top:3px;align-items:center;}
   .tx-comentario-edit input{width:120px;font-size:10.5px;padding:2px 5px;border-radius:4px;border:1px solid var(--accent);background:var(--panel2);color:var(--text);font-family:var(--sans);}
@@ -99,6 +98,8 @@
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
   .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
   .btn-disputa:hover{border-color:var(--accent);}
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  .back:hover{color:var(--text);border-color:var(--accent);}
   .dispute-item{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;}
   .dispute-item .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
   .dispute-item .notas{font-size:12.5px;margin-top:6px;white-space:pre-wrap;}
@@ -110,6 +111,20 @@
   #dispute-form input[type=file]{font-size:12px;color:var(--muted);}
   #dispute-form button[type=submit]{width:100%;padding:8px;border-radius:8px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);cursor:pointer;font-family:var(--sans);font-size:12.5px;}
   #dispute-form button[type=submit]:disabled{opacity:.6;cursor:default;}
+  #refund-form textarea,#refund-form input[type=password]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px;font-family:var(--sans);font-size:12.5px;}
+  #refund-form textarea{resize:vertical;}
+  #refund-form label{display:block;font-size:11px;color:var(--muted);margin-top:10px;margin-bottom:4px;}
+  #refund-form button[type=submit]{width:100%;padding:8px;border-radius:8px;border:1px solid #4a3a14;background:var(--warn-dim);color:var(--warn);cursor:pointer;font-family:var(--sans);font-size:12.5px;margin-top:12px;}
+  #refund-form button[type=submit]:disabled{opacity:.6;cursor:default;}
+  .refund-item{padding:12px 16px;border-bottom:1px solid var(--line);}
+  .refund-item:last-child{border-bottom:none;}
+  .refund-item .t1{font-size:13px;font-weight:600;}
+  .refund-item .t2{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
+  .refund-item .obs{font-size:12px;margin-top:6px;white-space:pre-wrap;}
+  .refund-item .acts{display:flex;gap:6px;margin-top:8px;}
+  .refund-item .acts button{font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font-family:var(--sans);}
+  .refund-item .acts button.aprovar{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
+  .refund-item .acts button.rejeitar{border-color:#4a2323;background:var(--bad-dim);color:var(--bad);}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-notif.on{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
@@ -154,9 +169,40 @@
   .timeline .arrow{color:var(--muted);}
   .timeline .step{display:flex;flex-direction:column;align-items:center;gap:2px;}
   .timeline .step .ts{color:var(--muted);font-size:9.5px;}
+  .hidden{display:none!important;}
+  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:100%;max-width:360px;}
+  .auth-card h1{font-size:16px;margin:0 0 4px;}
+  .auth-card label{display:block;margin-top:14px;font-size:12px;color:var(--muted);}
+  .auth-card input{width:100%;margin-top:5px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:var(--sans);font-size:13px;}
+  .auth-card button{width:100%;margin-top:18px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06121a;font-weight:700;font-size:13px;cursor:pointer;}
+  .auth-error{color:var(--bad);font-size:12px;margin-top:10px;}
+  .sem-acesso{max-width:420px;margin:80px auto;text-align:center;color:var(--muted);font-size:13px;}
 </style>
 </head>
 <body>
+
+<section id="auth-screen" class="auth-screen">
+  <form id="auth-form" class="auth-card">
+    <h1>🔒 Monitor Adyen</h1>
+    <p style="font-size:12px;margin:2px 0 0;color:var(--muted);">Entre com seu acesso</p>
+    <label>Email
+      <input type="email" id="auth-email" required autocomplete="email">
+    </label>
+    <label>Senha
+      <input type="password" id="auth-password" required autocomplete="current-password">
+    </label>
+    <p id="auth-error" class="auth-error hidden"></p>
+    <button type="submit">Entrar</button>
+  </form>
+</section>
+
+<div id="sem-acesso" class="sem-acesso hidden">
+  Seu acesso não tem nenhuma área liberada ainda.<br>Fale com o administrador (Master).
+  <div style="margin-top:14px;"><button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button></div>
+</div>
+
+<div id="app-root" class="hidden">
 
 <header>
   <div>
@@ -164,10 +210,13 @@
     <h1>Monitor de transações</h1>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
-    <a class="link-relatorios" href="/fechamentos.html">💰 Fechamentos</a>
-    <a class="link-relatorios" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
     <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <button class="back" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪 Sair</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
   </div>
 </header>
@@ -222,6 +271,11 @@
   </div>
 </div>
 
+<div class="panel hidden" id="refund-panel" style="margin-top:16px;">
+  <h2>Solicitações de estorno <span class="n" id="refund-count"></span></h2>
+  <div class="alerts" id="refund-requests" style="max-height:320px;"></div>
+</div>
+
 <div class="grid" style="margin-top:16px;">
   <div class="panel">
     <h2>Transações por dia <span class="n" id="trend-info"></span></h2>
@@ -272,7 +326,113 @@
   </div>
 </div>
 
+<div class="overlay" id="refund-overlay">
+  <div class="modal" style="width:min(420px,92vw);">
+    <h3>Solicitar estorno</h3>
+    <div id="refund-pedido-info" style="font-size:12px;color:var(--muted);"></div>
+    <form id="refund-form">
+      <label>Motivo do estorno</label>
+      <textarea id="refund-observacao" rows="3" placeholder="Descreva o motivo (o que o cliente pediu, o que aconteceu, etc.)" required></textarea>
+      <label>Confirme sua senha</label>
+      <input type="password" id="refund-password" required autocomplete="current-password">
+      <p id="refund-error" class="hidden" style="color:var(--bad);font-size:11.5px;margin-top:8px;"></p>
+      <button type="submit">Enviar solicitação</button>
+    </form>
+    <button class="close" onclick="document.getElementById('refund-overlay').classList.remove('show')">Cancelar</button>
+  </div>
+</div>
+
+</div><!-- /#app-root -->
+
 <script>
+// ---- autenticacao: login por conta (Master ou usuario com permissoes),
+// por DENTRO do Basic Auth que ja protege o site inteiro. O token fica no
+// localStorage e e anexado automaticamente em toda chamada pra /api/. ----
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+let ME = null;
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => {
+    if (res.status === 401 && url !== '/api/auth/login') { logout(); }
+    return res;
+  });
+};
+
+function logout(){
+  localStorage.removeItem('authToken');
+  AUTH_TOKEN = null; ME = null;
+  document.getElementById('app-root').classList.add('hidden');
+  document.getElementById('sem-acesso').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+function podeSecao(secao){
+  return ME && (ME.role==='master' || (ME.permissions?.sections||[]).includes(secao));
+}
+
+function aplicarNav(){
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !podeSecao('fechamentos'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
+  // a fila de solicitacoes de estorno e coisa do Master acompanhar - o usuario
+  // que solicitou ve o status direto na linha do pedido dele
+  document.getElementById('refund-panel').classList.toggle('hidden', ME.role!=='master');
+}
+
+async function tentarEntrar(){
+  if(!AUTH_TOKEN) return mostrarLogin();
+  const res = await _rawFetch('/api/me', { headers: { Authorization: 'Bearer '+AUTH_TOKEN } });
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  document.getElementById('auth-screen').classList.add('hidden');
+
+  if(!podeSecao('monitor')){
+    // essa pagina e o monitor - quem nao tem essa secao vai pra primeira que tiver
+    if(podeSecao('fechamentos')) return location.href='/fechamentos.html';
+    if(podeSecao('cofre')) return location.href='/cofre.html';
+    if(podeSecao('disputas')) return location.href='/relatorios.html';
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('sem-acesso').classList.add('hidden');
+  document.getElementById('app-root').classList.remove('hidden');
+  aplicarNav();
+  bootApp();
+}
+
+function mostrarLogin(){
+  document.getElementById('app-root').classList.add('hidden');
+  document.getElementById('sem-acesso').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+document.getElementById('auth-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const erroEl = document.getElementById('auth-error');
+  erroEl.classList.add('hidden');
+  try{
+    const res = await _rawFetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: document.getElementById('auth-email').value, password: document.getElementById('auth-password').value }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível entrar.');
+    AUTH_TOKEN = data.token;
+    localStorage.setItem('authToken', AUTH_TOKEN);
+    document.getElementById('auth-form').reset();
+    await tentarEntrar();
+  }catch(err){
+    erroEl.textContent = err.message;
+    erroEl.classList.remove('hidden');
+  }
+});
+
 let DATA = [];
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
@@ -311,7 +471,8 @@ async function loadAll(){
   render();
   renderOrdersChanged();
   renderChargebacks();
-  refreshDisputeMarkers();
+  if(podeSecao('disputas')) refreshDisputeMarkers();
+  refreshRefundRequests();
 }
 
 // pedidoId -> status do registro de disputa/monitoramento mais recente -
@@ -333,6 +494,86 @@ function marcadorDisputa(pedidoId){
   if(!d) return '';
   return `<span class="badge ${d.status}" title="Registro de acompanhamento: ${d.status}" style="margin-left:4px;">📎 ${d.status}</span>`;
 }
+
+// pedidoId -> solicitacao de estorno mais recente (usuario Leitor pede,
+// Master aprova/rejeita) - usada tanto pra marcar a linha do pedido quanto
+// pra montar a fila que o Master acompanha
+let REFUND_MARKERS = {};
+let REFUND_REQUESTS = [];
+async function refreshRefundRequests(){
+  REFUND_REQUESTS = await fetch('/api/refund-requests').then(r=>r.json());
+  const mapa = {};
+  REFUND_REQUESTS.forEach(r=>{
+    const atual = mapa[r.pedidoId];
+    if(!atual || (r.criadoEm||'') > (atual.criadoEm||'')) mapa[r.pedidoId] = r;
+  });
+  REFUND_MARKERS = mapa;
+  renderRefundPanel();
+  render();
+}
+
+function renderRefundPanel(){
+  if(ME.role!=='master') return;
+  const pendentes = REFUND_REQUESTS.filter(r=>r.status==='PENDENTE');
+  document.getElementById('refund-count').textContent = pendentes.length;
+  document.getElementById('refund-requests').innerHTML = pendentes.length ? pendentes.map(r=>`
+    <div class="refund-item">
+      <div class="t1">Pedido ${r.pedidoId} · ${r.unidade||'—'}</div>
+      <div class="t2">Solicitado por ${r.requestedByEmail} em ${fmtDT(r.criadoEm)}</div>
+      <div class="obs">${(r.observacao||'').replace(/</g,'&lt;')}</div>
+      <div class="acts">
+        <button type="button" class="aprovar" onclick="decidirEstorno('${r.id}','APROVADO')">✓ Aprovar</button>
+        <button type="button" class="rejeitar" onclick="decidirEstorno('${r.id}','REJEITADO')">✕ Rejeitar</button>
+      </div>
+    </div>
+  `).join('') : '<div class="empty">Nenhuma solicitação pendente.</div>';
+}
+
+async function decidirEstorno(id, status){
+  let motivoDecisao = '';
+  if(status==='REJEITADO'){
+    motivoDecisao = prompt('Motivo da rejeição (opcional):') || '';
+  }
+  await fetch('/api/refund-requests/'+id+'/status', {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao})
+  });
+  await refreshRefundRequests();
+}
+
+// modal de solicitar estorno - so aparece pra pedidos Aprovados; pede uma
+// observacao (motivo) e a propria senha, como confirmacao antes de entrar na
+// fila que o Master acompanha
+let REFUND_PEDIDO = null;
+function abrirEstorno(pedidoId, unidade){
+  REFUND_PEDIDO = { pedidoId, unidade };
+  document.getElementById('refund-pedido-info').textContent = `Pedido ${pedidoId} · ${unidade||'—'}`;
+  document.getElementById('refund-form').reset();
+  document.getElementById('refund-error').classList.add('hidden');
+  document.getElementById('refund-overlay').classList.add('show');
+}
+document.getElementById('refund-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('refund-error');
+  errEl.classList.add('hidden');
+  try{
+    const res = await fetch('/api/refund-requests', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        pedidoId: REFUND_PEDIDO.pedidoId,
+        unidade: REFUND_PEDIDO.unidade,
+        observacao: document.getElementById('refund-observacao').value,
+        password: document.getElementById('refund-password').value,
+      }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível enviar a solicitação.');
+    document.getElementById('refund-overlay').classList.remove('show');
+    await refreshRefundRequests();
+  }catch(err){
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  }
+});
 
 async function refreshChargebacks(){
   CHARGEBACKS = await fetch('/api/chargebacks').then(r=>r.json());
@@ -535,7 +776,7 @@ function computeSummary(rows){
 }
 
 // lista de dias (YYYY-MM-DD) dentro do intervalo de datas selecionado - usada
-// pra desenhar o grafico de tendencia dia a dia
+// pelas tabelas/paineis que ainda seguem o filtro de periodo
 function diasNoIntervalo(){
   const {start,end} = getDateRange();
   const dias = [];
@@ -552,14 +793,29 @@ function diasNoIntervalo(){
   return dias;
 }
 
-// grafico de linha (SVG puro, sem lib externa) da taxa de aprovacao dia a dia,
-// dentro do periodo/unidade/status selecionados
+// janela fixa dos ultimos N dias (hoje incluso) - o grafico de tendencia usa
+// isso em vez do filtro de periodo, pra sempre mostrar uma tendencia recente
+// util mesmo quando alguem filtra a tabela de transacoes por um unico dia
+const TREND_DIAS = 14;
+function diasUltimos(n){
+  const dias = [];
+  const cursor = new Date();
+  cursor.setHours(0,0,0,0);
+  cursor.setDate(cursor.getDate() - (n-1));
+  for(let i=0;i<n;i++){
+    dias.push(cursor.toISOString().slice(0,10));
+    cursor.setDate(cursor.getDate()+1);
+  }
+  return dias;
+}
+
 // grafico de barras empilhadas (aprovadas/recusadas/estornos) por dia - SVG
-// puro, sem lib externa. Trocado do grafico de linha por ser mais facil de
-// ler volume + composicao por dia de uma vez so
+// puro, sem lib externa. Segue so o filtro de unidade (nao o de periodo/data
+// nem o de status) - senao vira um grafico de 1 barra so quando alguem filtra
+// a tabela por um unico dia, o que nao ajuda a ver tendencia nenhuma
 function renderTrendChart(rows){
   const svg = document.getElementById('trend-chart');
-  const dias = diasNoIntervalo();
+  const dias = diasUltimos(TREND_DIAS);
   if(!dias.length){ svg.innerHTML = ''; return; }
 
   const porDia = {};
@@ -936,7 +1192,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
       const periodUnidadeStatus = filtraPorStatusEvento(periodUnidade);
       renderKpis(computeSummary(periodUnidadeStatus));
       renderAlerts(periodUnidadeStatus);
-      renderTrendChart(periodUnidadeStatus);
+      renderTrendChart(filtraPorUnidade(DATA));
       renderUnidadesTable(periodUnidadeStatus);
       renderOrdersChanged();
       renderChargebacks();
@@ -993,15 +1249,21 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             else if((d.status||'').includes('CHARGEBACK')) statusCls = 'row-chargeback';
             else if(ESTORNO_STATUSES.includes(d.status)) statusCls = 'row-estornado';
             else if(d.status==='RECUSADO') statusCls = 'row-recusado';
-            const podeComentar = ESTORNO_STATUSES.includes(d.status);
+            // comentario livre em qualquer pedido, exceto Aprovado - um pedido
+            // Aprovado ganha a acao de Solicitar Estorno no lugar
+            const podeComentar = d.status !== 'APROVADO';
             const pspEnc = encodeURIComponent(d.pspReference), eventEnc = encodeURIComponent(d.eventCode);
             const editandoEsteComentario = COMENTARIO_EM_EDICAO && COMENTARIO_EM_EDICAO.pspRefEnc===pspEnc && COMENTARIO_EM_EDICAO.eventCodeEnc===eventEnc;
             const comentarioHtml = !podeComentar ? '' : editandoEsteComentario
               ? `<div class="tx-comentario-edit" onclick="event.stopPropagation()"><input type="text" id="comentario-input" value="${(d.comentario||'').replace(/"/g,'&quot;')}" placeholder="Comentário..." onkeydown="comentarioKeydown(event,'${pspEnc}','${eventEnc}')"><button type="button" onclick="salvarComentario('${pspEnc}','${eventEnc}')">✓</button><button type="button" onclick="cancelarEdicaoComentario()">✕</button></div>`
               : `<div class="tx-comentario" onclick="event.stopPropagation(); iniciarEdicaoComentario('${pspEnc}','${eventEnc}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`;
+            const refundReq = d.status==='APROVADO' ? REFUND_MARKERS[orderKeyOf(d)] : null;
+            const estornoHtml = d.status!=='APROVADO' ? '' : refundReq
+              ? `<div class="tx-status-info" title="${(refundReq.observacao||'').replace(/"/g,'&quot;')}">💸 Estorno: ${refundReq.status}</div>`
+              : `<div class="tx-comentario" onclick="event.stopPropagation(); abrirEstorno('${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">💸 Solicitar estorno</div>`;
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}${comentarioHtml}</td>
+                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
                                         <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
@@ -1039,7 +1301,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
 let BOOT_ID = null;
 
 function connectStream(){
-  const es = new EventSource('/api/stream');
+  const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
   es.onopen = () => { document.getElementById('conn').classList.remove('off'); document.getElementById('conn-txt').textContent='ao vivo'; };
   es.onerror = () => { document.getElementById('conn').classList.add('off'); document.getElementById('conn-txt').textContent='reconectando...'; };
   es.addEventListener('hello', (e)=>{
@@ -1072,15 +1334,25 @@ function connectStream(){
     refreshChargebacks();
   });
   es.addEventListener('dispute-changed', ()=>{
-    refreshDisputeMarkers();
+    if(podeSecao('disputas')) refreshDisputeMarkers();
+  });
+  es.addEventListener('refund-requested', ()=>{
+    refreshRefundRequests();
+  });
+  es.addEventListener('refund-request-changed', ()=>{
+    refreshRefundRequests();
   });
 }
 
-loadAll().then(connectStream);
+function bootApp(){
+  loadAll().then(connectStream);
 
-// reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
-// tempo, mesmo quando nao chega nenhum webhook novo nesse meio tempo
-setInterval(()=>{ limparNovosExpirados(); if(!COMENTARIO_EM_EDICAO) render(); }, 2000);
+  // reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
+  // tempo, mesmo quando nao chega nenhum webhook novo nesse meio tempo
+  setInterval(()=>{ limparNovosExpirados(); if(!COMENTARIO_EM_EDICAO) render(); }, 2000);
+
+  initNotifBtn();
+}
 
 // ---- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----
 function urlBase64ToUint8Array(base64String) {
@@ -1123,14 +1395,16 @@ async function toggleNotifications(){
   updateNotifBtn(true);
 }
 
-(async function initNotifBtn(){
+async function initNotifBtn(){
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
     const reg = await navigator.serviceWorker.getRegistration('/sw.js');
     const sub = reg && await reg.pushManager.getSubscription();
     updateNotifBtn(!!sub);
   } catch(e) {}
-})();
+}
+
+tentarEntrar();
 </script>
 </body>
 </html>

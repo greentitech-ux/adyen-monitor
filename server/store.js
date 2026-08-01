@@ -169,9 +169,10 @@ function chargebacks() {
     .sort((a, b) => (b.ultimaAtualizacao || '').localeCompare(a.ultimaAtualizacao || ''));
 }
 
-function clientStats(key) {
+function clientStats(key, allowedUnidades) {
   const all = load();
-  const rows = all.filter((t) => clientKey(t) === key);
+  let rows = all.filter((t) => clientKey(t) === key);
+  if (allowedUnidades) rows = rows.filter((t) => allowedUnidades.has(t.unidade));
   const aprovadas = rows.filter((t) => t.status === 'APROVADO').length;
   const recusadas = rows.filter((t) => t.status === 'RECUSADO').length;
   const fraude = rows.filter((t) => t.fraudeSuspeita).length;

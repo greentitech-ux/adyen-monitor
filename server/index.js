@@ -12,6 +12,12 @@ const push = require('./push');
 const cardTesting = require('./cardTesting');
 const disputes = require('./disputes');
 const storage = require('./storage');
+const auth = require('./auth');
+const users = require('./users');
+const vaultGroups = require('./vaultGroups');
+const vaultSubgroups = require('./vaultSubgroups');
+const vaultEntries = require('./vaultEntries');
+const refunds = require('./refunds');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -26,7 +32,10 @@ const app = express();
 // protege tudo (dashboard, APIs, imagens/videos anexados) atras de usuario e
 // senha - o webhook da Adyen fica de fora (ja e verificado por assinatura
 // HMAC, e a Adyen nao manda esse header). Sem DASHBOARD_USER/PASSWORD
-// configurados, o site fica aberto (so pra facilitar teste local).
+// configurados, o site fica aberto (so pra facilitar teste local). Essa e
+// so a primeira camada (quem tem a senha do site) - por dentro dela, cada
+// pessoa loga com sua propria conta (veja auth.js) e so ve o que o Master
+// liberou pra ela.
 const DASHBOARD_USER = process.env.DASHBOARD_USER || '';
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || '';
 function senhasIguais(a, b) {
@@ -75,11 +84,45 @@ if (process.env.ADYEN_HMAC_KEYS) {
 }
 const LEGACY_HMAC_KEY = process.env.ADYEN_HMAC_KEY || '';
 
+// ---------- login (sem token ainda) e portao de autenticacao pro resto da API ----------
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const result = await auth.login(req.body.email, req.body.password);
+    res.json(result);
+  } catch (err) {
+    res.status(401).json({ error: err.message });
+  }
+});
+
+// tudo abaixo daqui exige um usuario logado (token JWT, via header ou
+// ?token= - o EventSource do SSE usa a query porque nao manda headers custom)
+app.use('/api', auth.requireAuth);
+
+app.get('/api/me', (req, res) => {
+  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions });
+});
+
+// so a secao pedida bloqueia quem nao tem permissao - Master sempre passa
+function requireSection(section) {
+  return (req, res, next) => {
+    if (!auth.hasSection(req, section)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    next();
+  };
+}
+
 // ---------- clientes SSE conectados (para empurrar atualizacoes ao vivo pro dashboard) ----------
+// cada cliente guarda suas proprias permissoes, pra so receber eventos das
+// unidades/secoes que ele pode ver
 const sseClients = new Set();
-function broadcast(event, data) {
+function broadcast(event, data, section) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of sseClients) res.write(payload);
+  for (const client of sseClients) {
+    if (!client.isMaster) {
+      if (section && !client.sections.has(section)) continue;
+      if (data && data.unidade && !client.unidades.has(data.unidade)) continue;
+    }
+    client.res.write(payload);
+  }
 }
 
 app.get('/api/stream', (req, res) => {
@@ -90,8 +133,14 @@ app.get('/api/stream', (req, res) => {
   });
   res.flushHeaders();
   res.write(`event: hello\ndata: ${JSON.stringify({ bootId: BOOT_ID })}\n\n`);
-  sseClients.add(res);
-  req.on('close', () => sseClients.delete(res));
+  const client = {
+    res,
+    isMaster: req.isMaster,
+    sections: req.isMaster ? null : new Set(req.permissions.sections || []),
+    unidades: req.isMaster ? null : new Set(req.permissions.unidades || []),
+  };
+  sseClients.add(client);
+  req.on('close', () => sseClients.delete(client));
 });
 
 // ---------- validacao de assinatura HMAC da Adyen ----------
@@ -141,7 +190,7 @@ app.post('/webhooks/adyen', async (req, res) => {
 
     const tx = normalize(item);
     store.addOrUpdate(tx);
-    broadcast('transaction', tx);
+    broadcast('transaction', tx, 'monitor');
     push.notify(tx); // estorno, estorno agendado, chargeback ou fraude -> push no celular/navegador
 
     // recusas seguidas do mesmo cartao em poucos minutos -> possivel teste de cartao clonado
@@ -160,12 +209,12 @@ app.post('/webhooks/adyen', async (req, res) => {
     // avisa o dashboard pra atualizar a secao de pedidos que mudaram de status
     const order = store.orderFor(tx.merchantReference || tx.originalReference || tx.pspReference);
     if (order && new Set(order.history.map((h) => h.status)).size > 1) {
-      broadcast('order-changed', order);
+      broadcast('order-changed', order, 'monitor');
     }
 
     // avisa o dashboard pra atualizar a secao dedicada de chargebacks
     if (['CHARGEBACK', 'CHARGEBACK_REVERTIDO', 'NOTIFICATION_OF_CHARGEBACK', 'DISPUTE_DEFENSE_PERIOD_ENDED', 'RETRIEVAL_REQUEST'].includes(tx.status)) {
-      broadcast('chargeback', order || tx);
+      broadcast('chargeback', order || tx, 'monitor');
     }
 
     // BIN lookup assincrono (nao bloqueia a resposta do webhook - a Adyen espera resposta rapida)
@@ -174,7 +223,7 @@ app.post('/webhooks/adyen', async (req, res) => {
         if (bank) {
           const updated = { ...tx, bancoEmissor: bank };
           store.addOrUpdate(updated);
-          broadcast('update', updated);
+          broadcast('update', updated, 'monitor');
         }
       });
     }
@@ -184,40 +233,75 @@ app.post('/webhooks/adyen', async (req, res) => {
   res.send('[accepted]');
 });
 
-// ---------- API para o dashboard ----------
-app.get('/api/transactions', (req, res) => {
-  res.json(store.allTransactions());
+// ---------- API para o dashboard (secao "monitor") ----------
+app.get('/api/transactions', requireSection('monitor'), (req, res) => {
+  res.json(auth.filterByUnidade(req, store.allTransactions()));
 });
 
-app.get('/api/clients/:key', (req, res) => {
-  res.json(store.clientStats(decodeURIComponent(req.params.key)));
+app.get('/api/clients/:key', requireSection('monitor'), (req, res) => {
+  const allowed = req.isMaster ? null : new Set(req.permissions.unidades || []);
+  res.json(store.clientStats(decodeURIComponent(req.params.key), allowed));
 });
 
 // comentario manual sobre um estorno (ex: "estornei eu mesmo pelo painel da Adyen")
-app.patch('/api/transactions/:pspReference/:eventCode/comentario', (req, res) => {
-  const tx = store.setComentario(req.params.pspReference, decodeURIComponent(req.params.eventCode), req.body.comentario || '');
-  if (!tx) return res.sendStatus(404);
-  broadcast('update', tx);
+app.patch('/api/transactions/:pspReference/:eventCode/comentario', requireSection('monitor'), (req, res) => {
+  const eventCode = decodeURIComponent(req.params.eventCode);
+  const existente = store.allTransactions().find((t) => t.pspReference === req.params.pspReference && t.eventCode === eventCode);
+  if (!existente) return res.sendStatus(404);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(existente.unidade)) return res.sendStatus(404);
+
+  const tx = store.setComentario(req.params.pspReference, eventCode, req.body.comentario || '');
+  broadcast('update', tx, 'monitor');
   res.json(tx);
 });
 
-app.get('/api/orders', (req, res) => {
-  res.json(store.allOrders());
+app.get('/api/orders', requireSection('monitor'), (req, res) => {
+  res.json(auth.filterByUnidade(req, store.allOrders()));
 });
 
-app.get('/api/orders/changed', (req, res) => {
-  res.json(store.ordersChanged());
+app.get('/api/orders/changed', requireSection('monitor'), (req, res) => {
+  res.json(auth.filterByUnidade(req, store.ordersChanged()));
 });
 
-app.get('/api/chargebacks', (req, res) => {
-  res.json(store.chargebacks());
+app.get('/api/chargebacks', requireSection('monitor'), (req, res) => {
+  res.json(auth.filterByUnidade(req, store.chargebacks()));
 });
 
-// ---------- registros de disputa/monitoramento (relatorio + evidencias pra recorrer na Adyen) ----------
-app.post('/api/disputes', upload.array('anexos', 8), async (req, res) => {
+app.get('/api/summary', requireSection('monitor'), (req, res) => {
+  const all = auth.filterByUnidade(req, store.allTransactions());
+  const aprovadas = all.filter((t) => t.status === 'APROVADO');
+  const recusadas = all.filter((t) => t.status === 'RECUSADO');
+  res.json({
+    total: all.length,
+    aprovadas: aprovadas.length,
+    recusadas: recusadas.length,
+    volumeAprovado: +aprovadas.reduce((s, t) => s + t.valor, 0).toFixed(2),
+    chargebacks: all.filter((t) => t.status.includes('CHARGEBACK')).length,
+    fraudeSuspeita: all.filter((t) => t.fraudeSuspeita).length,
+  });
+});
+
+// lista de unidades distintas ja vistas nas transacoes - usada pelo Master
+// pra montar o seletor de permissoes na tela de usuarios
+app.get('/api/meta/unidades', auth.requireMaster, (req, res) => {
+  const unidades = new Set(store.allTransactions().map((t) => t.unidade).filter(Boolean));
+  res.json([...unidades].sort());
+});
+
+// ---------- registros de disputa/monitoramento (secao "disputas") ----------
+function disputaPermitida(req, registro) {
+  if (!registro) return false;
+  if (req.isMaster) return true;
+  return !registro.unidade || (req.permissions.unidades || []).includes(registro.unidade);
+}
+
+app.post('/api/disputes', requireSection('disputas'), upload.array('anexos', 8), async (req, res) => {
   try {
     const { pedidoId, unidade, nomeContato, telefoneContato, notas } = req.body;
     if (!pedidoId) return res.status(400).json({ error: 'pedidoId é obrigatório' });
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
 
     const anexos = [];
     for (const file of req.files || []) {
@@ -226,7 +310,7 @@ app.post('/api/disputes', upload.array('anexos', 8), async (req, res) => {
     }
 
     const registro = await disputes.create({ pedidoId, unidade, nomeContato, telefoneContato, notas, anexos });
-    broadcast('dispute-changed', { pedidoId: registro.pedidoId, status: registro.status });
+    broadcast('dispute-changed', { pedidoId: registro.pedidoId, status: registro.status, unidade: registro.unidade }, 'disputas');
     res.json(registro);
   } catch (err) {
     console.error('Erro ao criar disputa:', err.message);
@@ -234,31 +318,37 @@ app.post('/api/disputes', upload.array('anexos', 8), async (req, res) => {
   }
 });
 
-app.get('/api/disputes', async (req, res) => {
-  res.json(await disputes.listAll());
+app.get('/api/disputes', requireSection('disputas'), async (req, res) => {
+  res.json(auth.filterByUnidade(req, (await disputes.listAll()).filter((d) => req.isMaster || !d.unidade || (req.permissions.unidades || []).includes(d.unidade))));
 });
 
-app.get('/api/disputes/:pedidoId', async (req, res) => {
-  res.json(await disputes.listByPedido(decodeURIComponent(req.params.pedidoId)));
+app.get('/api/disputes/:pedidoId', requireSection('disputas'), async (req, res) => {
+  const lista = await disputes.listByPedido(decodeURIComponent(req.params.pedidoId));
+  res.json(lista.filter((d) => disputaPermitida(req, d)));
 });
 
-app.patch('/api/disputes/:id/status', async (req, res) => {
+app.patch('/api/disputes/:id/status', requireSection('disputas'), async (req, res) => {
   try {
+    const atual = await disputes.getOne(req.params.id);
+    if (!disputaPermitida(req, atual)) return res.sendStatus(404);
     const registro = await disputes.updateStatus(req.params.id, req.body.status);
-    broadcast('dispute-changed', { pedidoId: registro.pedidoId, status: registro.status });
+    broadcast('dispute-changed', { pedidoId: registro.pedidoId, status: registro.status, unidade: registro.unidade }, 'disputas');
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.delete('/api/disputes/:id', async (req, res) => {
+app.delete('/api/disputes/:id', requireSection('disputas'), async (req, res) => {
+  const atual = await disputes.getOne(req.params.id);
+  if (!disputaPermitida(req, atual)) return res.sendStatus(404);
   await disputes.remove(req.params.id);
   res.json({ ok: true });
 });
 
-app.get('/api/disputes/anexo/:disputeId/:index', async (req, res) => {
+app.get('/api/disputes/anexo/:disputeId/:index', requireSection('disputas'), async (req, res) => {
   const registro = await disputes.getOne(req.params.disputeId);
+  if (!disputaPermitida(req, registro)) return res.sendStatus(404);
   const anexo = registro && registro.anexos && registro.anexos[Number(req.params.index)];
   if (!anexo) return res.sendStatus(404);
   storage.streamArquivo(anexo.path, anexo.tipo, res);
@@ -279,26 +369,225 @@ app.post('/api/push/unsubscribe', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/summary', (req, res) => {
-  const all = store.allTransactions();
-  const aprovadas = all.filter((t) => t.status === 'APROVADO');
-  const recusadas = all.filter((t) => t.status === 'RECUSADO');
-  res.json({
-    total: all.length,
-    aprovadas: aprovadas.length,
-    recusadas: recusadas.length,
-    volumeAprovado: +aprovadas.reduce((s, t) => s + t.valor, 0).toFixed(2),
-    chargebacks: all.filter((t) => t.status.includes('CHARGEBACK')).length,
-    fraudeSuspeita: all.filter((t) => t.fraudeSuspeita).length,
-  });
+// ---------- cofre de senhas (secao "cofre") ----------
+// grupos (ex: GBE) contem subgrupos (unidades, ex: DOM_BESSA, SPO_TACARUNA) -
+// e nos subgrupos que as senhas ficam. Grupos/subgrupos sao da organizacao
+// inteira; o Master decide quem enxerga qual SUBGRUPO (permissions.
+// vaultSubgroups) - dentro de um subgrupo liberado, o usuario pode ver e
+// gerenciar as senhas normalmente (o modo Leitor do Monitor nao se aplica
+// aqui, senao toda troca de senha dependeria do Master).
+function subgruposPermitidos(req) {
+  return req.isMaster ? null : new Set(req.permissions.vaultSubgroups || []);
+}
+
+app.get('/api/vault/groups', requireSection('cofre'), async (req, res) => {
+  res.json(await vaultGroups.list());
 });
 
-// ---------- fechamentos de caixa (ARCFOOD) ----------
+app.post('/api/vault/groups', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await vaultGroups.create(req.body.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/vault/groups/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await vaultGroups.rename(req.params.id, req.body.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/vault/groups/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await vaultGroups.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// lista de subgrupos - Master ve todos (pra montar a arvore inteira e a tela
+// de usuarios); usuario comum so ve os subgrupos liberados pra ele
+app.get('/api/vault/subgroups', requireSection('cofre'), async (req, res) => {
+  const todos = await vaultSubgroups.listAll();
+  if (req.isMaster) return res.json(todos);
+  const permitidos = subgruposPermitidos(req);
+  res.json(todos.filter((s) => permitidos.has(s.id)));
+});
+
+app.post('/api/vault/subgroups', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await vaultSubgroups.create(req.body.groupId, req.body.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/vault/subgroups/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await vaultSubgroups.rename(req.params.id, req.body.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/vault/subgroups/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await vaultSubgroups.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vault/entries', requireSection('cofre'), async (req, res) => {
+  const permitidos = subgruposPermitidos(req); // null = Master, todos
+  if (req.query.subgroupId) {
+    if (permitidos && !permitidos.has(req.query.subgroupId)) return res.json([]);
+    return res.json(await vaultEntries.listBySubgroups([req.query.subgroupId]));
+  }
+  res.json(await vaultEntries.listBySubgroups(permitidos ? [...permitidos] : null));
+});
+
+app.post('/api/vault/entries', requireSection('cofre'), async (req, res) => {
+  try {
+    const permitidos = subgruposPermitidos(req);
+    const subgroupId = req.body.subgroupId || null;
+    if (permitidos && (!subgroupId || !permitidos.has(subgroupId))) return res.status(403).json({ error: 'Você não tem acesso a esse subgrupo.' });
+    res.json(await vaultEntries.create(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/vault/entries/:id', requireSection('cofre'), async (req, res) => {
+  try {
+    const permitidos = subgruposPermitidos(req);
+    const atual = await vaultEntries.get(req.params.id);
+    if (!atual) return res.sendStatus(404);
+    if (permitidos && (!atual.subgroupId || !permitidos.has(atual.subgroupId))) return res.sendStatus(404);
+    if (permitidos && req.body.subgroupId !== undefined && (!req.body.subgroupId || !permitidos.has(req.body.subgroupId))) {
+      return res.status(403).json({ error: 'Você não tem acesso a esse subgrupo.' });
+    }
+    res.json(await vaultEntries.update(req.params.id, req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/vault/entries/:id', requireSection('cofre'), async (req, res) => {
+  try {
+    const permitidos = subgruposPermitidos(req);
+    const atual = await vaultEntries.get(req.params.id);
+    if (!atual) return res.sendStatus(404);
+    if (permitidos && (!atual.subgroupId || !permitidos.has(atual.subgroupId))) return res.sendStatus(404);
+    await vaultEntries.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- solicitacoes de estorno (usuario Leitor pede, Master aprova/rejeita) ----------
+app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => {
+  try {
+    const { pedidoId, unidade, observacao, password } = req.body;
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const senhaOk = await auth.verifyPassword(req.user.id, password);
+    if (!senhaOk) return res.status(401).json({ error: 'Senha incorreta.' });
+
+    const registro = await refunds.create({
+      pedidoId,
+      unidade,
+      observacao,
+      requestedById: req.user.id,
+      requestedByEmail: req.user.email,
+    });
+    broadcast('refund-requested', registro, 'monitor');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/refund-requests', requireSection('monitor'), async (req, res) => {
+  const todas = await refunds.listAll();
+  if (req.isMaster) return res.json(auth.filterByUnidade(req, todas));
+  res.json(todas.filter((r) => r.requestedById === req.user.id));
+});
+
+app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await refunds.updateStatus(req.params.id, req.body.status, {
+      motivoDecisao: req.body.motivoDecisao,
+      decidedByEmail: req.user.email,
+    });
+    broadcast('refund-request-changed', registro, 'monitor');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- gestao de usuarios (so o Master) ----------
+app.get('/api/users', auth.requireMaster, async (req, res) => {
+  res.json(await users.list());
+});
+
+app.post('/api/users', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.create(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/permissions', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updatePermissions(req.params.id, req.body.permissions));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/active', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.setActive(req.params.id, req.body.active));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/users/:id/reset-password', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.resetPassword(req.params.id, req.body.password));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/users/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await users.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- fechamentos de caixa ARCFOOD (secao "fechamentos") ----------
 // snapshot importado manualmente da planilha do Google Drive "FECHAMENTO
-// ARCFOOD" (aba BD) - atualizado sob demanda (peça "atualiza os fechamentos")
-// e nao ao vivo via webhook, diferente do resto do app.
+// ARCFOOD" (aba BD) - atualizado sob demanda, nao ao vivo via webhook. As
+// unidades aqui (19821/19855/19888/19889) sao codigos proprios da planilha,
+// nao o merchantAccountCode da Adyen, entao nao da pra reaproveitar
+// auth.filterByUnidade - o acesso e por secao inteira, como o cofre.
 const fechamentosData = require('./fechamentos-snapshot.json');
-app.get('/api/fechamentos', (req, res) => {
+app.get('/api/fechamentos', requireSection('fechamentos'), (req, res) => {
   res.json(fechamentosData);
 });
 
@@ -320,6 +609,7 @@ app.use((err, req, res, next) => {
 
 (async () => {
   await store.init(); // carrega o historico do Firestore antes de aceitar trafego
+  await auth.ensureMaster(); // garante que existe um acesso Master pra logar
 
   app.listen(PORT, async () => {
     console.log(`Monitor Adyen rodando em http://localhost:${PORT}`);
