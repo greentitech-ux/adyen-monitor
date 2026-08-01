@@ -3,12 +3,20 @@ require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
+const multer = require('multer');
 
 const store = require('./store');
 const { normalize } = require('./normalize');
 const { lookupBank } = require('./binLookup');
 const push = require('./push');
 const cardTesting = require('./cardTesting');
+const disputes = require('./disputes');
+const storage = require('./storage');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 6 }, // ate 6 imagens de 8MB por disputa
+});
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -162,6 +170,55 @@ app.get('/api/orders/changed', (req, res) => {
 
 app.get('/api/chargebacks', (req, res) => {
   res.json(store.chargebacks());
+});
+
+// ---------- disputas de chargeback (relatorio + evidencias pra recorrer na Adyen) ----------
+app.post('/api/disputes', upload.array('imagens', 6), async (req, res) => {
+  try {
+    const { pedidoId, unidade, notas } = req.body;
+    if (!pedidoId) return res.status(400).json({ error: 'pedidoId é obrigatório' });
+
+    const imagens = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarImagem(pedidoId, file);
+      imagens.push({ nome: file.originalname, path });
+    }
+
+    const registro = await disputes.create({ pedidoId, unidade, notas, imagens });
+    res.json(registro);
+  } catch (err) {
+    console.error('Erro ao criar disputa:', err.message);
+    res.status(500).json({ error: 'Erro ao salvar disputa' });
+  }
+});
+
+app.get('/api/disputes', async (req, res) => {
+  res.json(await disputes.listAll());
+});
+
+app.get('/api/disputes/:pedidoId', async (req, res) => {
+  res.json(await disputes.listByPedido(decodeURIComponent(req.params.pedidoId)));
+});
+
+app.patch('/api/disputes/:id/status', async (req, res) => {
+  try {
+    const registro = await disputes.updateStatus(req.params.id, req.body.status);
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/disputes/:id', async (req, res) => {
+  await disputes.remove(req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/disputes/imagem/:disputeId/:index', async (req, res) => {
+  const registro = await disputes.getOne(req.params.disputeId);
+  const imagem = registro && registro.imagens && registro.imagens[Number(req.params.index)];
+  if (!imagem) return res.sendStatus(404);
+  storage.streamImagem(imagem.path, res);
 });
 
 // ---------- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----------

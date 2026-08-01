@@ -79,6 +79,22 @@
   .badge.CHARGEBACK,.badge.NOTIFICATION_OF_CHARGEBACK{background:var(--bad-dim);color:var(--bad);}
   .badge.ESTORNADO,.badge.FALHA_ESTORNO,.badge.ESTORNO_AGENDADO{background:var(--warn-dim);color:var(--warn);}
   .badge.DISPUTE_DEFENSE_PERIOD_ENDED{background:#1e2733;color:var(--accent);}
+  .badge.ABERTA{background:var(--warn-dim);color:var(--warn);}
+  .badge.ENVIADA{background:#1e2733;color:var(--accent);}
+  .badge.GANHA{background:var(--ok-dim);color:var(--ok);}
+  .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
+  .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
+  .btn-disputa:hover{border-color:var(--accent);}
+  .dispute-item{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;}
+  .dispute-item .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
+  .dispute-item .notas{font-size:12.5px;margin-top:6px;white-space:pre-wrap;}
+  .dispute-item .imgs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .dispute-item .imgs img{width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+  .dispute-item select{margin-top:8px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--sans);}
+  #dispute-form textarea{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px;font-family:var(--sans);font-size:12.5px;resize:vertical;}
+  #dispute-form input[type=file]{font-size:12px;color:var(--muted);}
+  #dispute-form button[type=submit]{width:100%;padding:8px;border-radius:8px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);cursor:pointer;font-family:var(--sans);font-size:12.5px;}
+  #dispute-form button[type=submit]:disabled{opacity:.6;cursor:default;}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-notif.on{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
@@ -215,6 +231,19 @@
   </div>
 </div>
 
+<div class="overlay" id="dispute-overlay">
+  <div class="modal" style="width:min(560px,92vw);">
+    <h3 id="dispute-modal-title">Disputa de chargeback</h3>
+    <div id="dispute-history"></div>
+    <form id="dispute-form">
+      <textarea id="dispute-notas" rows="3" placeholder="Descreva a comprovação (ex: nota fiscal, retirada confirmada por câmera/portaria, etc.)" style="width:100%;margin-top:10px;"></textarea>
+      <input type="file" id="dispute-imagens" multiple accept="image/*" style="width:100%;margin-top:8px;">
+      <button type="submit" style="margin-top:10px;">Salvar registro de disputa</button>
+    </form>
+    <button class="close" onclick="document.getElementById('dispute-overlay').classList.remove('show')">Fechar</button>
+  </div>
+</div>
+
 <script>
 let DATA = [];
 
@@ -308,13 +337,75 @@ function renderChargebacks(){
         <span>${novo?'<span class="flag novo">NOVO</span> ':''}${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</span>
         <span class="valor">${fmtMoney(o.valor)}</span>
       </div>
-      <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}</div>
+      <div class="id">Pedido ${o.pedidoId} · ${o.unidade||'—'}${o.fraudeSuspeita?' <span class="flag">FRAUDE?</span>':''}
+        <button type="button" class="btn-disputa" onclick="event.stopPropagation(); abrirDisputa('${String(o.pedidoId).replace(/'/g,"\\'")}','${(o.unidade||'').replace(/'/g,"\\'")}')">📎 Disputa</button>
+      </div>
       <div class="timeline">
         ${o.history.map((h,i)=>`${i>0?'<span class="arrow">→</span>':''}<span class="step"><span class="badge ${h.status}">${h.status}</span><span class="ts">${fmtDT(h.dataHora)}</span></span>`).join('')}
       </div>
     </div>
   `;}).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
 }
+
+// ---- disputas de chargeback: relatorio + evidencias (imagens) pra recorrer na Adyen ----
+let DISPUTE_PEDIDO = null;
+
+async function abrirDisputa(pedidoId, unidade){
+  DISPUTE_PEDIDO = { pedidoId, unidade };
+  document.getElementById('dispute-modal-title').textContent = 'Disputa de chargeback — Pedido ' + pedidoId;
+  document.getElementById('dispute-notas').value = '';
+  document.getElementById('dispute-imagens').value = '';
+  document.getElementById('dispute-overlay').classList.add('show');
+  await carregarHistoricoDisputas(pedidoId);
+}
+
+async function carregarHistoricoDisputas(pedidoId){
+  const lista = await fetch('/api/disputes/'+encodeURIComponent(pedidoId)).then(r=>r.json());
+  const box = document.getElementById('dispute-history');
+  box.innerHTML = lista.length ? lista.map(d=>`
+    <div class="dispute-item">
+      <div class="top">
+        <span class="badge ${d.status}">${d.status}</span>
+        <span style="color:var(--muted);font-family:var(--mono);">${fmtDT(d.criadoEm)}</span>
+      </div>
+      ${d.notas?`<div class="notas">${d.notas}</div>`:''}
+      <div class="imgs">
+        ${(d.imagens||[]).map((img,i)=>`<a href="/api/disputes/imagem/${d.id}/${i}" target="_blank" rel="noopener"><img src="/api/disputes/imagem/${d.id}/${i}" alt="${img.nome||'evidência'}"></a>`).join('')}
+      </div>
+      <select onchange="atualizarStatusDisputa('${d.id}', this.value)">
+        ${['ABERTA','ENVIADA','GANHA','PERDIDA'].map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+  `).join('') : '<div class="empty">Nenhum registro de disputa ainda.</div>';
+}
+
+async function atualizarStatusDisputa(id, status){
+  await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  if(DISPUTE_PEDIDO) carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
+}
+
+document.getElementById('dispute-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!DISPUTE_PEDIDO) return;
+  const btn = e.target.querySelector('button[type=submit]');
+  const fd = new FormData();
+  fd.append('pedidoId', DISPUTE_PEDIDO.pedidoId);
+  fd.append('unidade', DISPUTE_PEDIDO.unidade || '');
+  fd.append('notas', document.getElementById('dispute-notas').value);
+  for(const f of document.getElementById('dispute-imagens').files) fd.append('imagens', f);
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try {
+    const resp = await fetch('/api/disputes', { method:'POST', body: fd });
+    if(!resp.ok) throw new Error('falha ao salvar');
+    document.getElementById('dispute-notas').value = '';
+    document.getElementById('dispute-imagens').value = '';
+    await carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
+  } catch(err) {
+    alert('Não foi possível salvar a disputa. Tente novamente.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar registro de disputa';
+  }
+});
 
 // filtra pelo intervalo de datas selecionado (data inicial e data final)
 function periodFiltered(){
