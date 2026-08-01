@@ -24,16 +24,26 @@
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
   .hidden{display:none!important;}
   .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
   .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);}
-  .kpi .val{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:6px;}
+  .kpi .val{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums;}
   .kpi .val.ok{color:var(--ok);} .kpi .val.bad{color:var(--bad);} .kpi .val.warn{color:var(--warn);}
+  .kpi .delta{font-family:var(--mono);font-size:11px;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .kpi .delta.ok{color:var(--ok);} .kpi .delta.bad{color:var(--bad);} .kpi .delta.muted{color:var(--muted);}
+
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px;}
-  .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .panel h2 .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
-  .controls{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center;}
+  .panel h2 .title-group{display:flex;align-items:baseline;gap:8px;min-width:0;}
+
+  .controls{display:flex;gap:8px;padding:10px 16px;flex-wrap:wrap;align-items:center;}
   .controls select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);}
+  .presets{display:flex;gap:4px;flex-wrap:wrap;}
+  .preset-btn{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .preset-btn:hover{color:var(--text);border-color:var(--accent);}
+  .preset-btn.active{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:600;}
   .daterange{display:flex;align-items:center;gap:6px;}
   .daterange input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);color-scheme:dark;}
   .daterange .sep{color:var(--muted);font-size:12px;}
@@ -46,18 +56,48 @@
   .multiselect-panel label:hover{background:var(--panel);}
   .multiselect-panel label.all-option{font-weight:600;border-bottom:1px solid var(--line);border-radius:0;margin-bottom:2px;padding-bottom:8px;}
   .multiselect-panel input[type=checkbox]{accent-color:var(--accent);}
-  .legend{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:10px 16px 0;}
-  .legend span{display:inline-flex;align-items:center;gap:5px;}
-  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:2px 16px 0;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{display:inline-block;width:12px;height:2px;border-radius:1px;}
+
   table{border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%;}
   thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);white-space:nowrap;}
   tbody td{padding:6px 10px;border-bottom:1px solid #1a1f26;white-space:nowrap;}
   tbody tr:hover{background:var(--panel2);}
-  .valor{font-family:var(--mono);}
+  .valor{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .truncate{max-width:160px;overflow:hidden;text-overflow:ellipsis;}
   .tablewrap{max-height:360px;overflow:auto;}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+
+  .chart-body{padding:10px 12px 14px;position:relative;}
+  .chart-svg{width:100%;height:230px;display:block;overflow:visible;}
+  .chart-svg .grid-line{stroke:var(--line);stroke-width:1;}
+  .chart-svg .axis-label{font-size:9px;fill:var(--muted);font-family:var(--mono);}
+  .chart-svg .crosshair{stroke:var(--muted);stroke-width:1;stroke-dasharray:2,3;pointer-events:none;opacity:0;}
+  .chart-svg .series-line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .chart-svg .hover-dot{pointer-events:none;opacity:0;}
+  .chart-svg .direct-label{font-size:9.5px;font-family:var(--mono);font-weight:600;}
+  .chart-svg .hit-col{fill:transparent;}
+  .chart-svg rect.bar{transition:opacity .1s ease;}
+  .chart-svg rect.bar.dim{opacity:.45;}
+
+  .viz-tooltip{position:fixed;z-index:2000;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:11.5px;pointer-events:none;opacity:0;transition:opacity .08s ease;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:260px;}
+  .viz-tooltip.show{opacity:1;}
+  .viz-tooltip .tt-date{font-family:var(--mono);color:var(--muted);font-size:10px;margin-bottom:5px;}
+  .viz-tooltip .tt-row{display:flex;align-items:center;gap:6px;justify-content:space-between;gap:12px;}
+  .viz-tooltip .tt-row+.tt-row{margin-top:3px;}
+  .viz-tooltip .tt-key{display:flex;align-items:center;gap:6px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .viz-tooltip .tt-key i{display:inline-block;width:10px;height:2px;flex:none;border-radius:1px;}
+  .viz-tooltip .tt-val{font-family:var(--mono);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+  .multiples-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;padding:12px 16px 16px;}
+  .multiple-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  .multiple-card .mc-title{font-size:11px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .multiple-card .mc-total{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .multiple-card svg{width:100%;height:44px;display:block;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -84,8 +124,8 @@
 <div class="kpis" id="kpis"></div>
 
 <div class="panel">
-  <h2>Filtros</h2>
   <div class="controls">
+    <div class="presets" id="presets"></div>
     <div class="daterange">
       <input type="date" id="f-date-start" title="Data inicial">
       <span class="sep">até</span>
@@ -103,23 +143,24 @@
   </div>
 </div>
 
-<div class="grid2">
-  <div class="panel">
-    <h2>Faturamento diário por unidade <span class="n" id="fat-info"></span></h2>
-    <div class="legend" id="fat-legend"></div>
-    <div style="padding:8px 16px 14px;">
-      <svg id="fat-chart" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:220px;display:block;"></svg>
-    </div>
+<div class="panel">
+  <h2>
+    <div class="title-group"><span>Faturamento diário</span><span class="n" id="fat-info"></span></div>
+  </h2>
+  <div class="legend" id="fat-legend"></div>
+  <div class="chart-body" id="fat-container"></div>
+</div>
+
+<div class="panel">
+  <h2>
+    <div class="title-group"><span>Diferença de caixa por dia</span><span class="n" id="dif-info"></span></div>
+  </h2>
+  <div class="legend">
+    <span><i style="background:var(--ok);"></i>Sobra</span>
+    <span><i style="background:var(--bad);"></i>Quebra / falta</span>
   </div>
-  <div class="panel">
-    <h2>Diferença de caixa por dia <span class="n" id="dif-info"></span></h2>
-    <div class="legend">
-      <span><i style="background:#3ddc97;"></i>Sobra</span>
-      <span><i style="background:#ff5c5c;"></i>Quebra/falta</span>
-    </div>
-    <div style="padding:8px 16px 14px;">
-      <svg id="dif-chart" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:220px;display:block;"></svg>
-    </div>
+  <div class="chart-body">
+    <svg id="dif-chart" class="chart-svg" viewBox="0 0 600 230" preserveAspectRatio="none"></svg>
   </div>
 </div>
 
@@ -145,6 +186,8 @@
 
 </div><!-- /#root -->
 
+<div class="viz-tooltip" id="viz-tooltip"></div>
+
 <script>
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
 if(!AUTH_TOKEN){ location.href = '/'; }
@@ -165,9 +208,16 @@ const GRUPOS = {
 };
 const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
 GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = u; });
-const PALETA = ['#5cc8ff','#f2b33d','#3ddc97','#ff8fd6','#ff5c5c','#a78bfa','#fb923c','#38bdf8','#facc15','#4ade80','#f472b6','#94a3b8','#22d3ee','#c084fc','#fbbf24','#34d399'];
+
+// paleta categorica validada (8 tons, ordem fixa - ver color-formula.md do
+// skill de dataviz). Usada so quando ate 6 series aparecem juntas no mesmo
+// grafico; alem disso a identidade vira "small multiples" (um card por
+// unidade), nao uma 9a cor gerada.
+const PALETA_CATEGORICA = ['#3987e5','#d95926','#199e70','#c98500','#d55181','#3ddc97','#9085e9','#e66767'];
 const CORES_UNIDADE = {};
-Object.keys(UNIDADES_NOMES).forEach((u,i)=>{ CORES_UNIDADE[u] = PALETA[i % PALETA.length]; });
+Object.keys(UNIDADES_NOMES).forEach((u,i)=>{ CORES_UNIDADE[u] = PALETA_CATEGORICA[i % PALETA_CATEGORICA.length]; });
+const LIMIAR_SMALL_MULTIPLES = 6; // acima disso, facet em vez de multi-linha
+
 const SEL_UNIDADE = new Set();
 
 function codigosDoGrupo(){
@@ -176,8 +226,15 @@ function codigosDoGrupo(){
   return GRUPOS[grupo] || [];
 }
 
-function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
+function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtMoneyCompact(v){
+  const abs = Math.abs(v||0);
+  if(abs>=1000000) return 'R$ '+(v/1000000).toFixed(1).replace('.',',')+'M';
+  if(abs>=1000) return 'R$ '+(v/1000).toFixed(1).replace('.',',')+'k';
+  return fmtMoney(v);
+}
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
 async function carregar(){
   const resp = await fetch('/api/fechamentos');
@@ -186,14 +243,42 @@ async function carregar(){
   const qtdArcfood = DATA.filter(d=>d.grupo==='ARCFOOD').length;
   const qtdBravo = DATA.filter(d=>d.grupo==='BRAVO').length;
   document.getElementById('sync-info').textContent = datas.length
-    ? `${datas.length} fechamentos (${qtdArcfood} ARCFOOD · ${qtdBravo} Grupo Bravo) · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · dados sincronizados manualmente da planilha`
+    ? `${datas.length} fechamentos (${qtdArcfood} ARCFOOD · ${qtdBravo} Grupo Bravo) · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · sincronizado manualmente da planilha`
     : 'nenhum fechamento importado ainda';
-  const fim = datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10);
-  const inicioDt = new Date(fim); inicioDt.setDate(inicioDt.getDate()-29);
-  document.getElementById('f-date-start').value = inicioDt.toISOString().slice(0,10);
-  document.getElementById('f-date-end').value = fim;
+  setupPresets(datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10));
   setupMultiselect();
   render();
+}
+
+// ---- presets de periodo (7/30/90 dias, mes atual) - lista de botoes, o
+// primeiro (30 dias) comeca marcado ----
+function setupPresets(dataFinalDados){
+  const presets = [
+    {lbl:'7 dias', dias:7},
+    {lbl:'30 dias', dias:30},
+    {lbl:'90 dias', dias:90},
+  ];
+  const cont = document.getElementById('presets');
+  cont.innerHTML = presets.map((p,i)=>`<button type="button" class="preset-btn${i===1?' active':''}" data-dias="${p.dias}">${p.lbl}</button>`).join('');
+  function aplicar(dias, btn){
+    cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    const fim = dataFinalDados;
+    const inicioDt = new Date(fim); inicioDt.setDate(inicioDt.getDate()-(dias-1));
+    document.getElementById('f-date-start').value = inicioDt.toISOString().slice(0,10);
+    document.getElementById('f-date-end').value = fim;
+    render();
+  }
+  cont.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>aplicar(Number(btn.dataset.dias), btn));
+  });
+  aplicar(30, cont.children[1]);
+  ['f-date-start','f-date-end'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>{
+      cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      render();
+    });
+  });
 }
 
 function setupMultiselect(){
@@ -211,7 +296,7 @@ function setupMultiselect(){
     for(const v of [...SEL_UNIDADE]) if(!codigos.includes(v)) SEL_UNIDADE.delete(v);
     panel.innerHTML = `
       <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${SEL_UNIDADE.size===0?'checked':''}></label>
-      ${codigos.map(c=>`<label><span>${UNIDADES_NOMES[c]} (${c})</span><input type="checkbox" value="${c}" ${SEL_UNIDADE.has(c)?'checked':''}></label>`).join('')}
+      ${codigos.map(c=>`<label><span>${escapeHtml(UNIDADES_NOMES[c])} (${escapeHtml(c)})</span><input type="checkbox" value="${escapeHtml(c)}" ${SEL_UNIDADE.has(c)?'checked':''}></label>`).join('')}
     `;
     panel.querySelector('[data-all]').addEventListener('change', ()=>{ SEL_UNIDADE.clear(); renderPanel(); render(); });
     panel.querySelectorAll('input[type=checkbox]:not([data-all])').forEach(cb=>{
@@ -249,22 +334,58 @@ function filtrar(){
   );
 }
 
+// ---- KPIs: valor + variacao contra o periodo anterior de mesmo tamanho ----
 function renderKpis(rows){
-  const soma = campo => +rows.reduce((s,d)=>s+(d[campo]||0),0).toFixed(2);
-  const faturamento = soma('faturamento');
-  const declarado = soma('totalDeclarado');
-  const diferenca = soma('diferenca');
-  const tc = soma('tc');
-  const cancelados = soma('cancelados');
+  const start = document.getElementById('f-date-start').value;
+  const end = document.getElementById('f-date-end').value;
+  const soma = (list,campo) => +list.reduce((s,d)=>s+(d[campo]||0),0).toFixed(2);
+
+  let anteriores = [];
+  if(start && end){
+    const dStart = new Date(start+'T00:00:00'), dEnd = new Date(end+'T00:00:00');
+    const dias = Math.round((dEnd-dStart)/86400000)+1;
+    const prevEnd = new Date(dStart); prevEnd.setDate(prevEnd.getDate()-1);
+    const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate()-(dias-1));
+    const grupo = document.getElementById('f-grupo').value;
+    const prevEndIso = prevEnd.toISOString().slice(0,10), prevStartIso = prevStart.toISOString().slice(0,10);
+    anteriores = DATA.filter(d=>
+      (!grupo || d.grupo===grupo) &&
+      (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
+      (d.data||'') >= prevStartIso && (d.data||'') <= prevEndIso
+    );
+  }
+
+  const faturamento = soma(rows,'faturamento');
+  const faturamentoAnt = soma(anteriores,'faturamento');
+  const declarado = soma(rows,'totalDeclarado');
+  const diferenca = soma(rows,'diferenca');
+  const tc = soma(rows,'tc');
+  const cancelados = soma(rows,'cancelados');
+
+  function delta(atual, anterior){
+    if(!anterior) return null;
+    const pct = ((atual-anterior)/Math.abs(anterior))*100;
+    return pct;
+  }
+  const deltaFat = delta(faturamento, faturamentoAnt);
+
   const kpis = [
     {lbl:'Fechamentos', val:rows.length, cls:''},
-    {lbl:'Faturamento', val:fmtMoney(faturamento), cls:'ok'},
+    {lbl:'Faturamento', val:fmtMoney(faturamento), cls:'ok', delta:deltaFat},
     {lbl:'Total declarado', val:fmtMoney(declarado), cls:''},
     {lbl:'Diferença de caixa', val:fmtMoney(diferenca), cls: diferenca<0?'bad':(diferenca>0?'warn':'ok')},
     {lbl:'TC total', val:tc.toFixed(0), cls:''},
     {lbl:'Cancelados', val:cancelados.toFixed(0), cls: cancelados>0?'warn':''},
   ];
-  document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`).join('');
+  document.getElementById('kpis').innerHTML = kpis.map(k=>{
+    let deltaHtml = '';
+    if(k.delta!=null && isFinite(k.delta)){
+      const cls = k.delta>0.5?'ok':(k.delta<-0.5?'bad':'muted');
+      const seta = k.delta>0.5?'▲':(k.delta<-0.5?'▼':'—');
+      deltaHtml = `<div class="delta ${cls}">${seta} ${Math.abs(k.delta).toFixed(1)}% vs período anterior</div>`;
+    }
+    return `<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div>${deltaHtml}</div>`;
+  }).join('');
 }
 
 function diasNoIntervalo(start,end){
@@ -281,14 +402,60 @@ function diasNoIntervalo(start,end){
   return dias;
 }
 
+// escolhe quais indices ganham rotulo no eixo X - espacados por "passo", mas
+// sempre garantindo o ultimo dia, sem deixar os dois ultimos colarem um no outro
+function indicesRotulo(n, passo){
+  const indices = [];
+  for(let i=0;i<n;i+=passo) indices.push(i);
+  if(indices[indices.length-1] !== n-1){
+    if(n-1 - indices[indices.length-1] < passo*0.6) indices.pop();
+    indices.push(n-1);
+  }
+  return indices;
+}
+
+// ---- tooltip compartilhado pelos graficos ----
+const tooltipEl = document.getElementById('viz-tooltip');
+function mostrarTooltip(clientX, clientY, html){
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  const pad = 14;
+  let x = clientX + pad, y = clientY + pad;
+  const rect = tooltipEl.getBoundingClientRect();
+  if(x + rect.width > window.innerWidth - 8) x = clientX - rect.width - pad;
+  if(y + rect.height > window.innerHeight - 8) y = clientY - rect.height - pad;
+  tooltipEl.style.left = Math.max(8,x)+'px';
+  tooltipEl.style.top = Math.max(8,y)+'px';
+}
+function esconderTooltip(){ tooltipEl.classList.remove('show'); }
+
+// converte coordenada de tela X pro sistema de coordenadas do viewBox do svg
+function xParaViewBox(svg, clientX){
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const ratio = vb.width / rect.width;
+  return (clientX - rect.left) * ratio;
+}
+
+// ---------------------------------------------------------------
+// Faturamento diario - multi-linha (ate 6 unidades) ou small
+// multiples (facet, quando ha mais unidades do que da pra comparar
+// por cor com seguranca)
+// ---------------------------------------------------------------
 function renderFaturamentoChart(rows){
   const start = document.getElementById('f-date-start').value;
   const end = document.getElementById('f-date-end').value;
   const dias = diasNoIntervalo(start,end);
-  const svg = document.getElementById('fat-chart');
+  const container = document.getElementById('fat-container');
   const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
-  document.getElementById('fat-legend').innerHTML = unidades.map(u=>`<span><i style="background:${CORES_UNIDADE[u]};"></i>${UNIDADES_NOMES[u]}</span>`).join('');
-  if(!dias.length){ svg.innerHTML=''; document.getElementById('fat-info').textContent=''; return; }
+
+  if(!dias.length || !unidades.length){
+    container.innerHTML = '<div class="empty">Sem dados no período.</div>';
+    document.getElementById('fat-legend').innerHTML = '';
+    document.getElementById('fat-info').textContent = '';
+    return;
+  }
+  document.getElementById('fat-info').textContent = `${fmtData(dias[0])} → ${fmtData(dias[dias.length-1])}`;
 
   const porDiaUnidade = {};
   unidades.forEach(u=>{ porDiaUnidade[u] = {}; dias.forEach(d=>porDiaUnidade[u][d]=0); });
@@ -298,76 +465,194 @@ function renderFaturamentoChart(rows){
     }
   });
 
-  const W=600,H=220,padL=44,padR=10,padT=10,padB=22;
+  if(unidades.length > LIMIAR_SMALL_MULTIPLES){
+    document.getElementById('fat-legend').innerHTML = '';
+    renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidade);
+  } else {
+    document.getElementById('fat-legend').innerHTML = unidades.map(u=>`<span><i style="background:${CORES_UNIDADE[u]};"></i>${escapeHtml(UNIDADES_NOMES[u])}</span>`).join('');
+    renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade);
+  }
+}
+
+function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade){
+  container.innerHTML = `<svg id="fat-chart" class="chart-svg" viewBox="0 0 600 230" preserveAspectRatio="none"></svg>`;
+  const svg = document.getElementById('fat-chart');
+
+  const direct = unidades.length >= 4; // >=4 series: rotulo direto vira obrigatorio
+  const W=600,H=230,padL=48,padR=direct?92:10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   let maxVal = 1;
   unidades.forEach(u=>dias.forEach(d=>{ maxVal = Math.max(maxVal, porDiaUnidade[u][d]); }));
+  maxVal *= 1.08; // respiro no topo pra rotulo/linha nao colar
 
-  const grid = [0,0.5,1].map(f=>{
+  const xAt = i => padL + (n===1 ? innerW/2 : innerW*i/(n-1));
+  const yAt = v => padT + innerH - (v/maxVal*innerH);
+
+  const grid = [0,0.25,0.5,0.75,1].map(f=>{
     const y = padT+innerH*(1-f);
-    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#232a33" stroke-width="1"/>` +
-           `<text x="2" y="${(y+3).toFixed(1)}" font-size="8.5" fill="#7d8896" font-family="monospace">${fmtMoney(maxVal*f)}</text>`;
+    return `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}"/>` +
+           `<text class="axis-label" x="2" y="${(y+3).toFixed(1)}">${fmtMoneyCompact(maxVal*f)}</text>`;
   }).join('');
   const passoRotulo = Math.max(1, Math.ceil(n/8));
-  const rotulos = dias.filter((d,i)=>i%passoRotulo===0 || i===n-1).map((d,idx)=>{
-    const i = dias.indexOf(d);
-    const x = padL + (n===1?innerW/2:innerW*i/(n-1));
-    return `<text x="${x.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${d.slice(8,10)}/${d.slice(5,7)}</text>`;
-  }).join('');
+  const rotulosX = indicesRotulo(n, passoRotulo).map(i=>
+    `<text class="axis-label" x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle">${dias[i].slice(8,10)}/${dias[i].slice(5,7)}</text>`).join('');
 
   let linhas = '';
+  const finalPts = [];
   unidades.forEach(u=>{
-    const pts = dias.map((d,i)=>{
-      const x = padL + (n===1?innerW/2:innerW*i/(n-1));
-      const y = padT + innerH - (porDiaUnidade[u][d]/maxVal*innerH);
-      return {x,y,v:porDiaUnidade[u][d],d};
-    });
+    const pts = dias.map((d,i)=>({x:xAt(i), y:yAt(porDiaUnidade[u][d])}));
     const linha = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    const pontos = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2" fill="${CORES_UNIDADE[u]}"><title>${UNIDADES_NOMES[u]} · ${p.d}: ${fmtMoney(p.v)}</title></circle>`).join('');
-    linhas += `<polyline points="${linha}" fill="none" stroke="${CORES_UNIDADE[u]}" stroke-width="2"/>${pontos}`;
+    linhas += `<polyline class="series-line" points="${linha}" stroke="${CORES_UNIDADE[u]}"/>`;
+    finalPts.push({u, x: pts[pts.length-1].x, y: pts[pts.length-1].y});
   });
+  if(direct){
+    // separa os rotulos que ficariam colados verticalmente na ponta das linhas,
+    // e desenha na margem direita reservada (fora da area de plotagem)
+    finalPts.sort((a,b)=>a.y-b.y);
+    const MIN_GAP = 11;
+    for(let i=1;i<finalPts.length;i++){
+      if(finalPts[i].y - finalPts[i-1].y < MIN_GAP) finalPts[i].y = finalPts[i-1].y + MIN_GAP;
+    }
+    finalPts.forEach(p=>{
+      linhas += `<text class="direct-label" x="${(p.x+8).toFixed(1)}" y="${(p.y+3).toFixed(1)}" text-anchor="start" fill="${CORES_UNIDADE[p.u]}">${escapeHtml(UNIDADES_NOMES[p.u])}</text>`;
+    });
+  }
 
-  svg.innerHTML = `${grid}${rotulos}${linhas}`;
-  document.getElementById('fat-info').textContent = `${dias[0]} → ${dias[dias.length-1]}`;
+  // crosshair + pontos de hover (um por serie), escondidos ate o pointermove
+  const crosshair = `<line class="crosshair" id="fat-crosshair" x1="0" y1="${padT}" x2="0" y2="${H-padB}"/>`;
+  const hoverDots = unidades.map(u=>`<circle class="hover-dot" id="fat-dot-${cssId(u)}" r="4" fill="${CORES_UNIDADE[u]}" stroke="var(--panel)" stroke-width="1.5"/>`).join('');
+  const hitCol = `<rect class="hit-col" id="fat-hit" x="${padL}" y="${padT}" width="${innerW}" height="${innerH}"/>`;
+
+  svg.innerHTML = `${grid}${rotulosX}${linhas}${crosshair}${hoverDots}${hitCol}`;
+
+  const hit = document.getElementById('fat-hit');
+  const crosshairEl = document.getElementById('fat-crosshair');
+  function onMove(evt){
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    const vx = xParaViewBox(svg, clientX);
+    let idx = Math.round((vx-padL)/innerW*(n-1));
+    idx = Math.max(0, Math.min(n-1, idx));
+    const x = xAt(idx);
+    crosshairEl.setAttribute('x1', x); crosshairEl.setAttribute('x2', x);
+    crosshairEl.style.opacity = 1;
+    const linhasTt = unidades.map(u=>{
+      const v = porDiaUnidade[u][dias[idx]];
+      const dot = document.getElementById('fat-dot-'+cssId(u));
+      dot.setAttribute('cx', x); dot.setAttribute('cy', yAt(v)); dot.style.opacity = 1;
+      return {u, v};
+    }).sort((a,b)=>b.v-a.v);
+    const html = `<div class="tt-date">${fmtData(dias[idx])}</div>` + linhasTt.map(r=>
+      `<div class="tt-row"><span class="tt-key"><i style="background:${CORES_UNIDADE[r.u]}"></i>${escapeHtml(UNIDADES_NOMES[r.u])}</span><span class="tt-val">${fmtMoney(r.v)}</span></div>`
+    ).join('');
+    mostrarTooltip(clientX, clientY, html);
+  }
+  function onLeave(){
+    crosshairEl.style.opacity = 0;
+    unidades.forEach(u=>{ const dot = document.getElementById('fat-dot-'+cssId(u)); if(dot) dot.style.opacity = 0; });
+    esconderTooltip();
+  }
+  hit.addEventListener('mousemove', onMove);
+  hit.addEventListener('mouseleave', onLeave);
+  hit.addEventListener('touchmove', (e)=>{ onMove(e); e.preventDefault(); }, {passive:false});
+  hit.addEventListener('touchend', onLeave);
 }
 
+function cssId(s){ return String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
+
+// small multiples: um mini-grafico por unidade, todos na MESMA cor (a
+// identidade aqui e o titulo do card, nao a cor - ver choosing-a-form.md)
+function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidade){
+  const cor = 'var(--accent)';
+  const ordenadas = [...unidades].sort((a,b)=>{
+    const totalA = dias.reduce((s,d)=>s+porDiaUnidade[a][d],0);
+    const totalB = dias.reduce((s,d)=>s+porDiaUnidade[b][d],0);
+    return totalB-totalA;
+  });
+  const n = dias.length;
+  container.innerHTML = `<div class="multiples-grid">${ordenadas.map(u=>{
+    const vals = dias.map(d=>porDiaUnidade[u][d]);
+    const total = vals.reduce((s,v)=>s+v,0);
+    const maxV = Math.max(1, ...vals);
+    const W=200,H=44,pad=3;
+    const pts = vals.map((v,i)=>{
+      const x = pad + (n===1?(W-2*pad)/2:(W-2*pad)*i/(n-1));
+      const y = H-pad-(v/maxV*(H-2*pad));
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<div class="multiple-card">
+      <div class="mc-title" title="${escapeHtml(UNIDADES_NOMES[u])}">${escapeHtml(UNIDADES_NOMES[u])}</div>
+      <div class="mc-total">${fmtMoneyCompact(total)}</div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${cor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------
+// Diferenca de caixa - grafico de barras divergente (positivo/
+// negativo), com hover por barra (a marca e o alvo do toque)
+// ---------------------------------------------------------------
 function renderDiferencaChart(rows){
   const start = document.getElementById('f-date-start').value;
   const end = document.getElementById('f-date-end').value;
   const dias = diasNoIntervalo(start,end);
   const svg = document.getElementById('dif-chart');
   if(!dias.length){ svg.innerHTML=''; document.getElementById('dif-info').textContent=''; return; }
+  document.getElementById('dif-info').textContent = `${fmtData(dias[0])} → ${fmtData(dias[dias.length-1])}`;
 
   const porDia = {};
   dias.forEach(d=>porDia[d]=0);
   rows.forEach(r=>{ if(porDia[r.data]!==undefined) porDia[r.data] += r.diferenca||0; });
 
-  const W=600,H=220,padL=44,padR=10,padT=10,padB=22;
+  const W=600,H=230,padL=48,padR=10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   const maxAbs = Math.max(1, ...dias.map(d=>Math.abs(porDia[d])));
   const zeroY = padT + innerH/2;
   const passo = innerW/n;
-  const largura = Math.min(24, passo*0.62);
+  const largura = Math.max(2, Math.min(22, passo*0.6));
 
-  const grid = `<line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W-padR}" y2="${zeroY.toFixed(1)}" stroke="#232a33" stroke-width="1"/>`+
-    `<text x="2" y="${(zeroY+3).toFixed(1)}" font-size="8.5" fill="#7d8896" font-family="monospace">R$ 0</text>`;
+  const grid = [-1,-0.5,0,0.5,1].map(f=>{
+    const y = zeroY - f*(innerH/2);
+    return `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}"/>` +
+      (f===0 ? '' : `<text class="axis-label" x="2" y="${(y+3).toFixed(1)}">${fmtMoneyCompact(maxAbs*f)}</text>`);
+  }).join('') + `<text class="axis-label" x="2" y="${(zeroY+3).toFixed(1)}">R$ 0</text>`;
+
   const passoRotulo = Math.max(1, Math.ceil(n/8));
+  const idsRotulo = new Set(indicesRotulo(n, passoRotulo));
   let barras = '', rotulos = '';
   dias.forEach((d,i)=>{
     const v = porDia[d];
     const cx = padL + passo*i + passo/2;
     const x = cx - largura/2;
-    const altura = Math.abs(v)/maxAbs*(innerH/2);
+    const altura = Math.max(1.5, Math.abs(v)/maxAbs*(innerH/2));
     const y = v>=0 ? zeroY-altura : zeroY;
-    const cor = v>=0 ? '#3ddc97' : '#ff5c5c';
-    barras += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${largura.toFixed(1)}" height="${altura.toFixed(1)}" fill="${cor}"><title>${d}: ${fmtMoney(v)}</title></rect>`;
-    if(i%passoRotulo===0 || i===n-1) rotulos += `<text x="${cx.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${d.slice(8,10)}/${d.slice(5,7)}</text>`;
+    const cor = v>=0 ? 'var(--ok)' : 'var(--bad)';
+    barras += `<rect class="bar" data-i="${i}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${largura.toFixed(1)}" height="${altura.toFixed(1)}" rx="1.5" fill="${cor}"/>`;
+    if(idsRotulo.has(i)) rotulos += `<text class="axis-label" x="${cx.toFixed(1)}" y="${H-6}" text-anchor="middle">${d.slice(8,10)}/${d.slice(5,7)}</text>`;
   });
+  const hitCols = dias.map((d,i)=>{
+    const x = padL + passo*i;
+    return `<rect class="hit-col" data-i="${i}" x="${x.toFixed(1)}" y="${padT}" width="${passo.toFixed(1)}" height="${innerH}"/>`;
+  }).join('');
 
-  svg.innerHTML = `${grid}${rotulos}${barras}`;
-  document.getElementById('dif-info').textContent = `${dias[0]} → ${dias[dias.length-1]}`;
+  svg.innerHTML = `${grid}${rotulos}${barras}${hitCols}`;
+
+  svg.querySelectorAll('.hit-col').forEach(col=>{
+    const i = Number(col.dataset.i);
+    col.addEventListener('mousemove', (evt)=>{
+      svg.querySelectorAll('rect.bar').forEach(b=>b.classList.toggle('dim', Number(b.dataset.i)!==i));
+      const v = porDia[dias[i]];
+      const cor = v>=0 ? 'var(--ok)' : 'var(--bad)';
+      const html = `<div class="tt-date">${fmtData(dias[i])}</div><div class="tt-row"><span class="tt-key"><i style="background:${v>=0?'#3ddc97':'#ff5c5c'}"></i>${v>=0?'Sobra':'Quebra/falta'}</span><span class="tt-val" style="color:${cor}">${fmtMoney(v)}</span></div>`;
+      mostrarTooltip(evt.clientX, evt.clientY, html);
+    });
+    col.addEventListener('mouseleave', ()=>{
+      svg.querySelectorAll('rect.bar').forEach(b=>b.classList.remove('dim'));
+      esconderTooltip();
+    });
+  });
 }
 
 function renderUnidadesTable(rows){
@@ -386,7 +671,7 @@ function renderUnidadesTable(rows){
   document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>{
     const cor = c.diferenca<0?'var(--bad)':(c.diferenca>0?'var(--warn)':'var(--ok)');
     return `<tr>
-      <td>${UNIDADES_NOMES[u]||u}${(UNIDADES_NOMES[u] && UNIDADES_NOMES[u]!==u) ? ` <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${u}</span>` : ''}</td>
+      <td>${escapeHtml(UNIDADES_NOMES[u]||u)}${(UNIDADES_NOMES[u] && UNIDADES_NOMES[u]!==u) ? ` <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${escapeHtml(u)}</span>` : ''}</td>
       <td class="valor">${c.qtd}</td>
       <td class="valor">${fmtMoney(c.faturamento)}</td>
       <td class="valor">${fmtMoney(c.declarado)}</td>
@@ -404,8 +689,8 @@ function renderTabela(rows){
     const cor = d.diferenca<0?'var(--bad)':(d.diferenca>0?'var(--warn)':'var(--ok)');
     return `<tr>
       <td>${fmtData(d.data)}</td>
-      <td>${UNIDADES_NOMES[d.unidade]||d.unidade}</td>
-      <td class="truncate" title="${d.gerente||''}">${d.gerente||'—'}</td>
+      <td>${escapeHtml(UNIDADES_NOMES[d.unidade]||d.unidade)}</td>
+      <td class="truncate" title="${escapeHtml(d.gerente||'')}">${escapeHtml(d.gerente||'—')}</td>
       <td class="valor">${fmtMoney(d.faturamento)}</td>
       <td class="valor">${fmtMoney(d.totalDeclarado)}</td>
       <td class="valor" style="color:${cor}">${fmtMoney(d.diferenca)}</td>
@@ -415,7 +700,7 @@ function renderTabela(rows){
       <td class="valor">${fmtMoney(d.food99)}</td>
       <td class="valor">${fmtMoney(d.pix)}</td>
       <td class="valor">${fmtMoney(d.loja)}</td>
-      <td class="truncate" title="${d.observacao||d.obsDif||''}">${d.observacao||d.obsDif||'—'}</td>
+      <td class="truncate" title="${escapeHtml(d.observacao||d.obsDif||'')}">${escapeHtml(d.observacao||d.obsDif||'—')}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="13" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
 }
@@ -428,8 +713,6 @@ function render(){
   renderUnidadesTable(rows);
   renderTabela(rows);
 }
-
-['f-date-start','f-date-end'].forEach(id=>document.getElementById(id).addEventListener('input', render));
 
 async function boot(){
   const res = await fetch('/api/me');
