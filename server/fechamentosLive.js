@@ -116,6 +116,45 @@ async function solicitarEdicao({ fechamentoId, mudancas, motivo, solicitadoPorId
   return pedido;
 }
 
+// campos de texto (alem dos numericos) que o Master tambem pode corrigir
+// direto - unidade/data ficam de fora de proposito (mudar isso e apagar e
+// relancar, nao "corrigir")
+const CAMPOS_TEXTO = ['gerente', 'observacao'];
+
+// edicao direta: so o Master usa isso (o resto passa por solicitarEdicao +
+// decidirEdicao). Como o Master e quem aprovaria a propria solicitacao,
+// pedir-e-aprovar pra si mesmo e so atrito - aqui a mudanca e aplicada na
+// hora, mas ainda fica registrada no historico do fechamento pra auditoria
+async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail }) {
+  const atual = await getOne(fechamentoId);
+  if (!atual) throw new Error('Fechamento não encontrado.');
+  const camposValidos = {};
+  Object.entries(mudancas || {}).forEach(([campo, valor]) => {
+    if (CAMPOS_NUMERICOS.includes(campo)) camposValidos[campo] = num(valor);
+    else if (CAMPOS_TEXTO.includes(campo)) camposValidos[campo] = String(valor ?? '').slice(0, 500);
+  });
+  if (!Object.keys(camposValidos).length) throw new Error('Nenhum campo válido para alterar.');
+
+  const valoresAnteriores = {};
+  Object.keys(camposValidos).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
+  const novosValores = { ...camposValidos };
+  const faturamentoFinal = novosValores.faturamento ?? atual.faturamento;
+  const declaradoFinal = novosValores.totalDeclarado ?? atual.totalDeclarado;
+  novosValores.diferenca = +(declaradoFinal - faturamentoFinal).toFixed(2);
+
+  const historico = [...(atual.historico || []), {
+    em: new Date().toISOString(),
+    por: editadoPorEmail,
+    motivo: (motivo && String(motivo).trim()) || '(edição direta do Master)',
+    valoresAnteriores,
+    valoresNovos: camposValidos,
+  }];
+
+  const ref = COLLECTION.doc(fechamentoId);
+  await ref.update({ ...novosValores, historico, atualizadoEm: new Date().toISOString() });
+  return { ...atual, ...novosValores, historico };
+}
+
 async function listarEdicoes() {
   const snap = await EDITS.orderBy('criadoEm', 'desc').get();
   return snap.docs.map((d) => d.data());
@@ -160,4 +199,4 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
   return { ...pedido, status };
 }
 
-module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, decidirEdicao };
+module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, decidirEdicao, editarDireto };

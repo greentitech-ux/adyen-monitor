@@ -190,8 +190,8 @@
 <div class="panel">
   <h2>
     <div class="title-group"><span>Fechamentos</span><span class="n" id="fechamentos-count"></span></div>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span class="sub" style="margin:0;">até</span>
+    <div class="daterange">
+      <span class="sep">até</span>
       <input type="date" id="fech-date-fim" title="Filtrar esta tabela até uma data específica, dentro do período principal">
     </div>
   </h2>
@@ -371,9 +371,10 @@ function setupPresets(refPadraoIso){
   }
 
   cont.querySelectorAll('.preset-btn').forEach(btn=>{
+    // ao clicar num preset a referencia e sempre hoje (nao a data ja
+    // selecionada) - Semana/Mes/Trimestre sempre voltam pro periodo atual
     btn.addEventListener('click', ()=>{
-      const refAtual = document.getElementById('f-date-end').value || refPadraoIso;
-      aplicarPreset(btn.dataset.tipo, refAtual, btn);
+      aplicarPreset(btn.dataset.tipo, isoLocal(new Date()), btn);
     });
   });
 

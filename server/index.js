@@ -702,6 +702,25 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
   }
 });
 
+// edicao direta de um lancamento - so o Master, sem passar pela fila de
+// aprovacao (ele mesmo e quem aprovaria, entao pedir pra si mesmo so
+// atrasaria); ainda assim fica registrado no historico do fechamento
+app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await fechamentosLive.editarDireto({
+      fechamentoId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      editadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-editado-direto', registro, 'lancamento');
+    broadcast('fechamento-editado-direto', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // fila de pedidos de correcao - so o Master decide (aprova/rejeita), mas quem
 // pediu pode acompanhar o status do proprio pedido
 app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {
