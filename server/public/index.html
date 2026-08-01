@@ -182,7 +182,7 @@
     </div>
     <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
   </div>
-  <div class="tablewrap">
+  <div class="tablewrap" style="max-height:360px;">
     <table>
       <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
       <tbody id="tx-body"></tbody>
@@ -874,8 +874,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             (SEL_STATUS.size===0 || SEL_STATUS.has(d.status)) &&
             (!q || (d.nomeCliente||'').toLowerCase().includes(q) || (d.cardHolder||'').toLowerCase().includes(q) || (d.merchantReference||'').toLowerCase().includes(q) || (d.last4||'').includes(q))
                                            ).sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
-      const LINHAS_VISIVEIS = 10;
-      const rows = filtradas.slice(0, LINHAS_VISIVEIS);
+      const rows = filtradas;
 
       // contagem historica por cliente (todo o DATA, nao so o periodo filtrado) -
       // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc
@@ -890,7 +889,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             if(d.fraudeSuspeita) c.fraude++;
       });
 
-      document.getElementById('tx-count').textContent = rows.length+' de '+filtradas.length+' ('+pedidosPeriodo.length+' no período)';
+      document.getElementById('tx-count').textContent = rows.length+' / '+pedidosPeriodo.length;
       document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
             const c = contagemClientes[clientKeyOf(d)] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0};
             const chave = 'tx:'+d.pspReference;
