@@ -1204,7 +1204,29 @@ async function salvarComentario(pspRefEnc, eventCodeEnc){
 // primeiro, depois originalReference (pra pedidos cujo evento anterior, ex.
 // OFFER_CLOSED, chegou sem merchantReference), so entao o proprio pspReference
 function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.pspReference; }
-  
+
+// as vezes o OFFER_CLOSED chega sem merchantReference/originalReference (a
+// Adyen nem sempre manda esses campos nesse evento), entao ele acaba caindo
+// numa chave de pedido propria (o proprio pspReference) em vez de se juntar
+// ao pedido real - vira um "pedido fantasma" que nunca atualiza, mesmo depois
+// do pedido de verdade avancar pra FALHA_ESTORNO/ESTORNADO/etc. Como nao da
+// pra linkar pela chave nesse caso, usamos um heuristico: mesma unidade +
+// mesmo valor + o outro pedido aconteceu no mesmo horario ou depois -> e
+// quase certo que e o mesmo pedido, entao o OFFER_CLOSED some da lista
+function removerOfferClosedSuperado(pedidos){
+  return pedidos.filter(p=>{
+    if(p.status !== 'OFFER_CLOSED') return true;
+    const superado = pedidos.some(o=>
+      o !== p &&
+      o.status !== 'OFFER_CLOSED' &&
+      o.unidade === p.unidade &&
+      o.valor === p.valor &&
+      (o.dataHora||'') >= (p.dataHora||'')
+    );
+    return !superado;
+  });
+}
+
   function render(){
       const period = periodFiltered();
       const periodUnidade = filtraPorUnidade(period);
@@ -1234,7 +1256,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             if(!rep.last4 && t.last4) rep.last4 = t.last4;
             if(!rep.bancoEmissor && t.bancoEmissor) rep.bancoEmissor = t.bancoEmissor;
       }
-      const pedidosPeriodo = [...porPedido.values()];
+      const pedidosPeriodo = removerOfferClosedSuperado([...porPedido.values()]);
 
       const q = document.getElementById('f-search').value.toLowerCase();
       const filtradas = pedidosPeriodo.filter(d=>
