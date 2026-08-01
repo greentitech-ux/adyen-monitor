@@ -15,7 +15,9 @@ const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
 const vaultGroups = require('./vaultGroups');
+const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
+const refunds = require('./refunds');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -368,18 +370,18 @@ app.post('/api/push/unsubscribe', async (req, res) => {
 });
 
 // ---------- cofre de senhas (secao "cofre") ----------
-// grupos = unidades do cofre; sao da organizacao inteira, o Master decide
-// quem enxerga qual grupo (permissions.vaultGroups). Dentro de um grupo
-// liberado, o usuario pode ver e gerenciar as senhas normalmente.
-function gruposPermitidos(req) {
-  return req.isMaster ? null : new Set(req.permissions.vaultGroups || []);
+// grupos (ex: GBE) contem subgrupos (unidades, ex: DOM_BESSA, SPO_TACARUNA) -
+// e nos subgrupos que as senhas ficam. Grupos/subgrupos sao da organizacao
+// inteira; o Master decide quem enxerga qual SUBGRUPO (permissions.
+// vaultSubgroups) - dentro de um subgrupo liberado, o usuario pode ver e
+// gerenciar as senhas normalmente (o modo Leitor do Monitor nao se aplica
+// aqui, senao toda troca de senha dependeria do Master).
+function subgruposPermitidos(req) {
+  return req.isMaster ? null : new Set(req.permissions.vaultSubgroups || []);
 }
 
 app.get('/api/vault/groups', requireSection('cofre'), async (req, res) => {
-  const todos = await vaultGroups.list();
-  if (req.isMaster) return res.json(todos);
-  const permitidos = gruposPermitidos(req);
-  res.json(todos.filter((g) => permitidos.has(g.id)));
+  res.json(await vaultGroups.list());
 });
 
 app.post('/api/vault/groups', auth.requireMaster, async (req, res) => {
@@ -407,20 +409,54 @@ app.delete('/api/vault/groups/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
-app.get('/api/vault/entries', requireSection('cofre'), async (req, res) => {
-  const permitidos = gruposPermitidos(req); // null = Master, todos
-  if (req.query.groupId) {
-    if (permitidos && !permitidos.has(req.query.groupId)) return res.json([]);
-    return res.json(await vaultEntries.listByGroups([req.query.groupId]));
+// lista de subgrupos - Master ve todos (pra montar a arvore inteira e a tela
+// de usuarios); usuario comum so ve os subgrupos liberados pra ele
+app.get('/api/vault/subgroups', requireSection('cofre'), async (req, res) => {
+  const todos = await vaultSubgroups.listAll();
+  if (req.isMaster) return res.json(todos);
+  const permitidos = subgruposPermitidos(req);
+  res.json(todos.filter((s) => permitidos.has(s.id)));
+});
+
+app.post('/api/vault/subgroups', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await vaultSubgroups.create(req.body.groupId, req.body.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-  res.json(await vaultEntries.listByGroups(permitidos ? [...permitidos] : null));
+});
+
+app.put('/api/vault/subgroups/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await vaultSubgroups.rename(req.params.id, req.body.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/vault/subgroups/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await vaultSubgroups.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vault/entries', requireSection('cofre'), async (req, res) => {
+  const permitidos = subgruposPermitidos(req); // null = Master, todos
+  if (req.query.subgroupId) {
+    if (permitidos && !permitidos.has(req.query.subgroupId)) return res.json([]);
+    return res.json(await vaultEntries.listBySubgroups([req.query.subgroupId]));
+  }
+  res.json(await vaultEntries.listBySubgroups(permitidos ? [...permitidos] : null));
 });
 
 app.post('/api/vault/entries', requireSection('cofre'), async (req, res) => {
   try {
-    const permitidos = gruposPermitidos(req);
-    const groupId = req.body.groupId || null;
-    if (permitidos && (!groupId || !permitidos.has(groupId))) return res.status(403).json({ error: 'Você não tem acesso a esse grupo.' });
+    const permitidos = subgruposPermitidos(req);
+    const subgroupId = req.body.subgroupId || null;
+    if (permitidos && (!subgroupId || !permitidos.has(subgroupId))) return res.status(403).json({ error: 'Você não tem acesso a esse subgrupo.' });
     res.json(await vaultEntries.create(req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -429,12 +465,12 @@ app.post('/api/vault/entries', requireSection('cofre'), async (req, res) => {
 
 app.put('/api/vault/entries/:id', requireSection('cofre'), async (req, res) => {
   try {
-    const permitidos = gruposPermitidos(req);
+    const permitidos = subgruposPermitidos(req);
     const atual = await vaultEntries.get(req.params.id);
     if (!atual) return res.sendStatus(404);
-    if (permitidos && (!atual.groupId || !permitidos.has(atual.groupId))) return res.sendStatus(404);
-    if (permitidos && req.body.groupId !== undefined && (!req.body.groupId || !permitidos.has(req.body.groupId))) {
-      return res.status(403).json({ error: 'Você não tem acesso a esse grupo.' });
+    if (permitidos && (!atual.subgroupId || !permitidos.has(atual.subgroupId))) return res.sendStatus(404);
+    if (permitidos && req.body.subgroupId !== undefined && (!req.body.subgroupId || !permitidos.has(req.body.subgroupId))) {
+      return res.status(403).json({ error: 'Você não tem acesso a esse subgrupo.' });
     }
     res.json(await vaultEntries.update(req.params.id, req.body));
   } catch (err) {
@@ -444,12 +480,55 @@ app.put('/api/vault/entries/:id', requireSection('cofre'), async (req, res) => {
 
 app.delete('/api/vault/entries/:id', requireSection('cofre'), async (req, res) => {
   try {
-    const permitidos = gruposPermitidos(req);
+    const permitidos = subgruposPermitidos(req);
     const atual = await vaultEntries.get(req.params.id);
     if (!atual) return res.sendStatus(404);
-    if (permitidos && (!atual.groupId || !permitidos.has(atual.groupId))) return res.sendStatus(404);
+    if (permitidos && (!atual.subgroupId || !permitidos.has(atual.subgroupId))) return res.sendStatus(404);
     await vaultEntries.remove(req.params.id);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- solicitacoes de estorno (usuario Leitor pede, Master aprova/rejeita) ----------
+app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => {
+  try {
+    const { pedidoId, unidade, observacao, password } = req.body;
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const senhaOk = await auth.verifyPassword(req.user.id, password);
+    if (!senhaOk) return res.status(401).json({ error: 'Senha incorreta.' });
+
+    const registro = await refunds.create({
+      pedidoId,
+      unidade,
+      observacao,
+      requestedById: req.user.id,
+      requestedByEmail: req.user.email,
+    });
+    broadcast('refund-requested', registro, 'monitor');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/refund-requests', requireSection('monitor'), async (req, res) => {
+  const todas = await refunds.listAll();
+  if (req.isMaster) return res.json(auth.filterByUnidade(req, todas));
+  res.json(todas.filter((r) => r.requestedById === req.user.id));
+});
+
+app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await refunds.updateStatus(req.params.id, req.body.status, {
+      motivoDecisao: req.body.motivoDecisao,
+      decidedByEmail: req.user.email,
+    });
+    broadcast('refund-request-changed', registro, 'monitor');
+    res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

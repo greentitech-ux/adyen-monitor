@@ -1,17 +1,18 @@
 // vaultEntries.js
-// CRUD das senhas salvas no cofre. A senha em si nunca e gravada em texto
-// puro no Firestore (veja vaultCrypto.js) - so e decifrada na hora de
-// responder pra quem tem permissao de ver aquele grupo (checado em index.js
-// antes de chamar essas funcoes).
+// CRUD das senhas salvas no cofre. Cada senha pertence a um subgrupo (unidade
+// dentro de um grupo - veja vaultSubgroups.js). A senha em si nunca e gravada
+// em texto puro no Firestore (veja vaultCrypto.js) - so e decifrada na hora
+// de responder pra quem tem permissao de ver aquele subgrupo (checado em
+// index.js antes de chamar essas funcoes).
 const db = require('./firestore');
 const { encrypt, decrypt } = require('./vaultCrypto');
 
 const entriesRef = db.collection('vaultEntries');
 
-async function listByGroups(groupIds) {
-  // groupIds === null significa "todos os grupos" (Master)
+async function listBySubgroups(subgroupIds) {
+  // subgroupIds === null significa "todos os subgrupos" (Master)
   let query = entriesRef;
-  const snap = groupIds === null ? await query.get() : await query.where('groupId', 'in', groupIds.length ? groupIds : ['__none__']).get();
+  const snap = subgroupIds === null ? await query.get() : await query.where('subgroupId', 'in', subgroupIds.length ? subgroupIds : ['__none__']).get();
   const entries = snap.docs.map(toEntry);
   entries.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
   return entries;
@@ -23,13 +24,13 @@ async function get(id) {
 }
 
 async function create(data) {
-  const { title, url, username, password, note, groupId } = data;
+  const { title, url, username, password, note, subgroupId } = data;
   if (!String(title || '').trim()) throw new Error('Título é obrigatório.');
   if (!String(password || '').trim()) throw new Error('Senha é obrigatória.');
 
   const now = new Date().toISOString();
   const doc = await entriesRef.add({
-    groupId: groupId || null,
+    subgroupId: subgroupId || null,
     title: String(title).trim(),
     url: String(url || '').trim(),
     username: String(username || '').trim(),
@@ -51,7 +52,7 @@ async function update(id, data) {
   if (data.url !== undefined) patch.url = String(data.url).trim();
   if (data.username !== undefined) patch.username = String(data.username).trim();
   if (data.note !== undefined) patch.note = String(data.note).trim();
-  if (data.groupId !== undefined) patch.groupId = data.groupId || null;
+  if (data.subgroupId !== undefined) patch.subgroupId = data.subgroupId || null;
   if (data.password) patch.passwordEnc = encrypt(data.password);
 
   await ref.update(patch);
@@ -69,7 +70,7 @@ function toEntry(doc) {
   const data = doc.data();
   return {
     id: doc.id,
-    groupId: data.groupId || null,
+    subgroupId: data.subgroupId || null,
     title: data.title,
     url: data.url,
     username: data.username,
@@ -80,4 +81,4 @@ function toEntry(doc) {
   };
 }
 
-module.exports = { listByGroups, get, create, update, remove };
+module.exports = { listBySubgroups, get, create, update, remove };

@@ -18,8 +18,10 @@ const usersRef = db.collection('users');
 
 // permissoes vazias por padrao - o Master preenche na hora de criar o acesso
 function emptyPermissions() {
-  return { sections: [], unidades: [], vaultGroups: [] };
+  return { sections: [], unidades: [], vaultSubgroups: [] };
 }
+
+const MAX_TENTATIVAS = 3;
 
 // garante que existe um Master assim que o servidor sobe. So cria se ainda
 // nao existir nenhum - nao sobrescreve senha em runs seguintes (pra nao
@@ -54,11 +56,31 @@ async function login(email, password) {
   const doc = snap.docs[0];
   const user = doc.data();
   if (user.active === false) throw new Error('Este acesso foi desativado.');
-  const ok = await bcrypt.compare(String(password || ''), user.passwordHash);
-  if (!ok) throw new Error('Email ou senha invalidos.');
+  if (user.locked) throw new Error('Acesso bloqueado após tentativas de senha erradas. Fale com o Master.');
 
-  const token = jwt.sign({ sub: doc.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+  const ok = await bcrypt.compare(String(password || ''), user.passwordHash);
+  if (!ok) {
+    // 3 senhas erradas seguidas bloqueia o acesso - so o Master destrava
+    // (trocando a senha pela tela de Usuarios)
+    const tentativas = (user.failedAttempts || 0) + 1;
+    const bloqueou = tentativas >= MAX_TENTATIVAS && user.role !== 'master';
+    await doc.ref.update({ failedAttempts: tentativas, locked: bloqueou });
+    if (bloqueou) throw new Error('Acesso bloqueado após 3 tentativas de senha erradas. Fale com o Master.');
+    throw new Error('Email ou senha invalidos.');
+  }
+
+  if (user.failedAttempts) await doc.ref.update({ failedAttempts: 0 });
+
+  const token = jwt.sign({ sub: doc.id, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
   return { token, user: toPublicUser(doc.id, user) };
+}
+
+// reautenticacao (ex: confirmar a senha antes de solicitar um estorno) - nao
+// gera token novo, so confirma que a senha bate com a conta logada
+async function verifyPassword(userId, password) {
+  const user = await getUserById(userId);
+  if (!user) return false;
+  return bcrypt.compare(String(password || ''), user.passwordHash);
 }
 
 function toPublicUser(id, user) {
@@ -125,6 +147,7 @@ function filterByUnidade(req, list) {
 module.exports = {
   ensureMaster,
   login,
+  verifyPassword,
   getUserById,
   toPublicUser,
   requireAuth,
