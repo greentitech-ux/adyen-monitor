@@ -86,6 +86,7 @@
   .badge.CHARGEBACK,.badge.NOTIFICATION_OF_CHARGEBACK{background:var(--bad-dim);color:var(--bad);}
   .badge.ESTORNADO,.badge.FALHA_ESTORNO,.badge.ESTORNO_AGENDADO{background:var(--warn-dim);color:var(--warn);}
   .badge.DISPUTE_DEFENSE_PERIOD_ENDED{background:#1e2733;color:var(--accent);}
+  .badge.MONITORANDO{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
   .badge.ABERTA{background:var(--warn-dim);color:var(--warn);}
   .badge.ENVIADA{background:#1e2733;color:var(--accent);}
   .badge.GANHA{background:var(--ok-dim);color:var(--ok);}
@@ -248,7 +249,7 @@
 
 <div class="overlay" id="dispute-overlay">
   <div class="modal" style="width:min(560px,92vw);">
-    <h3 id="dispute-modal-title">Disputa de chargeback</h3>
+    <h3 id="dispute-modal-title">Registro do pedido</h3>
     <div id="dispute-history"></div>
     <form id="dispute-form">
       <textarea id="dispute-notas" rows="3" placeholder="Descreva a comprovação (ex: nota fiscal, retirada confirmada por câmera/portaria, etc.)" style="width:100%;margin-top:10px;"></textarea>
@@ -378,12 +379,16 @@ function renderChargebacks(){
   `;}).join('') : '<div class="empty">Nenhum chargeback registrado.</div>';
 }
 
-// ---- disputas de chargeback: relatorio + evidencias (imagens) pra recorrer na Adyen ----
+// ---- registro por pedido: observacoes + evidencias (imagens), tanto pra
+// monitorar pedidos que ainda podem virar chargeback quanto pra disputa
+// formal de um chargeback ja aberto. Acessivel clicando no pedido (nao fica
+// como botao solto nas listas) ----
 let DISPUTE_PEDIDO = null;
+const DISPUTE_STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA'];
 
 async function abrirDisputa(pedidoId, unidade){
   DISPUTE_PEDIDO = { pedidoId, unidade };
-  document.getElementById('dispute-modal-title').textContent = 'Disputa de chargeback — Pedido ' + pedidoId;
+  document.getElementById('dispute-modal-title').textContent = 'Registro do pedido — ' + pedidoId;
   document.getElementById('dispute-notas').value = '';
   document.getElementById('dispute-imagens').value = '';
   document.getElementById('dispute-overlay').classList.add('show');
@@ -404,7 +409,7 @@ async function carregarHistoricoDisputas(pedidoId){
         ${(d.imagens||[]).map((img,i)=>`<a href="/api/disputes/imagem/${d.id}/${i}" target="_blank" rel="noopener"><img src="/api/disputes/imagem/${d.id}/${i}" alt="${img.nome||'evidência'}"></a>`).join('')}
       </div>
       <select onchange="atualizarStatusDisputa('${d.id}', this.value)">
-        ${['ABERTA','ENVIADA','GANHA','PERDIDA'].map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+        ${DISPUTE_STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
       </select>
     </div>
   `).join('') : '<div class="empty">Nenhum registro de disputa ainda.</div>';
@@ -801,7 +806,12 @@ function populateFilters(){
   renderMultiselectOptions('unidade', unidades, SEL_UNIDADE, 'Todas as unidades', 'unidades', UNIDADE_GROUPS);
 }
 
-async function showClient(key){
+// pedido do clique atual - guardado aqui (em vez de embutido no onclick) pra
+// nao ter que escapar aspas do pedidoId dentro do HTML gerado
+let CURRENT_MODAL_PEDIDO = null;
+
+async function showClient(key, pedidoId, unidade){
+  CURRENT_MODAL_PEDIDO = pedidoId ? { pedidoId, unidade } : null;
   const stats = await fetch('/api/clients/'+encodeURIComponent(key)).then(r=>r.json());
   document.getElementById('modal-title').textContent = 'Histórico — ' + key;
   document.getElementById('modal-body').innerHTML = `
@@ -810,8 +820,16 @@ async function showClient(key){
     <div class="row"><span>Recusadas</span><b style="color:var(--bad)">${stats.recusadas}</b></div>
     <div class="row"><span>Fraude suspeita</span><b style="color:var(--bad)">${stats.fraude}</b></div>
     <div class="row"><span>Taxa de aprovação</span><b>${stats.taxaAprovacao}%</b></div>
+    ${CURRENT_MODAL_PEDIDO ? `<button type="button" class="close" style="margin-top:10px;background:var(--panel2);border-color:#1e4a63;color:var(--accent);" onclick="abrirDisputaDoModal()">📎 Registrar observação / disputa deste pedido</button>` : ''}
   `;
   document.getElementById('overlay').classList.add('show');
+}
+
+function abrirDisputaDoModal(){
+  if(!CURRENT_MODAL_PEDIDO) return;
+  const { pedidoId, unidade } = CURRENT_MODAL_PEDIDO;
+  document.getElementById('overlay').classList.remove('show');
+  abrirDisputa(pedidoId, unidade);
 }
 
 // comentario manual num estorno (ex: "estornei eu mesmo pelo painel da
@@ -903,7 +921,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             else if(d.status==='RECUSADO') statusCls = 'row-recusado';
             const podeComentar = ESTORNO_STATUSES.includes(d.status);
             return `
-                <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}')">
+                <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
                       <td>${fmtDT(d.dataHora)}${podeComentar?`<div class="tx-comentario" onclick="event.stopPropagation(); editarComentario('${encodeURIComponent(d.pspReference)}','${encodeURIComponent(d.eventCode)}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`:''}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
