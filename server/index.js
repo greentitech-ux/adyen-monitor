@@ -202,7 +202,8 @@ app.post('/webhooks/adyen', async (req, res) => {
         push.notifyRaw(
           `Possível teste de cartão — ${tx.unidade || ''}`,
           `${alerta.tentativas} recusas seguidas do cartão •• ${tx.last4} em ${alerta.janelaMinutos} min`,
-          `card-testing-${tx.unidade}-${tx.last4}`
+          `card-testing-${tx.unidade}-${tx.last4}`,
+          tx.unidade
         );
       }
     }
@@ -283,11 +284,41 @@ app.get('/api/summary', requireSection('monitor'), (req, res) => {
   });
 });
 
-// lista de unidades distintas ja vistas nas transacoes - usada pelo Master
-// pra montar o seletor de permissoes na tela de usuarios
-app.get('/api/meta/unidades', auth.requireMaster, (req, res) => {
-  const unidades = new Set(store.allTransactions().map((t) => t.unidade).filter(Boolean));
-  res.json([...unidades].sort());
+// unidades da planilha de fechamento - IDs proprios (codigo da loja ARCFOOD
+// ou nome da loja do Grupo Bravo), diferentes do merchantAccountCode da
+// Adyen. Ficam fixos aqui porque uma unidade pode precisar de permissao
+// mesmo antes de ter qualquer transacao Adyen ou fechamento lancado.
+const FECHAMENTO_UNIDADES_NOMES = {
+  '19821': 'São Miguel (Fechamento)', '19855': 'Carrão (Fechamento)', '19888': 'Mooca (Fechamento)', '19889': 'Tatuapé (Fechamento)',
+  "Domino's Carrinho Aeroporto Recife": "Domino's Carrinho Aeroporto Recife",
+  'Dominos Bessa': 'Dominos Bessa',
+  'Dominos Campina Grande': 'Dominos Campina Grande',
+  'Dominos Caruaru': 'Dominos Caruaru',
+  'Dominos Garanhuns': 'Dominos Garanhuns',
+  'Dominos Praça Aeroporto Recife': 'Dominos Praça Aeroporto Recife',
+  'Dominos Tirol': 'Dominos Tirol',
+  'Milky Moo Tirol': 'Milky Moo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spoleto Praça Aeroporto Recife',
+  'Spoleto Shopping Recife': 'Spoleto Shopping Recife',
+  'Spoleto Shopping Tacaruna': 'Spoleto Shopping Tacaruna',
+  'São Braz IL': 'São Braz IL',
+};
+
+// lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
+// junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
+// com as unidades fixas de Fechamento/Lançamento (espaco de codigos
+// diferente, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
+// dados importados/lançados, pra nunca faltar opcao no checklist do Master
+app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
+  const mapa = {};
+  store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
+  Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
+  require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  const lista = Object.entries(mapa)
+    .map(([codigo, nome]) => ({ codigo, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  res.json(lista);
 });
 
 // ---------- registros de disputa/monitoramento (secao "disputas") ----------
@@ -362,7 +393,16 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 });
 
 app.post('/api/push/subscribe', async (req, res) => {
-  await push.addSubscription(req.body);
+  // guarda quem e essa inscricao (Master ve tudo; usuario comum so recebe
+  // alerta das unidades e secoes que ele tem acesso - sem isso o push
+  // vazava fraude/chargeback/estorno de TODAS as unidades pra qualquer
+  // pessoa logada que clicasse no sino, ignorando as permissoes dela)
+  await push.addSubscription(req.body, {
+    userId: req.user.id,
+    isMaster: req.isMaster,
+    unidades: req.isMaster ? null : (req.permissions.unidades || []),
+    sections: req.isMaster ? null : (req.permissions.sections || []),
+  });
   res.json({ ok: true });
 });
 
@@ -599,12 +639,14 @@ app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
   }
 });
 
-// ---------- fechamentos de caixa ARCFOOD (secao "fechamentos") ----------
-// snapshot importado manualmente da planilha do Google Drive "FECHAMENTO
-// ARCFOOD" (aba BD) - atualizado sob demanda, nao ao vivo via webhook. As
-// unidades aqui (19821/19855/19888/19889) sao codigos proprios da planilha,
-// nao o merchantAccountCode da Adyen, entao nao da pra reaproveitar
-// auth.filterByUnidade - o acesso e por secao inteira, como o cofre.
+// ---------- fechamentos de caixa (secao "fechamentos") ----------
+// combina o snapshot importado manualmente do Google Drive (ARCFOOD + Grupo
+// Bravo) com os fechamentos lançados ao vivo pelas lojas. As unidades aqui
+// (19821/19855/19888/19889, ou o nome da loja no Grupo Bravo) sao codigos
+// proprios da planilha, num espaco diferente do merchantAccountCode da
+// Adyen usado em Monitor/Disputas - mas o mesmo campo permissions.unidades
+// e reaproveitado pra filtrar as duas coisas (o Master escolhe os codigos
+// certos pelo seletor de /api/meta/unidades, que junta os dois espacos).
 const fechamentosData = require('./fechamentos-snapshot.json');
 app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   const lancados = await fechamentosLive.listAll();

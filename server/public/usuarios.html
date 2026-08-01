@@ -105,7 +105,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Unidades (monitor/disputas)</legend>
+        <legend>Unidades (monitor/disputas/fechamentos/lançamento)</legend>
         <div class="checks" id="c-unidades"></div>
       </fieldset>
 
@@ -168,6 +168,7 @@ window.fetch = (url, opts = {}) => {
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
 const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'] ];
+const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];
 let VAULT_SUBGROUPS = [];
@@ -217,9 +218,10 @@ async function boot(){
     fetch('/api/vault/subgroups').then(r=>r.json()),
   ]);
   UNIDADES = unidades; VAULT_GROUPS = groups; VAULT_SUBGROUPS = subgroups;
+  UNIDADES.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
 
   document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
+  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
 
   await carregarUsuarios();
@@ -265,9 +267,9 @@ async function rodarBackupAgora(){
   }
 }
 
-function tagList(items){
+function tagList(items, labelFn){
   if(!items || !items.length) return '<span style="color:var(--muted);">—</span>';
-  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(i)}</span>`).join('')}</div>`;
+  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(labelFn?labelFn(i):i)}</span>`).join('')}</div>`;
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -286,7 +288,7 @@ function renderUsers(){
       <td><span class="badge ${u.role}">${u.role}</span></td>
       <td>${statusBadges}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
-      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades)}</td>
+      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
       <td>
         ${isMaster ? '' : `
@@ -320,7 +322,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     if(!res.ok) throw new Error(data.error || 'Erro ao criar acesso.');
     document.getElementById('create-form').reset();
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
+    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
     document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
@@ -334,7 +336,7 @@ function editarPermissoes(id){
   document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
   const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
   document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
-  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x, x=>x, new Set(perms.unidades));
+  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x.codigo, x=>x.nome, new Set(perms.unidades));
   document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');
