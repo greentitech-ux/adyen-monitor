@@ -22,6 +22,8 @@
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
   .pulse{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);}
+  a.link-relatorios{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);white-space:nowrap;}
+  a.link-relatorios:hover{color:var(--text);border-color:var(--accent);}
   .pulse.off{background:var(--bad-dim);color:var(--bad);border-color:#4a2323;}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 rgba(61,220,151,.6);animation:p 2s infinite;}
   @keyframes p{0%{box-shadow:0 0 0 0 rgba(61,220,151,.5);}70%{box-shadow:0 0 0 6px rgba(61,220,151,0);}100%{box-shadow:0 0 0 0 rgba(61,220,151,0);}}
@@ -162,6 +164,7 @@
     <h1>Monitor de transações</h1>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
+    <a class="link-relatorios" href="/relatorios.html">📊 Relatórios</a>
     <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
     <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
@@ -213,9 +216,7 @@
   </div>
 
   <div class="panel">
-    <h2><span>Chargebacks <span class="n" id="chargebacks-count"></span></span>
-      <button type="button" class="btn-disputa" onclick="window.location.href='/relatorios.html'">📊 Relatórios</button>
-    </h2>
+    <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
     <div class="alerts" id="chargebacks"></div>
   </div>
 </div>
