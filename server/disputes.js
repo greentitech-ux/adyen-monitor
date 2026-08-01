@@ -2,9 +2,10 @@
 // Historico de registros por pedido: tanto pedidos que ja viraram chargeback
 // (disputa formal com a Adyen) quanto pedidos que ainda nao viraram, mas o
 // time quer monitorar de perto (observacoes + evidencias, pra decidir se e
-// preciso recorrer caso vire chargeback depois). Cada registro guarda notas +
-// imagens anexadas (comprovante de pedido/retirada) e um status de
-// acompanhamento. Persistido no Firestore, igual ao resto do app.
+// preciso recorrer caso vire chargeback depois). Cada registro guarda nome e
+// telefone de quem foi contatado, observacoes e anexos (foto, print, video,
+// audio da ligacao etc.) e um status de acompanhamento. Persistido no
+// Firestore, igual ao resto do app.
 const db = require('./firestore');
 const storage = require('./storage');
 const COLLECTION = db.collection('disputes');
@@ -13,16 +14,18 @@ const COLLECTION = db.collection('disputes');
 // ABERTA -> ENVIADA -> GANHA/PERDIDA: fluxo da disputa formal do chargeback.
 const STATUSES = ['MONITORANDO', 'ABERTA', 'ENVIADA', 'GANHA', 'PERDIDA'];
 
-async function create({ pedidoId, unidade, notas, imagens }) {
+async function create({ pedidoId, unidade, nomeContato, telefoneContato, notas, anexos }) {
   const doc = COLLECTION.doc();
   const agora = new Date().toISOString();
   const registro = {
     id: doc.id,
     pedidoId,
     unidade: unidade || null,
+    nomeContato: nomeContato || '',
+    telefoneContato: telefoneContato || '',
     notas: notas || '',
     status: 'MONITORANDO',
-    imagens: imagens || [], // [{ nome, path }] - path e a chave no Cloud Storage
+    anexos: anexos || [], // [{ nome, path, tipo }] - path e a chave no Cloud Storage, tipo e o mimetype
     criadoEm: agora,
     atualizadoEm: agora,
   };
@@ -54,7 +57,7 @@ async function updateStatus(id, status) {
 async function remove(id) {
   const registro = await getOne(id);
   if (!registro) return;
-  await Promise.all((registro.imagens || []).map((img) => storage.apagarImagem(img.path)));
+  await Promise.all((registro.anexos || []).map((a) => storage.apagarArquivo(a.path)));
   await COLLECTION.doc(id).delete();
 }
 

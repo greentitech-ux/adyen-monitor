@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatórios de disputa · Monitor Adyen</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  a.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);}
+  a.back:hover{color:var(--text);border-color:var(--accent);}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .tab{font-family:var(--mono);font-size:11.5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .tab.active{border-color:var(--accent);color:var(--accent);background:#132029;}
+  .cards{display:flex;flex-direction:column;gap:12px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;}
+  .card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .card .titulo{font-size:14px;font-weight:600;}
+  .card .sub{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono);}
+  .card .valor{font-family:var(--mono);font-size:14px;font-weight:600;}
+  .prazo{font-size:11.5px;margin-top:6px;}
+  .registro{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;}
+  .registro .linha1{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
+  .registro .notas{font-size:12.5px;margin-top:6px;white-space:pre-wrap;color:var(--text);}
+  .registro .imgs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .registro .imgs img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+  .badge{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;display:inline-block;}
+  .badge.MONITORANDO{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
+  .badge.ABERTA{background:var(--warn-dim);color:var(--warn);}
+  .badge.ENVIADA{background:#1e2733;color:var(--accent);}
+  .badge.GANHA{background:var(--ok-dim);color:var(--ok);}
+  .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
+  select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--sans);}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+  .count{font-family:var(--mono);color:var(--muted);font-size:12px;margin-left:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+    <h1>Relatórios de disputa</h1>
+  </div>
+  <a class="back" href="/">← Voltar ao monitor</a>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div class="cards" id="cards"></div>
+
+<script>
+const STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA'];
+let DISPUTES = [];
+let ORDERS_BY_ID = {};
+let FILTRO = 'TODOS';
+
+function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
+function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+
+function prazoInfo(prazoISO){
+  if(!prazoISO) return { texto:'sem prazo informado', cor:'var(--muted)' };
+  const ms = new Date(prazoISO).getTime() - Date.now();
+  const dias = Math.ceil(ms/(24*60*60*1000));
+  if(ms<=0) return { texto:`prazo de recorrer encerrado em ${fmtDT(prazoISO)}`, cor:'var(--bad)' };
+  const cor = dias<=2 ? 'var(--bad)' : (dias<=5 ? 'var(--warn)' : 'var(--ok)');
+  return { texto:`recorrer até ${fmtDT(prazoISO)} (${dias}d)`, cor };
+}
+
+function renderAnexo(disputeId, index, anexo){
+  const url = `/api/disputes/anexo/${disputeId}/${index}`;
+  const tipo = anexo.tipo || '';
+  if(tipo.startsWith('image/')) return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${anexo.nome||'evidência'}"></a>`;
+  if(tipo.startsWith('video/')) return `<video src="${url}" controls style="max-width:220px;max-height:140px;border-radius:6px;border:1px solid var(--line);"></video>`;
+  if(tipo.startsWith('audio/')) return `<audio src="${url}" controls style="max-width:240px;"></audio>`;
+  return `<a href="${url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);">📄 ${anexo.nome||'arquivo'}</a>`;
+}
+
+async function carregar(){
+  const [disputes, orders] = await Promise.all([
+    fetch('/api/disputes').then(r=>r.json()),
+    fetch('/api/orders').then(r=>r.json()),
+  ]);
+  DISPUTES = disputes;
+  ORDERS_BY_ID = {};
+  orders.forEach(o=>{ ORDERS_BY_ID[o.pedidoId] = o; });
+  renderTabs();
+  render();
+}
+
+function renderTabs(){
+  const contagem = { TODOS: DISPUTES.length };
+  STATUSES.forEach(s=>{ contagem[s] = DISPUTES.filter(d=>d.status===s).length; });
+  const tabs = ['TODOS', ...STATUSES];
+  document.getElementById('tabs').innerHTML = tabs.map(t=>
+    `<button type="button" class="tab ${FILTRO===t?'active':''}" onclick="mudarFiltro('${t}')">${t==='TODOS'?'Todos':t}<span class="count">${contagem[t]}</span></button>`
+  ).join('');
+}
+
+function mudarFiltro(t){ FILTRO = t; renderTabs(); render(); }
+
+function render(){
+  // agrupa os registros por pedido - um pedido pode ter varios registros ao longo do tempo
+  const porPedido = {};
+  DISPUTES.filter(d=>FILTRO==='TODOS' || d.status===FILTRO).forEach(d=>{
+    (porPedido[d.pedidoId] ||= []).push(d);
+  });
+  const pedidos = Object.entries(porPedido).sort((a,b)=>{
+    const ua = Math.max(...a[1].map(d=>new Date(d.atualizadoEm||d.criadoEm).getTime()));
+    const ub = Math.max(...b[1].map(d=>new Date(d.atualizadoEm||d.criadoEm).getTime()));
+    return ub-ua;
+  });
+
+  document.getElementById('cards').innerHTML = pedidos.length ? pedidos.map(([pedidoId, registros])=>{
+    const o = ORDERS_BY_ID[pedidoId] || {};
+    const prazo = prazoInfo(o.prazoDefesa);
+    registros.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
+    return `
+    <div class="card">
+      <div class="top">
+        <div>
+          <div class="titulo">${o.cliente||'cliente desconhecido'} ${o.last4?('· •• '+o.last4):''}</div>
+          <div class="sub">Pedido ${pedidoId} · ${o.unidade||'—'} · ${o.metodo||'?'}${o.statusAtual?(' · status atual: '+o.statusAtual):''}</div>
+          ${o.prazoDefesa?`<div class="prazo" style="color:${prazo.cor}">${prazo.texto}</div>`:''}
+        </div>
+        <div class="valor">${fmtMoney(o.valor)}</div>
+      </div>
+      ${registros.map(d=>`
+        <div class="registro">
+          <div class="linha1">
+            <span class="badge ${d.status}">${d.status}</span>
+            <select onchange="atualizarStatus('${d.id}', this.value)">
+              ${STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          ${(d.nomeContato||d.telefoneContato)?`<div class="notas">${d.nomeContato||'—'}${d.telefoneContato?(' · '+d.telefoneContato):''}</div>`:''}
+          ${d.notas?`<div class="notas">${d.notas}</div>`:''}
+          <div class="imgs">
+            ${(d.anexos||[]).map((a,i)=>renderAnexo(d.id,i,a)).join('')}
+          </div>
+          <div class="sub" style="margin-top:6px;">registrado em ${fmtDT(d.criadoEm)}</div>
+        </div>
+      `).join('')}
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum registro de observação/disputa por aqui ainda.</div>';
+}
+
+async function atualizarStatus(id, status){
+  await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  await carregar();
+}
+
+carregar();
+</script>
+</body>
+</html>

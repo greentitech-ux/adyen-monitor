@@ -15,7 +15,9 @@ const storage = require('./storage');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024, files: 6 }, // ate 6 imagens de 8MB por disputa
+  // anexos de disputa incluem foto/print (pequenos), mas tambem video e audio
+  // de ligacao (maiores) - ate 8 arquivos de 50MB cada por registro
+  limits: { fileSize: 50 * 1024 * 1024, files: 8 },
 });
 
 const app = express();
@@ -180,19 +182,19 @@ app.get('/api/chargebacks', (req, res) => {
   res.json(store.chargebacks());
 });
 
-// ---------- disputas de chargeback (relatorio + evidencias pra recorrer na Adyen) ----------
-app.post('/api/disputes', upload.array('imagens', 6), async (req, res) => {
+// ---------- registros de disputa/monitoramento (relatorio + evidencias pra recorrer na Adyen) ----------
+app.post('/api/disputes', upload.array('anexos', 8), async (req, res) => {
   try {
-    const { pedidoId, unidade, notas } = req.body;
+    const { pedidoId, unidade, nomeContato, telefoneContato, notas } = req.body;
     if (!pedidoId) return res.status(400).json({ error: 'pedidoId é obrigatório' });
 
-    const imagens = [];
+    const anexos = [];
     for (const file of req.files || []) {
-      const path = await storage.salvarImagem(pedidoId, file);
-      imagens.push({ nome: file.originalname, path });
+      const path = await storage.salvarArquivo(pedidoId, file);
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
     }
 
-    const registro = await disputes.create({ pedidoId, unidade, notas, imagens });
+    const registro = await disputes.create({ pedidoId, unidade, nomeContato, telefoneContato, notas, anexos });
     res.json(registro);
   } catch (err) {
     console.error('Erro ao criar disputa:', err.message);
@@ -222,11 +224,11 @@ app.delete('/api/disputes/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/disputes/imagem/:disputeId/:index', async (req, res) => {
+app.get('/api/disputes/anexo/:disputeId/:index', async (req, res) => {
   const registro = await disputes.getOne(req.params.disputeId);
-  const imagem = registro && registro.imagens && registro.imagens[Number(req.params.index)];
-  if (!imagem) return res.sendStatus(404);
-  storage.streamImagem(imagem.path, res);
+  const anexo = registro && registro.anexos && registro.anexos[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
 });
 
 // ---------- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----------

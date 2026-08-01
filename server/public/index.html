@@ -99,7 +99,8 @@
   .dispute-item .imgs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   .dispute-item .imgs img{width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
   .dispute-item select{margin-top:8px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--sans);}
-  #dispute-form textarea{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px;font-family:var(--sans);font-size:12.5px;resize:vertical;}
+  #dispute-form textarea,#dispute-form input[type=text]{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px;font-family:var(--sans);font-size:12.5px;}
+  #dispute-form textarea{resize:vertical;}
   #dispute-form input[type=file]{font-size:12px;color:var(--muted);}
   #dispute-form button[type=submit]{width:100%;padding:8px;border-radius:8px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);cursor:pointer;font-family:var(--sans);font-size:12.5px;}
   #dispute-form button[type=submit]:disabled{opacity:.6;cursor:default;}
@@ -209,7 +210,7 @@
 
   <div class="panel">
     <h2><span>Chargebacks <span class="n" id="chargebacks-count"></span></span>
-      <button type="button" class="btn-disputa" onclick="alert('Em breve: aqui vai abrir o relatório de disputas (vencidos, perdidos, chargeback e chargeback revertido).')">📊 Relatórios</button>
+      <button type="button" class="btn-disputa" onclick="window.location.href='/relatorios.html'">📊 Relatórios</button>
     </h2>
     <div class="alerts" id="chargebacks"></div>
   </div>
@@ -252,9 +253,14 @@
     <h3 id="dispute-modal-title">Registro do pedido</h3>
     <div id="dispute-history"></div>
     <form id="dispute-form">
-      <textarea id="dispute-notas" rows="3" placeholder="Descreva a comprovação (ex: nota fiscal, retirada confirmada por câmera/portaria, etc.)" style="width:100%;margin-top:10px;"></textarea>
-      <input type="file" id="dispute-imagens" multiple accept="image/*" style="width:100%;margin-top:8px;">
-      <button type="submit" style="margin-top:10px;">Salvar registro de disputa</button>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input type="text" id="dispute-nome" placeholder="Nome do cliente contatado" style="flex:1;">
+        <input type="text" id="dispute-telefone" placeholder="Telefone" style="flex:1;">
+      </div>
+      <textarea id="dispute-notas" rows="3" placeholder="Descreva a comprovação (ex: nota fiscal, retirada confirmada por câmera/portaria, etc.)" style="width:100%;margin-top:8px;"></textarea>
+      <input type="file" id="dispute-anexos" multiple style="width:100%;margin-top:8px;">
+      <div style="font-size:10.5px;color:var(--muted);margin-top:4px;">Foto, print, vídeo ou áudio (ex: gravação da ligação) — até 8 arquivos, 50MB cada.</div>
+      <button type="submit" style="margin-top:10px;">Salvar registro</button>
     </form>
     <button class="close" onclick="document.getElementById('dispute-overlay').classList.remove('show')">Fechar</button>
   </div>
@@ -386,11 +392,24 @@ function renderChargebacks(){
 let DISPUTE_PEDIDO = null;
 const DISPUTE_STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA'];
 
+// mostra a miniatura certa conforme o tipo do anexo (foto/print, video ou
+// audio da ligacao) - qualquer outro tipo vira link de download
+function renderAnexo(disputeId, index, anexo){
+  const url = `/api/disputes/anexo/${disputeId}/${index}`;
+  const tipo = anexo.tipo || '';
+  if(tipo.startsWith('image/')) return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${anexo.nome||'evidência'}"></a>`;
+  if(tipo.startsWith('video/')) return `<video src="${url}" controls style="max-width:220px;max-height:140px;border-radius:6px;border:1px solid var(--line);"></video>`;
+  if(tipo.startsWith('audio/')) return `<audio src="${url}" controls style="max-width:240px;"></audio>`;
+  return `<a href="${url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);">📄 ${anexo.nome||'arquivo'}</a>`;
+}
+
 async function abrirDisputa(pedidoId, unidade){
   DISPUTE_PEDIDO = { pedidoId, unidade };
   document.getElementById('dispute-modal-title').textContent = 'Registro do pedido — ' + pedidoId;
+  document.getElementById('dispute-nome').value = '';
+  document.getElementById('dispute-telefone').value = '';
   document.getElementById('dispute-notas').value = '';
-  document.getElementById('dispute-imagens').value = '';
+  document.getElementById('dispute-anexos').value = '';
   document.getElementById('dispute-overlay').classList.add('show');
   await carregarHistoricoDisputas(pedidoId);
 }
@@ -404,15 +423,16 @@ async function carregarHistoricoDisputas(pedidoId){
         <span class="badge ${d.status}">${d.status}</span>
         <span style="color:var(--muted);font-family:var(--mono);">${fmtDT(d.criadoEm)}</span>
       </div>
+      ${(d.nomeContato||d.telefoneContato)?`<div class="notas">${d.nomeContato||'—'}${d.telefoneContato?(' · '+d.telefoneContato):''}</div>`:''}
       ${d.notas?`<div class="notas">${d.notas}</div>`:''}
       <div class="imgs">
-        ${(d.imagens||[]).map((img,i)=>`<a href="/api/disputes/imagem/${d.id}/${i}" target="_blank" rel="noopener"><img src="/api/disputes/imagem/${d.id}/${i}" alt="${img.nome||'evidência'}"></a>`).join('')}
+        ${(d.anexos||[]).map((a,i)=>renderAnexo(d.id,i,a)).join('')}
       </div>
       <select onchange="atualizarStatusDisputa('${d.id}', this.value)">
         ${DISPUTE_STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
       </select>
     </div>
-  `).join('') : '<div class="empty">Nenhum registro de disputa ainda.</div>';
+  `).join('') : '<div class="empty">Nenhum registro ainda.</div>';
 }
 
 async function atualizarStatusDisputa(id, status){
@@ -427,19 +447,23 @@ document.getElementById('dispute-form').addEventListener('submit', async (e)=>{
   const fd = new FormData();
   fd.append('pedidoId', DISPUTE_PEDIDO.pedidoId);
   fd.append('unidade', DISPUTE_PEDIDO.unidade || '');
+  fd.append('nomeContato', document.getElementById('dispute-nome').value);
+  fd.append('telefoneContato', document.getElementById('dispute-telefone').value);
   fd.append('notas', document.getElementById('dispute-notas').value);
-  for(const f of document.getElementById('dispute-imagens').files) fd.append('imagens', f);
+  for(const f of document.getElementById('dispute-anexos').files) fd.append('anexos', f);
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     const resp = await fetch('/api/disputes', { method:'POST', body: fd });
     if(!resp.ok) throw new Error('falha ao salvar');
+    document.getElementById('dispute-nome').value = '';
+    document.getElementById('dispute-telefone').value = '';
     document.getElementById('dispute-notas').value = '';
-    document.getElementById('dispute-imagens').value = '';
+    document.getElementById('dispute-anexos').value = '';
     await carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
   } catch(err) {
-    alert('Não foi possível salvar a disputa. Tente novamente.');
+    alert('Não foi possível salvar o registro. Tente novamente.');
   } finally {
-    btn.disabled = false; btn.textContent = 'Salvar registro de disputa';
+    btn.disabled = false; btn.textContent = 'Salvar registro';
   }
 });
 
