@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Fechamentos de caixa · ARCFOOD</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  a.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);}
+  a.back:hover{color:var(--text);border-color:var(--accent);}
+  .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);}
+  .kpi .val{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:6px;}
+  .kpi .val.ok{color:var(--ok);} .kpi .val.bad{color:var(--bad);} .kpi .val.warn{color:var(--warn);}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+  .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .panel h2 .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
+  .controls{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center;}
+  .daterange{display:flex;align-items:center;gap:6px;}
+  .daterange input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);color-scheme:dark;}
+  .daterange .sep{color:var(--muted);font-size:12px;}
+  .multiselect{position:relative;}
+  .multiselect-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;white-space:nowrap;}
+  .multiselect-btn:hover{border-color:var(--accent);}
+  .multiselect-panel{display:none;position:fixed;z-index:1000;background:var(--panel2);border:1px solid var(--line);border-radius:8px;min-width:180px;max-height:260px;overflow-y:auto;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+  .multiselect-panel.open{display:block;}
+  .multiselect-panel label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;font-size:12px;border-radius:5px;cursor:pointer;white-space:nowrap;}
+  .multiselect-panel label:hover{background:var(--panel);}
+  .multiselect-panel label.all-option{font-weight:600;border-bottom:1px solid var(--line);border-radius:0;margin-bottom:2px;padding-bottom:8px;}
+  .multiselect-panel input[type=checkbox]{accent-color:var(--accent);}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:10px 16px 0;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;}
+  table{border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);white-space:nowrap;}
+  tbody td{padding:6px 10px;border-bottom:1px solid #1a1f26;white-space:nowrap;}
+  tbody tr:hover{background:var(--panel2);}
+  .valor{font-family:var(--mono);}
+  .tablewrap{max-height:360px;overflow:auto;}
+  .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Solutions Ti Tech · ARCFOOD</div>
+    <h1>Fechamentos de caixa</h1>
+    <div class="sub" id="sync-info">carregando...</div>
+  </div>
+  <a class="back" href="/">← Voltar ao monitor</a>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="panel">
+  <h2>Filtros</h2>
+  <div class="controls">
+    <div class="daterange">
+      <input type="date" id="f-date-start" title="Data inicial">
+      <span class="sep">até</span>
+      <input type="date" id="f-date-end" title="Data final">
+    </div>
+    <div class="multiselect" id="ms-unidade">
+      <button type="button" class="multiselect-btn" id="ms-unidade-btn">Todas as unidades</button>
+      <div class="multiselect-panel" id="ms-unidade-panel"></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>Faturamento diário por unidade <span class="n" id="fat-info"></span></h2>
+    <div class="legend" id="fat-legend"></div>
+    <div style="padding:8px 16px 14px;">
+      <svg id="fat-chart" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:220px;display:block;"></svg>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Diferença de caixa por dia <span class="n" id="dif-info"></span></h2>
+    <div class="legend">
+      <span><i style="background:#3ddc97;"></i>Sobra</span>
+      <span><i style="background:#ff5c5c;"></i>Quebra/falta</span>
+    </div>
+    <div style="padding:8px 16px 14px;">
+      <svg id="dif-chart" viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:220px;display:block;"></svg>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
+  <div class="tablewrap" style="max-height:220px;">
+    <table>
+      <thead><tr><th>Unid.</th><th>Fechamentos</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>TC total</th><th>Cancelados</th></tr></thead>
+      <tbody id="unidades-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Fechamentos <span class="n" id="fechamentos-count"></span></h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th></tr></thead>
+      <tbody id="fechamentos-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let DATA = [];
+const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
+const CORES_UNIDADE = { '19821':'#5cc8ff', '19855':'#f2b33d', '19888':'#3ddc97', '19889':'#ff8fd6' };
+const SEL_UNIDADE = new Set();
+
+function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
+function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+
+async function carregar(){
+  const resp = await fetch('/api/fechamentos');
+  DATA = await resp.json();
+  const datas = DATA.map(d=>d.data).filter(Boolean).sort();
+  document.getElementById('sync-info').textContent = datas.length
+    ? `${datas.length} fechamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · dados sincronizados manualmente da planilha`
+    : 'nenhum fechamento importado ainda';
+  const fim = datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10);
+  const inicioDt = new Date(fim); inicioDt.setDate(inicioDt.getDate()-29);
+  document.getElementById('f-date-start').value = inicioDt.toISOString().slice(0,10);
+  document.getElementById('f-date-end').value = fim;
+  setupMultiselect();
+  render();
+}
+
+function setupMultiselect(){
+  const wrap = document.getElementById('ms-unidade');
+  const btn = document.getElementById('ms-unidade-btn');
+  const panel = document.getElementById('ms-unidade-panel');
+  document.body.appendChild(panel);
+  function posicionar(){
+    const r = btn.getBoundingClientRect();
+    panel.style.top = (r.bottom+4)+'px';
+    panel.style.left = r.left+'px';
+  }
+  function renderPanel(){
+    const codigos = Object.keys(UNIDADES_NOMES);
+    panel.innerHTML = `
+      <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${SEL_UNIDADE.size===0?'checked':''}></label>
+      ${codigos.map(c=>`<label><span>${UNIDADES_NOMES[c]} (${c})</span><input type="checkbox" value="${c}" ${SEL_UNIDADE.has(c)?'checked':''}></label>`).join('')}
+    `;
+    panel.querySelector('[data-all]').addEventListener('change', ()=>{ SEL_UNIDADE.clear(); renderPanel(); render(); });
+    panel.querySelectorAll('input[type=checkbox]:not([data-all])').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        if(cb.checked) SEL_UNIDADE.add(cb.value); else SEL_UNIDADE.delete(cb.value);
+        renderPanel(); render();
+      });
+    });
+    btn.textContent = SEL_UNIDADE.size===0 ? 'Todas as unidades'
+      : SEL_UNIDADE.size===1 ? UNIDADES_NOMES[[...SEL_UNIDADE][0]]
+      : `${SEL_UNIDADE.size} unidades selecionadas`;
+  }
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const abrindo = !panel.classList.contains('open');
+    panel.classList.remove('open');
+    if(abrindo){ posicionar(); panel.classList.add('open'); }
+  });
+  document.addEventListener('click', (e)=>{
+    if(!panel.contains(e.target) && e.target!==btn) panel.classList.remove('open');
+  });
+  renderPanel();
+}
+
+function filtrar(){
+  const start = document.getElementById('f-date-start').value;
+  const end = document.getElementById('f-date-end').value;
+  return DATA.filter(d=>
+    (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
+    (!start || (d.data||'') >= start) &&
+    (!end || (d.data||'') <= end)
+  );
+}
+
+function renderKpis(rows){
+  const soma = campo => +rows.reduce((s,d)=>s+(d[campo]||0),0).toFixed(2);
+  const faturamento = soma('faturamento');
+  const declarado = soma('totalDeclarado');
+  const diferenca = soma('diferenca');
+  const tc = soma('tc');
+  const cancelados = soma('cancelados');
+  const kpis = [
+    {lbl:'Fechamentos', val:rows.length, cls:''},
+    {lbl:'Faturamento', val:fmtMoney(faturamento), cls:'ok'},
+    {lbl:'Total declarado', val:fmtMoney(declarado), cls:''},
+    {lbl:'Diferença de caixa', val:fmtMoney(diferenca), cls: diferenca<0?'bad':(diferenca>0?'warn':'ok')},
+    {lbl:'TC total', val:tc.toFixed(0), cls:''},
+    {lbl:'Cancelados', val:cancelados.toFixed(0), cls: cancelados>0?'warn':''},
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`).join('');
+}
+
+function diasNoIntervalo(start,end){
+  const dias = [];
+  if(!start || !end) return dias;
+  let cursor = new Date(start+'T00:00:00');
+  const limite = new Date(end+'T00:00:00');
+  let i=0;
+  while(cursor.getTime()<=limite.getTime() && i<400){
+    dias.push(cursor.toISOString().slice(0,10));
+    cursor.setDate(cursor.getDate()+1);
+    i++;
+  }
+  return dias;
+}
+
+function renderFaturamentoChart(rows){
+  const start = document.getElementById('f-date-start').value;
+  const end = document.getElementById('f-date-end').value;
+  const dias = diasNoIntervalo(start,end);
+  const svg = document.getElementById('fat-chart');
+  const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE] : Object.keys(UNIDADES_NOMES);
+  document.getElementById('fat-legend').innerHTML = unidades.map(u=>`<span><i style="background:${CORES_UNIDADE[u]};"></i>${UNIDADES_NOMES[u]}</span>`).join('');
+  if(!dias.length){ svg.innerHTML=''; document.getElementById('fat-info').textContent=''; return; }
+
+  const porDiaUnidade = {};
+  unidades.forEach(u=>{ porDiaUnidade[u] = {}; dias.forEach(d=>porDiaUnidade[u][d]=0); });
+  rows.forEach(r=>{
+    if(porDiaUnidade[r.unidade] && porDiaUnidade[r.unidade][r.data]!==undefined){
+      porDiaUnidade[r.unidade][r.data] += r.faturamento||0;
+    }
+  });
+
+  const W=600,H=220,padL=44,padR=10,padT=10,padB=22;
+  const innerW=W-padL-padR, innerH=H-padT-padB;
+  const n = dias.length;
+  let maxVal = 1;
+  unidades.forEach(u=>dias.forEach(d=>{ maxVal = Math.max(maxVal, porDiaUnidade[u][d]); }));
+
+  const grid = [0,0.5,1].map(f=>{
+    const y = padT+innerH*(1-f);
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#232a33" stroke-width="1"/>` +
+           `<text x="2" y="${(y+3).toFixed(1)}" font-size="8.5" fill="#7d8896" font-family="monospace">${fmtMoney(maxVal*f)}</text>`;
+  }).join('');
+  const passoRotulo = Math.max(1, Math.ceil(n/8));
+  const rotulos = dias.filter((d,i)=>i%passoRotulo===0 || i===n-1).map((d,idx)=>{
+    const i = dias.indexOf(d);
+    const x = padL + (n===1?innerW/2:innerW*i/(n-1));
+    return `<text x="${x.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${d.slice(8,10)}/${d.slice(5,7)}</text>`;
+  }).join('');
+
+  let linhas = '';
+  unidades.forEach(u=>{
+    const pts = dias.map((d,i)=>{
+      const x = padL + (n===1?innerW/2:innerW*i/(n-1));
+      const y = padT + innerH - (porDiaUnidade[u][d]/maxVal*innerH);
+      return {x,y,v:porDiaUnidade[u][d],d};
+    });
+    const linha = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const pontos = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2" fill="${CORES_UNIDADE[u]}"><title>${UNIDADES_NOMES[u]} · ${p.d}: ${fmtMoney(p.v)}</title></circle>`).join('');
+    linhas += `<polyline points="${linha}" fill="none" stroke="${CORES_UNIDADE[u]}" stroke-width="2"/>${pontos}`;
+  });
+
+  svg.innerHTML = `${grid}${rotulos}${linhas}`;
+  document.getElementById('fat-info').textContent = `${dias[0]} → ${dias[dias.length-1]}`;
+}
+
+function renderDiferencaChart(rows){
+  const start = document.getElementById('f-date-start').value;
+  const end = document.getElementById('f-date-end').value;
+  const dias = diasNoIntervalo(start,end);
+  const svg = document.getElementById('dif-chart');
+  if(!dias.length){ svg.innerHTML=''; document.getElementById('dif-info').textContent=''; return; }
+
+  const porDia = {};
+  dias.forEach(d=>porDia[d]=0);
+  rows.forEach(r=>{ if(porDia[r.data]!==undefined) porDia[r.data] += r.diferenca||0; });
+
+  const W=600,H=220,padL=44,padR=10,padT=10,padB=22;
+  const innerW=W-padL-padR, innerH=H-padT-padB;
+  const n = dias.length;
+  const maxAbs = Math.max(1, ...dias.map(d=>Math.abs(porDia[d])));
+  const zeroY = padT + innerH/2;
+  const passo = innerW/n;
+  const largura = Math.min(24, passo*0.62);
+
+  const grid = `<line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W-padR}" y2="${zeroY.toFixed(1)}" stroke="#232a33" stroke-width="1"/>`+
+    `<text x="2" y="${(zeroY+3).toFixed(1)}" font-size="8.5" fill="#7d8896" font-family="monospace">R$ 0</text>`;
+  const passoRotulo = Math.max(1, Math.ceil(n/8));
+  let barras = '', rotulos = '';
+  dias.forEach((d,i)=>{
+    const v = porDia[d];
+    const cx = padL + passo*i + passo/2;
+    const x = cx - largura/2;
+    const altura = Math.abs(v)/maxAbs*(innerH/2);
+    const y = v>=0 ? zeroY-altura : zeroY;
+    const cor = v>=0 ? '#3ddc97' : '#ff5c5c';
+    barras += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${largura.toFixed(1)}" height="${altura.toFixed(1)}" fill="${cor}"><title>${d}: ${fmtMoney(v)}</title></rect>`;
+    if(i%passoRotulo===0 || i===n-1) rotulos += `<text x="${cx.toFixed(1)}" y="${H-6}" font-size="9" fill="#7d8896" font-family="monospace" text-anchor="middle">${d.slice(8,10)}/${d.slice(5,7)}</text>`;
+  });
+
+  svg.innerHTML = `${grid}${rotulos}${barras}`;
+  document.getElementById('dif-info').textContent = `${dias[0]} → ${dias[dias.length-1]}`;
+}
+
+function renderUnidadesTable(rows){
+  const porUnidade = {};
+  rows.forEach(r=>{
+    const c = (porUnidade[r.unidade] ||= {qtd:0, faturamento:0, declarado:0, diferenca:0, tc:0, cancelados:0});
+    c.qtd++;
+    c.faturamento += r.faturamento||0;
+    c.declarado += r.totalDeclarado||0;
+    c.diferenca += r.diferenca||0;
+    c.tc += r.tc||0;
+    c.cancelados += r.cancelados||0;
+  });
+  const linhas = Object.entries(porUnidade).sort((a,b)=>b[1].faturamento-a[1].faturamento);
+  document.getElementById('unidades-count').textContent = linhas.length;
+  document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>{
+    const cor = c.diferenca<0?'var(--bad)':(c.diferenca>0?'var(--warn)':'var(--ok)');
+    return `<tr>
+      <td>${UNIDADES_NOMES[u]||u} <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${u}</span></td>
+      <td class="valor">${c.qtd}</td>
+      <td class="valor">${fmtMoney(c.faturamento)}</td>
+      <td class="valor">${fmtMoney(c.declarado)}</td>
+      <td class="valor" style="color:${cor}">${fmtMoney(c.diferenca)}</td>
+      <td class="valor">${c.tc.toFixed(0)}</td>
+      <td class="valor">${c.cancelados.toFixed(0)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
+}
+
+function renderTabela(rows){
+  const ordenadas = [...rows].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  document.getElementById('fechamentos-count').textContent = ordenadas.length;
+  document.getElementById('fechamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>{
+    const cor = d.diferenca<0?'var(--bad)':(d.diferenca>0?'var(--warn)':'var(--ok)');
+    return `<tr>
+      <td>${fmtData(d.data)}</td>
+      <td>${UNIDADES_NOMES[d.unidade]||d.unidade}</td>
+      <td class="truncate" title="${d.gerente||''}">${d.gerente||'—'}</td>
+      <td class="valor">${fmtMoney(d.faturamento)}</td>
+      <td class="valor">${fmtMoney(d.totalDeclarado)}</td>
+      <td class="valor" style="color:${cor}">${fmtMoney(d.diferenca)}</td>
+      <td class="valor">${fmtMoney(d.quebra)}</td>
+      <td class="valor">${fmtMoney(d.adyen)}</td>
+      <td class="valor">${fmtMoney(d.ifood)}</td>
+      <td class="valor">${fmtMoney(d.food99)}</td>
+      <td class="valor">${fmtMoney(d.pix)}</td>
+      <td class="valor">${fmtMoney(d.loja)}</td>
+      <td class="truncate" title="${d.observacao||d.obsDif||''}">${d.observacao||d.obsDif||'—'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="13" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
+}
+
+function render(){
+  const rows = filtrar();
+  renderKpis(rows);
+  renderFaturamentoChart(rows);
+  renderDiferencaChart(rows);
+  renderUnidadesTable(rows);
+  renderTabela(rows);
+}
+
+['f-date-start','f-date-end'].forEach(id=>document.getElementById(id).addEventListener('input', render));
+
+carregar();
+</script>
+</body>
+</html>

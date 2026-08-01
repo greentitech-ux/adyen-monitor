@@ -293,6 +293,15 @@ app.get('/api/summary', (req, res) => {
   });
 });
 
+// ---------- fechamentos de caixa (ARCFOOD) ----------
+// snapshot importado manualmente da planilha do Google Drive "FECHAMENTO
+// ARCFOOD" (aba BD) - atualizado sob demanda (peça "atualiza os fechamentos")
+// e nao ao vivo via webhook, diferente do resto do app.
+const fechamentosData = require('./fechamentos-snapshot.json');
+app.get('/api/fechamentos', (req, res) => {
+  res.json(fechamentosData);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // mensagens amigaveis pros erros mais comuns de upload (arquivo grande demais,
