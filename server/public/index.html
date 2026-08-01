@@ -219,6 +219,7 @@
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
     <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
+    <button class="btn-notif" id="btn-som" onclick="toggleSom()" title="Som/vibração de alerta">🔊</button>
     <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
     <button class="back" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪 Sair</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
@@ -1298,6 +1299,55 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
   document.getElementById('f-date-end').value = hoje;
 })();
 
+// ---- som + vibração pra alertas críticos (fraude, chargeback, estorno) ----
+// nao depende de permissao de push nem de service worker - toca direto na
+// aba aberta, então funciona mesmo sem o usuario ter aceitado notificacoes.
+// navegadores bloqueiam audio antes de uma interacao do usuario, entao o
+// AudioContext so e criado/retomado no primeiro clique/tecla da pagina.
+const ALERT_STATUSES = new Set(['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','CHARGEBACK','CHARGEBACK_REVERTIDO','NOTIFICATION_OF_CHARGEBACK']);
+let AUDIO_CTX = null;
+function prepararAudio(){
+  if(!AUDIO_CTX){
+    try{ AUDIO_CTX = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  } else if(AUDIO_CTX.state==='suspended'){
+    AUDIO_CTX.resume().catch(()=>{});
+  }
+}
+document.addEventListener('click', prepararAudio);
+document.addEventListener('keydown', prepararAudio);
+
+function somLigado(){ return localStorage.getItem('somAlertas') !== 'off'; }
+function tocarAlerta(){
+  if(!somLigado()) return;
+  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  if(!AUDIO_CTX || AUDIO_CTX.state==='suspended') return;
+  try{
+    const t = AUDIO_CTX.currentTime;
+    [0, 0.18].forEach((atraso)=>{
+      const osc = AUDIO_CTX.createOscillator();
+      const gain = AUDIO_CTX.createGain();
+      osc.type = 'sine'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t+atraso);
+      gain.gain.exponentialRampToValueAtTime(0.3, t+atraso+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t+atraso+0.16);
+      osc.connect(gain); gain.connect(AUDIO_CTX.destination);
+      osc.start(t+atraso); osc.stop(t+atraso+0.16);
+    });
+  }catch(e){}
+}
+function toggleSom(){
+  localStorage.setItem('somAlertas', somLigado() ? 'off' : 'on');
+  atualizarBtnSom();
+  if(somLigado()){ prepararAudio(); tocarAlerta(); }
+}
+function atualizarBtnSom(){
+  const btn = document.getElementById('btn-som');
+  if(!btn) return;
+  const ligado = somLigado();
+  btn.textContent = ligado ? '🔊' : '🔇';
+  btn.title = ligado ? 'Som/vibração de alerta ligado (clique pra desligar)' : 'Som/vibração de alerta desligado (clique pra ligar)';
+}
+
 // ---- SSE: atualizacoes ao vivo ----
 // identificador da versao do servidor atualmente conectada - quando um deploy
 // acontece o processo reinicia com um BOOT_ID novo; ao reconectar (o
@@ -1318,6 +1368,7 @@ function connectStream(){
     const tx = JSON.parse(e.data);
     DATA.push(tx);
     marcarNovo('tx:'+tx.pspReference);
+    if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
     populateFilters(); render();
   });
   es.addEventListener('update', (e)=>{
@@ -1325,6 +1376,7 @@ function connectStream(){
     const idx = DATA.findIndex(d=>d.pspReference===tx.pspReference && d.eventCode===tx.eventCode);
     if(idx>=0) DATA[idx]=tx;
     marcarNovo('tx:'+tx.pspReference);
+    if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
     render();
   });
   es.addEventListener('order-changed', (e)=>{
@@ -1336,12 +1388,14 @@ function connectStream(){
     const payload = JSON.parse(e.data);
     const key = payload.pedidoId || payload.merchantReference || payload.pspReference;
     marcarNovo('chargeback:'+key);
+    tocarAlerta();
     refreshChargebacks();
   });
   es.addEventListener('dispute-changed', ()=>{
     if(podeSecao('disputas')) refreshDisputeMarkers();
   });
   es.addEventListener('refund-requested', ()=>{
+    if(ME.role==='master') tocarAlerta();
     refreshRefundRequests();
   });
   es.addEventListener('refund-request-changed', ()=>{
@@ -1350,6 +1404,7 @@ function connectStream(){
 }
 
 function bootApp(){
+  atualizarBtnSom();
   loadAll().then(connectStream);
 
   // reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
