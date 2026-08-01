@@ -73,9 +73,12 @@ function allTransactions() {
 
 // agrupa os eventos de um mesmo pedido (merchantReference) em uma linha do tempo -
 // e assim conseguimos ver quando um pedido aprovado depois foi estornado, virou
-// chargeback, etc.
+// chargeback, etc. Alguns eventos (ex: OFFER_CLOSED) podem chegar sem
+// merchantReference; nesse caso usamos originalReference (referencia pro
+// pspReference do evento original) como segunda tentativa antes de cair pro
+// proprio pspReference, pra nao criar um "pedido" fantasma que nunca atualiza.
 function orderKey(tx) {
-  return tx.merchantReference || tx.pspReference;
+  return tx.merchantReference || tx.originalReference || tx.pspReference;
 }
 
 function allOrders() {

@@ -87,6 +87,7 @@ function normalize(item) {
   return {
     pspReference: item.pspReference,
     merchantReference: item.merchantReference,
+    originalReference: item.originalReference || null,
     eventCode: item.eventCode,
     status,
     fraudeSuspeita: isFraudSuspect(item),

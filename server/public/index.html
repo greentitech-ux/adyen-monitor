@@ -31,6 +31,7 @@
   .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);}
   .kpi .val{font-family:var(--mono);font-size:26px;font-weight:600;margin-top:6px;}
   .kpi .val.ok{color:var(--ok);} .kpi .val.bad{color:var(--bad);} .kpi .val.warn{color:var(--warn);}
+  .kpi .sub-val{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;}
   .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
   @media(max-width:900px){.grid{grid-template-columns:1fr;}}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
@@ -88,8 +89,11 @@
   .multiselect-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;white-space:nowrap;}
   .multiselect-btn:hover{border-color:var(--accent);}
   .multiselect.open .multiselect-btn{border-color:var(--accent);}
-  .multiselect-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:var(--panel2);border:1px solid var(--line);border-radius:8px;min-width:200px;max-height:260px;overflow-y:auto;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
-  .multiselect.open .multiselect-panel{display:block;}
+  /* o painel e "portado" pro body (posicionamento fixed, calculado via JS) pra
+     nao ficar preso/cortado dentro do container de transacoes, do mesmo jeito
+     que o calendario nativo do input de data flutua por cima de tudo */
+  .multiselect-panel{display:none;position:fixed;z-index:1000;background:var(--panel2);border:1px solid var(--line);border-radius:8px;min-width:200px;max-height:260px;overflow-y:auto;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+  .multiselect-panel.open{display:block;}
   .multiselect-panel label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;font-size:12px;border-radius:5px;cursor:pointer;white-space:nowrap;}
   .multiselect-panel label:hover{background:var(--panel);}
   .multiselect-panel label span{overflow:hidden;text-overflow:ellipsis;}
@@ -236,16 +240,43 @@ async function refreshChargebacks(){
   renderChargebacks();
 }
 
-// unidade(s) selecionada(s) no filtro de Transacoes vale pra tudo no
-// dashboard - KPIs, alertas, pedidos repetidos, pedidos que mudaram de
-// status e chargebacks sempre refletem a mesma selecao
+// os 3 filtros (periodo, unidade, status) valem pra tudo no dashboard - KPIs,
+// alertas, pedidos repetidos, pedidos que mudaram de status e chargebacks
+// sempre refletem a mesma selecao, em harmonia com a tabela de transacoes
 function filtraPorUnidade(lista){
   if(SEL_UNIDADE.size===0) return lista;
   return lista.filter(o=>SEL_UNIDADE.has(o.unidade));
 }
+function filtraPorStatusEvento(lista){
+  if(SEL_STATUS.size===0) return lista;
+  return lista.filter(d=>SEL_STATUS.has(d.status));
+}
+function getDateRange(){
+  const startVal = document.getElementById('f-date-start').value;
+  const endVal = document.getElementById('f-date-end').value;
+  return {
+    start: startVal ? new Date(startVal+'T00:00:00').getTime() : -Infinity,
+    end: endVal ? new Date(endVal+'T23:59:59.999').getTime() : Infinity,
+  };
+}
+function dentroDoIntervalo(iso){
+  if(!iso) return false;
+  const {start,end} = getDateRange();
+  const t = new Date(iso).getTime();
+  return t>=start && t<=end;
+}
+// pedidos (orders-changed/chargebacks) tem status atual + data da ultima
+// atualizacao - aplica os 3 filtros pra eles ficarem em harmonia com o resto
+function filtrarPedidos(lista){
+  return lista.filter(o=>
+    (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(o.unidade)) &&
+    (SEL_STATUS.size===0 || SEL_STATUS.has(o.statusAtual)) &&
+    dentroDoIntervalo(o.ultimaAtualizacao)
+  );
+}
 
 function renderChargebacks(){
-  const lista = filtraPorUnidade(CHARGEBACKS);
+  const lista = filtrarPedidos(CHARGEBACKS);
   document.getElementById('chargebacks-count').textContent = lista.length;
   document.getElementById('chargebacks').innerHTML = lista.length ? lista.map(o=>{
     const novo = ehNovo('chargeback:'+o.pedidoId);
@@ -265,10 +296,7 @@ function renderChargebacks(){
 
 // filtra pelo intervalo de datas selecionado (data inicial e data final)
 function periodFiltered(){
-  const startVal = document.getElementById('f-date-start').value;
-  const endVal = document.getElementById('f-date-end').value;
-  const start = startVal ? new Date(startVal+'T00:00:00').getTime() : -Infinity;
-  const end = endVal ? new Date(endVal+'T23:59:59.999').getTime() : Infinity;
+  const {start,end} = getDateRange();
   return DATA.filter(d => {
     if(!d.dataHora) return false;
     const t = new Date(d.dataHora).getTime();
@@ -279,14 +307,22 @@ function periodFiltered(){
 function computeSummary(rows){
   const aprovadas = rows.filter(t=>t.status==='APROVADO');
   const recusadas = rows.filter(t=>t.status==='RECUSADO');
+  const estornos = rows.filter(t=>t.status==='ESTORNADO');
+  const chargebacksRows = rows.filter(t=>(t.status||'').includes('CHARGEBACK'));
+  const fraudeRows = rows.filter(t=>t.fraudeSuspeita);
+  const soma = list=>+list.reduce((s,t)=>s+(t.valor||0),0).toFixed(2);
   return {
     total: rows.length,
     aprovadas: aprovadas.length,
     recusadas: recusadas.length,
-    volumeAprovado: +aprovadas.reduce((s,t)=>s+t.valor,0).toFixed(2),
-    estornos: rows.filter(t=>t.status==='ESTORNADO').length,
-    chargebacks: rows.filter(t=>(t.status||'').includes('CHARGEBACK')).length,
-    fraudeSuspeita: rows.filter(t=>t.fraudeSuspeita).length,
+    volumeAprovado: soma(aprovadas),
+    estornos: estornos.length,
+    valorEstornos: soma(estornos),
+    valorRecusadas: soma(recusadas),
+    chargebacks: chargebacksRows.length,
+    valorChargebacks: soma(chargebacksRows),
+    fraudeSuspeita: fraudeRows.length,
+    valorFraude: soma(fraudeRows),
   };
 }
 
@@ -296,7 +332,7 @@ async function refreshOrdersChanged(){
 }
 
 function renderOrdersChanged(){
-  const lista = filtraPorUnidade(ORDERS_CHANGED);
+  const lista = filtrarPedidos(ORDERS_CHANGED);
   document.getElementById('orders-count').textContent = lista.length;
   document.getElementById('orders').innerHTML = lista.length ? lista.map(o=>{
     const novo = ehNovo('order:'+o.pedidoId);
@@ -320,12 +356,12 @@ function renderKpis(s){
     {lbl:'Transações', val:s.total, cls:''},
     {lbl:'Taxa de aprovação', val:taxa.toFixed(1)+'%', cls: taxa>85?'ok':(taxa>70?'warn':'bad')},
     {lbl:'Volume aprovado', val:fmtMoney(s.volumeAprovado), cls:'ok'},
-    {lbl:'Recusadas', val:s.recusadas, cls: s.recusadas>0?'warn':''},
-    {lbl:'Estornos', val:s.estornos, cls: s.estornos>0?'warn':''},
-    {lbl:'Fraude suspeita', val:s.fraudeSuspeita, cls: s.fraudeSuspeita>0?'bad':''},
-    {lbl:'Chargebacks', val:s.chargebacks, cls: s.chargebacks>0?'bad':''},
+    {lbl:'Recusadas', val:s.recusadas, cls: s.recusadas>0?'warn':'', sub:fmtMoney(s.valorRecusadas)},
+    {lbl:'Estornos', val:s.estornos, cls: s.estornos>0?'warn':'', sub:fmtMoney(s.valorEstornos)},
+    {lbl:'Fraude suspeita', val:s.fraudeSuspeita, cls: s.fraudeSuspeita>0?'bad':'', sub:fmtMoney(s.valorFraude)},
+    {lbl:'Chargebacks', val:s.chargebacks, cls: s.chargebacks>0?'bad':'', sub:fmtMoney(s.valorChargebacks)},
   ];
-  document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`).join('');
+  document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div>${k.sub?`<div class="sub-val">${k.sub}</div>`:''}</div>`).join('');
 }
 
 // pedidos aprovados do mesmo cliente em sequencia rapida - pode ser cliente
@@ -414,14 +450,37 @@ const SEL_UNIDADE = new Set();
 function setupMultiselect(key, allLabel, selectedSet){
   const wrap = document.getElementById('ms-'+key);
   const btn = document.getElementById('ms-'+key+'-btn');
+  const panel = document.getElementById('ms-'+key+'-panel');
+  // "porta" o painel pro <body> com position:fixed, assim ele flutua por cima
+  // de tudo (igual ao calendario nativo do input de data) em vez de ficar
+  // preso/cortado dentro do container de transacoes
+  document.body.appendChild(panel);
+
+  function posicionar(){
+    const r = btn.getBoundingClientRect();
+    panel.style.top = (r.bottom + 4) + 'px';
+    panel.style.left = r.left + 'px';
+    const maxLeft = window.innerWidth - panel.offsetWidth - 8;
+    if(maxLeft > 0 && r.left > maxLeft) panel.style.left = maxLeft + 'px';
+  }
+  function fechar(){ wrap.classList.remove('open'); panel.classList.remove('open'); }
+
   btn.addEventListener('click', (e)=>{
     e.stopPropagation();
-    document.querySelectorAll('.multiselect.open').forEach(el=>{ if(el!==wrap) el.classList.remove('open'); });
-    wrap.classList.toggle('open');
+    const abrindo = !panel.classList.contains('open');
+    document.querySelectorAll('.multiselect-panel.open').forEach(p=>{ p.classList.remove('open'); });
+    document.querySelectorAll('.multiselect.open').forEach(el=>el.classList.remove('open'));
+    if(abrindo){
+      posicionar();
+      wrap.classList.add('open');
+      panel.classList.add('open');
+    }
   });
   document.addEventListener('click', (e)=>{
-    if(!wrap.contains(e.target)) wrap.classList.remove('open');
+    if(!panel.contains(e.target) && e.target!==btn) fechar();
   });
+  window.addEventListener('scroll', ()=>{ if(panel.classList.contains('open')) posicionar(); }, true);
+  window.addEventListener('resize', ()=>{ if(panel.classList.contains('open')) posicionar(); });
 }
 setupMultiselect('status');
 setupMultiselect('unidade');
@@ -497,13 +556,17 @@ async function showClient(key){
   document.getElementById('overlay').classList.add('show');
 }
 
-function orderKeyOf(t){ return t.merchantReference || t.pspReference; }
+// mesma logica de agrupamento do backend (store.js orderKey): merchantReference
+// primeiro, depois originalReference (pra pedidos cujo evento anterior, ex.
+// OFFER_CLOSED, chegou sem merchantReference), so entao o proprio pspReference
+function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.pspReference; }
   
   function render(){
       const period = periodFiltered();
       const periodUnidade = filtraPorUnidade(period);
-      renderKpis(computeSummary(periodUnidade));
-      renderAlerts(periodUnidade);
+      const periodUnidadeStatus = filtraPorStatusEvento(periodUnidade);
+      renderKpis(computeSummary(periodUnidadeStatus));
+      renderAlerts(periodUnidadeStatus);
       renderOrdersChanged();
       renderChargebacks();
 

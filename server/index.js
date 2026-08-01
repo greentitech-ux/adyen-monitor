@@ -111,7 +111,7 @@ app.post('/webhooks/adyen', async (req, res) => {
 
     // se esse pedido ja tinha outro status antes (ex: APROVADO -> ESTORNADO -> CHARGEBACK),
     // avisa o dashboard pra atualizar a secao de pedidos que mudaram de status
-    const order = store.orderFor(tx.merchantReference || tx.pspReference);
+    const order = store.orderFor(tx.merchantReference || tx.originalReference || tx.pspReference);
     if (order && new Set(order.history.map((h) => h.status)).size > 1) {
       broadcast('order-changed', order);
     }
