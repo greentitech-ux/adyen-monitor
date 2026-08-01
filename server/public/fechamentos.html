@@ -33,6 +33,7 @@
   .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
   .panel h2 .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
   .controls{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center;}
+  .controls select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);}
   .daterange{display:flex;align-items:center;gap:6px;}
   .daterange input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:var(--sans);color-scheme:dark;}
   .daterange .sep{color:var(--muted);font-size:12px;}
@@ -63,7 +64,7 @@
 
 <header>
   <div>
-    <div class="eyebrow">Solutions Ti Tech · ARCFOOD</div>
+    <div class="eyebrow">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
     <h1>Fechamentos de caixa</h1>
     <div class="sub" id="sync-info">carregando...</div>
   </div>
@@ -90,6 +91,11 @@
       <span class="sep">até</span>
       <input type="date" id="f-date-end" title="Data final">
     </div>
+    <select id="f-grupo">
+      <option value="">Todos os grupos</option>
+      <option value="ARCFOOD">ARCFOOD</option>
+      <option value="BRAVO">Grupo Bravo</option>
+    </select>
     <div class="multiselect" id="ms-unidade">
       <button type="button" class="multiselect-btn" id="ms-unidade-btn">Todas as unidades</button>
       <div class="multiselect-panel" id="ms-unidade-panel"></div>
@@ -153,9 +159,22 @@ window.fetch = (url, opts = {}) => {
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
 let DATA = [];
+const GRUPOS = {
+  ARCFOOD: ['19821','19855','19888','19889'],
+  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
+};
 const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
-const CORES_UNIDADE = { '19821':'#5cc8ff', '19855':'#f2b33d', '19888':'#3ddc97', '19889':'#ff8fd6' };
+GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = u; });
+const PALETA = ['#5cc8ff','#f2b33d','#3ddc97','#ff8fd6','#ff5c5c','#a78bfa','#fb923c','#38bdf8','#facc15','#4ade80','#f472b6','#94a3b8','#22d3ee','#c084fc','#fbbf24','#34d399'];
+const CORES_UNIDADE = {};
+Object.keys(UNIDADES_NOMES).forEach((u,i)=>{ CORES_UNIDADE[u] = PALETA[i % PALETA.length]; });
 const SEL_UNIDADE = new Set();
+
+function codigosDoGrupo(){
+  const grupo = document.getElementById('f-grupo').value;
+  if(!grupo) return Object.keys(UNIDADES_NOMES);
+  return GRUPOS[grupo] || [];
+}
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
@@ -164,8 +183,10 @@ async function carregar(){
   const resp = await fetch('/api/fechamentos');
   DATA = await resp.json();
   const datas = DATA.map(d=>d.data).filter(Boolean).sort();
+  const qtdArcfood = DATA.filter(d=>d.grupo==='ARCFOOD').length;
+  const qtdBravo = DATA.filter(d=>d.grupo==='BRAVO').length;
   document.getElementById('sync-info').textContent = datas.length
-    ? `${datas.length} fechamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · dados sincronizados manualmente da planilha`
+    ? `${datas.length} fechamentos (${qtdArcfood} ARCFOOD · ${qtdBravo} Grupo Bravo) · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · dados sincronizados manualmente da planilha`
     : 'nenhum fechamento importado ainda';
   const fim = datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10);
   const inicioDt = new Date(fim); inicioDt.setDate(inicioDt.getDate()-29);
@@ -186,7 +207,8 @@ function setupMultiselect(){
     panel.style.left = r.left+'px';
   }
   function renderPanel(){
-    const codigos = Object.keys(UNIDADES_NOMES);
+    const codigos = codigosDoGrupo();
+    for(const v of [...SEL_UNIDADE]) if(!codigos.includes(v)) SEL_UNIDADE.delete(v);
     panel.innerHTML = `
       <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${SEL_UNIDADE.size===0?'checked':''}></label>
       ${codigos.map(c=>`<label><span>${UNIDADES_NOMES[c]} (${c})</span><input type="checkbox" value="${c}" ${SEL_UNIDADE.has(c)?'checked':''}></label>`).join('')}
@@ -212,12 +234,15 @@ function setupMultiselect(){
     if(!panel.contains(e.target) && e.target!==btn) panel.classList.remove('open');
   });
   renderPanel();
+  document.getElementById('f-grupo').addEventListener('change', ()=>{ renderPanel(); render(); });
 }
 
 function filtrar(){
   const start = document.getElementById('f-date-start').value;
   const end = document.getElementById('f-date-end').value;
+  const grupo = document.getElementById('f-grupo').value;
   return DATA.filter(d=>
+    (!grupo || d.grupo===grupo) &&
     (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
     (!start || (d.data||'') >= start) &&
     (!end || (d.data||'') <= end)
@@ -261,7 +286,7 @@ function renderFaturamentoChart(rows){
   const end = document.getElementById('f-date-end').value;
   const dias = diasNoIntervalo(start,end);
   const svg = document.getElementById('fat-chart');
-  const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE] : Object.keys(UNIDADES_NOMES);
+  const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
   document.getElementById('fat-legend').innerHTML = unidades.map(u=>`<span><i style="background:${CORES_UNIDADE[u]};"></i>${UNIDADES_NOMES[u]}</span>`).join('');
   if(!dias.length){ svg.innerHTML=''; document.getElementById('fat-info').textContent=''; return; }
 
@@ -361,7 +386,7 @@ function renderUnidadesTable(rows){
   document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>{
     const cor = c.diferenca<0?'var(--bad)':(c.diferenca>0?'var(--warn)':'var(--ok)');
     return `<tr>
-      <td>${UNIDADES_NOMES[u]||u} <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${u}</span></td>
+      <td>${UNIDADES_NOMES[u]||u}${(UNIDADES_NOMES[u] && UNIDADES_NOMES[u]!==u) ? ` <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${u}</span>` : ''}</td>
       <td class="valor">${c.qtd}</td>
       <td class="valor">${fmtMoney(c.faturamento)}</td>
       <td class="valor">${fmtMoney(c.declarado)}</td>
