@@ -19,6 +19,8 @@ const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
 const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
+const fechamentosLive = require('./fechamentosLive');
+const backup = require('./backup');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -201,7 +203,8 @@ app.post('/webhooks/adyen', async (req, res) => {
         push.notifyRaw(
           `Possível teste de cartão — ${tx.unidade || ''}`,
           `${alerta.tentativas} recusas seguidas do cartão •• ${tx.last4} em ${alerta.janelaMinutos} min`,
-          `card-testing-${tx.unidade}-${tx.last4}`
+          `card-testing-${tx.unidade}-${tx.last4}`,
+          tx.unidade
         );
       }
     }
@@ -282,11 +285,41 @@ app.get('/api/summary', requireSection('monitor'), (req, res) => {
   });
 });
 
-// lista de unidades distintas ja vistas nas transacoes - usada pelo Master
-// pra montar o seletor de permissoes na tela de usuarios
-app.get('/api/meta/unidades', auth.requireMaster, (req, res) => {
-  const unidades = new Set(store.allTransactions().map((t) => t.unidade).filter(Boolean));
-  res.json([...unidades].sort());
+// unidades da planilha de fechamento - IDs proprios (codigo da loja ARCFOOD
+// ou nome da loja do Grupo Bravo), diferentes do merchantAccountCode da
+// Adyen. Ficam fixos aqui porque uma unidade pode precisar de permissao
+// mesmo antes de ter qualquer transacao Adyen ou fechamento lancado.
+const FECHAMENTO_UNIDADES_NOMES = {
+  '19821': 'São Miguel (Fechamento)', '19855': 'Carrão (Fechamento)', '19888': 'Mooca (Fechamento)', '19889': 'Tatuapé (Fechamento)',
+  "Domino's Carrinho Aeroporto Recife": "Domino's Carrinho Aeroporto Recife",
+  'Dominos Bessa': 'Dominos Bessa',
+  'Dominos Campina Grande': 'Dominos Campina Grande',
+  'Dominos Caruaru': 'Dominos Caruaru',
+  'Dominos Garanhuns': 'Dominos Garanhuns',
+  'Dominos Praça Aeroporto Recife': 'Dominos Praça Aeroporto Recife',
+  'Dominos Tirol': 'Dominos Tirol',
+  'Milky Moo Tirol': 'Milky Moo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spoleto Praça Aeroporto Recife',
+  'Spoleto Shopping Recife': 'Spoleto Shopping Recife',
+  'Spoleto Shopping Tacaruna': 'Spoleto Shopping Tacaruna',
+  'São Braz IL': 'São Braz IL',
+};
+
+// lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
+// junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
+// com as unidades fixas de Fechamento/Lançamento (espaco de codigos
+// diferente, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
+// dados importados/lançados, pra nunca faltar opcao no checklist do Master
+app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
+  const mapa = {};
+  store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
+  Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
+  require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  const lista = Object.entries(mapa)
+    .map(([codigo, nome]) => ({ codigo, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  res.json(lista);
 });
 
 // ---------- registros de disputa/monitoramento (secao "disputas") ----------
@@ -361,7 +394,16 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 });
 
 app.post('/api/push/subscribe', async (req, res) => {
-  await push.addSubscription(req.body);
+  // guarda quem e essa inscricao (Master ve tudo; usuario comum so recebe
+  // alerta das unidades e secoes que ele tem acesso - sem isso o push
+  // vazava fraude/chargeback/estorno de TODAS as unidades pra qualquer
+  // pessoa logada que clicasse no sino, ignorando as permissoes dela)
+  await push.addSubscription(req.body, {
+    userId: req.user.id,
+    isMaster: req.isMaster,
+    unidades: req.isMaster ? null : (req.permissions.unidades || []),
+    sections: req.isMaster ? null : (req.permissions.sections || []),
+  });
   res.json({ ok: true });
 });
 
@@ -648,6 +690,108 @@ app.delete('/api/users/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
+// ---------- backup do banco (so o Master ve/aciona) ----------
+app.get('/api/backups', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await backup.listarBackups());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await backup.rodarBackup());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- fechamentos de caixa (secao "fechamentos") ----------
+// combina o snapshot importado manualmente do Google Drive (ARCFOOD + Grupo
+// Bravo) com os fechamentos lançados ao vivo pelas lojas. As unidades aqui
+// (19821/19855/19888/19889, ou o nome da loja no Grupo Bravo) sao codigos
+// proprios da planilha, num espaco diferente do merchantAccountCode da
+// Adyen usado em Monitor/Disputas - mas o mesmo campo permissions.unidades
+// e reaproveitado pra filtrar as duas coisas (o Master escolhe os codigos
+// certos pelo seletor de /api/meta/unidades, que junta os dois espacos).
+const fechamentosData = require('./fechamentos-snapshot.json');
+app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
+  const lancados = await fechamentosLive.listAll();
+  res.json(auth.filterByUnidade(req, [...fechamentosData, ...lancados]));
+});
+
+// ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
+// substitui o AppSheet: a loja loga com um usuario proprio (papel "Fechamento",
+// limitado a sua(s) unidade(s)) e lanca o fechamento do dia direto no banco.
+// Depois de lancado o registro e imutavel - qualquer correcao vira um pedido
+// que so o Master pode aprovar (fechamentosLive.js guarda o historico).
+app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await fechamentosLive.create({
+      unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-lancado', registro, 'lancamento');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) => {
+  if (req.isMaster) return res.json(await fechamentosLive.listAll());
+  res.json(await fechamentosLive.listByUnidades(req.permissions.unidades || []));
+});
+
+app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {
+  try {
+    const atual = await fechamentosLive.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Fechamento não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const pedido = await fechamentosLive.solicitarEdicao({
+      fechamentoId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      solicitadoPorId: req.user.id,
+      solicitadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// fila de pedidos de correcao - so o Master decide (aprova/rejeita), mas quem
+// pediu pode acompanhar o status do proprio pedido
+app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {
+  const todas = await fechamentosLive.listarEdicoes();
+  if (req.isMaster) return res.json(todas);
+  res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
+});
+
+app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const pedido = await fechamentosLive.decidirEdicao(req.params.id, req.body.status, {
+      decididoPorEmail: req.user.email,
+      motivoDecisao: req.body.motivoDecisao,
+    });
+    broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
+    broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // mensagens amigaveis pros erros mais comuns de upload (arquivo grande demais,
@@ -680,6 +824,13 @@ app.use((err, req, res, next) => {
     if (removidos) console.log(`Retencao: removidas ${removidos} transacoes com mais de 90 dias.`);
     setInterval(() => {
       store.pruneOld().catch((err) => console.error('Erro na limpeza de retencao:', err.message));
+    }, 24 * 60 * 60 * 1000);
+
+    // backup automatico do banco: roda no start e depois 1x/dia (o Master
+    // tambem pode acionar na hora pela tela de Usuarios/Backup)
+    backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
+    setInterval(() => {
+      backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
     }, 24 * 60 * 60 * 1000);
   });
 })();

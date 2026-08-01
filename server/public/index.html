@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monitor Adyen · ao vivo</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
@@ -17,10 +18,19 @@
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  header{margin-bottom:20px;}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   .pulse{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid #234a3a;background:var(--ok-dim);color:var(--ok);}
   .pulse.off{background:var(--bad-dim);color:var(--bad);border-color:#4a2323;}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 rgba(61,220,151,.6);animation:p 2s infinite;}
@@ -205,18 +215,27 @@
 <div id="app-root" class="hidden">
 
 <header>
-  <div>
-    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
-    <h1>Monitor de transações</h1>
-  </div>
-  <div style="display:flex;align-items:center;gap:6px;">
-    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
-    <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
-    <button class="back" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪 Sair</button>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+      <h1>Monitor de transações</h1>
+    </div>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-links">
+      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+      <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+      <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+      <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
+      <button class="btn-notif" id="btn-som" onclick="toggleSom()" title="Som/vibração de alerta">🔊</button>
+      <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <button class="btn-notif btn-sair" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
   </div>
 </header>
 
@@ -374,6 +393,8 @@ function podeSecao(secao){
 }
 
 function aplicarNav(){
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !podeSecao('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !podeSecao('fechamentos'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
@@ -391,6 +412,7 @@ async function tentarEntrar(){
 
   if(!podeSecao('monitor')){
     // essa pagina e o monitor - quem nao tem essa secao vai pra primeira que tiver
+    if(podeSecao('fechamentos')) return location.href='/fechamentos.html';
     if(podeSecao('cofre')) return location.href='/cofre.html';
     if(podeSecao('disputas')) return location.href='/relatorios.html';
     document.getElementById('sem-acesso').classList.remove('hidden');
@@ -1290,6 +1312,55 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
   document.getElementById('f-date-end').value = hoje;
 })();
 
+// ---- som + vibração pra alertas críticos (fraude, chargeback, estorno) ----
+// nao depende de permissao de push nem de service worker - toca direto na
+// aba aberta, então funciona mesmo sem o usuario ter aceitado notificacoes.
+// navegadores bloqueiam audio antes de uma interacao do usuario, entao o
+// AudioContext so e criado/retomado no primeiro clique/tecla da pagina.
+const ALERT_STATUSES = new Set(['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','CHARGEBACK','CHARGEBACK_REVERTIDO','NOTIFICATION_OF_CHARGEBACK']);
+let AUDIO_CTX = null;
+function prepararAudio(){
+  if(!AUDIO_CTX){
+    try{ AUDIO_CTX = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  } else if(AUDIO_CTX.state==='suspended'){
+    AUDIO_CTX.resume().catch(()=>{});
+  }
+}
+document.addEventListener('click', prepararAudio);
+document.addEventListener('keydown', prepararAudio);
+
+function somLigado(){ return localStorage.getItem('somAlertas') !== 'off'; }
+function tocarAlerta(){
+  if(!somLigado()) return;
+  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  if(!AUDIO_CTX || AUDIO_CTX.state==='suspended') return;
+  try{
+    const t = AUDIO_CTX.currentTime;
+    [0, 0.18].forEach((atraso)=>{
+      const osc = AUDIO_CTX.createOscillator();
+      const gain = AUDIO_CTX.createGain();
+      osc.type = 'sine'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t+atraso);
+      gain.gain.exponentialRampToValueAtTime(0.3, t+atraso+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t+atraso+0.16);
+      osc.connect(gain); gain.connect(AUDIO_CTX.destination);
+      osc.start(t+atraso); osc.stop(t+atraso+0.16);
+    });
+  }catch(e){}
+}
+function toggleSom(){
+  localStorage.setItem('somAlertas', somLigado() ? 'off' : 'on');
+  atualizarBtnSom();
+  if(somLigado()){ prepararAudio(); tocarAlerta(); }
+}
+function atualizarBtnSom(){
+  const btn = document.getElementById('btn-som');
+  if(!btn) return;
+  const ligado = somLigado();
+  btn.textContent = ligado ? '🔊' : '🔇';
+  btn.title = ligado ? 'Som/vibração de alerta ligado (clique pra desligar)' : 'Som/vibração de alerta desligado (clique pra ligar)';
+}
+
 // ---- SSE: atualizacoes ao vivo ----
 // identificador da versao do servidor atualmente conectada - quando um deploy
 // acontece o processo reinicia com um BOOT_ID novo; ao reconectar (o
@@ -1310,6 +1381,7 @@ function connectStream(){
     const tx = JSON.parse(e.data);
     DATA.push(tx);
     marcarNovo('tx:'+tx.pspReference);
+    if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
     populateFilters(); render();
   });
   es.addEventListener('update', (e)=>{
@@ -1317,6 +1389,7 @@ function connectStream(){
     const idx = DATA.findIndex(d=>d.pspReference===tx.pspReference && d.eventCode===tx.eventCode);
     if(idx>=0) DATA[idx]=tx;
     marcarNovo('tx:'+tx.pspReference);
+    if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
     render();
   });
   es.addEventListener('order-changed', (e)=>{
@@ -1328,12 +1401,14 @@ function connectStream(){
     const payload = JSON.parse(e.data);
     const key = payload.pedidoId || payload.merchantReference || payload.pspReference;
     marcarNovo('chargeback:'+key);
+    tocarAlerta();
     refreshChargebacks();
   });
   es.addEventListener('dispute-changed', ()=>{
     if(podeSecao('disputas')) refreshDisputeMarkers();
   });
   es.addEventListener('refund-requested', ()=>{
+    if(ME.role==='master') tocarAlerta();
     refreshRefundRequests();
   });
   es.addEventListener('refund-request-changed', ()=>{
@@ -1342,6 +1417,7 @@ function connectStream(){
 }
 
 function bootApp(){
+  atualizarBtnSom();
   loadAll().then(connectStream);
 
   // reavalia periodicamente pra remover o destaque "NOVO" depois da janela de

@@ -15,6 +15,8 @@ self.addEventListener('push', (event) => {
       badge: '/icon.svg',
       tag: data.tag,
       vibrate: [200, 100, 200],
+      silent: false,
+      renotify: true,
     })
   );
 });

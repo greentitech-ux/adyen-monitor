@@ -23,8 +23,21 @@ async function loadSubs() {
   return snap.docs.map((d) => d.data());
 }
 
-async function addSubscription(sub) {
-  await COLLECTION.doc(subDocId(sub.endpoint)).set(sub, { merge: true });
+// meta = { userId, isMaster, unidades, sections } - null em unidades/sections
+// significa Master (sem restricao). Sem meta (inscricoes antigas, de antes
+// dessa checagem existir) e tratado como sem permissao nenhuma, nao como
+// acesso total - mais seguro pedir pra re-inscrever do que vazar alerta.
+async function addSubscription(sub, meta) {
+  await COLLECTION.doc(subDocId(sub.endpoint)).set({ ...sub, meta: meta || null }, { merge: true });
+}
+
+function podeReceber(sub, { unidade, section }) {
+  const meta = sub.meta;
+  if (!meta) return false; // inscricao antiga sem dono conhecido - nao arrisca
+  if (meta.isMaster) return true;
+  if (section && !(meta.sections || []).includes(section)) return false;
+  if (unidade && !(meta.unidades || []).includes(unidade)) return false;
+  return true;
 }
 
 async function removeSubscription(endpoint) {
@@ -59,11 +72,12 @@ function titleFor(tx) {
   return `${labels[tx.status] || tx.status} — ${tx.unidade || ''}`;
 }
 
-async function sendToAll(data) {
+async function sendToAll(data, { unidade, section } = {}) {
   if (!PUBLIC_KEY || !PRIVATE_KEY) return;
   const payload = JSON.stringify(data);
   const subs = await loadSubs();
   for (const sub of subs) {
+    if (!podeReceber(sub, { unidade, section })) continue;
     try {
       await webpush.sendNotification(sub, payload);
     } catch (err) {
@@ -83,13 +97,13 @@ async function notify(tx) {
     title: titleFor(tx),
     body: `${tx.nomeCliente || tx.cardHolder || 'Cliente'} · R$ ${(tx.valor || 0).toFixed(2)}${tx.motivo ? ' · ' + tx.motivo : ''}`,
     tag: tx.pspReference,
-  });
+  }, { unidade: tx.unidade, section: 'monitor' });
 }
 
 // alerta generico (ex: teste de cartao clonado) - nao depende de uma
 // transacao especifica normalizada
-async function notifyRaw(title, body, tag) {
-  await sendToAll({ title, body, tag });
+async function notifyRaw(title, body, tag, unidade) {
+  await sendToAll({ title, body, tag }, { unidade, section: 'monitor' });
 }
 
 module.exports = { addSubscription, removeSubscription, notify, notifyRaw, PUBLIC_KEY };

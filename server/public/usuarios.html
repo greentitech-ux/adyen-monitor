@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuários · Monitor Adyen</title>
 <meta name="theme-color" content="#0b0d10">
 <style>
@@ -16,7 +17,9 @@
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
@@ -69,8 +72,10 @@
     <div class="eyebrow">Solutions Ti Tech · Adyen</div>
     <h1>Usuários e permissões</h1>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
     <a class="back" href="/">📈 Monitor</a>
+    <a class="back" href="/lancamento.html">🧾 Fechamento</a>
+    <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back" href="/relatorios.html">📊 Relatórios</a>
     <a class="back" href="/cofre.html">🔐 Cofre</a>
     <button class="back" onclick="logout()">🚪 Sair</button>
@@ -100,7 +105,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Unidades (monitor/disputas)</legend>
+        <legend>Unidades (monitor/disputas/fechamentos/lançamento)</legend>
         <div class="checks" id="c-unidades"></div>
       </fieldset>
 
@@ -112,6 +117,17 @@
       <p class="err hidden" id="create-err"></p>
       <button type="submit" class="primary">Criar acesso</button>
     </form>
+  </div>
+
+  <div class="panel">
+    <h2>Backup do banco de dados</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Backup automático todo dia, guardado no Storage por 30 dias. Use "Fazer backup agora" antes de qualquer mudança grande, por segurança.</p>
+    <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
+    <p class="ok-msg hidden" id="backup-msg" style="margin-top:10px;"></p>
+    <table style="margin-top:14px;">
+      <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
+      <tbody id="backups-body"></tbody>
+    </table>
   </div>
 </div>
 
@@ -151,7 +167,8 @@ window.fetch = (url, opts = {}) => {
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'] ];
+const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];
 let VAULT_SUBGROUPS = [];
@@ -201,12 +218,14 @@ async function boot(){
     fetch('/api/vault/subgroups').then(r=>r.json()),
   ]);
   UNIDADES = unidades; VAULT_GROUPS = groups; VAULT_SUBGROUPS = subgroups;
+  UNIDADES.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
 
   document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
+  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
 
   await carregarUsuarios();
+  await carregarBackups();
 }
 
 async function carregarUsuarios(){
@@ -214,9 +233,43 @@ async function carregarUsuarios(){
   renderUsers();
 }
 
-function tagList(items){
+function fmtBytes(n){
+  if(!n) return '—';
+  if(n<1024) return n+' B';
+  if(n<1024*1024) return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(1)+' MB';
+}
+
+async function carregarBackups(){
+  const backups = await fetch('/api/backups').then(r=>r.json());
+  document.getElementById('backups-body').innerHTML = backups.length ? backups.map(b=>`
+    <tr><td>${escapeHtml(b.nome)}</td><td>${new Date(b.criadoEm).toLocaleString('pt-BR')}</td><td>${fmtBytes(b.tamanhoBytes)}</td></tr>
+  `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum backup ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+async function rodarBackupAgora(){
+  const btn = document.getElementById('btn-backup-run');
+  const msg = document.getElementById('backup-msg');
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/backups/run', { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao fazer backup');
+    msg.textContent = `Backup criado: ${data.registros} registros em ${data.colecoes} coleções.`;
+    msg.className = 'ok-msg';
+    await carregarBackups();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+}
+
+function tagList(items, labelFn){
   if(!items || !items.length) return '<span style="color:var(--muted);">—</span>';
-  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(i)}</span>`).join('')}</div>`;
+  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(labelFn?labelFn(i):i)}</span>`).join('')}</div>`;
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -235,7 +288,7 @@ function renderUsers(){
       <td><span class="badge ${u.role}">${u.role}</span></td>
       <td>${statusBadges}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
-      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades)}</td>
+      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
       <td>
         ${isMaster ? '' : `
@@ -269,7 +322,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     if(!res.ok) throw new Error(data.error || 'Erro ao criar acesso.');
     document.getElementById('create-form').reset();
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
+    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
     document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
@@ -283,7 +336,7 @@ function editarPermissoes(id){
   document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
   const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
   document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
-  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x, x=>x, new Set(perms.unidades));
+  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x.codigo, x=>x.nome, new Set(perms.unidades));
   document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');
