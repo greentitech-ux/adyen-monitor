@@ -107,7 +107,7 @@
 
 <header>
   <div>
-    <div class="eyebrow">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
+    <div class="eyebrow" id="eyebrow-grupos">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
     <h1>Fechamentos de caixa</h1>
     <div class="sub" id="sync-info">carregando...</div>
   </div>
@@ -142,8 +142,8 @@
     </div>
     <select id="f-grupo">
       <option value="">Todos os grupos</option>
-      <option value="ARCFOOD">ARCFOOD</option>
-      <option value="BRAVO">Grupo Bravo</option>
+      <option id="f-grupo-arcfood" value="ARCFOOD">ARCFOOD</option>
+      <option id="f-grupo-bravo" value="BRAVO">Grupo Bravo</option>
     </select>
     <div class="multiselect" id="ms-unidade">
       <button type="button" class="multiselect-btn" id="ms-unidade-btn">Todas as unidades</button>
@@ -229,6 +229,24 @@ const LIMIAR_SMALL_MULTIPLES = 6; // acima disso, facet em vez de multi-linha
 
 const SEL_UNIDADE = new Set();
 let UNIDADES_PERMITIDAS = null; // null = sem restrição (Master); senao, Set das unidades liberadas pro usuario
+let GRUPO_VISIVEL = { ARCFOOD:true, BRAVO:true }; // false quando o usuario nao tem nenhuma unidade do grupo
+
+// esconde qualquer mencao a um grupo (opcao no seletor, eyebrow, contagem no
+// sync-info) quando o usuario nao tem acesso a nenhuma unidade daquele grupo
+function atualizarVisibilidadeGrupos(){
+  GRUPO_VISIVEL.ARCFOOD = !UNIDADES_PERMITIDAS || GRUPOS.ARCFOOD.some(c=>UNIDADES_PERMITIDAS.has(c));
+  GRUPO_VISIVEL.BRAVO = !UNIDADES_PERMITIDAS || GRUPOS.BRAVO.some(c=>UNIDADES_PERMITIDAS.has(c));
+
+  document.getElementById('f-grupo-arcfood').classList.toggle('hidden', !GRUPO_VISIVEL.ARCFOOD);
+  document.getElementById('f-grupo-bravo').classList.toggle('hidden', !GRUPO_VISIVEL.BRAVO);
+  if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('f-grupo').value==='ARCFOOD') document.getElementById('f-grupo').value = '';
+  if(!GRUPO_VISIVEL.BRAVO && document.getElementById('f-grupo').value==='BRAVO') document.getElementById('f-grupo').value = '';
+
+  const nomes = ['Solutions Ti Tech'];
+  if(GRUPO_VISIVEL.ARCFOOD) nomes.push('ARCFOOD');
+  if(GRUPO_VISIVEL.BRAVO) nomes.push('Grupo Bravo');
+  document.getElementById('eyebrow-grupos').textContent = nomes.join(' · ');
+}
 
 function codigosDoGrupo(){
   const grupo = document.getElementById('f-grupo').value;
@@ -254,10 +272,12 @@ async function carregar(){
   const resp = await fetch('/api/fechamentos');
   DATA = await resp.json();
   const datas = DATA.map(d=>d.data).filter(Boolean).sort();
-  const qtdArcfood = DATA.filter(d=>d.grupo==='ARCFOOD').length;
-  const qtdBravo = DATA.filter(d=>d.grupo==='BRAVO').length;
+  const partesGrupo = [];
+  if(GRUPO_VISIVEL.ARCFOOD) partesGrupo.push(`${DATA.filter(d=>d.grupo==='ARCFOOD').length} ARCFOOD`);
+  if(GRUPO_VISIVEL.BRAVO) partesGrupo.push(`${DATA.filter(d=>d.grupo==='BRAVO').length} Grupo Bravo`);
+  const sufixoGrupo = partesGrupo.length ? ` (${partesGrupo.join(' · ')})` : '';
   document.getElementById('sync-info').textContent = datas.length
-    ? `${datas.length} fechamentos (${qtdArcfood} ARCFOOD · ${qtdBravo} Grupo Bravo) · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · sincronizado manualmente da planilha`
+    ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · sincronizado manualmente da planilha`
     : 'nenhum fechamento importado ainda';
   setupPresets(datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10));
   setupMultiselect();
@@ -772,6 +792,7 @@ async function boot(){
   const isMaster = me.role==='master';
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
+  atualizarVisibilidadeGrupos();
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
