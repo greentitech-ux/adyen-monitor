@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fechamentos de caixa · ARCFOOD</title>
 <meta name="theme-color" content="#0b0d10">
 <style>
@@ -16,7 +17,9 @@
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
@@ -108,7 +111,7 @@
     <h1>Fechamentos de caixa</h1>
     <div class="sub" id="sync-info">carregando...</div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
     <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
@@ -233,11 +236,12 @@ function codigosDoGrupo(){
 }
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function fmtMoneyCompact(v){
-  const abs = Math.abs(v||0);
-  if(abs>=1000000) return 'R$ '+(v/1000000).toFixed(1).replace('.',',')+'M';
-  if(abs>=1000) return 'R$ '+(v/1000).toFixed(1).replace('.',',')+'k';
-  return fmtMoney(v);
+// valor cheio (sem abreviar em K/M) pra eixos de gráfico - sem centavos, so pra
+// caber no espaço do eixo sem virar ilegível
+function fmtMoneyEixo(v){
+  const n = Math.round(v||0);
+  const sinal = n<0 ? '-' : '';
+  return sinal + 'R$ ' + Math.abs(n).toLocaleString('pt-BR');
 }
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
@@ -513,7 +517,7 @@ function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade){
   const svg = document.getElementById('fat-chart');
 
   const direct = unidades.length >= 4; // >=4 series: rotulo direto vira obrigatorio
-  const W=600,H=230,padL=48,padR=direct?92:10,padT=10,padB=24;
+  const W=600,H=230,padL=68,padR=direct?92:10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   let maxVal = 1;
@@ -526,7 +530,7 @@ function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade){
   const grid = [0,0.25,0.5,0.75,1].map(f=>{
     const y = padT+innerH*(1-f);
     return `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}"/>` +
-           `<text class="axis-label" x="2" y="${(y+3).toFixed(1)}">${fmtMoneyCompact(maxVal*f)}</text>`;
+           `<text class="axis-label" x="2" y="${(y+3).toFixed(1)}">${fmtMoneyEixo(maxVal*f)}</text>`;
   }).join('');
   const passoRotulo = Math.max(1, Math.ceil(n/8));
   const rotulosX = indicesRotulo(n, passoRotulo).map(i=>
@@ -617,7 +621,7 @@ function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidad
     }).join(' ');
     return `<div class="multiple-card">
       <div class="mc-title" title="${escapeHtml(UNIDADES_NOMES[u])}">${escapeHtml(UNIDADES_NOMES[u])}</div>
-      <div class="mc-total">${fmtMoneyCompact(total)}</div>
+      <div class="mc-total">${fmtMoney(total)}</div>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${cor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>`;
   }).join('')}</div>`;
@@ -639,7 +643,7 @@ function renderDiferencaChart(rows){
   dias.forEach(d=>porDia[d]=0);
   rows.forEach(r=>{ if(porDia[r.data]!==undefined) porDia[r.data] += r.diferenca||0; });
 
-  const W=600,H=230,padL=48,padR=10,padT=10,padB=24;
+  const W=600,H=230,padL=68,padR=10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   const maxAbs = Math.max(1, ...dias.map(d=>Math.abs(porDia[d])));
@@ -650,7 +654,7 @@ function renderDiferencaChart(rows){
   const grid = [-1,-0.5,0,0.5,1].map(f=>{
     const y = zeroY - f*(innerH/2);
     return `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}"/>` +
-      (f===0 ? '' : `<text class="axis-label" x="2" y="${(y+3).toFixed(1)}">${fmtMoneyCompact(maxAbs*f)}</text>`);
+      (f===0 ? '' : `<text class="axis-label" x="2" y="${(y+3).toFixed(1)}">${fmtMoneyEixo(maxAbs*f)}</text>`);
   }).join('') + `<text class="axis-label" x="2" y="${(zeroY+3).toFixed(1)}">R$ 0</text>`;
 
   const passoRotulo = Math.max(1, Math.ceil(n/8));

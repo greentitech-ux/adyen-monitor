@@ -18,6 +18,7 @@ const CAMPOS_NUMERICOS = [
   'caixaInicial', 'caixaFinal', 'delivery', 'carryout', 'pickup', 'loja',
   'adyen', 'ifood', 'food99', 'pix', 'pixCnpj', 'outros', 'totalSaida',
   'faturamento', 'totalDeclarado', 'quebra', 'tc', 'cancelados',
+  'entradaDinheiro', 'deposito',
 ];
 
 function num(v) {
@@ -25,7 +26,17 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function create({ unidade, unidadeNome, grupo, data, gerente, campos, observacao, criadoPorId, criadoPorEmail }) {
+// itens informativos (maquininhas e saidas de caixa detalhadas) - guardados
+// pra dar transparencia/auditoria, mas quem soma pro fechamento e o cliente
+// (campos.adyen e campos.totalSaida ja vem com a soma pronta)
+function sanitizarItens(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((item) => ({ descricao: String(item?.descricao || '').slice(0, 200), valor: num(item?.valor) }))
+    .filter((item) => item.descricao || item.valor);
+}
+
+async function create({ unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
 
@@ -40,6 +51,8 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, obse
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
   registro.diferenca = +(registro.totalDeclarado - registro.faturamento).toFixed(2);
   registro.observacao = observacao || null;
+  registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
+  registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
 
   const agora = new Date().toISOString();
   registro.criadoPorId = criadoPorId;

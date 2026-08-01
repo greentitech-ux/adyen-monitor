@@ -618,12 +618,12 @@ app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
 // que so o Master pode aprovar (fechamentosLive.js guarda o historico).
 app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, gerente, campos, observacao } = req.body;
+    const { unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await fechamentosLive.create({
-      unidade, unidadeNome, grupo, data, gerente, campos, observacao,
+      unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });

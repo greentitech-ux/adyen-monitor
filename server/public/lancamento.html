@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Lançamento de fechamento · Monitor Adyen</title>
 <meta name="theme-color" content="#0b0d10">
 <style>
@@ -16,46 +16,58 @@
     --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
   }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:20px 16px 60px;max-width:640px;margin-inline:auto;}
-  h1{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:0;}
-  h2{font-size:14px;font-weight:700;margin:0 0 12px;}
-  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
-  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;}
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:640px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
   .hidden{display:none!important;}
-  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
-  label{display:block;font-size:11.5px;color:var(--muted);margin:12px 0 4px;font-family:var(--mono);}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
   label:first-child{margin-top:0;}
-  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-size:14px;font-family:var(--sans);}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
-  textarea{resize:vertical;min-height:60px;}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;}
-  .grid2 label{grid-column:span 2;}
-  @media(min-width:420px){ .grid2 label.half{grid-column:span 1;} }
-  .btn-primary{width:100%;margin-top:18px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  textarea{resize:vertical;min-height:56px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-add:hover{border-color:var(--accent);}
+  .resumo{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:12.5px;display:flex;flex-direction:column;gap:4px;}
+  .resumo .linha{display:flex;justify-content:space-between;gap:8px;}
+  .resumo b{font-variant-numeric:tabular-nums;}
+  .resumo .dif.ok{color:var(--ok);} .resumo .dif.bad{color:var(--bad);}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
   .btn-primary:disabled{opacity:.5;cursor:default;}
-  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
   .msg.ok{background:var(--ok-dim);color:var(--ok);}
   .msg.err{background:var(--bad-dim);color:var(--bad);}
   .card{border-top:1px solid var(--line);padding:12px 0;}
   .card:first-child{border-top:none;padding-top:0;}
-  .card .linha1{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;}
-  .card .sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px;}
-  .card .valores{display:flex;gap:14px;margin-top:8px;font-size:12.5px;flex-wrap:wrap;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .card .valores{display:flex;gap:12px;margin-top:8px;font-size:12px;flex-wrap:wrap;}
   .card .valores b{color:var(--text);}
-  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
   .badge.PENDENTE{background:var(--warn-dim);color:var(--warn);}
   .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
   .badge.REJEITADO{background:var(--bad-dim);color:var(--bad);}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
   .overlay.hidden{display:none!important;}
-  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:18px 16px 24px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
-  .sheet h3{margin:0 0 4px;font-size:15px;}
-  .sheet .sub{font-size:11.5px;color:var(--muted);font-family:var(--mono);margin-bottom:14px;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
 </style>
 </head>
 <body>
@@ -78,64 +90,107 @@
 <div class="panel">
   <h2>Novo fechamento</h2>
   <form id="form-lancar">
-    <label>Unidade</label>
-    <select id="f-unidade" required></select>
 
-    <label>Data do fechamento</label>
-    <input type="date" id="f-data" required>
+    <div class="secao">
+      <div class="secao-titulo">Identificação</div>
+      <label>Unidade</label>
+      <select id="f-unidade" required></select>
 
-    <label>Gerente responsável</label>
-    <input type="text" id="f-gerente" placeholder="nome de quem fechou o caixa">
-
-    <div class="grid2">
-      <label class="half">Caixa inicial (R$)</label>
-      <label class="half">Caixa final (R$)</label>
-      <input class="half" type="number" step="0.01" id="f-caixaInicial">
-      <input class="half" type="number" step="0.01" id="f-caixaFinal">
-
-      <label class="half">Delivery</label>
-      <label class="half">Carryout</label>
-      <input class="half" type="number" step="0.01" id="f-delivery">
-      <input class="half" type="number" step="0.01" id="f-carryout">
-
-      <label class="half">Pickup</label>
-      <label class="half">Loja (salão)</label>
-      <input class="half" type="number" step="0.01" id="f-pickup">
-      <input class="half" type="number" step="0.01" id="f-loja">
-
-      <label class="half">Adyen (maquininha)</label>
-      <label class="half">iFood</label>
-      <input class="half" type="number" step="0.01" id="f-adyen">
-      <input class="half" type="number" step="0.01" id="f-ifood">
-
-      <label class="half">99Food</label>
-      <label class="half">Pix</label>
-      <input class="half" type="number" step="0.01" id="f-food99">
-      <input class="half" type="number" step="0.01" id="f-pix">
-
-      <label class="half">Pix CNPJ</label>
-      <label class="half">Outros</label>
-      <input class="half" type="number" step="0.01" id="f-pixCnpj">
-      <input class="half" type="number" step="0.01" id="f-outros">
-
-      <label class="half">Total de saída</label>
-      <label class="half">Faturamento total</label>
-      <input class="half" type="number" step="0.01" id="f-totalSaida">
-      <input class="half" type="number" step="0.01" id="f-faturamento">
-
-      <label class="half">Total declarado</label>
-      <label class="half">Quebra de caixa</label>
-      <input class="half" type="number" step="0.01" id="f-totalDeclarado">
-      <input class="half" type="number" step="0.01" id="f-quebra">
-
-      <label class="half">TC (tíquete médio)</label>
-      <label class="half">Cancelados</label>
-      <input class="half" type="number" step="0.01" id="f-tc">
-      <input class="half" type="number" step="0.01" id="f-cancelados">
+      <div class="grid2">
+        <div>
+          <label>Data do fechamento</label>
+          <input type="date" id="f-data" required>
+        </div>
+        <div>
+          <label>Gerente responsável</label>
+          <input type="text" id="f-gerente" placeholder="nome de quem fechou">
+        </div>
+      </div>
     </div>
 
-    <label>Observação (opcional)</label>
-    <textarea id="f-observacao" placeholder="qualquer detalhe do fechamento do dia"></textarea>
+    <div class="secao">
+      <div class="secao-titulo">Caixa</div>
+      <div class="grid2">
+        <div>
+          <label>Caixa inicial (R$)</label>
+          <input type="number" step="0.01" inputmode="decimal" id="f-caixaInicial">
+        </div>
+        <div>
+          <label>Caixa final (R$)</label>
+          <input type="number" step="0.01" inputmode="decimal" id="f-caixaFinal">
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label>Entrada em dinheiro</label>
+          <input type="number" step="0.01" inputmode="decimal" id="f-entradaDinheiro">
+        </div>
+        <div>
+          <label>Depósito</label>
+          <input type="number" step="0.01" inputmode="decimal" id="f-deposito">
+        </div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Canais de venda</div>
+      <div class="grid2">
+        <div><label>Delivery</label><input type="number" step="0.01" inputmode="decimal" id="f-delivery"></div>
+        <div><label>Carryout</label><input type="number" step="0.01" inputmode="decimal" id="f-carryout"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Pickup</label><input type="number" step="0.01" inputmode="decimal" id="f-pickup"></div>
+        <div><label>Loja (salão)</label><input type="number" step="0.01" inputmode="decimal" id="f-loja"></div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Formas de pagamento</div>
+      <div class="grid2">
+        <div><label>iFood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
+        <div id="wrap-food99"><label>99Food</label><input type="number" step="0.01" inputmode="decimal" id="f-food99"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Pix</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
+        <div><label>Pix CNPJ</label><input type="number" step="0.01" inputmode="decimal" id="f-pixCnpj"></div>
+      </div>
+      <label>Outros</label>
+      <input type="number" step="0.01" inputmode="decimal" id="f-outros">
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Maquininhas (cartão) <span id="maq-total" style="color:var(--text);"></span></div>
+      <div id="lista-maquinas"></div>
+      <button type="button" class="btn-add" onclick="adicionarMaquina()">+ Adicionar maquininha</button>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Saídas de caixa (sangrias) <span id="saida-total" style="color:var(--text);"></span></div>
+      <div id="lista-saidas"></div>
+      <button type="button" class="btn-add" onclick="adicionarSaida()">+ Adicionar saída</button>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Fechamento</div>
+      <div class="grid2">
+        <div><label>Faturamento total</label><input type="number" step="0.01" inputmode="decimal" id="f-faturamento"></div>
+        <div><label>Total declarado</label><input type="number" step="0.01" inputmode="decimal" id="f-totalDeclarado"></div>
+      </div>
+      <div class="grid2">
+        <div><label>TC (tíquete médio)</label><input type="number" step="0.01" inputmode="decimal" id="f-tc"></div>
+        <div><label>Cancelados</label><input type="number" step="0.01" inputmode="decimal" id="f-cancelados"></div>
+      </div>
+      <div class="resumo">
+        <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
+        <div class="linha"><span>Soma saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
+        <div class="linha"><span>Diferença (declarado − faturamento)</span><b id="resumo-diferenca" class="dif">R$ 0,00</b></div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <label>Observação (opcional)</label>
+      <textarea id="f-observacao" placeholder="qualquer detalhe do fechamento do dia"></textarea>
+    </div>
 
     <div class="msg hidden" id="msg"></div>
     <button class="btn-primary" type="submit" id="btn-enviar">Lançar fechamento</button>
@@ -179,17 +234,86 @@ window.fetch = (url, opts = {}) => {
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
-const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
-const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados'];
-const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Adyen', ifood:'iFood', food99:'99Food', pix:'Pix', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados' };
+// mesma lista de unidades/marcas usada em fechamentos.html - ARCFOOD usa
+// 99Food como canal de pagamento, o Grupo Bravo (Domino's/Spoleto/Milky Moo)
+// não usa. Fora essa diferença, a estrutura financeira é a mesma; o que muda
+// loja a loja é a quantidade de maquininhas e de sangrias no dia, por isso
+// essas duas seções são listas que a própria loja adiciona/remove.
+const ARCFOOD_UNIDADES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
+const BRAVO_UNIDADES = ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"];
+const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES };
+BRAVO_UNIDADES.forEach(u=>{ UNIDADES_NOMES[u] = u; });
+function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'BRAVO'; }
+
+const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
+const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'iFood', food99:'99Food', pix:'Pix', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
 
 let ME = null;
 let MEUS = [];
 let EDICOES = [];
 let EDITANDO_ID = null;
+let MAQUINAS = [];
+let SAIDAS = [];
+let SEQ = 0;
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
+// ---------- linhas repetíveis: maquininhas e saídas de caixa ----------
+function adicionarMaquina(valor){
+  MAQUINAS.push({ id: ++SEQ, descricao: `Maquininha ${MAQUINAS.length+1}`, valor: valor||'' });
+  renderMaquinas();
+}
+function removerMaquina(id){ MAQUINAS = MAQUINAS.filter(m=>m.id!==id); renderMaquinas(); }
+function renderMaquinas(){
+  document.getElementById('lista-maquinas').innerHTML = MAQUINAS.map(m=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(m.descricao)}" oninput="MAQUINAS.find(x=>x.id===${m.id}).descricao=this.value" placeholder="nome/identificação">
+      <input type="number" step="0.01" inputmode="decimal" value="${m.valor}" oninput="MAQUINAS.find(x=>x.id===${m.id}).valor=this.value; atualizarResumo();" placeholder="R$">
+      <button type="button" class="btn-remover" onclick="removerMaquina(${m.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma maquininha adicionada.</div>';
+  atualizarResumo();
+}
+function adicionarSaida(valor, descricao){
+  SAIDAS.push({ id: ++SEQ, descricao: descricao||'', valor: valor||'' });
+  renderSaidas();
+}
+function removerSaida(id){ SAIDAS = SAIDAS.filter(s=>s.id!==id); renderSaidas(); }
+function renderSaidas(){
+  document.getElementById('lista-saidas').innerHTML = SAIDAS.map(s=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(s.descricao)}" oninput="SAIDAS.find(x=>x.id===${s.id}).descricao=this.value" placeholder="motivo da saída">
+      <input type="number" step="0.01" inputmode="decimal" value="${s.valor}" oninput="SAIDAS.find(x=>x.id===${s.id}).valor=this.value; atualizarResumo();" placeholder="R$">
+      <button type="button" class="btn-remover" onclick="removerSaida(${s.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma saída registrada.</div>';
+  atualizarResumo();
+}
+
+function atualizarResumo(){
+  const somaMaquinas = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
+  const somaSaidas = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
+  document.getElementById('maq-total').textContent = somaMaquinas ? fmtMoney(somaMaquinas) : '';
+  document.getElementById('saida-total').textContent = somaSaidas ? fmtMoney(somaSaidas) : '';
+  document.getElementById('resumo-maquinas').textContent = fmtMoney(somaMaquinas);
+  document.getElementById('resumo-saidas').textContent = fmtMoney(somaSaidas);
+  const faturamento = num(document.getElementById('f-faturamento').value);
+  const declarado = num(document.getElementById('f-totalDeclarado').value);
+  const dif = +(declarado - faturamento).toFixed(2);
+  const elDif = document.getElementById('resumo-diferenca');
+  elDif.textContent = fmtMoney(dif);
+  elDif.className = 'dif ' + (Math.abs(dif) < 0.01 ? 'ok' : 'bad');
+}
+['f-faturamento','f-totalDeclarado'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', atualizarResumo);
+});
+
+function aplicarFranquia(unidade){
+  const grupo = grupoDaUnidade(unidade);
+  document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
+}
+document.getElementById('f-unidade').addEventListener('change', (ev)=>aplicarFranquia(ev.target.value));
 
 async function carregar(){
   const [meus, edicoes] = await Promise.all([
@@ -232,8 +356,6 @@ function renderLista(){
   }).join('');
 }
 
-function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
 function abrirEdicao(id){
   EDITANDO_ID = id;
   const f = MEUS.find(x=>x.id===id);
@@ -267,6 +389,15 @@ document.getElementById('form-edicao').addEventListener('submit', async (ev)=>{
   }
 });
 
+function resetarForm(){
+  document.getElementById('form-lancar').reset();
+  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
+  MAQUINAS = []; SAIDAS = [];
+  adicionarMaquina();
+  renderSaidas();
+  aplicarFranquia(document.getElementById('f-unidade').value);
+}
+
 document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const btn = document.getElementById('btn-enviar');
@@ -275,27 +406,37 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   btn.disabled = true;
   try{
     const unidade = document.getElementById('f-unidade').value;
+    const grupo = grupoDaUnidade(unidade);
     const campos = {};
-    CAMPOS_NUMERICOS.forEach(c=>{ campos[c] = document.getElementById('f-'+c).value; });
+    CAMPOS_NUMERICOS.forEach(c=>{
+      const el = document.getElementById('f-'+c);
+      campos[c] = el ? el.value : 0;
+    });
+    campos.adyen = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
+    campos.totalSaida = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
+    if(grupo!=='ARCFOOD') campos.food99 = 0;
+
     const body = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
-      grupo: ME.permissions?.unidades?.length ? 'MANUAL' : 'MANUAL',
+      grupo,
       data: document.getElementById('f-data').value,
       gerente: document.getElementById('f-gerente').value,
       campos,
       observacao: document.getElementById('f-observacao').value,
+      detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
+      detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
     const res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao lançar');
     msg.textContent = 'Fechamento lançado com sucesso.'; msg.className = 'msg ok';
-    document.getElementById('form-lancar').reset();
-    document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
+    resetarForm();
     await carregar();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
   }finally{
+    msg.classList.remove('hidden');
     btn.disabled = false;
   }
 });
@@ -316,10 +457,13 @@ async function boot(){
   const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
   const selUnidade = document.getElementById('f-unidade');
   selUnidade.innerHTML = unidades.length
-    ? unidades.map(u=>`<option value="${u}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
   document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
   document.getElementById('f-data').max = new Date().toISOString().slice(0,10);
+  adicionarMaquina();
+  renderSaidas();
+  aplicarFranquia(selUnidade.value);
 
   document.getElementById('root').classList.remove('hidden');
   await carregar();

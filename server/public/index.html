@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monitor Adyen · ao vivo</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
@@ -17,7 +18,9 @@
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
@@ -209,7 +212,7 @@
     <div class="eyebrow">Solutions Ti Tech · Adyen</div>
     <h1>Monitor de transações</h1>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
     <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
     <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
