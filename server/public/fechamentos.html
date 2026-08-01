@@ -517,11 +517,12 @@ function renderFaturamentoChart(rows){
 }
 
 function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade){
-  container.innerHTML = `<svg id="fat-chart" class="chart-svg" viewBox="0 0 600 230" preserveAspectRatio="none"></svg>`;
+  const W = Math.max(1, Math.round(container.getBoundingClientRect().width)) || 600;
+  container.innerHTML = `<svg id="fat-chart" class="chart-svg" viewBox="0 0 ${W} 230" preserveAspectRatio="none"></svg>`;
   const svg = document.getElementById('fat-chart');
 
   const direct = unidades.length >= 4; // >=4 series: rotulo direto vira obrigatorio
-  const W=600,H=230,padL=68,padR=direct?92:10,padT=10,padB=24;
+  const H=230,padL=68,padR=direct?92:10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   let maxVal = 1;
@@ -647,7 +648,9 @@ function renderDiferencaChart(rows){
   dias.forEach(d=>porDia[d]=0);
   rows.forEach(r=>{ if(porDia[r.data]!==undefined) porDia[r.data] += r.diferenca||0; });
 
-  const W=600,H=230,padL=68,padR=10,padT=10,padB=24;
+  const W = Math.max(1, Math.round(svg.getBoundingClientRect().width)) || 600;
+  svg.setAttribute('viewBox', `0 0 ${W} 230`);
+  const H=230,padL=68,padR=10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   const maxAbs = Math.max(1, ...dias.map(d=>Math.abs(porDia[d])));
@@ -755,6 +758,12 @@ function render(){
   renderUnidadesTable(rows);
   renderTabela(rows);
 }
+
+let resizeTimer = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{ renderFaturamentoChart(filtrar()); renderDiferencaChart(filtrar()); }, 150);
+});
 
 async function boot(){
   const res = await fetch('/api/me');
