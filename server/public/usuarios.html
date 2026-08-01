@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Usuários · Monitor Adyen</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;}
+  .back:hover{color:var(--text);border-color:var(--accent);}
+  .hidden{display:none!important;}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  .panel h2{font-size:13px;margin:0 0 14px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
+  tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;}
+  .badge.master{background:var(--warn-dim);color:var(--warn);}
+  .badge.user{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
+  .badge.on{background:var(--ok-dim);color:var(--ok);}
+  .badge.off{background:var(--bad-dim);color:var(--bad);}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:280px;}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
+  .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
+  .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .rowacts button:hover{border-color:var(--accent);}
+  form.create{display:flex;flex-direction:column;gap:10px;max-width:520px;}
+  form.create label{font-size:11.5px;color:var(--muted);}
+  form.create input{width:100%;margin-top:4px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
+  fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;}
+  legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;padding:0 6px;}
+  .checks{display:flex;flex-wrap:wrap;gap:10px;}
+  .checks label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text);white-space:nowrap;}
+  .checks input{width:auto;margin:0;}
+  button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;align-self:flex-start;}
+  .err{color:var(--bad);font-size:11.5px;}
+  .ok-msg{color:var(--ok);font-size:11.5px;}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:480px;}
+  .modal h3{margin:0 0 14px;font-size:14px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+    <h1>Usuários e permissões</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back" href="/">📈 Monitor</a>
+    <a class="back" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back" href="/cofre.html">🔐 Cofre</a>
+    <button class="back" onclick="logout()">🚪 Sair</button>
+  </div>
+</header>
+
+<div id="sem-acesso" class="empty hidden">Só o acesso Master pode gerenciar usuários.</div>
+
+<div id="root" class="hidden">
+  <div class="panel">
+    <h2>Acessos cadastrados</h2>
+    <table>
+      <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Grupos do cofre</th><th></th></tr></thead>
+      <tbody id="users-body"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Criar novo acesso</h2>
+    <form class="create" id="create-form">
+      <label>Email<input type="email" id="c-email" required></label>
+      <label>Senha temporária (mín. 8 caracteres)<input type="text" id="c-password" required minlength="8"></label>
+
+      <fieldset>
+        <legend>Seções</legend>
+        <div class="checks" id="c-sections"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Unidades (monitor/disputas)</legend>
+        <div class="checks" id="c-unidades"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grupos do cofre</legend>
+        <div class="checks" id="c-groups"></div>
+      </fieldset>
+
+      <p class="err hidden" id="create-err"></p>
+      <button type="submit" class="primary">Criar acesso</button>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="perm-overlay">
+  <form class="modal" id="perm-form">
+    <h3 id="perm-title">Editar permissões</h3>
+    <fieldset>
+      <legend>Seções</legend>
+      <div class="checks" id="p-sections"></div>
+    </fieldset>
+    <fieldset style="margin-top:10px;">
+      <legend>Unidades</legend>
+      <div class="checks" id="p-unidades"></div>
+    </fieldset>
+    <fieldset style="margin-top:10px;">
+      <legend>Grupos do cofre</legend>
+      <div class="checks" id="p-groups"></div>
+    </fieldset>
+    <p class="err hidden" id="perm-err"></p>
+    <div class="modal-actions">
+      <button type="button" id="perm-cancel">Cancelar</button>
+      <button type="submit" class="primary">Salvar permissões</button>
+    </div>
+  </form>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'] ];
+let UNIDADES = [];
+let VAULT_GROUPS = [];
+let USERS = [];
+let EDITING_USER = null;
+
+function checksHtml(name, options, valueFn, labelFn, checkedSet){
+  return options.map(opt=>{
+    const value = valueFn(opt), label = labelFn(opt);
+    const checked = checkedSet.has(value) ? 'checked' : '';
+    return `<label><input type="checkbox" name="${name}" value="${value}" ${checked}> ${label}</label>`;
+  }).join('') || `<span style="color:var(--muted);font-size:11.5px;">Nenhuma opção disponível ainda.</span>`;
+}
+function readChecked(container){
+  return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+}
+
+async function boot(){
+  const meRes = await fetch('/api/me');
+  if(!meRes.ok){ logout(); return; }
+  const me = await meRes.json();
+  if(me.role!=='master'){ document.getElementById('sem-acesso').classList.remove('hidden'); return; }
+  document.getElementById('root').classList.remove('hidden');
+
+  const [unidades, groups] = await Promise.all([
+    fetch('/api/meta/unidades').then(r=>r.json()),
+    fetch('/api/vault/groups').then(r=>r.json()),
+  ]);
+  UNIDADES = unidades; VAULT_GROUPS = groups;
+
+  document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
+  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
+  document.getElementById('c-groups').innerHTML = checksHtml('groups', VAULT_GROUPS, g=>g.id, g=>g.name, new Set());
+
+  await carregarUsuarios();
+}
+
+async function carregarUsuarios(){
+  USERS = await fetch('/api/users').then(r=>r.json());
+  renderUsers();
+}
+
+function tagList(items){
+  if(!items || !items.length) return '<span style="color:var(--muted);">—</span>';
+  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(i)}</span>`).join('')}</div>`;
+}
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderUsers(){
+  const tbody = document.getElementById('users-body');
+  tbody.innerHTML = USERS.map(u=>{
+    const perms = u.permissions || {sections:[],unidades:[],vaultGroups:[]};
+    const groupNames = (perms.vaultGroups||[]).map(id => VAULT_GROUPS.find(g=>g.id===id)?.name || id);
+    const isMaster = u.role==='master';
+    return `
+    <tr>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class="badge ${u.role}">${u.role}</span></td>
+      <td><span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span></td>
+      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
+      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades)}</td>
+      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(groupNames)}</td>
+      <td>
+        ${isMaster ? '' : `
+        <div class="rowacts">
+          <button type="button" onclick="editarPermissoes('${u.id}')">Permissões</button>
+          <button type="button" onclick="resetarSenha('${u.id}')">Nova senha</button>
+          <button type="button" onclick="alternarAtivo('${u.id}', ${!u.active})">${u.active?'Desativar':'Ativar'}</button>
+          <button type="button" onclick="excluirUsuario('${u.id}','${escapeHtml(u.email)}')">Excluir</button>
+        </div>`}
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
+}
+
+document.getElementById('create-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('create-err');
+  errEl.classList.add('hidden');
+  const payload = {
+    email: document.getElementById('c-email').value,
+    password: document.getElementById('c-password').value,
+    permissions: {
+      sections: readChecked(document.getElementById('c-sections')),
+      unidades: readChecked(document.getElementById('c-unidades')),
+      vaultGroups: readChecked(document.getElementById('c-groups')),
+    },
+  };
+  try{
+    const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao criar acesso.');
+    document.getElementById('create-form').reset();
+    document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
+    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u, u=>u, new Set());
+    document.getElementById('c-groups').innerHTML = checksHtml('groups', VAULT_GROUPS, g=>g.id, g=>g.name, new Set());
+    await carregarUsuarios();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+const permOverlay = document.getElementById('perm-overlay');
+function editarPermissoes(id){
+  const u = USERS.find(x=>x.id===id);
+  if(!u) return;
+  EDITING_USER = id;
+  document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
+  const perms = u.permissions || {sections:[],unidades:[],vaultGroups:[]};
+  document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
+  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x, x=>x, new Set(perms.unidades));
+  document.getElementById('p-groups').innerHTML = checksHtml('groups', VAULT_GROUPS, g=>g.id, g=>g.name, new Set(perms.vaultGroups));
+  document.getElementById('perm-err').classList.add('hidden');
+  permOverlay.classList.add('show');
+}
+document.getElementById('perm-cancel').addEventListener('click', ()=>permOverlay.classList.remove('show'));
+permOverlay.addEventListener('click', (e)=>{ if(e.target===permOverlay) permOverlay.classList.remove('show'); });
+
+document.getElementById('perm-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('perm-err');
+  const permissions = {
+    sections: readChecked(document.getElementById('p-sections')),
+    unidades: readChecked(document.getElementById('p-unidades')),
+    vaultGroups: readChecked(document.getElementById('p-groups')),
+  };
+  try{
+    const res = await fetch('/api/users/'+EDITING_USER+'/permissions', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({permissions})});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+    permOverlay.classList.remove('show');
+    await carregarUsuarios();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+async function resetarSenha(id){
+  const nova = prompt('Nova senha temporária (mín. 8 caracteres):');
+  if(!nova) return;
+  const res = await fetch('/api/users/'+id+'/reset-password', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:nova})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao trocar senha.'); return; }
+  alert('Senha atualizada.');
+}
+
+async function alternarAtivo(id, active){
+  await fetch('/api/users/'+id+'/active', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
+  await carregarUsuarios();
+}
+
+async function excluirUsuario(id, email){
+  if(!confirm(`Excluir o acesso de ${email}?`)) return;
+  await fetch('/api/users/'+id, {method:'DELETE'});
+  await carregarUsuarios();
+}
+
+boot();
+</script>
+</body>
+</html>

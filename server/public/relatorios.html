@@ -20,8 +20,6 @@
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-  a.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);}
-  a.back:hover{color:var(--text);border-color:var(--accent);}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
   .tab{font-family:var(--mono);font-size:11.5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .tab.active{border-color:var(--accent);color:var(--accent);background:#132029;}
@@ -45,6 +43,9 @@
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
   select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--sans);}
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+  .hidden{display:none!important;}
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
   .count{font-family:var(--mono);color:var(--muted);font-size:12px;margin-left:8px;}
 </style>
 </head>
@@ -55,13 +56,34 @@
     <div class="eyebrow">Solutions Ti Tech · Adyen</div>
     <h1>Relatórios de disputa</h1>
   </div>
-  <a class="back" href="/">← Voltar ao monitor</a>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
+  </div>
 </header>
 
+<div id="sem-acesso" class="empty hidden">Você não tem acesso aos Relatórios de disputa. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
 <div class="tabs" id="tabs"></div>
 <div class="cards" id="cards"></div>
+</div>
 
 <script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+
 const STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA'];
 let DISPUTES = [];
 let ORDERS_BY_ID = {};
@@ -162,7 +184,26 @@ async function atualizarStatus(id, status){
   await carregar();
 }
 
-carregar();
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  const me = await res.json();
+  const isMaster = me.role==='master';
+  const secoes = isMaster ? ['monitor','disputas','cofre'] : (me.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+
+  if(!secoes.includes('disputas')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+}
+
+boot();
 </script>
 </body>
 </html>

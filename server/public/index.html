@@ -97,8 +97,8 @@
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
   .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
   .btn-disputa:hover{border-color:var(--accent);}
-  a.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);}
-  a.back:hover{color:var(--text);border-color:var(--accent);}
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  .back:hover{color:var(--text);border-color:var(--accent);}
   .dispute-item{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;}
   .dispute-item .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
   .dispute-item .notas{font-size:12.5px;margin-top:6px;white-space:pre-wrap;}
@@ -154,9 +154,40 @@
   .timeline .arrow{color:var(--muted);}
   .timeline .step{display:flex;flex-direction:column;align-items:center;gap:2px;}
   .timeline .step .ts{color:var(--muted);font-size:9.5px;}
+  .hidden{display:none!important;}
+  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:100%;max-width:360px;}
+  .auth-card h1{font-size:16px;margin:0 0 4px;}
+  .auth-card label{display:block;margin-top:14px;font-size:12px;color:var(--muted);}
+  .auth-card input{width:100%;margin-top:5px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:var(--sans);font-size:13px;}
+  .auth-card button{width:100%;margin-top:18px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06121a;font-weight:700;font-size:13px;cursor:pointer;}
+  .auth-error{color:var(--bad);font-size:12px;margin-top:10px;}
+  .sem-acesso{max-width:420px;margin:80px auto;text-align:center;color:var(--muted);font-size:13px;}
 </style>
 </head>
 <body>
+
+<section id="auth-screen" class="auth-screen">
+  <form id="auth-form" class="auth-card">
+    <h1>🔒 Monitor Adyen</h1>
+    <p style="font-size:12px;margin:2px 0 0;color:var(--muted);">Entre com seu acesso</p>
+    <label>Email
+      <input type="email" id="auth-email" required autocomplete="email">
+    </label>
+    <label>Senha
+      <input type="password" id="auth-password" required autocomplete="current-password">
+    </label>
+    <p id="auth-error" class="auth-error hidden"></p>
+    <button type="submit">Entrar</button>
+  </form>
+</section>
+
+<div id="sem-acesso" class="sem-acesso hidden">
+  Seu acesso não tem nenhuma área liberada ainda.<br>Fale com o administrador (Master).
+  <div style="margin-top:14px;"><button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button></div>
+</div>
+
+<div id="app-root" class="hidden">
 
 <header>
   <div>
@@ -164,9 +195,12 @@
     <h1>Monitor de transações</h1>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
-    <a class="back" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
     <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <button class="back" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪 Sair</button>
     <div class="pulse" id="conn"><span class="dot"></span><span id="conn-txt">conectando...</span></div>
   </div>
 </header>
@@ -271,7 +305,92 @@
   </div>
 </div>
 
+</div><!-- /#app-root -->
+
 <script>
+// ---- autenticacao: login por conta (Master ou usuario com permissoes),
+// por DENTRO do Basic Auth que ja protege o site inteiro. O token fica no
+// localStorage e e anexado automaticamente em toda chamada pra /api/. ----
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+let ME = null;
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => {
+    if (res.status === 401 && url !== '/api/auth/login') { logout(); }
+    return res;
+  });
+};
+
+function logout(){
+  localStorage.removeItem('authToken');
+  AUTH_TOKEN = null; ME = null;
+  document.getElementById('app-root').classList.add('hidden');
+  document.getElementById('sem-acesso').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+function podeSecao(secao){
+  return ME && (ME.role==='master' || (ME.permissions?.sections||[]).includes(secao));
+}
+
+function aplicarNav(){
+  document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
+}
+
+async function tentarEntrar(){
+  if(!AUTH_TOKEN) return mostrarLogin();
+  const res = await _rawFetch('/api/me', { headers: { Authorization: 'Bearer '+AUTH_TOKEN } });
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  document.getElementById('auth-screen').classList.add('hidden');
+
+  if(!podeSecao('monitor')){
+    // essa pagina e o monitor - quem nao tem essa secao vai pra primeira que tiver
+    if(podeSecao('cofre')) return location.href='/cofre.html';
+    if(podeSecao('disputas')) return location.href='/relatorios.html';
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('sem-acesso').classList.add('hidden');
+  document.getElementById('app-root').classList.remove('hidden');
+  aplicarNav();
+  bootApp();
+}
+
+function mostrarLogin(){
+  document.getElementById('app-root').classList.add('hidden');
+  document.getElementById('sem-acesso').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+document.getElementById('auth-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const erroEl = document.getElementById('auth-error');
+  erroEl.classList.add('hidden');
+  try{
+    const res = await _rawFetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: document.getElementById('auth-email').value, password: document.getElementById('auth-password').value }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível entrar.');
+    AUTH_TOKEN = data.token;
+    localStorage.setItem('authToken', AUTH_TOKEN);
+    document.getElementById('auth-form').reset();
+    await tentarEntrar();
+  }catch(err){
+    erroEl.textContent = err.message;
+    erroEl.classList.remove('hidden');
+  }
+});
+
 let DATA = [];
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
@@ -1032,7 +1151,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
 let BOOT_ID = null;
 
 function connectStream(){
-  const es = new EventSource('/api/stream');
+  const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
   es.onopen = () => { document.getElementById('conn').classList.remove('off'); document.getElementById('conn-txt').textContent='ao vivo'; };
   es.onerror = () => { document.getElementById('conn').classList.add('off'); document.getElementById('conn-txt').textContent='reconectando...'; };
   es.addEventListener('hello', (e)=>{
@@ -1069,11 +1188,15 @@ function connectStream(){
   });
 }
 
-loadAll().then(connectStream);
+function bootApp(){
+  loadAll().then(connectStream);
 
-// reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
-// tempo, mesmo quando nao chega nenhum webhook novo nesse meio tempo
-setInterval(()=>{ limparNovosExpirados(); if(!COMENTARIO_EM_EDICAO) render(); }, 2000);
+  // reavalia periodicamente pra remover o destaque "NOVO" depois da janela de
+  // tempo, mesmo quando nao chega nenhum webhook novo nesse meio tempo
+  setInterval(()=>{ limparNovosExpirados(); if(!COMENTARIO_EM_EDICAO) render(); }, 2000);
+
+  initNotifBtn();
+}
 
 // ---- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----
 function urlBase64ToUint8Array(base64String) {
@@ -1116,14 +1239,16 @@ async function toggleNotifications(){
   updateNotifBtn(true);
 }
 
-(async function initNotifBtn(){
+async function initNotifBtn(){
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
     const reg = await navigator.serviceWorker.getRegistration('/sw.js');
     const sub = reg && await reg.pushManager.getSubscription();
     updateNotifBtn(!!sub);
   } catch(e) {}
-})();
+}
+
+tentarEntrar();
 </script>
 </body>
 </html>

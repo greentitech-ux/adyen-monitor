@@ -87,6 +87,23 @@ o resto do sistema não muda.
 Fraude é marcada separadamente (`fraudeSuspeita: true`) e pode aparecer em
 qualquer status - ela não substitui o status, é um alerta adicional.
 
+## Contas, permissões e Cofre de senhas
+
+Além do Basic Auth do site inteiro (`DASHBOARD_USER`/`DASHBOARD_PASSWORD`),
+o app tem seu próprio sistema de login (`JWT_SECRET`, `MASTER_EMAIL`,
+`MASTER_PASSWORD` no `.env`): o Master é criado automaticamente na primeira
+vez que o servidor sobe e, pela tela **Usuários** (`/usuarios.html`), cria
+outros acessos com permissões granulares:
+
+- **Seções**: `monitor` (este dashboard), `disputas` (`/relatorios.html`),
+  `cofre` (`/cofre.html`, senhas da equipe - URL, usuário, senha, observação,
+  organizadas em grupos/unidades, criptografadas com `ENCRYPTION_KEY`).
+- **Unidades**: filtra quais `merchantAccountCode` cada acesso vê no monitor
+  e nas disputas.
+- **Grupos do cofre**: quais grupos de senha cada acesso pode ver/gerenciar.
+
+Ver `server/auth.js`, `server/users.js` e `server/vault*.js`.
+
 ## Limitações honestas
 
 - O armazenamento é um arquivo JSON local (`data/transactions.json`) - ótimo
