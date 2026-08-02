@@ -478,7 +478,23 @@ document.getElementById('auth-form').addEventListener('submit', async (e)=>{
 let DATA = [];
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
-function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+const FUSO_BR = 'America/Sao_Paulo';
+function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR',{timeZone:FUSO_BR})+' '+d.toLocaleTimeString('pt-BR',{timeZone:FUSO_BR,hour:'2-digit',minute:'2-digit'}); }
+// Date "falso" cujos getters locais (getFullYear/getMonth/getDate/getHours...)
+// ja refletem o horario de Sao Paulo, independente do fuso configurado no
+// navegador/servidor - evita virar o dia errado perto da meia-noite quando o
+// ambiente roda em UTC (comum em hospedagem)
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function clientKeyOf(t){ return t.shopperReference || `${t.cardHolder||'desconhecido'}::${t.last4||'----'}`; }
 function soNumero(unidade){ return (unidade||'').replace(/\D/g,'') || '—'; }
 
@@ -839,7 +855,7 @@ function diasNoIntervalo(){
   const limite = new Date(end);
   let i = 0;
   while(cursor.getTime() <= limite.getTime() && i < 366){
-    dias.push(cursor.toISOString().slice(0,10));
+    dias.push(isoLocalBR(cursor));
     cursor.setDate(cursor.getDate()+1);
     i++;
   }
@@ -852,11 +868,11 @@ function diasNoIntervalo(){
 const TREND_DIAS = 14;
 function diasUltimos(n){
   const dias = [];
-  const cursor = new Date();
+  const cursor = agoraBrasilia();
   cursor.setHours(0,0,0,0);
   cursor.setDate(cursor.getDate() - (n-1));
   for(let i=0;i<n;i++){
-    dias.push(cursor.toISOString().slice(0,10));
+    dias.push(isoLocalBR(cursor));
     cursor.setDate(cursor.getDate()+1);
   }
   return dias;
@@ -1477,7 +1493,7 @@ function removerOfferClosedSuperado(pedidos){
 // botao "Hoje": reseta o periodo pro dia de hoje na hora, sem precisar
 // recarregar a pagina (util quando ja se navegou pra outras datas)
 function filtrarHoje(){
-  const hoje = new Date().toISOString().slice(0,10);
+  const hoje = hojeBrasilia();
   document.getElementById('f-date-start').value = hoje;
   document.getElementById('f-date-end').value = hoje;
   render();

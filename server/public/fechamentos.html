@@ -286,7 +286,7 @@ async function carregarStatusSincronizacao(){
     const status = await fetch('/api/fechamentos/sincronizacao').then(r=>r.json());
     if(status.ultimaEm){
       const dt = new Date(status.ultimaEm);
-      SYNC_INFO_SUFIXO = ` · planilhas sincronizadas automaticamente (última vez ${dt.toLocaleString('pt-BR')})`;
+      SYNC_INFO_SUFIXO = ` · planilhas sincronizadas automaticamente (última vez ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})})`;
     } else {
       SYNC_INFO_SUFIXO = ' · aguardando a 1ª sincronização automática com as planilhas';
     }
@@ -324,7 +324,7 @@ async function carregar(){
   document.getElementById('sync-info').textContent = datas.length
     ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
     : 'nenhum fechamento importado ainda';
-  const ontem = new Date(); ontem.setDate(ontem.getDate()-1);
+  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
   setupPresets(isoLocal(ontem)); // por padrao, referencia e sempre "ontem" (dia -1)
   setupMultiselect();
   render();
@@ -339,7 +339,7 @@ async function carregarEdicoes(){
   document.getElementById('edicoes-lista').innerHTML = pendentes.map(p=>`
     <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;">
       <div style="font-size:12.5px;font-weight:600;">${escapeHtml(p.unidadeNome||p.unidade)} · ${fmtData(p.data)}</div>
-      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR')}</div>
+      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</div>
       <div style="font-size:12px;margin-bottom:6px;">${Object.entries(p.mudancas).map(([campo,valor])=>`<div>${campo}: <b>${fmtMoney(valor)}</b></div>`).join('')}</div>
       <div style="font-size:12px;color:var(--text);margin-bottom:8px;white-space:pre-wrap;">${escapeHtml(p.motivo)}</div>
       <div style="display:flex;gap:8px;">
@@ -365,6 +365,19 @@ async function decidirEdicaoFechamento(id, status){
 // intervalo livre ----
 function pad2(n){ return String(n).padStart(2,'0'); }
 function isoLocal(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+// Date "falso" cujos getters locais ja refletem o horario de Sao Paulo,
+// independente do fuso do navegador/servidor - evita virar o dia errado
+// perto da meia-noite quando o ambiente roda em UTC (comum em hospedagem)
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
 
 function calcularPreset(tipo, refIso){
   const ref = new Date(refIso+'T00:00:00');
@@ -409,7 +422,7 @@ function setupPresets(refPadraoIso){
     // ao clicar num preset a referencia e sempre hoje (nao a data ja
     // selecionada) - Semana/Mes/Trimestre sempre voltam pro periodo atual
     btn.addEventListener('click', ()=>{
-      aplicarPreset(btn.dataset.tipo, isoLocal(new Date()), btn);
+      aplicarPreset(btn.dataset.tipo, isoLocal(agoraBrasilia()), btn);
     });
   });
 
@@ -498,7 +511,7 @@ function renderKpis(rows){
     const prevEnd = new Date(dStart); prevEnd.setDate(prevEnd.getDate()-1);
     const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate()-(dias-1));
     const grupo = document.getElementById('f-grupo').value;
-    const prevEndIso = prevEnd.toISOString().slice(0,10), prevStartIso = prevStart.toISOString().slice(0,10);
+    const prevEndIso = isoLocal(prevEnd), prevStartIso = isoLocal(prevStart);
     anteriores = DATA.filter(d=>
       (!grupo || d.grupo===grupo) &&
       (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
@@ -546,7 +559,7 @@ function diasNoIntervalo(start,end){
   const limite = new Date(end+'T00:00:00');
   let i=0;
   while(cursor.getTime()<=limite.getTime() && i<400){
-    dias.push(cursor.toISOString().slice(0,10));
+    dias.push(isoLocal(cursor));
     cursor.setDate(cursor.getDate()+1);
     i++;
   }
