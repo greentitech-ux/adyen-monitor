@@ -22,9 +22,17 @@
   h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
   h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
   .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
-  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
-  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
   .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
@@ -73,14 +81,19 @@
 <body>
 
 <header>
-  <div>
-    <div class="eyebrow">Solutions Ti Tech · Adyen</div>
-    <h1>Lançamento de fechamento</h1>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Solutions Ti Tech · Adyen</div>
+      <h1>Lançamento de fechamento</h1>
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
-    <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Entregas</a>
+  <div class="header-nav">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <button class="back" onclick="logout()">🚪 Sair</button>
+    <a class="back active" href="/lancamento.html">🧾 Fechamento</a>
+    <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Entregas</a>
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
   </div>
 </header>
 
