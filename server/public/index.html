@@ -366,7 +366,7 @@
 
 <div class="overlay" id="overlay">
   <div class="modal">
-    <h3 id="modal-title">Histórico do cliente</h3>
+    <h3 id="modal-title"></h3>
     <div id="modal-body"></div>
     <button class="close" onclick="document.getElementById('overlay').classList.remove('show')">Fechar</button>
   </div>
@@ -1311,10 +1311,19 @@ function populateFilters(){
 // nao ter que escapar aspas do pedidoId dentro do HTML gerado
 let CURRENT_MODAL_PEDIDO = null;
 
+function primeiroUltimoNome(nome){
+  const partes = String(nome||'').trim().split(/\s+/).filter(Boolean);
+  if(partes.length <= 2) return partes.join(' ');
+  return `${partes[0]} ${partes[partes.length-1]}`;
+}
+
 async function showClient(key, pedidoId, unidade){
   CURRENT_MODAL_PEDIDO = pedidoId ? { pedidoId, unidade } : null;
   const stats = await fetch('/api/clients/'+encodeURIComponent(key)).then(r=>r.json());
-  document.getElementById('modal-title').textContent = 'Histórico — ' + key;
+  const pedido = pedidoId ? DATA.find(d=>String(orderKeyOf(d))===String(pedidoId)) : null;
+  document.getElementById('modal-title').textContent = pedido
+    ? `${unidade||pedido.unidade||''} : ${primeiroUltimoNome(pedido.nomeCliente||pedido.cardHolder||'Cliente desconhecido')} | ${fmtMoney(pedido.valor)}`
+    : (unidade || key);
   document.getElementById('modal-body').innerHTML = `
     <div class="row"><span>Total de transações</span><b>${stats.total}</b></div>
     <div class="row"><span>Aprovadas</span><b style="color:var(--ok)">${stats.aprovadas}</b></div>
@@ -1515,6 +1524,31 @@ function removerOfferClosedSuperado(pedidos){
   });
 }
 
+  // protecao extra pros KPIs do topo (Transacoes / Taxa de aprovacao): mesmo
+  // antes da tag de FRAUDE "pegar" um pedido (a marcacao automatica pode
+  // levar um tempo pra escalar o cluster inteiro), uma identidade que ja
+  // acumulou mais de 4 tentativas no periodo filtrado e quase sempre um
+  // ataque em massa (varios cartoes testados pelo mesmo cliente, ex: casos
+  // reais de Gustavo Oliveira/Eduardo Rodrigues somando mais de 100 pedidos
+  // num unico dia) - entao so os 2 pedidos mais recentes dessa identidade
+  // contam nos KPIs, o resto fica de fora da soma (mas continua visivel
+  // normalmente na tabela de Transacoes e nos paineis de fraude)
+  function capearIdentidadesEmMassa(rows){
+    const porIdentidade = new Map();
+    rows.forEach(d=>{
+      const idKey = identidadeFraudeDoPedido(d);
+      if(!idKey) return;
+      (porIdentidade.get(idKey) || porIdentidade.set(idKey, []).get(idKey)).push(d);
+    });
+    const excluidos = new Set();
+    porIdentidade.forEach(grupo=>{
+      if(grupo.length <= 4) return;
+      const ordenado = [...grupo].sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+      ordenado.slice(2).forEach(d=>excluidos.add(orderKeyOf(d)));
+    });
+    return excluidos.size ? rows.filter(d=>!excluidos.has(orderKeyOf(d))) : rows;
+  }
+
   function render(){
       const period = periodFiltered();
       const periodUnidade = filtraPorUnidade(period);
@@ -1529,10 +1563,13 @@ function removerOfferClosedSuperado(pedidos){
         const info = fraudeInfoDoPedido(t);
         return !(info && info.nivel==='FRAUDE');
       });
-      renderKpis(computeSummary(semFraudeMarcada));
+      // segunda camada de protecao: cap de 2 pedidos por identidade quando
+      // ela passa de 4 tentativas no periodo (ver capearIdentidadesEmMassa)
+      const paraKpis = capearIdentidadesEmMassa(semFraudeMarcada);
+      renderKpis(computeSummary(paraKpis));
       renderAlerts(periodUnidadeStatus);
       renderTrendChart(filtraPorUnidade(DATA));
-      renderUnidadesTable(semFraudeMarcada);
+      renderUnidadesTable(paraKpis);
       renderOrdersChanged();
       renderChargebacks();
 
@@ -1668,21 +1705,15 @@ function removerOfferClosedSuperado(pedidos){
             const unidadeEsc = (d.unidade||'').replace(/'/g,"\\'");
             const chaveClienteEsc = (chaveCliente||'').replace(/'/g,"\\'");
             const nomeClienteEsc = (d.nomeCliente||d.cardHolder||'').replace(/'/g,"\\'");
-            // Suspeito (+ remover marcação, quando ja marcado) fica sob a
-            // coluna Nome do Cliente, junto com o comentário. Fraude fica
-            // sob Unidade quando o pedido foi Aprovado, ou sob Status pros
-            // demais status - assim o botão sempre aparece perto do dado
-            // que mais importa pra decidir (unidade quando passou, motivo
-            // do status quando não passou)
+            // Suspeito e Fraude ficam lado a lado, sob a coluna Data/Hora
             const fraudeRemoverHtml = infoFraude && infoFraude.direto
               ? `<div class="tx-comentario" onclick="event.stopPropagation(); removerMarcaFraude('${pedidoIdEsc}')">✕ remover marcação</div>`
               : '';
-            const fraudeSuspeitoHtml = (infoFraude && infoFraude.direto) ? '' :
-              `<div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0},'${d.status}')">⚠️ Suspeito</div>`;
-            const fraudeFraudeHtml = (infoFraude && infoFraude.direto) ? '' :
-              `<div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0},'${d.status}')">🚫 Fraude</div>`;
-            const fraudeNaUnidade = d.status==='APROVADO' ? fraudeFraudeHtml : '';
-            const fraudeNoStatus = d.status!=='APROVADO' ? fraudeFraudeHtml : '';
+            const fraudeAcoesHtml = (infoFraude && infoFraude.direto) ? '' :
+              `<div style="display:flex;gap:10px;">
+                <div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0},'${d.status}')">⚠️ Suspeito</div>
+                <div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0},'${d.status}')">🚫 Fraude</div>
+              </div>`;
             const fraudeBadge = !infoFraude ? '' : infoFraude.nivel==='FRAUDE'
               ? `<span class="flag" style="background:var(--bad-dim);color:var(--bad);">🚫 FRAUDE${infoFraude.direto?'':' (recorrente)'}</span>`
               : `<span class="flag" style="background:var(--warn-dim);color:var(--warn);">⚠️ SUSPEITO</span>`;
@@ -1691,10 +1722,10 @@ function removerOfferClosedSuperado(pedidos){
             const observacao = (d.status!=='APROVADO' && d.motivo) ? d.motivo : '—';
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}</td>
-                            <td class="valor">${soNumero(d.unidade)}${fraudeNaUnidade}</td>
-                                  <td title="${d.nomeCliente||''}">${d.nomeCliente||'—'}${comentarioHtml}${fraudeRemoverHtml}${fraudeSuspeitoHtml}</td>
-                                        <td class="statuscell" title="${d.status}">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${fraudeBadge}${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}${fraudeNoStatus}</td>
+                      <td>${fmtDT(d.dataHora)}${fraudeRemoverHtml}${fraudeAcoesHtml}</td>
+                            <td class="valor">${soNumero(d.unidade)}</td>
+                                  <td title="${d.nomeCliente||''}">${d.nomeCliente||'—'}${comentarioHtml}</td>
+                                        <td class="statuscell" title="${d.status}">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${fraudeBadge}${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
                                               <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
                                                     <td>${d.metodo||'—'}</td>
                                                           <td class="valor">${fmtMoney(d.valor)}</td>
