@@ -22,9 +22,20 @@
   @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
   .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
 
@@ -106,22 +117,30 @@
 <body>
 
 <header>
-  <div>
-    <div class="eyebrow" id="eyebrow-grupos">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
-    <h1>Fechamentos de caixa</h1>
-    <div class="sub" id="sync-info">carregando...</div>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow" id="eyebrow-grupos">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
+      <h1>Fechamentos de caixa</h1>
+      <div class="sub" id="sync-info">carregando...</div>
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <button class="back hidden" id="btn-sincronizar-planilhas" onclick="sincronizarPlanilhas()" style="cursor:pointer;">🔄 Sincronizar agora</button>
-    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
-    <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
-    <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
-    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    <button class="back" onclick="location.reload()" title="Atualizar página" style="cursor:pointer;">🔄 Atualizar</button>
-    <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
+  <div class="header-nav">
+    <div class="nav-links">
+      <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+      <a class="back active" id="nav-fechamentos-self" href="/fechamentos.html">💰 Fechamentos</a>
+      <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+      <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+      <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+      <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    </div>
+    <div class="nav-actions">
+      <button class="back hidden" id="btn-sincronizar-planilhas" onclick="sincronizarPlanilhas()" style="cursor:pointer;">🔄 Sincronizar agora</button>
+      <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
   </div>
 </header>
 
