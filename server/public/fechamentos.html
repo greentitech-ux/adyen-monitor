@@ -280,19 +280,27 @@ function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); retu
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
 // texto de "última sincronização" a partir do status que o backend guarda
-// (a sincronizacao com as planilhas do Sheets roda sozinha no servidor)
+// (a sincronizacao com as planilhas do Sheets roda sozinha no servidor) - so
+// mostra um resumo curto (sincronizou ou não) na tela; a mensagem de erro
+// completa (pode ser bem longa, tipo a da API do Google) fica so no title
+// (tooltip ao passar o mouse), pra nao poluir o cabeçalho
 async function carregarStatusSincronizacao(){
   try{
     const status = await fetch('/api/fechamentos/sincronizacao').then(r=>r.json());
-    if(status.ultimaEm){
+    if(status.ultimoErro){
+      SYNC_INFO_SUFIXO = ' · ⚠️ planilhas não sincronizadas';
+      SYNC_INFO_TITLE = `Falha na última tentativa de sincronização: ${status.ultimoErro}`;
+    } else if(status.ultimaEm){
       const dt = new Date(status.ultimaEm);
-      SYNC_INFO_SUFIXO = ` · planilhas sincronizadas automaticamente (última vez ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})})`;
+      SYNC_INFO_SUFIXO = ' · ✅ planilhas sincronizadas';
+      SYNC_INFO_TITLE = `Última sincronização automática: ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
     } else {
-      SYNC_INFO_SUFIXO = ' · aguardando a 1ª sincronização automática com as planilhas';
+      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização';
+      SYNC_INFO_TITLE = '';
     }
-    if(status.ultimoErro) SYNC_INFO_SUFIXO += ` — ⚠️ falha na última tentativa: ${status.ultimoErro}`;
   }catch(e){
     SYNC_INFO_SUFIXO = '';
+    SYNC_INFO_TITLE = '';
   }
 }
 
@@ -312,6 +320,7 @@ async function sincronizarPlanilhas(){
 }
 
 let SYNC_INFO_SUFIXO = '';
+let SYNC_INFO_TITLE = '';
 async function carregar(){
   const resp = await fetch('/api/fechamentos');
   DATA = await resp.json();
@@ -321,9 +330,11 @@ async function carregar(){
   if(GRUPO_VISIVEL.ARCFOOD) partesGrupo.push(`${DATA.filter(d=>d.grupo==='ARCFOOD').length} ARCFOOD`);
   if(GRUPO_VISIVEL.BRAVO) partesGrupo.push(`${DATA.filter(d=>d.grupo==='BRAVO').length} Grupo Bravo`);
   const sufixoGrupo = partesGrupo.length ? ` (${partesGrupo.join(' · ')})` : '';
-  document.getElementById('sync-info').textContent = datas.length
+  const elSyncInfo = document.getElementById('sync-info');
+  elSyncInfo.textContent = datas.length
     ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
     : 'nenhum fechamento importado ainda';
+  elSyncInfo.title = SYNC_INFO_TITLE;
   const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
   setupPresets(isoLocal(ontem)); // por padrao, referencia e sempre "ontem" (dia -1)
   setupMultiselect();
