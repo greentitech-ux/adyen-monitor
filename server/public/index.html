@@ -261,6 +261,7 @@
 <div class="panel">
   <h2>Transações <span class="n" id="tx-count"></span></h2>
   <div class="controls">
+    <button type="button" class="multiselect-btn" id="btn-hoje" onclick="filtrarHoje()" title="Volta o período pra hoje">Hoje</button>
     <div class="daterange">
       <input type="date" id="f-date-start" title="Data inicial">
       <span class="sep">até</span>
@@ -1473,12 +1474,17 @@ function removerOfferClosedSuperado(pedidos){
   }
 ['f-date-start','f-date-end','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 
-// padrao: ultimo dia (data inicial = data final = hoje)
-(function initDateRange(){
+// botao "Hoje": reseta o periodo pro dia de hoje na hora, sem precisar
+// recarregar a pagina (util quando ja se navegou pra outras datas)
+function filtrarHoje(){
   const hoje = new Date().toISOString().slice(0,10);
   document.getElementById('f-date-start').value = hoje;
   document.getElementById('f-date-end').value = hoje;
-})();
+  render();
+}
+
+// padrao: ultimo dia (data inicial = data final = hoje)
+filtrarHoje();
 
 // ---- som + vibração pra alertas críticos (fraude, chargeback, estorno) ----
 // nao depende de permissao de push nem de service worker - toca direto na
