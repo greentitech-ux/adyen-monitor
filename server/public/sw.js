@@ -2,7 +2,7 @@
 // (com som padrao do sistema) mesmo com a aba fechada.
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Monitor Adyen', body: 'Novo evento' };
+  let data = { title: 'Zenith Ops', body: 'Novo evento' };
   try {
     data = event.data.json();
   } catch (e) {

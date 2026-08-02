@@ -1,4 +1,4 @@
-# Monitor Adyen
+# Zenith Ops
 
 Backend que recebe os webhooks da Adyen em tempo real, normaliza os eventos
 (aprovado, recusado, fraude suspeita, estornado, falha no estorno, chargeback,

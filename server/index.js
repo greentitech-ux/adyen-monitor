@@ -56,7 +56,7 @@ if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
       const pass = rest.join(':');
       if (senhasIguais(user, DASHBOARD_USER) && senhasIguais(pass, DASHBOARD_PASSWORD)) return next();
     }
-    res.set('WWW-Authenticate', 'Basic realm="Monitor Adyen"');
+    res.set('WWW-Authenticate', 'Basic realm="Zenith Ops"');
     res.status(401).send('Autenticação necessária.');
   });
 } else {
@@ -745,7 +745,7 @@ app.use((err, req, res, next) => {
   await auth.ensureMaster(); // garante que existe um acesso Master pra logar
 
   app.listen(PORT, async () => {
-    console.log(`Monitor Adyen rodando em http://localhost:${PORT}`);
+    console.log(`Zenith Ops rodando em http://localhost:${PORT}`);
     console.log(`Webhook: POST http://localhost:${PORT}/webhooks/adyen`);
     const contas = Object.keys(HMAC_KEYS);
     if (contas.length) console.log(`HMAC configurada para: ${contas.join(', ')}`);
