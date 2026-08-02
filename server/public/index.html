@@ -383,6 +383,14 @@
   </div>
 </div>
 
+<div class="overlay" id="fraude-popup-overlay">
+  <div class="modal" style="width:min(420px,92vw);border-color:var(--bad);">
+    <h3 style="color:var(--bad);">🚫 Pedido recusado — suspeita de fraude</h3>
+    <div id="fraude-popup-info" style="font-size:13px;margin-top:6px;"></div>
+    <button type="button" class="btn-disputa" style="width:100%;margin-top:16px;padding:10px;font-size:13px;border-color:var(--bad);color:var(--bad);" onclick="fecharPopupFraude()">OK (<span id="fraude-popup-contagem">10</span>s)</button>
+  </div>
+</div>
+
 </div><!-- /#app-root -->
 
 <script>
@@ -1507,6 +1515,38 @@ filtrarHoje();
 // aba aberta, então funciona mesmo sem o usuario ter aceitado notificacoes.
 // navegadores bloqueiam audio antes de uma interacao do usuario, entao o
 // AudioContext so e criado/retomado no primeiro clique/tecla da pagina.
+// ---- popup de alerta pra pedido recusado com suspeita de fraude - fila (um
+// de cada vez) com fechamento automatico em 10s ou manual pelo OK ----
+const FILA_POPUP_FRAUDE = [];
+let POPUP_FRAUDE_TIMER = null;
+function enfileirarPopupFraude(tx){
+  FILA_POPUP_FRAUDE.push(tx);
+  if(FILA_POPUP_FRAUDE.length===1) mostrarPopupFraude();
+}
+function mostrarPopupFraude(){
+  const tx = FILA_POPUP_FRAUDE[0];
+  if(!tx) return;
+  document.getElementById('fraude-popup-info').innerHTML =
+    `${tx.nomeCliente||tx.cardHolder||'Cliente desconhecido'} · ${tx.unidade||'—'} · ${fmtMoney(tx.valor)}${tx.last4?(' · •• '+tx.last4):''}${tx.motivo?('<br><span style="color:var(--muted);font-size:12px;">'+tx.motivo+'</span>'):''}`;
+  document.getElementById('fraude-popup-overlay').classList.add('show');
+  tocarAlerta();
+  let restante = 10;
+  document.getElementById('fraude-popup-contagem').textContent = restante;
+  clearInterval(POPUP_FRAUDE_TIMER);
+  POPUP_FRAUDE_TIMER = setInterval(()=>{
+    restante--;
+    const el = document.getElementById('fraude-popup-contagem');
+    if(el) el.textContent = Math.max(restante,0);
+    if(restante<=0) fecharPopupFraude();
+  }, 1000);
+}
+function fecharPopupFraude(){
+  clearInterval(POPUP_FRAUDE_TIMER);
+  document.getElementById('fraude-popup-overlay').classList.remove('show');
+  FILA_POPUP_FRAUDE.shift();
+  if(FILA_POPUP_FRAUDE.length) mostrarPopupFraude();
+}
+
 const ALERT_STATUSES = new Set(['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','CHARGEBACK','CHARGEBACK_REVERTIDO','NOTIFICATION_OF_CHARGEBACK']);
 let AUDIO_CTX = null;
 function prepararAudio(){
@@ -1571,7 +1611,8 @@ function connectStream(){
     const tx = JSON.parse(e.data);
     DATA.push(tx);
     marcarNovo('tx:'+tx.pspReference);
-    if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
+    if(tx.status==='RECUSADO' && tx.fraudeSuspeita) enfileirarPopupFraude(tx);
+    else if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
     populateFilters(); render();
   });
   es.addEventListener('update', (e)=>{
