@@ -15,6 +15,7 @@ const disputes = require('./disputes');
 const fraudMarks = require('./fraudMarks');
 const fraudReport = require('./fraudReport');
 const alertReport = require('./alertReport');
+const fraudIdentity = require('./fraudIdentity');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
@@ -179,6 +180,31 @@ function hmacValid(item) {
   return hmac === sign;
 }
 
+// quando um cluster de identidade (fraudIdentity) e confirmado como fraude
+// (padrao de troca de cartao intensificou, ou ja existe outra marca FRAUDE
+// no mesmo cluster), qualquer marca SUSPEITO ainda ativa nesse cluster
+// tambem vira FRAUDE - "intensificou, muda a tag toda do grupo junto"
+async function escalarClusterParaFraude(nomes, motivo) {
+  if (!nomes || !nomes.length) return;
+  const nomesNorm = new Set(nomes.map(fraudMarks.normalizarNome));
+  const marcas = await fraudMarks.listAll();
+  const suspeitosDoCluster = marcas.filter((m) => m.nivel === 'SUSPEITO' && nomesNorm.has(fraudMarks.normalizarNome(m.clienteNome)));
+  for (const m of suspeitosDoCluster) {
+    const registro = await fraudMarks.marcar({
+      pedidoId: m.pedidoId,
+      unidade: m.unidade,
+      nivel: 'FRAUDE',
+      motivo,
+      clienteChave: m.clienteChave,
+      clienteNome: m.clienteNome,
+      statusPedido: m.statusPedido,
+      valor: m.valor,
+      marcadoPorEmail: 'deteccao-automatica@sistema',
+    });
+    broadcast('fraude-marcada', registro, 'monitor');
+  }
+}
+
 // ---------- endpoint de webhook ----------
 app.post('/webhooks/adyen', async (req, res) => {
   const items = req.body?.notificationItems || [];
@@ -217,6 +243,25 @@ app.post('/webhooks/adyen', async (req, res) => {
       }
     }
 
+    // identificador de pedido usado em todo o bloco de deteccao de fraude
+    // abaixo (mesmo calculo usado no resto do arquivo)
+    const pedidoIdAtual = tx.merchantReference || tx.originalReference || tx.pspReference;
+
+    // cruza o nome do cliente (shopper) com o nome impresso no cartao pra
+    // ligar pedidos de nomes "diferentes" que na verdade sao o mesmo anel
+    // de fraude (ex real: um pedido tem nomeCliente "Thais Mendes" e
+    // cardHolder "Luciano Jose"; outro tem nomeCliente "Luciano Silva" e
+    // cardHolder "Thais M Mendes" - os nomes se cruzam entre os campos).
+    // Todo o resto do bloco usa esse cluster como identidade, em vez de so
+    // o nome exato - ver fraudIdentity.js
+    const clusterInfo = fraudIdentity.registrarPedido(pedidoIdAtual, tx.nomeCliente, tx.cardHolder);
+
+    // a propria Adyen ja marca o pedido como suspeito de fraude
+    // (fraudResultType/totalFraudScore) - nesse caso NAO colocamos nossa
+    // TAG de FRAUDE por cima: duplicaria a mesma informacao nos relatorios.
+    // O objetivo da nossa deteccao e pegar o que a Adyen NAO pegou sozinha.
+    const jaFraudeNativaAdyen = !!tx.fraudeSuspeita;
+
     // mesmo cliente (mesmo nome) testando varios finais de cartao
     // DIFERENTES num intervalo curto -> padrao classico de cartao
     // clonado/roubado, com ou sem nenhuma aprovacao acontecer (um ataque
@@ -225,16 +270,21 @@ app.post('/webhooks/adyen', async (req, res) => {
     // fila do botao manual "Marcar fraude" - aparece no painel/monitor
     // sem precisar de ninguem clicar. So dispara uma vez por ataque (ver
     // cardHopping.js); as tentativas seguintes da mesma pessoa (podem ser
-    // muitas, em massa) entram sozinhas pela propagacao por nome logo
-    // abaixo, sem precisar de um motivo detalhado pra cada uma
-    if (tx.status === 'RECUSADO' || tx.status === 'APROVADO') {
-      const padraoTroca = cardHopping.registrarTentativa(tx);
+    // muitas, em massa) entram sozinhas pela propagacao por identidade
+    // logo abaixo, sem precisar de um motivo detalhado pra cada uma -
+    // e qualquer SUSPEITO ja existente no mesmo cluster de nomes escala
+    // pra FRAUDE junto (o padrao "intensificou" pro grupo inteiro)
+    if ((tx.status === 'RECUSADO' || tx.status === 'APROVADO') && !jaFraudeNativaAdyen) {
+      // conta cartoes distintos pelo CLUSTER (nomes cruzados), nao so pelo
+      // nome exato desse pedido - assim um ataque que troca de nome a cada
+      // tentativa (alem do cartao) tambem cruza o limiar
+      const chaveCardHopping = clusterInfo ? `${tx.unidade}:cluster:${clusterInfo.clusterId}` : undefined;
+      const padraoTroca = cardHopping.registrarTentativa(tx, chaveCardHopping);
       if (padraoTroca) {
         try {
-          const pedidoId = tx.merchantReference || tx.originalReference || tx.pspReference;
           const clienteNome = tx.nomeCliente || tx.cardHolder || null;
           const registro = await fraudMarks.marcar({
-            pedidoId,
+            pedidoId: pedidoIdAtual,
             unidade: tx.unidade,
             nivel: 'FRAUDE',
             motivo: `Detecção automática: ${padraoTroca.cartoesDistintos} finais de cartão diferentes testados pelo mesmo cliente em ${padraoTroca.janelaMinutos} min.`,
@@ -248,41 +298,46 @@ app.post('/webhooks/adyen', async (req, res) => {
           push.notifyRaw(
             `🚫 Fraude detectada automaticamente — ${tx.unidade || ''}`,
             `${clienteNome || 'Cliente'} testou ${padraoTroca.cartoesDistintos} cartões diferentes em pouco tempo`,
-            `fraude-auto-${pedidoId}`,
+            `fraude-auto-${pedidoIdAtual}`,
             tx.unidade
           );
+          if (clusterInfo) {
+            await escalarClusterParaFraude(clusterInfo.nomes, 'Escalado: padrão de troca de cartão confirmado no mesmo grupo de pedidos.');
+          }
         } catch (err) {
           console.error('Erro ao marcar fraude automática (troca de cartão):', err.message);
         }
       }
     }
 
-    // cliente ja identificado como fraude em algum pedido anterior (mesmo
-    // nome, MESMO SE trocar de bandeira/final de cartao) -> qualquer pedido
-    // novo dele tambem entra automaticamente como FRAUDE, sem precisar
-    // repetir o padrao de troca de cartao de novo. Preferimos alertar
-    // demais a deixar passar batido - o Master sempre pode remover a
-    // marcacao de um pedido especifico se for engano; o nome continua
-    // sendo monitorado pros proximos pedidos mesmo assim
-    {
-      const pedidoIdAtual = tx.merchantReference || tx.originalReference || tx.pspReference;
-      const nomeAtual = tx.nomeCliente || tx.cardHolder || null;
-      if (nomeAtual) {
-        try {
-          const marcasExistentes = await fraudMarks.listAll();
-          const nomeNormalizado = fraudMarks.normalizarNome(nomeAtual);
-          const jaConhecido = marcasExistentes.some(
-            (m) => m.nivel === 'FRAUDE' && fraudMarks.normalizarNome(m.clienteNome) === nomeNormalizado
-          );
-          const jaMarcadoNesse = marcasExistentes.some((m) => m.pedidoId === pedidoIdAtual);
-          if (jaConhecido && !jaMarcadoNesse) {
+    // identidade cruzada (cluster de nomes/cartoes ligados, ver acima): a
+    // partir do 2º pedido conectado no mesmo cluster ja marca SUSPEITO,
+    // mesmo sem repetir cartao - nao precisa esperar acumular varias
+    // tentativas iguais, o simples cruzamento de nome ja e o sinal. Se o
+    // cluster ja tem FRAUDE confirmada (por essa via ou pela troca de
+    // cartao acima, ou por marcacao manual), propaga pro pedido novo e
+    // escala qualquer SUSPEITO residual do mesmo grupo junto. Preferimos
+    // alertar demais a deixar passar batido - o Master sempre pode
+    // remover a marcacao de um pedido especifico se for engano.
+    if (clusterInfo) {
+      try {
+        const marcasExistentes = await fraudMarks.listAll();
+        const jaMarcadoNesse = marcasExistentes.some((m) => m.pedidoId === pedidoIdAtual);
+        const nomesClusterNorm = new Set(clusterInfo.nomes.map(fraudMarks.normalizarNome));
+        const marcaFraudeCluster = marcasExistentes.find(
+          (m) => m.nivel === 'FRAUDE' && nomesClusterNorm.has(fraudMarks.normalizarNome(m.clienteNome))
+        );
+        const clienteNome = tx.nomeCliente || tx.cardHolder || null;
+
+        if (marcaFraudeCluster) {
+          if (!jaMarcadoNesse && !jaFraudeNativaAdyen) {
             const registro = await fraudMarks.marcar({
               pedidoId: pedidoIdAtual,
               unidade: tx.unidade,
               nivel: 'FRAUDE',
-              motivo: 'Cliente já identificado como fraude em pedido(s) anterior(es) (mesmo nome, outro cartão).',
-              clienteChave: `nome:${nomeAtual}`,
-              clienteNome: nomeAtual,
+              motivo: 'Cliente já identificado como fraude (nome ou cartão relacionado a pedido(s) anterior(es)).',
+              clienteChave: clienteNome ? `nome:${clienteNome}` : null,
+              clienteNome,
               statusPedido: tx.status,
               valor: tx.valor,
               marcadoPorEmail: 'deteccao-automatica@sistema',
@@ -290,14 +345,28 @@ app.post('/webhooks/adyen', async (req, res) => {
             broadcast('fraude-marcada', registro, 'monitor');
             push.notifyRaw(
               `🚫 Fraude (cliente já conhecido) — ${tx.unidade || ''}`,
-              `${nomeAtual} já tinha pedido marcado como fraude antes`,
+              `${clienteNome || 'Cliente'} está ligado a pedido(s) já confirmado(s) como fraude`,
               `fraude-auto-${pedidoIdAtual}`,
               tx.unidade
             );
           }
-        } catch (err) {
-          console.error('Erro ao propagar marcação de fraude por nome:', err.message);
+          await escalarClusterParaFraude(clusterInfo.nomes, 'Escalado: outro pedido do mesmo grupo já confirmado como fraude.');
+        } else if (!jaMarcadoNesse && clusterInfo.totalPedidos >= 2) {
+          const registro = await fraudMarks.marcar({
+            pedidoId: pedidoIdAtual,
+            unidade: tx.unidade,
+            nivel: 'SUSPEITO',
+            motivo: `Nome ou cartão relacionado a outro pedido recente (grupo: ${clusterInfo.nomeRepresentativo || 'sem nome'}).`,
+            clienteChave: clienteNome ? `nome:${clienteNome}` : null,
+            clienteNome,
+            statusPedido: tx.status,
+            valor: tx.valor,
+            marcadoPorEmail: 'deteccao-automatica@sistema',
+          });
+          broadcast('fraude-marcada', registro, 'monitor');
         }
+      } catch (err) {
+        console.error('Erro ao processar identidade cruzada de fraude:', err.message);
       }
     }
 
