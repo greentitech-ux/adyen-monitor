@@ -13,8 +13,8 @@ function caminhoSeguro(nome) {
   return (nome || 'arquivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
-async function salvarArquivo(pedidoId, file) {
-  const caminho = `disputes/${caminhoSeguro(pedidoId)}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${caminhoSeguro(file.originalname)}`;
+async function salvarArquivo(pedidoId, file, pasta = 'disputes') {
+  const caminho = `${pasta}/${caminhoSeguro(pedidoId)}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${caminhoSeguro(file.originalname)}`;
   const blob = bucket.file(caminho);
   await blob.save(file.buffer, { contentType: file.mimetype || 'application/octet-stream' });
   return caminho;
