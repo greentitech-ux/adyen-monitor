@@ -285,13 +285,13 @@
   </div>
   <div class="tablewrap" id="tx-table-wrap" style="max-height:518px;">
     <table>
-      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th class="statuscell">Status</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
+      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th class="statuscell">Status</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th><th>Observação</th></tr></thead>
       <tbody id="tx-body"></tbody>
     </table>
   </div>
 </div>
 
-<div class="grid4" style="margin-top:16px;">
+<div class="grid3" style="margin-top:16px;">
   <div class="panel">
     <h2>Pedidos que mudaram de status <span class="n" id="orders-count"></span></h2>
     <div class="orders" id="orders"></div>
@@ -303,25 +303,36 @@
   </div>
 
   <div class="panel">
-    <h2>Alertas de falha / fraude <span class="n" id="alert-count"></span></h2>
-    <div class="alerts" id="alerts"></div>
-  </div>
-
-  <div class="panel">
     <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
     <div class="alerts" id="chargebacks"></div>
   </div>
 </div>
 
-<div class="panel" id="fraude-panel" style="margin-top:16px;">
-  <h2>
-    <span>🚩 Suspeitos e fraudes monitorados <span class="n" id="fraude-count"></span></span>
-    <span id="fraude-relatorio-btns" class="hidden" style="display:flex;gap:6px;">
-      <button type="button" class="btn-disputa" onclick="baixarRelatorioFraude('csv')">📄 Relatório CSV</button>
-      <button type="button" class="btn-disputa" onclick="baixarRelatorioFraude('pdf')">📄 Relatório PDF</button>
-    </span>
-  </h2>
-  <div class="alerts" id="fraude-monitor" style="max-height:320px;"></div>
+<!-- Alertas de falha/fraude e Suspeitos e fraudes monitorados ficam lado a
+     lado - os dois painéis de acompanhamento de fraude juntos, cada um com
+     seu próprio relatório CSV/PDF (Master) -->
+<div class="grid" style="margin-top:16px;">
+  <div class="panel">
+    <h2>
+      <span>Alertas de falha / fraude <span class="n" id="alert-count"></span></span>
+      <span id="alertas-relatorio-btns" class="hidden" style="display:flex;gap:6px;">
+        <button type="button" class="btn-disputa" onclick="baixarRelatorioAlertas('csv')">📄 Relatório CSV</button>
+        <button type="button" class="btn-disputa" onclick="baixarRelatorioAlertas('pdf')">📄 Relatório PDF</button>
+      </span>
+    </h2>
+    <div class="alerts" id="alerts" style="max-height:400px;"></div>
+  </div>
+
+  <div class="panel" id="fraude-panel">
+    <h2>
+      <span>🚩 Suspeitos e fraudes monitorados <span class="n" id="fraude-count"></span></span>
+      <span id="fraude-relatorio-btns" class="hidden" style="display:flex;gap:6px;">
+        <button type="button" class="btn-disputa" onclick="baixarRelatorioFraude('csv')">📄 Relatório CSV</button>
+        <button type="button" class="btn-disputa" onclick="baixarRelatorioFraude('pdf')">📄 Relatório PDF</button>
+      </span>
+    </h2>
+    <div class="alerts" id="fraude-monitor" style="max-height:400px;"></div>
+  </div>
 </div>
 
 <div class="panel hidden" id="refund-panel" style="margin-top:16px;">
@@ -447,6 +458,7 @@ function aplicarNav(){
   // que solicitou ve o status direto na linha do pedido dele
   document.getElementById('refund-panel').classList.toggle('hidden', ME.role!=='master');
   document.getElementById('fraude-relatorio-btns').classList.toggle('hidden', ME.role!=='master');
+  document.getElementById('alertas-relatorio-btns').classList.toggle('hidden', ME.role!=='master');
 }
 
 // relatorio de fraude (CSV/PDF) - resumo por cliente com quantidade de
@@ -455,6 +467,14 @@ function aplicarNav(){
 function baixarRelatorioFraude(formato){
   const params = new URLSearchParams({ token: AUTH_TOKEN });
   window.location.href = `/api/fraude/relatorio.${formato}?${params.toString()}`;
+}
+
+// relatorio do painel Alertas de falha/fraude (CSV/PDF) - mesmo esquema do
+// relatorio de fraude, so que pros alertas (recusas repetidas, Amex,
+// fraude suspeita nativa, fim de disputa). So o Master ve o botao.
+function baixarRelatorioAlertas(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  window.location.href = `/api/alertas/relatorio.${formato}?${params.toString()}`;
 }
 
 async function tentarEntrar(){
@@ -1068,6 +1088,15 @@ function identidadeFraudeDoPedido(d){
   const nome = (d.nomeCliente || d.cardHolder || '').trim().toLowerCase();
   return nome || null;
 }
+// pedidos RECUSADOS repetidos da mesma identidade tambem formam uma thread
+// na tabela de Transacoes (mesmo tratamento do painel de Alertas de
+// falha/fraude): guardado fora da funcao pra sobreviver aos re-renders
+let THREADS_RECUSADAS_EXPANDIDAS = new Set();
+function toggleThreadRecusadas(chave){
+  if(THREADS_RECUSADAS_EXPANDIDAS.has(chave)) THREADS_RECUSADAS_EXPANDIDAS.delete(chave);
+  else THREADS_RECUSADAS_EXPANDIDAS.add(chave);
+  render();
+}
 function detectarPedidosRepetidos(rows){
   const aprovadas = rows.filter(d=>d.status==='APROVADO').slice()
     .sort((a,b)=>(a.dataHora||'').localeCompare(b.dataHora||''));
@@ -1589,8 +1618,21 @@ function removerOfferClosedSuperado(pedidos){
             if(d.fraudeSuspeita) c.fraude++;
       });
 
-      document.getElementById('tx-count').textContent = rows.length+' / '+pedidosPeriodo.length;
-      document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
+      // pedidos RECUSADOS repetidos da mesma identidade (mesmo sem marcacao
+      // de fraude ainda) tambem formam uma thread: so o pedido mais recente
+      // vira linha na tabela, os anteriores ficam disponiveis so se
+      // expandir - evita uma linha por tentativa quando o mesmo cliente
+      // testa varios cartoes seguidos (mesmo tratamento ja usado no painel
+      // de Alertas de falha/fraude)
+      const recusadasPorIdentidade = new Map();
+      rows.forEach(d=>{
+            if(d.status!=='RECUSADO') return;
+            const idKey = identidadeFraudeDoPedido(d);
+            if(!idKey) return;
+            (recusadasPorIdentidade.get(idKey) || recusadasPorIdentidade.set(idKey, []).get(idKey)).push(d);
+      });
+
+      function linhaTransacao(d){
             // null quando o pedido nao tem cartao nem nome pra identificar o
             // cliente com segurança (Pix anonimo, comum hoje) - nesse caso as
             // colunas de contagem mostram "—" em vez de emprestar o numero de
@@ -1616,6 +1658,7 @@ function removerOfferClosedSuperado(pedidos){
               ? `<div class="tx-comentario-edit" onclick="event.stopPropagation()"><input type="text" id="comentario-input" value="${(d.comentario||'').replace(/"/g,'&quot;')}" placeholder="Comentário..." onkeydown="comentarioKeydown(event,'${pspEnc}','${eventEnc}')"><button type="button" onclick="salvarComentario('${pspEnc}','${eventEnc}')">✓</button><button type="button" onclick="cancelarEdicaoComentario()">✕</button></div>`
               : `<div class="tx-comentario" onclick="event.stopPropagation(); iniciarEdicaoComentario('${pspEnc}','${eventEnc}')">${d.comentario?('💬 '+d.comentario):'+ comentário'}</div>`;
             const refundReq = d.status==='APROVADO' ? REFUND_MARKERS[orderKeyOf(d)] : null;
+            // Solicitar estorno fica sob a coluna Valor (nao mais sob Data/Hora)
             const estornoHtml = d.status!=='APROVADO' ? '' : refundReq
               ? `<div class="tx-status-info" title="${(refundReq.observacao||'').replace(/"/g,'&quot;')}">💸 Estorno: ${refundReq.status}</div>`
               : `<div class="tx-comentario" onclick="event.stopPropagation(); abrirEstorno('${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">💸 Solicitar estorno</div>`;
@@ -1637,15 +1680,18 @@ function removerOfferClosedSuperado(pedidos){
             const fraudeBadge = !infoFraude ? '' : infoFraude.nivel==='FRAUDE'
               ? `<span class="flag" style="background:var(--bad-dim);color:var(--bad);">🚫 FRAUDE${infoFraude.direto?'':' (recorrente)'}</span>`
               : `<span class="flag" style="background:var(--warn-dim);color:var(--warn);">⚠️ SUSPEITO</span>`;
+            // resposta/observacao da Adyen (motivo da recusa, do estorno etc.) -
+            // so faz sentido pra quem nao foi aprovado
+            const observacao = (d.status!=='APROVADO' && d.motivo) ? d.motivo : '—';
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}${fraudeRemoverHtml}${fraudeSuspeitoHtml}</td>
+                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${fraudeRemoverHtml}${fraudeSuspeitoHtml}</td>
                             <td class="valor">${soNumero(d.unidade)}${fraudeFraudeHtml}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
                                         <td class="statuscell" title="${d.status}">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${fraudeBadge}${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
                                               <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
                                                     <td>${d.metodo||'—'}</td>
-                                                          <td class="valor">${fmtMoney(d.valor)}</td>
+                                                          <td class="valor">${fmtMoney(d.valor)}${estornoHtml}</td>
                                                                 <td>${d.last4?('•• '+d.last4):'—'}</td>
                                                                       <td class="valor">${c?c.total:'—'}</td>
                                                                             <td class="valor">${c?c.aprovadas:'—'}</td>
@@ -1653,8 +1699,29 @@ function removerOfferClosedSuperado(pedidos){
                                                                                         <td class="valor">${c?c.estornadas:'—'}</td>
                                                                                               <td class="valor">${c?c.fraude:'—'}</td>
                                                                                                     <td class="truncate" title="${d.bancoEmissor||''}">${d.bancoEmissor||'—'}</td>
-                                                                                                        </tr>
-                                                                                                          `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
+                                                                                                          <td class="truncate" title="${observacao}">${observacao}</td>
+                                                                                                              </tr>
+                                                                                                                `;
+      }
+
+      document.getElementById('tx-count').textContent = rows.length+' / '+pedidosPeriodo.length;
+      document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
+            const idKey = d.status==='RECUSADO' ? identidadeFraudeDoPedido(d) : null;
+            const grupo = idKey ? recusadasPorIdentidade.get(idKey) : null;
+            if(grupo && grupo.length>=2){
+              const ordenado = [...grupo].sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+              // so o representante (mais recente do grupo) vira linha - os
+              // demais ficam escondidos ate esse representante ser expandido
+              if(orderKeyOf(d) !== orderKeyOf(ordenado[0])) return '';
+              const expandido = THREADS_RECUSADAS_EXPANDIDAS.has(idKey);
+              const restante = ordenado.slice(1);
+              const linhaToggle = `<tr class="thread-toggle"><td colspan="15" style="padding:6px 10px;background:var(--panel2);">
+                <button type="button" class="btn-disputa" onclick="event.stopPropagation(); toggleThreadRecusadas('${idKey.replace(/'/g,"\\'")}')">${expandido?'▾ Ocultar':'▸ Ver'} as ${ordenado.length} tentativas recusadas de ${d.nomeCliente||d.cardHolder||'cliente'}</button>
+              </td></tr>`;
+              return linhaTransacao(d) + linhaToggle + (expandido ? restante.map(o=>linhaTransacao(o)).join('') : '');
+            }
+            return linhaTransacao(d);
+      }).join('') : '<tr><td colspan="15" class="empty">Nenhuma transação encontrada.</td></tr>';
       if(COMENTARIO_EM_EDICAO){
         const input = document.getElementById('comentario-input');
         if(input){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }

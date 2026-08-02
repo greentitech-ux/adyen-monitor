@@ -14,6 +14,7 @@ const cardHopping = require('./cardHopping');
 const disputes = require('./disputes');
 const fraudMarks = require('./fraudMarks');
 const fraudReport = require('./fraudReport');
+const alertReport = require('./alertReport');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
@@ -216,11 +217,16 @@ app.post('/webhooks/adyen', async (req, res) => {
       }
     }
 
-    // mesmo cliente (mesmo nome) testando varios finais de cartao DIFERENTES
-    // ate um aprovar, num intervalo curto -> padrao classico de cartao
-    // clonado/roubado. Quando detecta, marca o pedido aprovado como FRAUDE
-    // automaticamente, na mesma fila do botao manual "Marcar fraude" -
-    // aparece no painel/monitor sem precisar de ninguem clicar
+    // mesmo cliente (mesmo nome) testando varios finais de cartao
+    // DIFERENTES num intervalo curto -> padrao classico de cartao
+    // clonado/roubado, com ou sem nenhuma aprovacao acontecer (um ataque
+    // 100% recusado e igualmente suspeito). Quando detecta, marca o
+    // pedido que cruzou o limiar como FRAUDE automaticamente, na mesma
+    // fila do botao manual "Marcar fraude" - aparece no painel/monitor
+    // sem precisar de ninguem clicar. So dispara uma vez por ataque (ver
+    // cardHopping.js); as tentativas seguintes da mesma pessoa (podem ser
+    // muitas, em massa) entram sozinhas pela propagacao por nome logo
+    // abaixo, sem precisar de um motivo detalhado pra cada uma
     if (tx.status === 'RECUSADO' || tx.status === 'APROVADO') {
       const padraoTroca = cardHopping.registrarTentativa(tx);
       if (padraoTroca) {
@@ -231,7 +237,7 @@ app.post('/webhooks/adyen', async (req, res) => {
             pedidoId,
             unidade: tx.unidade,
             nivel: 'FRAUDE',
-            motivo: `Detecção automática: ${padraoTroca.cartoesDistintos} finais de cartão diferentes testados pelo mesmo cliente em ${padraoTroca.janelaMinutos} min antes de aprovar.`,
+            motivo: `Detecção automática: ${padraoTroca.cartoesDistintos} finais de cartão diferentes testados pelo mesmo cliente em ${padraoTroca.janelaMinutos} min.`,
             clienteChave: clienteNome ? `nome:${clienteNome}` : null,
             clienteNome,
             statusPedido: tx.status,
@@ -241,7 +247,7 @@ app.post('/webhooks/adyen', async (req, res) => {
           broadcast('fraude-marcada', registro, 'monitor');
           push.notifyRaw(
             `🚫 Fraude detectada automaticamente — ${tx.unidade || ''}`,
-            `${clienteNome || 'Cliente'} testou ${padraoTroca.cartoesDistintos} cartões diferentes até aprovar`,
+            `${clienteNome || 'Cliente'} testou ${padraoTroca.cartoesDistintos} cartões diferentes em pouco tempo`,
             `fraude-auto-${pedidoId}`,
             tx.unidade
           );
@@ -415,6 +421,26 @@ app.get('/api/fraude/relatorio.pdf', auth.requireMaster, async (req, res) => {
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
   const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} cliente(s) monitorado(s)`;
   fraudReport.writePDF(res, { titulo: 'Relatório de Fraude', subtitulo, linhas });
+});
+
+// ---------- relatorio do painel "Alertas de falha/fraude" (Master) - mesma
+// deteccao/agrupamento por cliente do renderAlerts() em index.html ----------
+app.get('/api/alertas/relatorio.csv', auth.requireMaster, (req, res) => {
+  const { inicio, fim } = req.query;
+  const transacoes = store.allTransactions().filter((t) => (!inicio || (t.dataHora || '') >= inicio) && (!fim || (t.dataHora || '') <= fim + 'T23:59:59'));
+  const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${alertReport.slugify('relatorio-alertas')}.csv"`);
+  res.send(alertReport.toCSV(linhas));
+});
+
+app.get('/api/alertas/relatorio.pdf', auth.requireMaster, (req, res) => {
+  const { inicio, fim } = req.query;
+  const transacoes = store.allTransactions().filter((t) => (!inicio || (t.dataHora || '') >= inicio) && (!fim || (t.dataHora || '') <= fim + 'T23:59:59'));
+  const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
+  const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+  const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} cliente(s) com alerta`;
+  alertReport.writePDF(res, { titulo: 'Relatório de Alertas', subtitulo, linhas });
 });
 
 app.get('/api/summary', requireSection('monitor'), (req, res) => {
