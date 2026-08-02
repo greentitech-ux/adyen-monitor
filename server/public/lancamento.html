@@ -280,6 +280,21 @@ let SEQ = 0;
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+// Date "falso" cujos getters locais ja refletem o horario de Sao Paulo,
+// independente do fuso do navegador/servidor - evita virar o dia errado
+// perto da meia-noite quando o ambiente roda em UTC (comum em hospedagem)
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
@@ -367,7 +382,7 @@ function renderLista(){
         ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
         ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
       </div>
-      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR')}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
+      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
       <div class="valores">
         <span>Faturamento <b>${fmtMoney(f.faturamento)}</b></span>
         <span>Declarado <b>${fmtMoney(f.totalDeclarado)}</b></span>
@@ -461,7 +476,7 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
 
 function resetarForm(){
   document.getElementById('form-lancar').reset();
-  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-data').value = hojeBrasilia();
   MAQUINAS = []; SAIDAS = [];
   adicionarMaquina();
   renderSaidas();
@@ -530,8 +545,8 @@ async function boot(){
   selUnidade.innerHTML = unidades.length
     ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
-  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
-  document.getElementById('f-data').max = new Date().toISOString().slice(0,10);
+  document.getElementById('f-data').value = hojeBrasilia();
+  document.getElementById('f-data').max = hojeBrasilia();
   adicionarMaquina();
   renderSaidas();
   aplicarFranquia(selUnidade.value);

@@ -243,7 +243,7 @@ function fmtBytes(n){
 async function carregarBackups(){
   const backups = await fetch('/api/backups').then(r=>r.json());
   document.getElementById('backups-body').innerHTML = backups.length ? backups.map(b=>`
-    <tr><td>${escapeHtml(b.nome)}</td><td>${new Date(b.criadoEm).toLocaleString('pt-BR')}</td><td>${fmtBytes(b.tamanhoBytes)}</td></tr>
+    <tr><td>${escapeHtml(b.nome)}</td><td>${new Date(b.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</td><td>${fmtBytes(b.tamanhoBytes)}</td></tr>
   `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum backup ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
 }
 
