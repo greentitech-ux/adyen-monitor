@@ -357,8 +357,7 @@ async function carregar(){
     ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
     : 'nenhum fechamento importado ainda';
   elSyncInfo.title = SYNC_INFO_TITLE;
-  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
-  setupPresets(isoLocal(ontem)); // por padrao, referencia e sempre "ontem" (dia -1)
+  setupPresets(); // estado inicial: D-1 nos KPIs/tabelas; o grafico usa os ultimos 30 dias (ver chartRange())
   setupMultiselect();
   render();
 }
@@ -414,6 +413,10 @@ function agoraBrasilia(){
 
 function calcularPreset(tipo, refIso){
   const ref = new Date(refIso+'T00:00:00');
+  if(tipo==='ontem'){
+    const ontem = new Date(ref); ontem.setDate(ontem.getDate()-1);
+    return {inicio:isoLocal(ontem), fim:isoLocal(ontem)};
+  }
   if(tipo==='semana'){
     const dow = ref.getDay(); // 0=domingo
     const inicio = new Date(ref); inicio.setDate(ref.getDate()-dow);
@@ -432,8 +435,24 @@ function calcularPreset(tipo, refIso){
 }
 
 let presetAtivo = null;
-function setupPresets(refPadraoIso){
+// false = modo padrao (KPIs/tabelas em D-1, grafico nos ultimos 30 dias -
+// ver chartRange()); true = usuario escolheu um filtro de data explicito
+// (preset ou intervalo livre) e todos os paineis passam a seguir esse mesmo
+// intervalo. So volta a false num reload completo (botao Atualizar).
+let filtroDataAtivo = false;
+
+function chartRange(){
+  if(filtroDataAtivo){
+    return { start: document.getElementById('f-date-start').value, end: document.getElementById('f-date-end').value };
+  }
+  const fim = agoraBrasilia(); fim.setDate(fim.getDate()-1); // ontem
+  const inicio = new Date(fim); inicio.setDate(inicio.getDate()-29); // ultimos 30 dias, terminando ontem
+  return { start: isoLocal(inicio), end: isoLocal(fim) };
+}
+
+function setupPresets(){
   const presets = [
+    {lbl:'Ontem', tipo:'ontem'},
     {lbl:'Semana', tipo:'semana'},
     {lbl:'Mês', tipo:'mes'},
     {lbl:'Trimestre', tipo:'trimestre'},
@@ -443,6 +462,7 @@ function setupPresets(refPadraoIso){
 
   function aplicarPreset(tipo, refIso, btn){
     presetAtivo = tipo;
+    filtroDataAtivo = true;
     cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
     if(btn) btn.classList.add('active');
     const range = calcularPreset(tipo, refIso);
@@ -453,26 +473,29 @@ function setupPresets(refPadraoIso){
 
   cont.querySelectorAll('.preset-btn').forEach(btn=>{
     // ao clicar num preset a referencia e sempre hoje (nao a data ja
-    // selecionada) - Semana/Mes/Trimestre sempre voltam pro periodo atual
+    // selecionada) - Ontem/Semana/Mes/Trimestre sempre voltam pro periodo atual
     btn.addEventListener('click', ()=>{
       aplicarPreset(btn.dataset.tipo, isoLocal(agoraBrasilia()), btn);
     });
   });
 
-  aplicarPreset('mes', refPadraoIso, cont.children[1]); // Mes ativo por padrao
+  // estado inicial (e apos "Atualizar"/reload): nenhum preset ativo, campos
+  // mostram D-1 - o grafico ignora esses campos nesse modo (ver chartRange())
+  // ate o usuario escolher um filtro de data explicito
+  presetAtivo = null;
+  filtroDataAtivo = false;
+  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
+  const ontemIso = isoLocal(ontem);
+  document.getElementById('f-date-start').value = ontemIso;
+  document.getElementById('f-date-end').value = ontemIso;
 
   ['f-date-start','f-date-end'].forEach(id=>{
     document.getElementById(id).addEventListener('input', ()=>{
-      if(presetAtivo){
-        const refIso = document.getElementById(id).value;
-        if(refIso){
-          const range = calcularPreset(presetAtivo, refIso);
-          document.getElementById('f-date-start').value = range.inicio;
-          document.getElementById('f-date-end').value = range.fim;
-        }
-      } else {
-        cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-      }
+      // edicao manual = intervalo livre (permite qualquer intervalo, inclusive
+      // um unico dia): desativa o preset em vez de re-snapar pro periodo cheio
+      presetAtivo = null;
+      filtroDataAtivo = true;
+      cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
       render();
     });
   });
@@ -519,9 +542,7 @@ function setupMultiselect(){
   document.getElementById('f-grupo').addEventListener('change', ()=>{ renderPanel(); render(); });
 }
 
-function filtrar(){
-  const start = document.getElementById('f-date-start').value;
-  const end = document.getElementById('f-date-end').value;
+function filtrarPorIntervalo(start, end){
   const grupo = document.getElementById('f-grupo').value;
   return DATA.filter(d=>
     (!grupo || d.grupo===grupo) &&
@@ -529,6 +550,9 @@ function filtrar(){
     (!start || (d.data||'') >= start) &&
     (!end || (d.data||'') <= end)
   );
+}
+function filtrar(){
+  return filtrarPorIntervalo(document.getElementById('f-date-start').value, document.getElementById('f-date-end').value);
 }
 
 // ---- KPIs: valor + variacao contra o periodo anterior de mesmo tamanho ----
@@ -639,9 +663,7 @@ function xParaViewBox(svg, clientX){
 // multiples (facet, quando ha mais unidades do que da pra comparar
 // por cor com seguranca)
 // ---------------------------------------------------------------
-function renderFaturamentoChart(rows){
-  const start = document.getElementById('f-date-start').value;
-  const end = document.getElementById('f-date-end').value;
+function renderFaturamentoChart(rows, start, end){
   const dias = diasNoIntervalo(start,end);
   const container = document.getElementById('fat-container');
   const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
@@ -953,10 +975,19 @@ function renderTabela(rows){
   }).join('') : '<tr><td colspan="14" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
 }
 
+// grafico de faturamento tem intervalo proprio (chartRange()): segue o
+// filtro de data quando um esta ativo, senao usa sempre os ultimos 30 dias -
+// por isso nao reaproveita direto as "rows" do filtro principal
+function renderChartAtual(){
+  const cr = chartRange();
+  const chartRows = filtroDataAtivo ? filtrar() : filtrarPorIntervalo(cr.start, cr.end);
+  renderFaturamentoChart(chartRows, cr.start, cr.end);
+}
+
 function render(){
   const rows = filtrar();
   renderKpis(rows);
-  renderFaturamentoChart(rows);
+  renderChartAtual();
   // renderDiferencaChart(rows); // painel desativado, ver comentario acima da funcao
   renderUnidadesTable(rows);
   renderTabela(rows);
@@ -967,7 +998,7 @@ document.getElementById('fech-date-fim').addEventListener('input', ()=>{ renderT
 let resizeTimer = null;
 window.addEventListener('resize', ()=>{
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(()=>{ renderFaturamentoChart(filtrar()); }, 150);
+  resizeTimer = setTimeout(renderChartAtual, 150);
 });
 
 async function boot(){
