@@ -235,4 +235,4 @@ async function sincronizar() {
   return mesclarLancamentosDoMesmoDia(resultado);
 }
 
-module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, mesclarLancamentosDoMesmoDia };
+module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, getAccessToken, buscarAba, mesclarLancamentosDoMesmoDia };

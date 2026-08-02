@@ -77,6 +77,7 @@
     <div class="sub" id="header-info">carregando...</div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+    <button class="back hidden" id="btn-sincronizar-planilha" onclick="sincronizarPlanilha()" style="cursor:pointer;">🔄 Sincronizar agora</button>
     <button class="back hidden" id="btn-recarregar" onclick="carregar()" style="cursor:pointer;">🔄 Atualizar</button>
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
     <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">🛵 Lançar entrega</a>
@@ -190,6 +191,42 @@ function codigosDisponiveis(){
   return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
 }
 
+let SYNC_INFO_SUFIXO = '';
+let SYNC_INFO_TITLE = '';
+async function carregarStatusSincronizacao(){
+  try{
+    const status = await fetch('/api/entregas/sincronizacao').then(r=>r.json());
+    if(status.ultimoErro){
+      SYNC_INFO_SUFIXO = ' · ⚠️ planilha não sincronizada';
+      SYNC_INFO_TITLE = `Falha na última tentativa de sincronização: ${status.ultimoErro}`;
+    } else if(status.ultimaEm){
+      const dt = new Date(status.ultimaEm);
+      SYNC_INFO_SUFIXO = ' · ✅ histórico sincronizado';
+      SYNC_INFO_TITLE = `Última sincronização automática do histórico (planilha MOTOS BRAVO): ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
+    } else {
+      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização do histórico';
+      SYNC_INFO_TITLE = '';
+    }
+  }catch(e){
+    SYNC_INFO_SUFIXO = ''; SYNC_INFO_TITLE = '';
+  }
+}
+
+async function sincronizarPlanilha(){
+  const btn = document.getElementById('btn-sincronizar-planilha');
+  btn.disabled = true; btn.textContent = '🔄 Sincronizando...';
+  try{
+    const resp = await fetch('/api/entregas/sincronizar-planilha', { method:'POST' });
+    const status = await resp.json();
+    if(!resp.ok) throw new Error(status.ultimoErro || 'Erro ao sincronizar.');
+    await carregar();
+  }catch(err){
+    alert('Não foi possível sincronizar a planilha: ' + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
+  }
+}
+
 async function carregar(){
   const [dados, unidadesMeta] = await Promise.all([
     fetch('/api/entregas').then(r=>r.json()),
@@ -197,10 +234,13 @@ async function carregar(){
   ]);
   DATA = dados;
   unidadesMeta.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
+  await carregarStatusSincronizacao();
   const datas = DATA.map(d=>d.data).filter(Boolean).sort();
-  document.getElementById('header-info').textContent = datas.length
-    ? `${DATA.length} lançamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}`
-    : 'nenhuma entrega lançada ainda';
+  const elHeaderInfo = document.getElementById('header-info');
+  elHeaderInfo.textContent = datas.length
+    ? `${DATA.length} lançamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
+    : `nenhuma entrega lançada ainda${SYNC_INFO_SUFIXO}`;
+  elHeaderInfo.title = SYNC_INFO_TITLE;
   const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
   setupPresets(isoLocal(ontem));
   setupMultiselect();
@@ -428,7 +468,7 @@ function renderTabela(rows){
       <td class="valor">${fmtMoney(d.valor)}</td>
       <td class="valor">${fmtMoney(d.coopRecebe)}</td>
       <td class="valor">${d.quantTotal}</td>
-      <td>${d.etiquetaPath ? `<a href="/api/entregas/etiqueta/${d.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank" style="color:var(--accent);">📎 ver</a>` : '—'}</td>
+      <td>${d.etiquetaPath ? `<a href="/api/entregas/etiqueta/${d.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank" style="color:var(--accent);">📎 ver</a>` : (d.etiquetaOrigem ? `<span class="sub" title="Ainda não migrada pro app - referência original do AppSheet/Drive">📎 ${escapeHtml(d.etiquetaOrigem)}</span>` : '—')}</td>
       <td class="truncate" title="${escapeHtml(d.observacao||'')}">${escapeHtml(d.observacao||'—')}</td>
     </tr>`).join('') : '<tr><td colspan="15" class="empty">Nenhuma entrega no período/unidade selecionados.</td></tr>';
 }
@@ -457,6 +497,7 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
+  document.getElementById('btn-sincronizar-planilha').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('entregas')){
     document.getElementById('sem-acesso').classList.remove('hidden');
