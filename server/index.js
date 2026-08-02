@@ -11,15 +11,21 @@ const { lookupBank } = require('./binLookup');
 const push = require('./push');
 const cardTesting = require('./cardTesting');
 const disputes = require('./disputes');
+const fraudMarks = require('./fraudMarks');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
 const vaultGroups = require('./vaultGroups');
 const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
+const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
+const sangrias = require('./sangrias');
+const entregasLive = require('./entregasLive');
 const backup = require('./backup');
+const sheetsSync = require('./sheetsSync');
+const entregasSync = require('./entregasSync');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -270,6 +276,43 @@ app.get('/api/chargebacks', requireSection('monitor'), (req, res) => {
   res.json(auth.filterByUnidade(req, store.chargebacks()));
 });
 
+// ---------- marcacao manual de suspeita/fraude por pedido (monitoramento
+// efetivo, separado do status que vem da Adyen - esse continua intacto) ----------
+app.get('/api/fraude', requireSection('monitor'), (req, res) => {
+  fraudMarks.listAll().then((lista) => res.json(auth.filterByUnidade(req, lista)));
+});
+
+app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
+  try {
+    const { pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor } = req.body;
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await fraudMarks.marcar({
+      pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor,
+      marcadoPorEmail: req.user.email,
+    });
+    broadcast('fraude-marcada', registro, 'monitor');
+    if (nivel === 'FRAUDE') {
+      push.notifyRaw(
+        '🚫 Pedido marcado como fraude',
+        `${registro.clienteNome || 'Cliente'} · ${registro.unidade || ''}${registro.motivo ? ' · ' + registro.motivo : ''}`,
+        `fraude-${registro.pedidoId}`,
+        registro.unidade
+      );
+    }
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/fraude/:pedidoId', requireSection('monitor'), async (req, res) => {
+  await fraudMarks.remover(decodeURIComponent(req.params.pedidoId));
+  broadcast('fraude-removida', { pedidoId: req.params.pedidoId }, 'monitor');
+  res.json({ ok: true });
+});
+
 app.get('/api/summary', requireSection('monitor'), (req, res) => {
   const all = auth.filterByUnidade(req, store.allTransactions());
   const aprovadas = all.filter((t) => t.status === 'APROVADO');
@@ -304,17 +347,33 @@ const FECHAMENTO_UNIDADES_NOMES = {
   'São Braz IL': 'São Braz IL',
 };
 
+// unidades do app de entregas (motoboys) - nomes como aparecem nas planilhas
+// atuais do AppSheet ("MOTOS BRAVO"); igual ao Fechamento, ficam fixas aqui
+// pra ja aparecerem no checklist de permissoes mesmo antes de qualquer
+// lançamento. O Master pode liberar mais conforme novas unidades entrarem
+// (o app de entregas ainda esta sendo migrado loja a loja do AppSheet).
+const ENTREGAS_UNIDADES_NOMES = {
+  'Tirol Natal': 'Tirol Natal (Entregas)',
+  'MMTirol Natal': 'Milky Moo Tirol Natal (Entregas)',
+  Bessa: 'Bessa (Entregas)',
+  Caruaru: 'Caruaru (Entregas)',
+  Garanhuns: 'Garanhuns (Entregas)',
+};
+
 // lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
 // junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
-// com as unidades fixas de Fechamento/Lançamento (espaco de codigos
-// diferente, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
+// com as unidades fixas de Fechamento/Lançamento/Entregas (espacos de codigo
+// diferentes, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
 // dados importados/lançados, pra nunca faltar opcao no checklist do Master
 app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   const mapa = {};
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
+  Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
+  (await entregasLive.listAll()).forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   const lista = Object.entries(mapa)
     .map(([codigo, nome]) => ({ codigo, nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -533,6 +592,73 @@ app.delete('/api/vault/entries/:id', requireSection('cofre'), async (req, res) =
   }
 });
 
+// exporta o cofre (tudo, um grupo ou um subgrupo) em CSV ou PDF - so o Master
+// (a senha vai em texto puro no arquivo, de proposito - e pra servir como
+// inventario/backup). ?scope=all|group|subgroup&id=<groupId|subgroupId>
+async function resolverEscopoExportacao(req) {
+  const scope = ['group', 'subgroup'].includes(req.query.scope) ? req.query.scope : 'all';
+  const id = req.query.id || null;
+  const [groups, subgroups] = await Promise.all([vaultGroups.list(), vaultSubgroups.listAll()]);
+  const groupById = new Map(groups.map((g) => [g.id, g]));
+  const subgroupById = new Map(subgroups.map((s) => [s.id, s]));
+
+  let subgroupIds = null; // null = tudo
+  let titulo = 'Cofre de senhas · Todas as senhas';
+  if (scope === 'subgroup') {
+    const sub = subgroupById.get(id);
+    if (!sub) throw new Error('Subgrupo não encontrado.');
+    const grp = groupById.get(sub.groupId);
+    subgroupIds = [sub.id];
+    titulo = `Cofre de senhas · ${grp ? grp.name + ' / ' : ''}${sub.name}`;
+  } else if (scope === 'group') {
+    const grp = groupById.get(id);
+    if (!grp) throw new Error('Grupo não encontrado.');
+    subgroupIds = subgroups.filter((s) => s.groupId === id).map((s) => s.id);
+    titulo = `Cofre de senhas · ${grp.name}`;
+  }
+
+  const entries = await vaultEntries.listBySubgroups(subgroupIds);
+  const rows = entries
+    .map((e) => {
+      const sub = e.subgroupId ? subgroupById.get(e.subgroupId) : null;
+      const grp = sub ? groupById.get(sub.groupId) : null;
+      return {
+        grupo: grp ? grp.name : '',
+        subgrupo: sub ? sub.name : '',
+        titulo: e.title,
+        url: e.url,
+        usuario: e.username,
+        senha: e.password,
+        observacao: e.note,
+        atualizadoEm: e.updatedAt,
+      };
+    })
+    .sort((a, b) => (a.grupo + a.subgrupo + a.titulo).localeCompare(b.grupo + b.subgrupo + b.titulo, 'pt-BR'));
+
+  return { titulo, rows };
+}
+
+app.get('/api/vault/export.csv', auth.requireMaster, async (req, res) => {
+  try {
+    const { titulo, rows } = await resolverEscopoExportacao(req);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${vaultExport.slugify(titulo)}.csv"`);
+    res.send(vaultExport.toCSV(rows));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
+  try {
+    const { titulo, rows } = await resolverEscopoExportacao(req);
+    const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')} · ${rows.length} senha(s)`;
+    vaultExport.writePDF(res, { titulo, subtitulo, rows });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- solicitacoes de estorno (usuario Leitor pede, Master aprova/rejeita) ----------
 app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => {
   try {
@@ -640,17 +766,63 @@ app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
 });
 
 // ---------- fechamentos de caixa (secao "fechamentos") ----------
-// combina o snapshot importado manualmente do Google Drive (ARCFOOD + Grupo
-// Bravo) com os fechamentos lançados ao vivo pelas lojas. As unidades aqui
-// (19821/19855/19888/19889, ou o nome da loja no Grupo Bravo) sao codigos
-// proprios da planilha, num espaco diferente do merchantAccountCode da
-// Adyen usado em Monitor/Disputas - mas o mesmo campo permissions.unidades
-// e reaproveitado pra filtrar as duas coisas (o Master escolhe os codigos
-// certos pelo seletor de /api/meta/unidades, que junta os dois espacos).
-const fechamentosData = require('./fechamentos-snapshot.json');
+// combina os fechamentos das planilhas do Google Sheets (ARCFOOD + Grupo
+// Bravo, aba "BD") com os fechamentos lançados ao vivo pelas lojas. As
+// unidades aqui (19821/19855/19888/19889, ou o nome da loja no Grupo Bravo)
+// sao codigos proprios da planilha, num espaco diferente do
+// merchantAccountCode da Adyen usado em Monitor/Disputas - mas o mesmo campo
+// permissions.unidades e reaproveitado pra filtrar as duas coisas (o Master
+// escolhe os codigos certos pelo seletor de /api/meta/unidades, que junta os
+// dois espacos).
+//
+// fechamentosData comeca com o snapshot estatico (fallback pro caso da 1a
+// sincronizacao ainda nao ter rodado, ou de a API do Sheets estar fora do
+// ar) e e substituido pelos dados frescos da planilha assim que
+// sincronizarPlanilhasFechamento roda com sucesso (no boot e a cada
+// SHEETS_SYNC_INTERVAL_MS).
+let fechamentosData = require('./fechamentos-snapshot.json');
+let statusSincronizacaoPlanilhas = { ultimaEm: null, ultimoErro: null, sincronizando: false };
+
+async function sincronizarPlanilhasFechamento() {
+  if (statusSincronizacaoPlanilhas.sincronizando) return statusSincronizacaoPlanilhas;
+  statusSincronizacaoPlanilhas.sincronizando = true;
+  try {
+    const dados = await sheetsSync.sincronizar();
+    if (dados.length) {
+      fechamentosData = dados;
+      statusSincronizacaoPlanilhas.ultimaEm = new Date().toISOString();
+      statusSincronizacaoPlanilhas.ultimoErro = null;
+      console.log(`Fechamentos: sincronizados ${dados.length} registros das planilhas do Google Sheets.`);
+    } else {
+      statusSincronizacaoPlanilhas.ultimoErro = 'A sincronização rodou mas não retornou nenhuma linha - planilhas continuam com os dados anteriores.';
+      console.warn(statusSincronizacaoPlanilhas.ultimoErro);
+    }
+  } catch (err) {
+    statusSincronizacaoPlanilhas.ultimoErro = err.message;
+    console.error('Erro ao sincronizar planilhas de fechamento:', err.message);
+  } finally {
+    statusSincronizacaoPlanilhas.sincronizando = false;
+  }
+  return statusSincronizacaoPlanilhas;
+}
+
 app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   const lancados = await fechamentosLive.listAll();
-  res.json(auth.filterByUnidade(req, [...fechamentosData, ...lancados]));
+  const sangriasLancadas = (await sangrias.listAll()).map(sangrias.comoFechamento);
+  const combinado = sheetsSync.mesclarLancamentosDoMesmoDia([...fechamentosData, ...lancados, ...sangriasLancadas]);
+  res.json(auth.filterByUnidade(req, combinado));
+});
+
+app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
+  res.json(statusSincronizacaoPlanilhas);
+});
+
+// forca uma sincronizacao imediata com as planilhas - so o Master (evita
+// disparar chamadas extras na API do Google sem necessidade)
+app.post('/api/fechamentos/sincronizar-planilhas', auth.requireMaster, async (req, res) => {
+  const status = await sincronizarPlanilhasFechamento();
+  if (status.ultimoErro) return res.status(502).json(status);
+  res.json(status);
 });
 
 // ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
@@ -681,6 +853,34 @@ app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) 
   res.json(await fechamentosLive.listByUnidades(req.permissions.unidades || []));
 });
 
+// ---------- sangria (retirada de caixa) registrada em campo, ao longo do
+// dia - pensado pra quem visita varias lojas (ex: supervisor) e nao ta
+// esperando o fechamento do dia sair pra lancar a retirada. Fica separado do
+// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos) ----------
+app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, grupo, data, valor, descricao } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await sangrias.criar({
+      unidade, unidadeNome, grupo, data, valor, descricao,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('sangria-lancada', registro, 'lancamento');
+    broadcast('sangria-lancada', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/sangrias/minhas', requireSection('lancamento'), async (req, res) => {
+  if (req.isMaster) return res.json(await sangrias.listAll());
+  res.json(await sangrias.listByUnidades(req.permissions.unidades || []));
+});
+
 app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {
   try {
     const atual = await fechamentosLive.getOne(req.params.id);
@@ -702,6 +902,25 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
   }
 });
 
+// edicao direta de um lancamento - so o Master, sem passar pela fila de
+// aprovacao (ele mesmo e quem aprovaria, entao pedir pra si mesmo so
+// atrasaria); ainda assim fica registrado no historico do fechamento
+app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await fechamentosLive.editarDireto({
+      fechamentoId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      editadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-editado-direto', registro, 'lancamento');
+    broadcast('fechamento-editado-direto', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // fila de pedidos de correcao - so o Master decide (aprova/rejeita), mas quem
 // pediu pode acompanhar o status do proprio pedido
 app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {
@@ -718,6 +937,158 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
     });
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- entregas (motoboys) - substitui o app de entregas do AppSheet ----------
+// mesmo desenho do fechamento: secao "entregas-lancamento" e onde a loja
+// lança as corridas dos entregadores do dia (varias por unidade+data, uma por
+// entregador/turno); secao "entregas" e o dashboard de acompanhamento
+// (Master ve tudo, cada loja so ve as suas unidades). Etiqueta (foto do
+// comprovante/etiquetas do entregador) e opcional, guardada no mesmo Storage
+// dos anexos de disputa.
+//
+// entregasHistoricoData: historico importado direto da planilha "MOTOS
+// BRAVO" (AppSheet) via entregasSync - comeca vazio (so aparece depois da 1a
+// sincronizacao, no boot) e e somente leitura (nao tem dono/permissao de
+// edicao, so o Master ve as diferencas na planilha em si). A aba "BDMotos"
+// fica de fora por enquanto (sem coluna Data preenchida - ver entregasSync.js).
+let entregasHistoricoData = [];
+let statusSincronizacaoEntregas = { ultimaEm: null, ultimoErro: null, sincronizando: false };
+
+async function sincronizarPlanilhaEntregas() {
+  if (statusSincronizacaoEntregas.sincronizando) return statusSincronizacaoEntregas;
+  statusSincronizacaoEntregas.sincronizando = true;
+  try {
+    const dados = await entregasSync.sincronizar();
+    if (dados.length) {
+      entregasHistoricoData = dados;
+      statusSincronizacaoEntregas.ultimaEm = new Date().toISOString();
+      statusSincronizacaoEntregas.ultimoErro = null;
+      console.log(`Entregas: sincronizados ${dados.length} registros historicos da planilha do Google Sheets.`);
+    } else {
+      statusSincronizacaoEntregas.ultimoErro = 'A sincronização rodou mas não retornou nenhuma linha - histórico continua com os dados anteriores.';
+      console.warn(statusSincronizacaoEntregas.ultimoErro);
+    }
+  } catch (err) {
+    statusSincronizacaoEntregas.ultimoErro = err.message;
+    console.error('Erro ao sincronizar planilha de entregas:', err.message);
+  } finally {
+    statusSincronizacaoEntregas.sincronizando = false;
+  }
+  return statusSincronizacaoEntregas;
+}
+
+app.get('/api/entregas/sincronizacao', requireSection('entregas'), (req, res) => {
+  res.json(statusSincronizacaoEntregas);
+});
+
+// forca uma sincronizacao imediata - so o Master (evita chamadas extras na API do Google sem necessidade)
+app.post('/api/entregas/sincronizar-planilha', auth.requireMaster, async (req, res) => {
+  const status = await sincronizarPlanilhaEntregas();
+  if (status.ultimoErro) return res.status(502).json(status);
+  res.json(status);
+});
+
+app.post('/api/entregas/lancar', requireSection('entregas-lancamento'), upload.single('etiqueta'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao } = JSON.parse(req.body.payload || '{}');
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await entregasLive.create({
+      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao,
+      etiquetaFile: req.file || null,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('entrega-lancada', registro, 'entregas-lancamento');
+    broadcast('entrega-lancada', registro, 'entregas');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/entregas/meus', requireSection('entregas-lancamento'), async (req, res) => {
+  if (req.isMaster) return res.json(await entregasLive.listAll());
+  res.json(await entregasLive.listByUnidades(req.permissions.unidades || []));
+});
+
+// dashboard de acompanhamento (secao separada - pode ser liberada sem dar
+// acesso de lançamento, e vice-versa) - junta o historico da planilha
+// (AppSheet, somente leitura) com os lançamentos ao vivo pela loja
+app.get('/api/entregas', requireSection('entregas'), async (req, res) => {
+  res.json(auth.filterByUnidade(req, [...entregasHistoricoData, ...(await entregasLive.listAll())]));
+});
+
+app.get('/api/entregas/etiqueta/:id', (req, res, next) => {
+  if (!req.isMaster && !auth.hasSection(req, 'entregas') && !auth.hasSection(req, 'entregas-lancamento')) {
+    return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+  }
+  next();
+}, async (req, res) => {
+  const registro = await entregasLive.getOne(req.params.id);
+  if (!registro || !registro.etiquetaPath) return res.sendStatus(404);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(registro.unidade)) return res.sendStatus(404);
+  storage.streamArquivo(registro.etiquetaPath, null, res);
+});
+
+app.post('/api/entregas/:id/solicitar-edicao', requireSection('entregas-lancamento'), async (req, res) => {
+  try {
+    const atual = await entregasLive.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Lançamento não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const pedido = await entregasLive.solicitarEdicao({
+      entregaId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      solicitadoPorId: req.user.id,
+      solicitadoPorEmail: req.user.email,
+    });
+    broadcast('entrega-edicao-solicitada', pedido, 'entregas-lancamento');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// edicao direta - so o Master, sem fila de aprovacao (ainda fica no historico)
+app.patch('/api/entregas/:id/editar-direto', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await entregasLive.editarDireto({
+      entregaId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      editadoPorEmail: req.user.email,
+    });
+    broadcast('entrega-editada-direto', registro, 'entregas-lancamento');
+    broadcast('entrega-editada-direto', registro, 'entregas');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/entregas/edicoes', requireSection('entregas-lancamento'), async (req, res) => {
+  const todas = await entregasLive.listarEdicoes();
+  if (req.isMaster) return res.json(todas);
+  res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
+});
+
+app.patch('/api/entregas/edicoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const pedido = await entregasLive.decidirEdicao(req.params.id, req.body.status, {
+      decididoPorEmail: req.user.email,
+      motivoDecisao: req.body.motivoDecisao,
+    });
+    broadcast('entrega-edicao-decidida', pedido, 'entregas-lancamento');
+    broadcast('entrega-edicao-decidida', pedido, 'entregas');
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -764,5 +1135,16 @@ app.use((err, req, res, next) => {
     setInterval(() => {
       backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
     }, 24 * 60 * 60 * 1000);
+
+    // sincroniza os fechamentos com as planilhas do Google Sheets: roda no
+    // start e depois periodicamente (15min por padrao - ajustavel via
+    // SHEETS_SYNC_INTERVAL_MS). O Master tambem pode forçar pela tela.
+    sincronizarPlanilhasFechamento();
+    const intervaloSync = Number(process.env.SHEETS_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
+    setInterval(sincronizarPlanilhasFechamento, intervaloSync);
+
+    // mesma logica pro historico de entregas (planilha "MOTOS BRAVO" do AppSheet)
+    sincronizarPlanilhaEntregas();
+    setInterval(sincronizarPlanilhaEntregas, intervaloSync);
   });
 })();

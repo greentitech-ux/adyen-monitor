@@ -96,6 +96,23 @@
   .flag.novo{color:var(--accent);border-color:#1e4a63;background:rgba(92,200,255,.12);}
   .tablewrap{max-height:520px;overflow:auto;}
   .badge{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;display:inline-block;}
+  /* colunas de texto longo (nome do cartão, banco) e a de status (que pode
+     ter varios badges/flags empilhados) ficam mais estreitas - o texto
+     completo aparece via title (tooltip) ao passar o mouse */
+  .truncate{max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+  th.statuscell,td.statuscell{max-width:140px;}
+  td.statuscell .badge{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;}
+  /* painel de Transacoes responsivo ate tablet - os filtros empilham em vez
+     de espremer numa linha so, e a tabela fica um pouco mais compacta. No
+     celular (<=640px) fica como sempre foi (scroll horizontal do .tablewrap) */
+  @media (min-width:641px) and (max-width:1024px){
+    .controls{flex-direction:column;align-items:stretch;}
+    .controls .daterange,.controls .multiselect,.controls input{width:100%;}
+    .controls .daterange input{flex:1;}
+    #tx-table-wrap table{font-size:10.5px;}
+    #tx-table-wrap thead th{padding:6px 8px;}
+    #tx-table-wrap tbody td{padding:5px 8px;}
+  }
   .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
   .badge.RECUSADO{background:var(--bad-dim);color:var(--bad);}
   .badge.CHARGEBACK,.badge.NOTIFICATION_OF_CHARGEBACK{background:var(--bad-dim);color:var(--bad);}
@@ -108,7 +125,9 @@
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
   .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
   .btn-disputa:hover{border-color:var(--accent);}
-  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
   .back:hover{color:var(--text);border-color:var(--accent);}
   .dispute-item{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;}
   .dispute-item .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
@@ -224,8 +243,11 @@
   </div>
   <div class="header-nav">
     <div class="nav-links">
+      <a class="back active" id="nav-monitor" href="/">📈 Monitor</a>
       <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
       <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+      <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+      <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
       <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
       <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
       <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
@@ -234,6 +256,7 @@
       <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
       <button class="btn-notif" id="btn-som" onclick="toggleSom()" title="Som/vibração de alerta">🔊</button>
       <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
       <button class="btn-notif btn-sair" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
     </div>
   </div>
@@ -244,6 +267,7 @@
 <div class="panel">
   <h2>Transações <span class="n" id="tx-count"></span></h2>
   <div class="controls">
+    <button type="button" class="multiselect-btn" id="btn-hoje" onclick="filtrarHoje()" title="Volta o período pra hoje">Hoje</button>
     <div class="daterange">
       <input type="date" id="f-date-start" title="Data inicial">
       <span class="sep">até</span>
@@ -259,9 +283,9 @@
     </div>
     <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
   </div>
-  <div class="tablewrap" style="max-height:360px;">
+  <div class="tablewrap" id="tx-table-wrap" style="max-height:360px;">
     <table>
-      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Status</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
+      <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th class="statuscell">Status</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
       <tbody id="tx-body"></tbody>
     </table>
   </div>
@@ -287,6 +311,11 @@
     <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
     <div class="alerts" id="chargebacks"></div>
   </div>
+</div>
+
+<div class="panel" id="fraude-panel" style="margin-top:16px;">
+  <h2>🚩 Suspeitos e fraudes monitorados <span class="n" id="fraude-count"></span></h2>
+  <div class="alerts" id="fraude-monitor" style="max-height:320px;"></div>
 </div>
 
 <div class="panel hidden" id="refund-panel" style="margin-top:16px;">
@@ -360,6 +389,14 @@
   </div>
 </div>
 
+<div class="overlay" id="fraude-popup-overlay">
+  <div class="modal" style="width:min(420px,92vw);border-color:var(--bad);">
+    <h3 style="color:var(--bad);">🚫 Pedido recusado — suspeita de fraude</h3>
+    <div id="fraude-popup-info" style="font-size:13px;margin-top:6px;"></div>
+    <button type="button" class="btn-disputa" style="width:100%;margin-top:16px;padding:10px;font-size:13px;border-color:var(--bad);color:var(--bad);" onclick="fecharPopupFraude()">OK (<span id="fraude-popup-contagem">10</span>s)</button>
+  </div>
+</div>
+
 </div><!-- /#app-root -->
 
 <script>
@@ -395,6 +432,8 @@ function podeSecao(secao){
 function aplicarNav(){
   document.getElementById('nav-lancamento').classList.toggle('hidden', !podeSecao('lancamento'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !podeSecao('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !podeSecao('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !podeSecao('entregas-lancamento'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
@@ -413,6 +452,9 @@ async function tentarEntrar(){
   if(!podeSecao('monitor')){
     // essa pagina e o monitor - quem nao tem essa secao vai pra primeira que tiver
     if(podeSecao('fechamentos')) return location.href='/fechamentos.html';
+    if(podeSecao('entregas')) return location.href='/entregas.html';
+    if(podeSecao('lancamento')) return location.href='/lancamento.html';
+    if(podeSecao('entregas-lancamento')) return location.href='/entrega-lancamento.html';
     if(podeSecao('cofre')) return location.href='/cofre.html';
     if(podeSecao('disputas')) return location.href='/relatorios.html';
     document.getElementById('sem-acesso').classList.remove('hidden');
@@ -455,7 +497,23 @@ document.getElementById('auth-form').addEventListener('submit', async (e)=>{
 let DATA = [];
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
-function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+const FUSO_BR = 'America/Sao_Paulo';
+function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR',{timeZone:FUSO_BR})+' '+d.toLocaleTimeString('pt-BR',{timeZone:FUSO_BR,hour:'2-digit',minute:'2-digit'}); }
+// Date "falso" cujos getters locais (getFullYear/getMonth/getDate/getHours...)
+// ja refletem o horario de Sao Paulo, independente do fuso configurado no
+// navegador/servidor - evita virar o dia errado perto da meia-noite quando o
+// ambiente roda em UTC (comum em hospedagem)
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function clientKeyOf(t){ return t.shopperReference || `${t.cardHolder||'desconhecido'}::${t.last4||'----'}`; }
 function soNumero(unidade){ return (unidade||'').replace(/\D/g,'') || '—'; }
 
@@ -492,6 +550,7 @@ async function loadAll(){
   renderChargebacks();
   if(podeSecao('disputas')) refreshDisputeMarkers();
   refreshRefundRequests();
+  refreshFraudMarks();
 }
 
 // pedidoId -> status do registro de disputa/monitoramento mais recente -
@@ -717,14 +776,24 @@ async function carregarHistoricoDisputas(pedidoId){
       </div>
       <select onchange="atualizarStatusDisputa('${d.id}', this.value)">
         ${DISPUTE_STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+        <option value="__REMOVER__">Remover</option>
       </select>
     </div>
   `).join('') : '<div class="empty">Nenhum registro ainda.</div>';
 }
 
 async function atualizarStatusDisputa(id, status){
-  await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
-  if(DISPUTE_PEDIDO) carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
+  if(status === '__REMOVER__'){
+    if(!confirm('Remover este registro? A tag de acompanhamento some e o pedido sai do relatório de disputas.')) {
+      if(DISPUTE_PEDIDO) carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId); // desfaz a selecao no <select>
+      return;
+    }
+    await fetch('/api/disputes/'+id, { method:'DELETE' });
+  } else {
+    await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  }
+  if(DISPUTE_PEDIDO) await carregarHistoricoDisputas(DISPUTE_PEDIDO.pedidoId);
+  if(podeSecao('disputas')) refreshDisputeMarkers();
 }
 
 document.getElementById('dispute-form').addEventListener('submit', async (e)=>{
@@ -805,7 +874,7 @@ function diasNoIntervalo(){
   const limite = new Date(end);
   let i = 0;
   while(cursor.getTime() <= limite.getTime() && i < 366){
-    dias.push(cursor.toISOString().slice(0,10));
+    dias.push(isoLocalBR(cursor));
     cursor.setDate(cursor.getDate()+1);
     i++;
   }
@@ -818,11 +887,11 @@ function diasNoIntervalo(){
 const TREND_DIAS = 14;
 function diasUltimos(n){
   const dias = [];
-  const cursor = new Date();
+  const cursor = agoraBrasilia();
   cursor.setHours(0,0,0,0);
   cursor.setDate(cursor.getDate() - (n-1));
   for(let i=0;i<n;i++){
-    dias.push(cursor.toISOString().slice(0,10));
+    dias.push(isoLocalBR(cursor));
     cursor.setDate(cursor.getDate()+1);
   }
   return dias;
@@ -1204,7 +1273,100 @@ async function salvarComentario(pspRefEnc, eventCodeEnc){
 // primeiro, depois originalReference (pra pedidos cujo evento anterior, ex.
 // OFFER_CLOSED, chegou sem merchantReference), so entao o proprio pspReference
 function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.pspReference; }
-  
+
+// ---- marcacao manual de suspeita/fraude por pedido - monitoramento efetivo,
+// separado do status que vem da Adyen (esse continua igual). FRAUDE_POR_PEDIDO
+// e a marcacao direta nesse pedido; FRAUDE_CHAVES_CLIENTE guarda a chave do
+// cliente (mesma logica de chaveClienteIdentificavel) de quem ja foi marcado
+// como FRAUDE alguma vez - assim, se ele fizer outro pedido depois, esse
+// pedido novo ja entra no monitoramento sozinho, sem precisar marcar de novo ----
+let FRAUDE_MARKS = [];
+let FRAUDE_POR_PEDIDO = {};
+let FRAUDE_CHAVES_CLIENTE = new Set();
+async function refreshFraudMarks(){
+  FRAUDE_MARKS = await fetch('/api/fraude').then(r=>r.json());
+  FRAUDE_POR_PEDIDO = {};
+  FRAUDE_CHAVES_CLIENTE = new Set();
+  FRAUDE_MARKS.forEach(m=>{
+    FRAUDE_POR_PEDIDO[m.pedidoId] = m;
+    if(m.nivel==='FRAUDE' && m.clienteChave) FRAUDE_CHAVES_CLIENTE.add(m.clienteChave);
+  });
+  renderFraudeMonitor();
+  render();
+}
+
+// nivel de suspeita/fraude aplicavel a um pedido: marcacao direta nele, ou
+// herdada por ser o mesmo cliente de um pedido ja confirmado como fraude antes
+function fraudeInfoDoPedido(d){
+  const direto = FRAUDE_POR_PEDIDO[orderKeyOf(d)];
+  if(direto) return { nivel: direto.nivel, direto: true };
+  const chave = chaveClienteIdentificavel(d);
+  if(chave && FRAUDE_CHAVES_CLIENTE.has(chave)) return { nivel:'FRAUDE', direto:false };
+  return null;
+}
+
+async function marcarFraude(pedidoId, unidade, nivel, clienteChave, clienteNome, valor){
+  let motivo = '';
+  if(nivel==='FRAUDE'){
+    motivo = prompt('Motivo (opcional) — o que indicou fraude nesse pedido?') || '';
+  }
+  await fetch('/api/fraude/marcar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor }),
+  });
+  await refreshFraudMarks();
+}
+
+async function removerMarcaFraude(pedidoId){
+  if(!confirm('Remover a marcação de suspeita/fraude deste pedido?')) return;
+  await fetch('/api/fraude/'+encodeURIComponent(pedidoId), { method:'DELETE' });
+  await refreshFraudMarks();
+}
+
+function renderFraudeMonitor(){
+  const lista = [...FRAUDE_MARKS].sort((a,b)=>(b.atualizadoEm||'').localeCompare(a.atualizadoEm||''));
+  const elCount = document.getElementById('fraude-count');
+  if(elCount) elCount.textContent = lista.length;
+  const el = document.getElementById('fraude-monitor');
+  if(!el) return;
+  el.innerHTML = lista.length ? lista.map(m=>{
+    const alta = m.nivel==='FRAUDE';
+    return `
+    <div class="alert">
+      <div class="sev ${alta?'high':'med'}"></div>
+      <div class="body" style="flex:1;">
+        <div class="t1"><span class="badge" style="background:${alta?'var(--bad-dim)':'var(--warn-dim)'};color:${alta?'var(--bad)':'var(--warn)'};">${alta?'🚫 FRAUDE':'⚠️ SUSPEITO'}</span> ${m.clienteNome||'cliente desconhecido'} · ${m.unidade||'—'} · ${fmtMoney(m.valor)}</div>
+        <div class="t2">Pedido ${m.pedidoId} · marcado por ${m.atualizadoPorEmail||m.criadoPorEmail||'—'} em ${fmtDT(m.atualizadoEm)}${m.motivo?(' · '+m.motivo):''}</div>
+        <div style="margin-top:8px;">
+          <button type="button" class="btn-disputa" onclick="removerMarcaFraude('${String(m.pedidoId).replace(/'/g,"\\'")}')">✕ Remover</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum pedido suspeito ou marcado como fraude no momento.</div>';
+}
+
+// as vezes o OFFER_CLOSED chega sem merchantReference/originalReference (a
+// Adyen nem sempre manda esses campos nesse evento), entao ele acaba caindo
+// numa chave de pedido propria (o proprio pspReference) em vez de se juntar
+// ao pedido real - vira um "pedido fantasma" que nunca atualiza, mesmo depois
+// do pedido de verdade avancar pra FALHA_ESTORNO/ESTORNADO/etc. Como nao da
+// pra linkar pela chave nesse caso, usamos um heuristico: mesma unidade +
+// mesmo valor + o outro pedido aconteceu no mesmo horario ou depois -> e
+// quase certo que e o mesmo pedido, entao o OFFER_CLOSED some da lista
+function removerOfferClosedSuperado(pedidos){
+  return pedidos.filter(p=>{
+    if(p.status !== 'OFFER_CLOSED') return true;
+    const superado = pedidos.some(o=>
+      o !== p &&
+      o.status !== 'OFFER_CLOSED' &&
+      o.unidade === p.unidade &&
+      o.valor === p.valor &&
+      (o.dataHora||'') >= (p.dataHora||'')
+    );
+    return !superado;
+  });
+}
+
   function render(){
       const period = periodFiltered();
       const periodUnidade = filtraPorUnidade(period);
@@ -1234,7 +1396,7 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             if(!rep.last4 && t.last4) rep.last4 = t.last4;
             if(!rep.bancoEmissor && t.bancoEmissor) rep.bancoEmissor = t.bancoEmissor;
       }
-      const pedidosPeriodo = [...porPedido.values()];
+      const pedidosPeriodo = removerOfferClosedSuperado([...porPedido.values()]);
 
       const q = document.getElementById('f-search').value.toLowerCase();
       const filtradas = pedidosPeriodo.filter(d=>
@@ -1244,27 +1406,54 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
       const rows = filtradas;
 
       // contagem historica por cliente (todo o DATA, nao so o periodo filtrado) -
-      // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc
+      // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc.
+      //
+      // duas correcoes importantes aqui (numeros idênticos e inflados em pedidos
+      // Pix diferentes eram o sintoma):
+      // 1. DATA tem um registro por EVENTO da Adyen (autorizacao, estorno,
+      //    chargeback...), entao um mesmo pedido conta varias vezes se so
+      //    somarmos direto - agrupamos por pedido primeiro (mesma logica de
+      //    orderKeyOf usada no resto da tela) e usamos so o status mais recente.
+      // 2. clientKeyOf cai pra shopperReference (que em Pix sem
+      //    e-mail cadastrado vira so "<unidade>:", igual pra QUALQUER cliente
+      //    daquela unidade) - isso juntava clientes diferentes na mesma conta.
+      //    chaveClienteIdentificavel (mesma usada na deteccao de repetidos)
+      //    exige cartao ou nome pra contar; sem nenhum dos dois, retorna null
+      //    e a linha mostra "—" em vez de emprestar a contagem de outro cliente.
+      const pedidosHistorico = new Map();
+      DATA.forEach(t=>{
+            const key = orderKeyOf(t);
+            const atual = pedidosHistorico.get(key);
+            if(!atual || (t.dataHora||'') >= (atual.dataHora||'')) pedidosHistorico.set(key, t);
+      });
+      const ESTORNO_STATUSES_HIST = ['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','ESTORNO_REVERTIDO'];
       const contagemClientes = {};
-      DATA.forEach(d=>{
-            const k = clientKeyOf(d);
+      pedidosHistorico.forEach(d=>{
+            const k = chaveClienteIdentificavel(d);
+            if(!k) return;
             const c = (contagemClientes[k] ||= {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0});
             c.total++;
             if(d.status==='APROVADO') c.aprovadas++;
             if(d.status==='RECUSADO') c.recusadas++;
-            if(d.status==='ESTORNADO') c.estornadas++;
+            if(ESTORNO_STATUSES_HIST.includes(d.status)) c.estornadas++;
             if(d.fraudeSuspeita) c.fraude++;
       });
 
       document.getElementById('tx-count').textContent = rows.length+' / '+pedidosPeriodo.length;
       document.getElementById('tx-body').innerHTML = rows.length ? rows.map(d=>{
-            const c = contagemClientes[clientKeyOf(d)] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0};
+            // null quando o pedido nao tem cartao nem nome pra identificar o
+            // cliente com segurança (Pix anonimo, comum hoje) - nesse caso as
+            // colunas de contagem mostram "—" em vez de emprestar o numero de
+            // outro cliente qualquer
+            const chaveCliente = chaveClienteIdentificavel(d);
+            const c = chaveCliente ? (contagemClientes[chaveCliente] || {total:0, aprovadas:0, recusadas:0, estornadas:0, fraude:0}) : null;
             const chave = 'tx:'+d.pspReference;
             const desde = tempoDesdeChegada(chave);
             const novo = desde < NEW_HIGHLIGHT_MS;
             const ESTORNO_STATUSES = ['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','ESTORNO_REVERTIDO'];
+            const infoFraude = fraudeInfoDoPedido(d); // marcacao manual, separada do status da Adyen
             let statusCls = '';
-            if(d.fraudeSuspeita) statusCls = 'row-fraude';
+            if(d.fraudeSuspeita || (infoFraude && infoFraude.nivel==='FRAUDE')) statusCls = 'row-fraude';
             else if((d.status||'').includes('CHARGEBACK')) statusCls = 'row-chargeback';
             else if(ESTORNO_STATUSES.includes(d.status)) statusCls = 'row-estornado';
             else if(d.status==='RECUSADO') statusCls = 'row-recusado';
@@ -1280,21 +1469,36 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
             const estornoHtml = d.status!=='APROVADO' ? '' : refundReq
               ? `<div class="tx-status-info" title="${(refundReq.observacao||'').replace(/"/g,'&quot;')}">💸 Estorno: ${refundReq.status}</div>`
               : `<div class="tx-comentario" onclick="event.stopPropagation(); abrirEstorno('${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">💸 Solicitar estorno</div>`;
+            // acoes de marcar/desmarcar suspeita ou fraude - imediatas, 1 clique,
+            // sem precisar abrir nenhum modal
+            const pedidoIdEsc = String(orderKeyOf(d)).replace(/'/g,"\\'");
+            const unidadeEsc = (d.unidade||'').replace(/'/g,"\\'");
+            const chaveClienteEsc = (chaveCliente||'').replace(/'/g,"\\'");
+            const nomeClienteEsc = (d.nomeCliente||d.cardHolder||'').replace(/'/g,"\\'");
+            const fraudeHtml = infoFraude && infoFraude.direto
+              ? `<div class="tx-comentario" onclick="event.stopPropagation(); removerMarcaFraude('${pedidoIdEsc}')">✕ remover marcação</div>`
+              : `<div style="display:flex;gap:10px;">
+                   <div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">⚠️ Marcar suspeito</div>
+                   <div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">🚫 Marcar fraude</div>
+                 </div>`;
+            const fraudeBadge = !infoFraude ? '' : infoFraude.nivel==='FRAUDE'
+              ? `<span class="flag" style="background:var(--bad-dim);color:var(--bad);">🚫 FRAUDE${infoFraude.direto?'':' (recorrente)'}</span>`
+              : `<span class="flag" style="background:var(--warn-dim);color:var(--warn);">⚠️ SUSPEITO</span>`;
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}</td>
+                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}${fraudeHtml}</td>
                             <td class="valor">${soNumero(d.unidade)}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
-                                        <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
-                                              <td>${d.metodo||'—'}</td>
-                                                    <td class="valor">${fmtMoney(d.valor)}</td>
-                                                          <td>${d.last4?('•• '+d.last4):'—'}</td>
-                                                                <td class="statuscell">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
-                                                                      <td class="valor">${c.total}</td>
-                                                                            <td class="valor">${c.aprovadas}</td>
-                                                                                  <td class="valor">${c.recusadas}</td>
-                                                                                        <td class="valor">${c.estornadas}</td>
-                                                                                              <td class="valor">${c.fraude}</td>
+                                        <td class="statuscell" title="${d.status}">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${fraudeBadge}${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
+                                              <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>
+                                                    <td>${d.metodo||'—'}</td>
+                                                          <td class="valor">${fmtMoney(d.valor)}</td>
+                                                                <td>${d.last4?('•• '+d.last4):'—'}</td>
+                                                                      <td class="valor">${c?c.total:'—'}</td>
+                                                                            <td class="valor">${c?c.aprovadas:'—'}</td>
+                                                                                  <td class="valor">${c?c.recusadas:'—'}</td>
+                                                                                        <td class="valor">${c?c.estornadas:'—'}</td>
+                                                                                              <td class="valor">${c?c.fraude:'—'}</td>
                                                                                                     <td class="truncate" title="${d.bancoEmissor||''}">${d.bancoEmissor||'—'}</td>
                                                                                                         </tr>
                                                                                                           `;}).join('') : '<tr><td colspan="14" class="empty">Nenhuma transação encontrada.</td></tr>';
@@ -1305,18 +1509,55 @@ function orderKeyOf(t){ return t.merchantReference || t.originalReference || t.p
   }
 ['f-date-start','f-date-end','f-search'].forEach(id=>document.getElementById(id).addEventListener('input',render));
 
-// padrao: ultimo dia (data inicial = data final = hoje)
-(function initDateRange(){
-  const hoje = new Date().toISOString().slice(0,10);
+// botao "Hoje": reseta o periodo pro dia de hoje na hora, sem precisar
+// recarregar a pagina (util quando ja se navegou pra outras datas)
+function filtrarHoje(){
+  const hoje = hojeBrasilia();
   document.getElementById('f-date-start').value = hoje;
   document.getElementById('f-date-end').value = hoje;
-})();
+  render();
+}
+
+// padrao: ultimo dia (data inicial = data final = hoje)
+filtrarHoje();
 
 // ---- som + vibração pra alertas críticos (fraude, chargeback, estorno) ----
 // nao depende de permissao de push nem de service worker - toca direto na
 // aba aberta, então funciona mesmo sem o usuario ter aceitado notificacoes.
 // navegadores bloqueiam audio antes de uma interacao do usuario, entao o
 // AudioContext so e criado/retomado no primeiro clique/tecla da pagina.
+// ---- popup de alerta pra pedido recusado com suspeita de fraude - fila (um
+// de cada vez) com fechamento automatico em 10s ou manual pelo OK ----
+const FILA_POPUP_FRAUDE = [];
+let POPUP_FRAUDE_TIMER = null;
+function enfileirarPopupFraude(tx){
+  FILA_POPUP_FRAUDE.push(tx);
+  if(FILA_POPUP_FRAUDE.length===1) mostrarPopupFraude();
+}
+function mostrarPopupFraude(){
+  const tx = FILA_POPUP_FRAUDE[0];
+  if(!tx) return;
+  document.getElementById('fraude-popup-info').innerHTML =
+    `${tx.nomeCliente||tx.cardHolder||'Cliente desconhecido'} · ${tx.unidade||'—'} · ${fmtMoney(tx.valor)}${tx.last4?(' · •• '+tx.last4):''}${tx.motivo?('<br><span style="color:var(--muted);font-size:12px;">'+tx.motivo+'</span>'):''}`;
+  document.getElementById('fraude-popup-overlay').classList.add('show');
+  tocarAlerta();
+  let restante = 10;
+  document.getElementById('fraude-popup-contagem').textContent = restante;
+  clearInterval(POPUP_FRAUDE_TIMER);
+  POPUP_FRAUDE_TIMER = setInterval(()=>{
+    restante--;
+    const el = document.getElementById('fraude-popup-contagem');
+    if(el) el.textContent = Math.max(restante,0);
+    if(restante<=0) fecharPopupFraude();
+  }, 1000);
+}
+function fecharPopupFraude(){
+  clearInterval(POPUP_FRAUDE_TIMER);
+  document.getElementById('fraude-popup-overlay').classList.remove('show');
+  FILA_POPUP_FRAUDE.shift();
+  if(FILA_POPUP_FRAUDE.length) mostrarPopupFraude();
+}
+
 const ALERT_STATUSES = new Set(['ESTORNADO','FALHA_ESTORNO','ESTORNO_AGENDADO','CHARGEBACK','CHARGEBACK_REVERTIDO','NOTIFICATION_OF_CHARGEBACK']);
 let AUDIO_CTX = null;
 function prepararAudio(){
@@ -1381,7 +1622,8 @@ function connectStream(){
     const tx = JSON.parse(e.data);
     DATA.push(tx);
     marcarNovo('tx:'+tx.pspReference);
-    if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
+    if(tx.status==='RECUSADO' && tx.fraudeSuspeita) enfileirarPopupFraude(tx);
+    else if(tx.fraudeSuspeita || ALERT_STATUSES.has(tx.status)) tocarAlerta();
     populateFilters(); render();
   });
   es.addEventListener('update', (e)=>{
@@ -1406,6 +1648,14 @@ function connectStream(){
   });
   es.addEventListener('dispute-changed', ()=>{
     if(podeSecao('disputas')) refreshDisputeMarkers();
+  });
+  es.addEventListener('fraude-marcada', (e)=>{
+    const m = JSON.parse(e.data);
+    if(m.nivel==='FRAUDE') tocarAlerta();
+    refreshFraudMarks();
+  });
+  es.addEventListener('fraude-removida', ()=>{
+    refreshFraudMarks();
   });
   es.addEventListener('refund-requested', ()=>{
     if(ME.role==='master') tocarAlerta();

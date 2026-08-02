@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Lançamento de entregas · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:640px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  .hidden{display:none!important;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  input[type=file]{padding:8px 9px;font-size:12.5px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .resumo{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:12.5px;display:flex;flex-direction:column;gap:4px;}
+  .resumo .linha{display:flex;justify-content:space-between;gap:8px;}
+  .resumo b{font-variant-numeric:tabular-nums;}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .card{border-top:1px solid var(--line);padding:12px 0;}
+  .card:first-child{border-top:none;padding-top:0;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .card .valores{display:flex;gap:12px;margin-top:8px;font-size:12px;flex-wrap:wrap;}
+  .card .valores b{color:var(--text);}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.PENDENTE{background:var(--warn-dim);color:var(--warn);}
+  .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
+  .badge.REJEITADO{background:var(--bad-dim);color:var(--bad);}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
+    <h1>Lançamento de entregas</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <button class="back" onclick="logout()">🚪 Sair</button>
+  </div>
+</header>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao lançamento de entregas. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<div class="panel">
+  <h2>Nova corrida / turno</h2>
+  <form id="form-lancar">
+
+    <div class="secao">
+      <div class="secao-titulo">Identificação</div>
+      <label>Unidade</label>
+      <select id="f-unidade" required></select>
+
+      <div class="grid2">
+        <div>
+          <label>Data</label>
+          <input type="date" id="f-data" required>
+        </div>
+        <div>
+          <label>Entregador</label>
+          <input type="text" id="f-entregador" placeholder="nome do motoboy" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Entregas</div>
+      <div class="grid2">
+        <div><label>Entregas</label><input type="number" step="1" inputmode="numeric" id="f-entrega" value="0"></div>
+        <div><label>Extra</label><input type="number" step="1" inputmode="numeric" id="f-extra" value="0"></div>
+      </div>
+      <label>Obs. Extra (opcional)</label>
+      <input type="text" id="f-obsExtra" placeholder="ex: distância, bairro">
+
+      <div class="grid2">
+        <div><label>Retorno</label><input type="number" step="1" inputmode="numeric" id="f-retorno" value="0"></div>
+        <div><label>Pos 00hs</label><input type="number" step="1" inputmode="numeric" id="f-pos00hs" value="0"></div>
+      </div>
+      <label>Obs. Retorno (opcional)</label>
+      <input type="text" id="f-obsRetorno" placeholder="motivo do retorno">
+
+      <label>Fora de área</label>
+      <input type="number" step="1" inputmode="numeric" id="f-foraDeArea" value="0">
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Valores</div>
+      <div class="grid2">
+        <div><label>Bônus (Gami/NEXT)</label><input type="number" step="0.01" inputmode="decimal" id="f-bonus" value="0"></div>
+        <div><label>Ajuda de custo</label><input type="number" step="0.01" inputmode="decimal" id="f-ajudaCusto" value="0"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Valor a pagar</label><input type="number" step="0.01" inputmode="decimal" id="f-valor" value="0"></div>
+        <div><label>COOP recebe</label><input type="number" step="0.01" inputmode="decimal" id="f-coopRecebe" value="0"></div>
+      </div>
+      <label>Quantidade total</label>
+      <input type="number" step="1" inputmode="numeric" id="f-quantTotal" value="0">
+      <div class="resumo">
+        <div class="linha"><span>Sugestão (entregas + extra)</span><b id="resumo-sugestao">0</b></div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Etiqueta / comprovante (opcional)</div>
+      <input type="file" id="f-etiqueta" accept="image/*" capture="environment">
+    </div>
+
+    <div class="secao">
+      <label>Observação (opcional)</label>
+      <textarea id="f-observacao" placeholder="qualquer detalhe da corrida/turno"></textarea>
+    </div>
+
+    <div class="msg hidden" id="msg"></div>
+    <button class="btn-primary" type="submit" id="btn-enviar">Lançar entrega</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>Meus últimos lançamentos</h2>
+  <div id="lista-lancamentos"><div class="empty">carregando...</div></div>
+</div>
+
+</div>
+
+<div class="overlay hidden" id="overlay-edicao">
+  <div class="sheet">
+    <h3>Pedir correção</h3>
+    <div class="sub" id="edicao-info"></div>
+    <form id="form-edicao">
+      <label>Qual valor está errado e qual o valor correto?</label>
+      <select id="e-campo"></select>
+      <input type="number" step="0.01" id="e-valor" placeholder="valor correto" style="margin-top:8px;">
+      <label>Motivo da correção</label>
+      <textarea id="e-motivo" placeholder="explique o que aconteceu, o Master vai revisar antes de aprovar" required></textarea>
+      <div class="msg hidden" id="msg-edicao"></div>
+      <button class="btn-primary" type="submit">Enviar pedido ao Master</button>
+    </form>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharEdicao()">Cancelar</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay-master">
+  <div class="sheet">
+    <h3>Editar lançamento (Master)</h3>
+    <div class="sub" id="master-info"></div>
+    <form id="form-master">
+      <div class="grid2">
+        <div><label>Entregador</label><input type="text" id="m-entregador"></div>
+      </div>
+      <div class="grid2" id="m-campos-numericos"></div>
+      <label>Obs. Retorno</label>
+      <input type="text" id="m-obsRetorno">
+      <label>Obs. Extra</label>
+      <input type="text" id="m-obsExtra">
+      <label>Observação</label>
+      <textarea id="m-observacao"></textarea>
+      <label>Motivo da alteração (opcional, fica registrado no histórico)</label>
+      <textarea id="m-motivo" placeholder="ex: corrigido conforme conferência"></textarea>
+      <div class="msg hidden" id="msg-master"></div>
+      <button class="btn-primary" type="submit">Salvar alterações</button>
+    </form>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharMaster()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+
+const CAMPOS_NUMERICOS = ['entrega','retorno','extra','bonus','pos00hs','foraDeArea','ajudaCusto','valor','coopRecebe','quantTotal'];
+const NOMES_CAMPOS = { entrega:'Entregas', retorno:'Retorno', extra:'Extra', bonus:'Bônus (Gami/NEXT)', pos00hs:'Pos 00hs', foraDeArea:'Fora de área', ajudaCusto:'Ajuda de custo', valor:'Valor a pagar', coopRecebe:'COOP recebe', quantTotal:'Quantidade total' };
+const CAMPOS_MONETARIOS = new Set(['bonus','ajudaCusto','valor','coopRecebe']);
+
+// mesma lista fixa usada no backend (index.js) - fallback pra loja ver o
+// nome certo da unidade mesmo sem poder chamar /api/meta/unidades (so o
+// Master pode); se o Master cadastrar mais unidades depois, o proprio
+// backend ja resolve o nome certo nos lançamentos existentes
+const ENTREGAS_UNIDADES_NOMES = { 'Tirol Natal':'Tirol Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Bessa', Caruaru:'Caruaru', Garanhuns:'Garanhuns' };
+
+let ME = null;
+let IS_MASTER = false;
+let UNIDADES_NOMES = { ...ENTREGAS_UNIDADES_NOMES };
+let MEUS = [];
+let EDICOES = [];
+let EDITANDO_ID = null;
+let EDITANDO_MASTER_ID = null;
+
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtValorCampo(campo,v){ return CAMPOS_MONETARIOS.has(campo) ? fmtMoney(v) : (Number(v)||0).toString(); }
+function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
+function atualizarSugestao(){
+  const sugestao = num(document.getElementById('f-entrega').value) + num(document.getElementById('f-extra').value);
+  document.getElementById('resumo-sugestao').textContent = sugestao;
+}
+['f-entrega','f-extra'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', atualizarSugestao);
+});
+
+async function carregar(){
+  const [meus, edicoes] = await Promise.all([
+    fetch('/api/entregas/meus').then(r=>r.json()),
+    fetch('/api/entregas/edicoes').then(r=>r.json()),
+  ]);
+  MEUS = meus.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||'')).slice(0,30);
+  EDICOES = edicoes;
+  renderLista();
+}
+
+function edicaoPendente(entregaId){
+  return EDICOES.find(e=>e.entregaId===entregaId && e.status==='PENDENTE');
+}
+function ultimaDecisao(entregaId){
+  return EDICOES.filter(e=>e.entregaId===entregaId && e.status!=='PENDENTE').sort((a,b)=>(b.decididoEm||'').localeCompare(a.decididoEm||''))[0];
+}
+
+function renderLista(){
+  const el = document.getElementById('lista-lancamentos');
+  if(!MEUS.length){ el.innerHTML = '<div class="empty">Nenhuma entrega lançada ainda.</div>'; return; }
+  el.innerHTML = MEUS.map(f=>{
+    const pendente = edicaoPendente(f.id);
+    const decidida = !pendente && ultimaDecisao(f.id);
+    return `
+    <div class="card">
+      <div class="linha1">
+        <span>${escapeHtml(f.entregador)} · ${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
+        ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
+        ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
+      </div>
+      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.etiquetaPath?' · <a href="/api/entregas/etiqueta/'+f.id+'?token='+encodeURIComponent(AUTH_TOKEN)+'" target="_blank" style="color:var(--accent);">📎 etiqueta</a>':''}</div>
+      <div class="valores">
+        <span>Entregas <b>${f.entrega}</b></span>
+        <span>Extra <b>${f.extra}</b></span>
+        <span>Valor <b>${fmtMoney(f.valor)}</b></span>
+      </div>
+      ${IS_MASTER
+        ? '<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEditarMaster(\''+f.id+'\')">✎ Editar (Master)</button>'
+        : (pendente?'':'<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEdicao(\''+f.id+'\')">Pedir correção</button>')}
+    </div>`;
+  }).join('');
+}
+
+function abrirEdicao(id){
+  EDITANDO_ID = id;
+  const f = MEUS.find(x=>x.id===id);
+  document.getElementById('edicao-info').textContent = `${f.entregador} · ${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado, a correção precisa de aprovação do Master.`;
+  document.getElementById('e-campo').innerHTML = CAMPOS_NUMERICOS.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtValorCampo(c,f[c])})</option>`).join('');
+  document.getElementById('e-valor').value = '';
+  document.getElementById('e-motivo').value = '';
+  document.getElementById('msg-edicao').classList.add('hidden');
+  document.getElementById('overlay-edicao').classList.remove('hidden');
+}
+function fecharEdicao(){ document.getElementById('overlay-edicao').classList.add('hidden'); EDITANDO_ID=null; }
+
+document.getElementById('form-edicao').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const campo = document.getElementById('e-campo').value;
+  const valor = document.getElementById('e-valor').value;
+  const motivo = document.getElementById('e-motivo').value;
+  const msg = document.getElementById('msg-edicao');
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch(`/api/entregas/${EDITANDO_ID}/solicitar-edicao`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mudancas: { [campo]: valor }, motivo }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');
+    fecharEdicao();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }
+});
+
+function abrirEditarMaster(id){
+  EDITANDO_MASTER_ID = id;
+  const f = MEUS.find(x=>x.id===id);
+  document.getElementById('master-info').textContent = `${f.entregador} · ${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — edição direta, aplicada na hora (fica registrada no histórico).`;
+  document.getElementById('m-entregador').value = f.entregador || '';
+  document.getElementById('m-obsRetorno').value = f.obsRetorno || '';
+  document.getElementById('m-obsExtra').value = f.obsExtra || '';
+  document.getElementById('m-observacao').value = f.observacao || '';
+  document.getElementById('m-motivo').value = '';
+  document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS.map(c=>
+    `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="${CAMPOS_MONETARIOS.has(c)?'0.01':'1'}" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
+  ).join('');
+  document.getElementById('msg-master').classList.add('hidden');
+  document.getElementById('overlay-master').classList.remove('hidden');
+}
+function fecharMaster(){ document.getElementById('overlay-master').classList.add('hidden'); EDITANDO_MASTER_ID=null; }
+
+document.getElementById('form-master').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-master');
+  msg.classList.add('hidden');
+  const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
+  const mudancas = {};
+  CAMPOS_NUMERICOS.forEach(c=>{
+    const v = num(document.getElementById('m-'+c).value);
+    if(v !== num(f[c])) mudancas[c] = v;
+  });
+  const entregador = document.getElementById('m-entregador').value;
+  if(entregador !== (f.entregador||'')) mudancas.entregador = entregador;
+  const obsRetorno = document.getElementById('m-obsRetorno').value;
+  if(obsRetorno !== (f.obsRetorno||'')) mudancas.obsRetorno = obsRetorno;
+  const obsExtra = document.getElementById('m-obsExtra').value;
+  if(obsExtra !== (f.obsExtra||'')) mudancas.obsExtra = obsExtra;
+  const observacao = document.getElementById('m-observacao').value;
+  if(observacao !== (f.observacao||'')) mudancas.observacao = observacao;
+  const motivo = document.getElementById('m-motivo').value;
+  if(!Object.keys(mudancas).length){ fecharMaster(); return; }
+  try{
+    const res = await fetch(`/api/entregas/${EDITANDO_MASTER_ID}/editar-direto`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mudancas, motivo }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharMaster();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+
+function resetarForm(){
+  document.getElementById('form-lancar').reset();
+  document.getElementById('f-data').value = hojeBrasilia();
+  CAMPOS_NUMERICOS.forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = 0; });
+  atualizarSugestao();
+}
+
+document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const btn = document.getElementById('btn-enviar');
+  const msg = document.getElementById('msg');
+  msg.classList.add('hidden');
+  btn.disabled = true;
+  try{
+    const unidade = document.getElementById('f-unidade').value;
+    const campos = {};
+    CAMPOS_NUMERICOS.forEach(c=>{
+      const el = document.getElementById('f-'+c);
+      campos[c] = el ? el.value : 0;
+    });
+    const payload = {
+      unidade,
+      unidadeNome: UNIDADES_NOMES[unidade] || unidade,
+      data: document.getElementById('f-data').value,
+      entregador: document.getElementById('f-entregador').value,
+      campos,
+      obsRetorno: document.getElementById('f-obsRetorno').value,
+      obsExtra: document.getElementById('f-obsExtra').value,
+      observacao: document.getElementById('f-observacao').value,
+    };
+    const form = new FormData();
+    form.append('payload', JSON.stringify(payload));
+    const etiqueta = document.getElementById('f-etiqueta').files[0];
+    if(etiqueta) form.append('etiqueta', etiqueta);
+
+    const res = await fetch('/api/entregas/lancar', { method:'POST', body: form });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao lançar');
+    msg.textContent = 'Entrega lançada com sucesso.'; msg.className = 'msg ok';
+    resetarForm();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+});
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  const isMaster = ME.role==='master';
+  IS_MASTER = isMaster;
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+
+  if(!secoes.includes('entregas-lancamento')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+
+  const unidadesMeta = isMaster ? await fetch('/api/meta/unidades').then(r=>r.json()).catch(()=>[]) : null;
+  if(unidadesMeta) unidadesMeta.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
+  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
+  if(!isMaster) unidades.forEach(u=>{ if(!UNIDADES_NOMES[u]) UNIDADES_NOMES[u] = u; });
+  const selUnidade = document.getElementById('f-unidade');
+  selUnidade.innerHTML = unidades.length
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+  document.getElementById('f-data').value = hojeBrasilia();
+  document.getElementById('f-data').max = hojeBrasilia();
+  atualizarSugestao();
+
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+}
+
+boot();
+</script>
+</body>
+</html>

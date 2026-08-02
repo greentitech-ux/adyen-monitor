@@ -22,9 +22,20 @@
   @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
   .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
 
@@ -106,18 +117,30 @@
 <body>
 
 <header>
-  <div>
-    <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-    <h1>Fechamentos de caixa</h1>
-    <div class="sub" id="sync-info">carregando...</div>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow" id="eyebrow-grupos">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
+      <h1>Fechamentos de caixa</h1>
+      <div class="sub" id="sync-info">carregando...</div>
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
-    <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
+  <div class="header-nav">
+    <div class="nav-links">
+      <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+      <a class="back active" id="nav-fechamentos-self" href="/fechamentos.html">💰 Fechamentos</a>
+      <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+      <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+      <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+      <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    </div>
+    <div class="nav-actions">
+      <button class="back hidden" id="btn-sincronizar-planilhas" onclick="sincronizarPlanilhas()" style="cursor:pointer;">🔄 Sincronizar agora</button>
+      <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
   </div>
 </header>
 
@@ -142,8 +165,8 @@
     </div>
     <select id="f-grupo">
       <option value="">Todos os grupos</option>
-      <option value="ARCFOOD">ARCFOOD</option>
-      <option value="BRAVO">Grupo Bravo</option>
+      <option id="f-grupo-arcfood" value="ARCFOOD">ARCFOOD</option>
+      <option id="f-grupo-bravo" value="BRAVO">Grupo Bravo</option>
     </select>
     <div class="multiselect" id="ms-unidade">
       <button type="button" class="multiselect-btn" id="ms-unidade-btn">Todas as unidades</button>
@@ -154,12 +177,14 @@
 
 <div class="panel">
   <h2>
-    <div class="title-group"><span>Faturamento diário</span><span class="n" id="fat-info"></span></div>
+    <div class="title-group"><span>Faturamento</span><span class="n" id="fat-info"></span></div>
   </h2>
   <div class="legend" id="fat-legend"></div>
   <div class="chart-body" id="fat-container"></div>
 </div>
 
+<!-- Painel "Diferença de caixa por dia" desativado a pedido (nao e prioridade
+     agora). Codigo mantido comentado (aqui e no bloco de script) pra uso futuro.
 <div class="panel">
   <h2>
     <div class="title-group"><span>Diferença de caixa por dia</span><span class="n" id="dif-info"></span></div>
@@ -172,22 +197,30 @@
     <svg id="dif-chart" class="chart-svg" viewBox="0 0 600 230" preserveAspectRatio="none"></svg>
   </div>
 </div>
+-->
+
 
 <div class="panel">
   <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
-  <div class="tablewrap" style="max-height:220px;">
+  <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
-      <thead><tr><th>Unid.</th><th>Fechamentos</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>TC total</th><th>Cancelados</th></tr></thead>
+      <thead><tr><th>Unid.</th><th>Previsão (mês)</th><th>Fechamentos</th><th>Faturamento</th><th>Diferença</th><th>TC total</th><th>Cancelados</th></tr></thead>
       <tbody id="unidades-body"></tbody>
     </table>
   </div>
 </div>
 
 <div class="panel">
-  <h2>Fechamentos <span class="n" id="fechamentos-count"></span></h2>
+  <h2>
+    <div class="title-group"><span>Fechamentos</span><span class="n" id="fechamentos-count"></span></div>
+    <div class="daterange">
+      <span class="sep">até</span>
+      <input type="date" id="fech-date-fim" title="Filtrar esta tabela até uma data específica, dentro do período principal">
+    </div>
+  </h2>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th></tr></thead>
       <tbody id="fechamentos-body"></tbody>
     </table>
   </div>
@@ -229,6 +262,24 @@ const LIMIAR_SMALL_MULTIPLES = 6; // acima disso, facet em vez de multi-linha
 
 const SEL_UNIDADE = new Set();
 let UNIDADES_PERMITIDAS = null; // null = sem restrição (Master); senao, Set das unidades liberadas pro usuario
+let GRUPO_VISIVEL = { ARCFOOD:true, BRAVO:true }; // false quando o usuario nao tem nenhuma unidade do grupo
+
+// esconde qualquer mencao a um grupo (opcao no seletor, eyebrow, contagem no
+// sync-info) quando o usuario nao tem acesso a nenhuma unidade daquele grupo
+function atualizarVisibilidadeGrupos(){
+  GRUPO_VISIVEL.ARCFOOD = !UNIDADES_PERMITIDAS || GRUPOS.ARCFOOD.some(c=>UNIDADES_PERMITIDAS.has(c));
+  GRUPO_VISIVEL.BRAVO = !UNIDADES_PERMITIDAS || GRUPOS.BRAVO.some(c=>UNIDADES_PERMITIDAS.has(c));
+
+  document.getElementById('f-grupo-arcfood').classList.toggle('hidden', !GRUPO_VISIVEL.ARCFOOD);
+  document.getElementById('f-grupo-bravo').classList.toggle('hidden', !GRUPO_VISIVEL.BRAVO);
+  if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('f-grupo').value==='ARCFOOD') document.getElementById('f-grupo').value = '';
+  if(!GRUPO_VISIVEL.BRAVO && document.getElementById('f-grupo').value==='BRAVO') document.getElementById('f-grupo').value = '';
+
+  const nomes = ['Solutions Ti Tech'];
+  if(GRUPO_VISIVEL.ARCFOOD) nomes.push('ARCFOOD');
+  if(GRUPO_VISIVEL.BRAVO) nomes.push('Grupo Bravo');
+  document.getElementById('eyebrow-grupos').textContent = nomes.join(' · ');
+}
 
 function codigosDoGrupo(){
   const grupo = document.getElementById('f-grupo').value;
@@ -250,16 +301,63 @@ function fmtMoneyEixo(v){
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
+// texto de "última sincronização" a partir do status que o backend guarda
+// (a sincronizacao com as planilhas do Sheets roda sozinha no servidor) - so
+// mostra um resumo curto (sincronizou ou não) na tela; a mensagem de erro
+// completa (pode ser bem longa, tipo a da API do Google) fica so no title
+// (tooltip ao passar o mouse), pra nao poluir o cabeçalho
+async function carregarStatusSincronizacao(){
+  try{
+    const status = await fetch('/api/fechamentos/sincronizacao').then(r=>r.json());
+    if(status.ultimoErro){
+      SYNC_INFO_SUFIXO = ' · ⚠️ planilhas não sincronizadas';
+      SYNC_INFO_TITLE = `Falha na última tentativa de sincronização: ${status.ultimoErro}`;
+    } else if(status.ultimaEm){
+      const dt = new Date(status.ultimaEm);
+      SYNC_INFO_SUFIXO = ' · ✅ planilhas sincronizadas';
+      SYNC_INFO_TITLE = `Última sincronização automática: ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
+    } else {
+      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização';
+      SYNC_INFO_TITLE = '';
+    }
+  }catch(e){
+    SYNC_INFO_SUFIXO = '';
+    SYNC_INFO_TITLE = '';
+  }
+}
+
+async function sincronizarPlanilhas(){
+  const btn = document.getElementById('btn-sincronizar-planilhas');
+  btn.disabled = true; btn.textContent = '🔄 Sincronizando...';
+  try{
+    const resp = await fetch('/api/fechamentos/sincronizar-planilhas', { method:'POST' });
+    const status = await resp.json();
+    if(!resp.ok) throw new Error(status.ultimoErro || 'Erro ao sincronizar.');
+    await carregar();
+  }catch(err){
+    alert('Não foi possível sincronizar as planilhas: ' + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
+  }
+}
+
+let SYNC_INFO_SUFIXO = '';
+let SYNC_INFO_TITLE = '';
 async function carregar(){
   const resp = await fetch('/api/fechamentos');
   DATA = await resp.json();
+  await carregarStatusSincronizacao();
   const datas = DATA.map(d=>d.data).filter(Boolean).sort();
-  const qtdArcfood = DATA.filter(d=>d.grupo==='ARCFOOD').length;
-  const qtdBravo = DATA.filter(d=>d.grupo==='BRAVO').length;
-  document.getElementById('sync-info').textContent = datas.length
-    ? `${datas.length} fechamentos (${qtdArcfood} ARCFOOD · ${qtdBravo} Grupo Bravo) · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])} · sincronizado manualmente da planilha`
+  const partesGrupo = [];
+  if(GRUPO_VISIVEL.ARCFOOD) partesGrupo.push(`${DATA.filter(d=>d.grupo==='ARCFOOD').length} ARCFOOD`);
+  if(GRUPO_VISIVEL.BRAVO) partesGrupo.push(`${DATA.filter(d=>d.grupo==='BRAVO').length} Grupo Bravo`);
+  const sufixoGrupo = partesGrupo.length ? ` (${partesGrupo.join(' · ')})` : '';
+  const elSyncInfo = document.getElementById('sync-info');
+  elSyncInfo.textContent = datas.length
+    ? `${datas.length} fechamentos${sufixoGrupo} · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
     : 'nenhum fechamento importado ainda';
-  setupPresets(datas.length ? datas[datas.length-1] : new Date().toISOString().slice(0,10));
+  elSyncInfo.title = SYNC_INFO_TITLE;
+  setupPresets(); // estado inicial: D-1 nos KPIs/tabelas; o grafico usa os ultimos 30 dias (ver chartRange())
   setupMultiselect();
   render();
 }
@@ -273,7 +371,7 @@ async function carregarEdicoes(){
   document.getElementById('edicoes-lista').innerHTML = pendentes.map(p=>`
     <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;">
       <div style="font-size:12.5px;font-weight:600;">${escapeHtml(p.unidadeNome||p.unidade)} · ${fmtData(p.data)}</div>
-      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR')}</div>
+      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</div>
       <div style="font-size:12px;margin-bottom:6px;">${Object.entries(p.mudancas).map(([campo,valor])=>`<div>${campo}: <b>${fmtMoney(valor)}</b></div>`).join('')}</div>
       <div style="font-size:12px;color:var(--text);margin-bottom:8px;white-space:pre-wrap;">${escapeHtml(p.motivo)}</div>
       <div style="display:flex;gap:8px;">
@@ -292,31 +390,111 @@ async function decidirEdicaoFechamento(id, status){
   await carregar();
 }
 
-// ---- presets de periodo (7/30/90 dias, mes atual) - lista de botoes, o
-// primeiro (30 dias) comeca marcado ----
-function setupPresets(dataFinalDados){
+// ---- presets de periodo: Semana (dom-sab), Mes (mes cheio) e Trimestre
+// (mes clicado + 2 meses anteriores). Cada preset fica "grudado": editar
+// qualquer campo de data com um preset ativo re-snapa o periodo inteiro
+// pra semana/mes/trimestre daquela data digitada, em vez de virar um
+// intervalo livre ----
+function pad2(n){ return String(n).padStart(2,'0'); }
+function isoLocal(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+// Date "falso" cujos getters locais ja refletem o horario de Sao Paulo,
+// independente do fuso do navegador/servidor - evita virar o dia errado
+// perto da meia-noite quando o ambiente roda em UTC (comum em hospedagem)
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+
+function calcularPreset(tipo, refIso){
+  const ref = new Date(refIso+'T00:00:00');
+  if(tipo==='ontem'){
+    const ontem = new Date(ref); ontem.setDate(ontem.getDate()-1);
+    return {inicio:isoLocal(ontem), fim:isoLocal(ontem)};
+  }
+  if(tipo==='semana'){
+    const dow = ref.getDay(); // 0=domingo
+    const inicio = new Date(ref); inicio.setDate(ref.getDate()-dow);
+    const fim = new Date(inicio); fim.setDate(inicio.getDate()+6);
+    return {inicio:isoLocal(inicio), fim:isoLocal(fim)};
+  }
+  if(tipo==='mes'){
+    const inicio = new Date(ref.getFullYear(), ref.getMonth(), 1);
+    const fim = new Date(ref.getFullYear(), ref.getMonth()+1, 0);
+    return {inicio:isoLocal(inicio), fim:isoLocal(fim)};
+  }
+  // trimestre: mes da data de referencia + os 2 meses anteriores
+  const inicio = new Date(ref.getFullYear(), ref.getMonth()-2, 1);
+  const fim = new Date(ref.getFullYear(), ref.getMonth()+1, 0);
+  return {inicio:isoLocal(inicio), fim:isoLocal(fim)};
+}
+
+let presetAtivo = null;
+// false = modo padrao (KPIs/tabelas em D-1, grafico nos ultimos 30 dias -
+// ver chartRange()); true = usuario escolheu um filtro de data explicito
+// (preset ou intervalo livre) e todos os paineis passam a seguir esse mesmo
+// intervalo. So volta a false num reload completo (botao Atualizar).
+let filtroDataAtivo = false;
+
+function chartRange(){
+  if(filtroDataAtivo){
+    return { start: document.getElementById('f-date-start').value, end: document.getElementById('f-date-end').value };
+  }
+  const fim = agoraBrasilia(); fim.setDate(fim.getDate()-1); // ontem
+  const inicio = new Date(fim); inicio.setDate(inicio.getDate()-29); // ultimos 30 dias, terminando ontem
+  return { start: isoLocal(inicio), end: isoLocal(fim) };
+}
+
+function setupPresets(){
   const presets = [
-    {lbl:'7 dias', dias:7},
-    {lbl:'30 dias', dias:30},
-    {lbl:'90 dias', dias:90},
+    {lbl:'Ontem', tipo:'ontem'},
+    {lbl:'Semana', tipo:'semana'},
+    {lbl:'Mês', tipo:'mes'},
+    {lbl:'Trimestre', tipo:'trimestre'},
   ];
   const cont = document.getElementById('presets');
-  cont.innerHTML = presets.map((p,i)=>`<button type="button" class="preset-btn${i===1?' active':''}" data-dias="${p.dias}">${p.lbl}</button>`).join('');
-  function aplicar(dias, btn){
+  cont.innerHTML = presets.map(p=>`<button type="button" class="preset-btn" data-tipo="${p.tipo}">${p.lbl}</button>`).join('');
+
+  function aplicarPreset(tipo, refIso, btn){
+    presetAtivo = tipo;
+    filtroDataAtivo = true;
     cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
     if(btn) btn.classList.add('active');
-    const fim = dataFinalDados;
-    const inicioDt = new Date(fim); inicioDt.setDate(inicioDt.getDate()-(dias-1));
-    document.getElementById('f-date-start').value = inicioDt.toISOString().slice(0,10);
-    document.getElementById('f-date-end').value = fim;
+    const range = calcularPreset(tipo, refIso);
+    document.getElementById('f-date-start').value = range.inicio;
+    document.getElementById('f-date-end').value = range.fim;
     render();
   }
+
   cont.querySelectorAll('.preset-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>aplicar(Number(btn.dataset.dias), btn));
+    // ao clicar num preset a referencia e sempre hoje (nao a data ja
+    // selecionada) - Ontem/Semana/Mes/Trimestre sempre voltam pro periodo atual
+    btn.addEventListener('click', ()=>{
+      aplicarPreset(btn.dataset.tipo, isoLocal(agoraBrasilia()), btn);
+    });
   });
-  aplicar(30, cont.children[1]);
+
+  // estado inicial (e apos "Atualizar"/reload): nenhum preset ativo, campos
+  // mostram D-1 - o grafico ignora esses campos nesse modo (ver chartRange())
+  // ate o usuario escolher um filtro de data explicito
+  presetAtivo = null;
+  filtroDataAtivo = false;
+  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
+  const ontemIso = isoLocal(ontem);
+  document.getElementById('f-date-start').value = ontemIso;
+  document.getElementById('f-date-end').value = ontemIso;
+
   ['f-date-start','f-date-end'].forEach(id=>{
     document.getElementById(id).addEventListener('input', ()=>{
+      // edicao manual = intervalo livre (permite qualquer intervalo, inclusive
+      // um unico dia): desativa o preset em vez de re-snapar pro periodo cheio
+      presetAtivo = null;
+      filtroDataAtivo = true;
       cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
       render();
     });
@@ -364,9 +542,7 @@ function setupMultiselect(){
   document.getElementById('f-grupo').addEventListener('change', ()=>{ renderPanel(); render(); });
 }
 
-function filtrar(){
-  const start = document.getElementById('f-date-start').value;
-  const end = document.getElementById('f-date-end').value;
+function filtrarPorIntervalo(start, end){
   const grupo = document.getElementById('f-grupo').value;
   return DATA.filter(d=>
     (!grupo || d.grupo===grupo) &&
@@ -374,6 +550,9 @@ function filtrar(){
     (!start || (d.data||'') >= start) &&
     (!end || (d.data||'') <= end)
   );
+}
+function filtrar(){
+  return filtrarPorIntervalo(document.getElementById('f-date-start').value, document.getElementById('f-date-end').value);
 }
 
 // ---- KPIs: valor + variacao contra o periodo anterior de mesmo tamanho ----
@@ -389,7 +568,7 @@ function renderKpis(rows){
     const prevEnd = new Date(dStart); prevEnd.setDate(prevEnd.getDate()-1);
     const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate()-(dias-1));
     const grupo = document.getElementById('f-grupo').value;
-    const prevEndIso = prevEnd.toISOString().slice(0,10), prevStartIso = prevStart.toISOString().slice(0,10);
+    const prevEndIso = isoLocal(prevEnd), prevStartIso = isoLocal(prevStart);
     anteriores = DATA.filter(d=>
       (!grupo || d.grupo===grupo) &&
       (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
@@ -437,7 +616,7 @@ function diasNoIntervalo(start,end){
   const limite = new Date(end+'T00:00:00');
   let i=0;
   while(cursor.getTime()<=limite.getTime() && i<400){
-    dias.push(cursor.toISOString().slice(0,10));
+    dias.push(isoLocal(cursor));
     cursor.setDate(cursor.getDate()+1);
     i++;
   }
@@ -484,9 +663,7 @@ function xParaViewBox(svg, clientX){
 // multiples (facet, quando ha mais unidades do que da pra comparar
 // por cor com seguranca)
 // ---------------------------------------------------------------
-function renderFaturamentoChart(rows){
-  const start = document.getElementById('f-date-start').value;
-  const end = document.getElementById('f-date-end').value;
+function renderFaturamentoChart(rows, start, end){
   const dias = diasNoIntervalo(start,end);
   const container = document.getElementById('fat-container');
   const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
@@ -500,28 +677,31 @@ function renderFaturamentoChart(rows){
   document.getElementById('fat-info').textContent = `${fmtData(dias[0])} → ${fmtData(dias[dias.length-1])}`;
 
   const porDiaUnidade = {};
-  unidades.forEach(u=>{ porDiaUnidade[u] = {}; dias.forEach(d=>porDiaUnidade[u][d]=0); });
+  const porDiaUnidadeTC = {};
+  unidades.forEach(u=>{ porDiaUnidade[u] = {}; porDiaUnidadeTC[u] = {}; dias.forEach(d=>{ porDiaUnidade[u][d]=0; porDiaUnidadeTC[u][d]=0; }); });
   rows.forEach(r=>{
     if(porDiaUnidade[r.unidade] && porDiaUnidade[r.unidade][r.data]!==undefined){
       porDiaUnidade[r.unidade][r.data] += r.faturamento||0;
+      porDiaUnidadeTC[r.unidade][r.data] += r.tc||0;
     }
   });
 
   if(unidades.length > LIMIAR_SMALL_MULTIPLES){
     document.getElementById('fat-legend').innerHTML = '';
-    renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidade);
+    renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidade, porDiaUnidadeTC);
   } else {
     document.getElementById('fat-legend').innerHTML = unidades.map(u=>`<span><i style="background:${CORES_UNIDADE[u]};"></i>${escapeHtml(UNIDADES_NOMES[u])}</span>`).join('');
-    renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade);
+    renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade, porDiaUnidadeTC);
   }
 }
 
-function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade){
-  container.innerHTML = `<svg id="fat-chart" class="chart-svg" viewBox="0 0 600 230" preserveAspectRatio="none"></svg>`;
+function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade, porDiaUnidadeTC){
+  const W = Math.max(1, Math.round(container.getBoundingClientRect().width)) || 600;
+  container.innerHTML = `<svg id="fat-chart" class="chart-svg" viewBox="0 0 ${W} 230" preserveAspectRatio="none"></svg>`;
   const svg = document.getElementById('fat-chart');
 
   const direct = unidades.length >= 4; // >=4 series: rotulo direto vira obrigatorio
-  const W=600,H=230,padL=68,padR=direct?92:10,padT=10,padB=24;
+  const H=230,padL=68,padR=direct?92:10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   let maxVal = 1;
@@ -581,12 +761,13 @@ function renderFaturamentoMultiLinha(container, unidades, dias, porDiaUnidade){
     crosshairEl.style.opacity = 1;
     const linhasTt = unidades.map(u=>{
       const v = porDiaUnidade[u][dias[idx]];
+      const tc = porDiaUnidadeTC[u][dias[idx]];
       const dot = document.getElementById('fat-dot-'+cssId(u));
       dot.setAttribute('cx', x); dot.setAttribute('cy', yAt(v)); dot.style.opacity = 1;
-      return {u, v};
+      return {u, v, tc};
     }).sort((a,b)=>b.v-a.v);
     const html = `<div class="tt-date">${fmtData(dias[idx])}</div>` + linhasTt.map(r=>
-      `<div class="tt-row"><span class="tt-key"><i style="background:${CORES_UNIDADE[r.u]}"></i>${escapeHtml(UNIDADES_NOMES[r.u])}</span><span class="tt-val">${fmtMoney(r.v)}</span></div>`
+      `<div class="tt-row"><span class="tt-key"><i style="background:${CORES_UNIDADE[r.u]}"></i>${escapeHtml(UNIDADES_NOMES[r.u])}</span><span class="tt-val">${fmtMoney(r.v)} <span style="color:var(--muted);font-weight:400;">· ${r.tc.toFixed(0)} TC</span></span></div>`
     ).join('');
     mostrarTooltip(clientX, clientY, html);
   }
@@ -605,7 +786,7 @@ function cssId(s){ return String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
 
 // small multiples: um mini-grafico por unidade, todos na MESMA cor (a
 // identidade aqui e o titulo do card, nao a cor - ver choosing-a-form.md)
-function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidade){
+function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidade, porDiaUnidadeTC){
   const cor = 'var(--accent)';
   const ordenadas = [...unidades].sort((a,b)=>{
     const totalA = dias.reduce((s,d)=>s+porDiaUnidade[a][d],0);
@@ -616,6 +797,7 @@ function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidad
   container.innerHTML = `<div class="multiples-grid">${ordenadas.map(u=>{
     const vals = dias.map(d=>porDiaUnidade[u][d]);
     const total = vals.reduce((s,v)=>s+v,0);
+    const totalTc = dias.reduce((s,d)=>s+porDiaUnidadeTC[u][d],0);
     const maxV = Math.max(1, ...vals);
     const W=200,H=44,pad=3;
     const pts = vals.map((v,i)=>{
@@ -625,7 +807,7 @@ function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidad
     }).join(' ');
     return `<div class="multiple-card">
       <div class="mc-title" title="${escapeHtml(UNIDADES_NOMES[u])}">${escapeHtml(UNIDADES_NOMES[u])}</div>
-      <div class="mc-total">${fmtMoney(total)}</div>
+      <div class="mc-total">${fmtMoney(total)} <span style="color:var(--muted);font-size:11px;font-weight:400;">· ${totalTc.toFixed(0)} TC</span></div>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${cor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>`;
   }).join('')}</div>`;
@@ -633,8 +815,12 @@ function renderFaturamentoSmallMultiples(container, unidades, dias, porDiaUnidad
 
 // ---------------------------------------------------------------
 // Diferenca de caixa - grafico de barras divergente (positivo/
-// negativo), com hover por barra (a marca e o alvo do toque)
+// negativo), com hover por barra (a marca e o alvo do toque).
+// Desativado a pedido (nao e prioridade agora) - mantido comentado
+// pra uso futuro. O painel correspondente no HTML tambem esta
+// comentado, e as chamadas em render()/resize foram removidas.
 // ---------------------------------------------------------------
+/*
 function renderDiferencaChart(rows){
   const start = document.getElementById('f-date-start').value;
   const end = document.getElementById('f-date-end').value;
@@ -647,7 +833,9 @@ function renderDiferencaChart(rows){
   dias.forEach(d=>porDia[d]=0);
   rows.forEach(r=>{ if(porDia[r.data]!==undefined) porDia[r.data] += r.diferenca||0; });
 
-  const W=600,H=230,padL=68,padR=10,padT=10,padB=24;
+  const W = Math.max(1, Math.round(svg.getBoundingClientRect().width)) || 600;
+  svg.setAttribute('viewBox', `0 0 ${W} 230`);
+  const H=230,padL=68,padR=10,padT=10,padB=24;
   const innerW=W-padL-padR, innerH=H-padT-padB;
   const n = dias.length;
   const maxAbs = Math.max(1, ...dias.map(d=>Math.abs(porDia[d])));
@@ -696,14 +884,47 @@ function renderDiferencaChart(rows){
     });
   });
 }
+*/
+
+// ---- previsao de faturamento (run-rate simples): acumulado do mes ate a
+// data de referencia, dividido pelos dias ja decorridos e projetado pros
+// dias totais do mes. Usa sempre TODO o historico da unidade no mes (nao
+// so as linhas do filtro atual), pra nao mudar de valor so por trocar de
+// preset (semana/mes/trimestre) ----
+function previsaoMensal(unidade, refIso){
+  if(!refIso) return null;
+  const [anoStr, mesStr, diaStr] = refIso.split('-');
+  const diasNoMes = new Date(Number(anoStr), Number(mesStr), 0).getDate();
+  const diasDecorridos = Math.min(Number(diaStr), diasNoMes);
+  if(diasDecorridos<=0) return null;
+  const prefixo = `${anoStr}-${mesStr}-`;
+  const acumulado = DATA.reduce((s,d)=> (d.unidade===unidade && (d.data||'').startsWith(prefixo) && d.data<=refIso) ? s+(d.faturamento||0) : s, 0);
+  return (acumulado/diasDecorridos)*diasNoMes;
+}
+
+// ---- previsao do dia seguinte: media do faturamento da unidade nas
+// ultimas ocorrencias (ate 6) do mesmo dia da semana, antes da data
+// seguinte a informada ----
+function previsaoDiaSeguinte(unidade, dataIso){
+  if(!dataIso) return null;
+  const prox = new Date(dataIso+'T00:00:00'); prox.setDate(prox.getDate()+1);
+  const proxIso = isoLocal(prox);
+  const diaSemana = prox.getDay();
+  const historico = DATA
+    .filter(d=>d.unidade===unidade && d.data && d.data<proxIso && new Date(d.data+'T00:00:00').getDay()===diaSemana)
+    .sort((a,b)=>b.data.localeCompare(a.data))
+    .slice(0,6);
+  if(!historico.length) return null;
+  return historico.reduce((s,d)=>s+(d.faturamento||0),0)/historico.length;
+}
 
 function renderUnidadesTable(rows){
+  const refIso = document.getElementById('f-date-end').value;
   const porUnidade = {};
   rows.forEach(r=>{
-    const c = (porUnidade[r.unidade] ||= {qtd:0, faturamento:0, declarado:0, diferenca:0, tc:0, cancelados:0});
+    const c = (porUnidade[r.unidade] ||= {qtd:0, faturamento:0, diferenca:0, tc:0, cancelados:0});
     c.qtd++;
     c.faturamento += r.faturamento||0;
-    c.declarado += r.totalDeclarado||0;
     c.diferenca += r.diferenca||0;
     c.tc += r.tc||0;
     c.cancelados += r.cancelados||0;
@@ -712,11 +933,12 @@ function renderUnidadesTable(rows){
   document.getElementById('unidades-count').textContent = linhas.length;
   document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>{
     const cor = c.diferenca<0?'var(--bad)':(c.diferenca>0?'var(--warn)':'var(--ok)');
+    const previsao = previsaoMensal(u, refIso);
     return `<tr>
       <td>${escapeHtml(UNIDADES_NOMES[u]||u)}${(UNIDADES_NOMES[u] && UNIDADES_NOMES[u]!==u) ? ` <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${escapeHtml(u)}</span>` : ''}</td>
+      <td class="valor" style="color:var(--accent);">${previsao==null ? '—' : fmtMoney(previsao)}</td>
       <td class="valor">${c.qtd}</td>
       <td class="valor">${fmtMoney(c.faturamento)}</td>
-      <td class="valor">${fmtMoney(c.declarado)}</td>
       <td class="valor" style="color:${cor}">${fmtMoney(c.diferenca)}</td>
       <td class="valor">${c.tc.toFixed(0)}</td>
       <td class="valor">${c.cancelados.toFixed(0)}</td>
@@ -725,14 +947,20 @@ function renderUnidadesTable(rows){
 }
 
 function renderTabela(rows){
-  const ordenadas = [...rows].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  // segue sempre o filtro de data principal; o campo "até" deste painel e
+  // opcional, so pra restringir ainda mais so esta tabela quando desejado
+  const fimExtra = document.getElementById('fech-date-fim').value;
+  const filtradas = fimExtra ? rows.filter(d=>(d.data||'')<=fimExtra) : rows;
+  const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   document.getElementById('fechamentos-count').textContent = ordenadas.length;
   document.getElementById('fechamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>{
     const cor = d.diferenca<0?'var(--bad)':(d.diferenca>0?'var(--warn)':'var(--ok)');
+    const previsao = previsaoDiaSeguinte(d.unidade, d.data);
     return `<tr>
       <td>${fmtData(d.data)}</td>
       <td>${escapeHtml(UNIDADES_NOMES[d.unidade]||d.unidade)}</td>
       <td class="truncate" title="${escapeHtml(d.gerente||'')}">${escapeHtml(d.gerente||'—')}</td>
+      <td class="valor" style="color:var(--accent);">${previsao==null ? '—' : fmtMoney(previsao)}</td>
       <td class="valor">${fmtMoney(d.faturamento)}</td>
       <td class="valor">${fmtMoney(d.totalDeclarado)}</td>
       <td class="valor" style="color:${cor}">${fmtMoney(d.diferenca)}</td>
@@ -744,31 +972,52 @@ function renderTabela(rows){
       <td class="valor">${fmtMoney(d.loja)}</td>
       <td class="truncate" title="${escapeHtml(d.observacao||d.obsDif||'')}">${escapeHtml(d.observacao||d.obsDif||'—')}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="13" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
+  }).join('') : '<tr><td colspan="14" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
+}
+
+// grafico de faturamento tem intervalo proprio (chartRange()): segue o
+// filtro de data quando um esta ativo, senao usa sempre os ultimos 30 dias -
+// por isso nao reaproveita direto as "rows" do filtro principal
+function renderChartAtual(){
+  const cr = chartRange();
+  const chartRows = filtroDataAtivo ? filtrar() : filtrarPorIntervalo(cr.start, cr.end);
+  renderFaturamentoChart(chartRows, cr.start, cr.end);
 }
 
 function render(){
   const rows = filtrar();
   renderKpis(rows);
-  renderFaturamentoChart(rows);
-  renderDiferencaChart(rows);
+  renderChartAtual();
+  // renderDiferencaChart(rows); // painel desativado, ver comentario acima da funcao
   renderUnidadesTable(rows);
   renderTabela(rows);
 }
+
+document.getElementById('fech-date-fim').addEventListener('input', ()=>{ renderTabela(filtrar()); });
+
+let resizeTimer = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderChartAtual, 150);
+});
 
 async function boot(){
   const res = await fetch('/api/me');
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
+  atualizarVisibilidadeGrupos();
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('btn-sincronizar-planilhas').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('fechamentos')){
     document.getElementById('sem-acesso').classList.remove('hidden');

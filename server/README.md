@@ -97,9 +97,29 @@ outros acessos com permissões granulares:
 
 - **Seções**: `monitor` (este dashboard), `disputas` (`/relatorios.html`),
   `cofre` (`/cofre.html`, senhas da equipe - URL, usuário, senha, observação,
-  organizadas em grupos/unidades, criptografadas com `ENCRYPTION_KEY`).
-- **Unidades**: filtra quais `merchantAccountCode` cada acesso vê no monitor
-  e nas disputas.
+  organizadas em grupos/unidades, criptografadas com `ENCRYPTION_KEY`),
+  `fechamentos`/`lancamento` (fechamento de caixa, ver acima) e
+  `entregas`/`entregas-lancamento` (entregas dos motoboys - substitui o app
+  de entregas do AppSheet: `/entrega-lancamento.html` é onde a loja lança
+  cada corrida/turno de um entregador, `/entregas.html` é o painel de
+  acompanhamento; o Master sempre vê tudo, cada loja só vê e lança nas
+  próprias unidades).
+  - O painel de Entregas também traz o **histórico** direto da planilha
+    "MOTOS BRAVO" do Google Sheets (mesma planilha do AppSheet atual),
+    sincronizado automaticamente pelo `entregasSync.js` (mesmo mecanismo do
+    Fechamento, ver `SHEET_ID_ARCFOOD`/`SHEET_ID_BRAVO` acima) - a planilha
+    (`SHEET_ID_ENTREGAS`, por padrão a "MOTOS BRAVO") precisa estar
+    compartilhada com o email de serviço (`FIREBASE_CLIENT_EMAIL`) como
+    leitora. Por padrão sincroniza as abas `Garanhuns,Bessa,Caruaru,Tirol,
+    MMTirol` (`SHEET_ABAS_ENTREGAS`) - a aba `BDMotos` fica de fora por ora
+    porque não tem a coluna "Data" preenchida na planilha de origem (só o
+    dia da semana); assim que isso for corrigido na planilha (ou os dados
+    virem de outra fonte), é só adicionar `BDMotos` à lista de abas. Esses
+    registros históricos são só leitura (não passam pela fila de correção) e
+    as etiquetas (fotos) ainda apontam pro arquivo original no Drive do
+    AppSheet (`etiquetaOrigem`) - não foram migradas pro Storage do app.
+- **Unidades**: filtra quais `merchantAccountCode`/código de unidade cada
+  acesso vê no monitor, nas disputas, nos fechamentos e nas entregas.
 - **Grupos do cofre**: quais grupos de senha cada acesso pode ver/gerenciar.
 
 Ver `server/auth.js`, `server/users.js` e `server/vault*.js`.

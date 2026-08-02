@@ -22,9 +22,17 @@
   h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
   h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
   .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
-  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
-  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
   .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
@@ -73,19 +81,43 @@
 <body>
 
 <header>
-  <div>
-    <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-    <h1>Lançamento de fechamento</h1>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
+      <h1>Lançamento de fechamento</h1>
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
+  <div class="header-nav">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <button class="back" onclick="logout()">🚪 Sair</button>
+    <a class="back active" href="/lancamento.html">🧾 Fechamento</a>
+    <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Entregas</a>
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
   </div>
 </header>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso ao lançamento de fechamento. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
+
+<div class="panel" id="painel-sangria">
+  <h2>💰 Registrar sangria</h2>
+  <div class="sub" style="margin:-2px 0 10px;">Pra retiradas de caixa feitas durante o dia, na visita à loja - sem precisar esperar o fechamento sair. Some automático no fechamento do dia.</div>
+  <form id="form-sangria">
+    <label>Unidade</label>
+    <select id="s-unidade" required></select>
+    <div class="grid2">
+      <div><label>Data</label><input type="date" id="s-data" required></div>
+      <div><label>Valor retirado (R$)</label><input type="number" step="0.01" inputmode="decimal" id="s-valor" required></div>
+    </div>
+    <label>Observação (opcional)</label>
+    <input type="text" id="s-descricao" placeholder="ex: retirada na visita da tarde">
+    <div class="msg hidden" id="msg-sangria"></div>
+    <button class="btn-primary" type="submit" id="btn-sangria">Registrar sangria</button>
+  </form>
+  <div id="lista-sangrias" style="margin-top:4px;"></div>
+</div>
 
 <div class="panel">
   <h2>Novo fechamento</h2>
@@ -221,6 +253,26 @@
   </div>
 </div>
 
+<div class="overlay hidden" id="overlay-master">
+  <div class="sheet">
+    <h3>Editar fechamento (Master)</h3>
+    <div class="sub" id="master-info"></div>
+    <form id="form-master">
+      <div class="grid2">
+        <div><label>Gerente responsável</label><input type="text" id="m-gerente"></div>
+      </div>
+      <div class="grid2" id="m-campos-numericos"></div>
+      <label>Observação</label>
+      <textarea id="m-observacao"></textarea>
+      <label>Motivo da alteração (opcional, fica registrado no histórico do fechamento)</label>
+      <textarea id="m-motivo" placeholder="ex: corrigido conforme conferência do caixa"></textarea>
+      <div class="msg hidden" id="msg-master"></div>
+      <button class="btn-primary" type="submit">Salvar alterações</button>
+    </form>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharMaster()">Cancelar</button>
+  </div>
+</div>
+
 <script>
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
 if(!AUTH_TOKEN){ location.href = '/'; }
@@ -249,15 +301,32 @@ const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pic
 const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'iFood', food99:'99Food', pix:'Pix', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
 
 let ME = null;
+let IS_MASTER = false;
 let MEUS = [];
 let EDICOES = [];
 let EDITANDO_ID = null;
+let EDITANDO_MASTER_ID = null;
 let MAQUINAS = [];
 let SAIDAS = [];
 let SEQ = 0;
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+// Date "falso" cujos getters locais ja refletem o horario de Sao Paulo,
+// independente do fuso do navegador/servidor - evita virar o dia errado
+// perto da meia-noite quando o ambiente roda em UTC (comum em hospedagem)
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
@@ -325,6 +394,61 @@ async function carregar(){
   renderLista();
 }
 
+// ---------- sangria (retirada de caixa) registrada em campo - separado do
+// fechamento em si, soma automatico no fechamento do dia (server junta na
+// hora de listar) ----------
+let SANGRIAS = [];
+async function carregarSangrias(){
+  SANGRIAS = await fetch('/api/sangrias/minhas').then(r=>r.json());
+  SANGRIAS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
+  renderSangrias();
+}
+function renderSangrias(){
+  const el = document.getElementById('lista-sangrias');
+  const recentes = SANGRIAS.slice(0,8);
+  if(!recentes.length){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="sub" style="margin-bottom:6px;">Últimas sangrias registradas</div>` + recentes.map(s=>`
+    <div class="card" style="padding:8px 0;">
+      <div class="linha1" style="font-size:12.5px;">
+        <span>${escapeHtml(s.unidadeNome||s.unidade)} · ${fmtData(s.data)}</span>
+        <b>${fmtMoney(s.valor)}</b>
+      </div>
+      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
+    </div>`).join('');
+}
+
+document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const btn = document.getElementById('btn-sangria');
+  const msg = document.getElementById('msg-sangria');
+  msg.classList.add('hidden');
+  btn.disabled = true;
+  try{
+    const unidade = document.getElementById('s-unidade').value;
+    const grupo = grupoDaUnidade(unidade);
+    const body = {
+      unidade,
+      unidadeNome: UNIDADES_NOMES[unidade] || unidade,
+      grupo,
+      data: document.getElementById('s-data').value,
+      valor: document.getElementById('s-valor').value,
+      descricao: document.getElementById('s-descricao').value,
+    };
+    const res = await fetch('/api/sangrias', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao registrar sangria');
+    msg.textContent = 'Sangria registrada com sucesso.'; msg.className = 'msg ok';
+    document.getElementById('form-sangria').reset();
+    document.getElementById('s-data').value = hojeBrasilia();
+    await carregarSangrias();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+});
+
 function edicaoPendente(fechamentoId){
   return EDICOES.find(e=>e.fechamentoId===fechamentoId && e.status==='PENDENTE');
 }
@@ -345,13 +469,15 @@ function renderLista(){
         ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
         ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
       </div>
-      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR')}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
+      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
       <div class="valores">
         <span>Faturamento <b>${fmtMoney(f.faturamento)}</b></span>
         <span>Declarado <b>${fmtMoney(f.totalDeclarado)}</b></span>
         <span>Diferença <b style="color:${Math.abs(f.diferenca)<0.01?'var(--ok)':'var(--bad)'}">${fmtMoney(f.diferenca)}</b></span>
       </div>
-      ${pendente?'':'<button class="link-btn" style="margin-top:8px;" onclick="abrirEdicao(\''+f.id+'\')">Pedir correção</button>'}
+      ${IS_MASTER
+        ? '<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEditarMaster(\''+f.id+'\')">✎ Editar (Master)</button>'
+        : (pendente?'':'<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEdicao(\''+f.id+'\')">Pedir correção</button>')}
     </div>`;
   }).join('');
 }
@@ -389,9 +515,55 @@ document.getElementById('form-edicao').addEventListener('submit', async (ev)=>{
   }
 });
 
+// ---------- edicao direta (so Master): aplica na hora, sem fila de aprovacao ----------
+function abrirEditarMaster(id){
+  EDITANDO_MASTER_ID = id;
+  const f = MEUS.find(x=>x.id===id);
+  document.getElementById('master-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — edição direta, aplicada na hora (fica registrada no histórico do fechamento).`;
+  document.getElementById('m-gerente').value = f.gerente || '';
+  document.getElementById('m-observacao').value = f.observacao || '';
+  document.getElementById('m-motivo').value = '';
+  document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS.map(c=>
+    `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="0.01" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
+  ).join('');
+  document.getElementById('msg-master').classList.add('hidden');
+  document.getElementById('overlay-master').classList.remove('hidden');
+}
+function fecharMaster(){ document.getElementById('overlay-master').classList.add('hidden'); EDITANDO_MASTER_ID=null; }
+
+document.getElementById('form-master').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-master');
+  msg.classList.add('hidden');
+  const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
+  const mudancas = {};
+  CAMPOS_NUMERICOS.forEach(c=>{
+    const v = num(document.getElementById('m-'+c).value);
+    if(v !== num(f[c])) mudancas[c] = v;
+  });
+  const gerente = document.getElementById('m-gerente').value;
+  if(gerente !== (f.gerente||'')) mudancas.gerente = gerente;
+  const observacao = document.getElementById('m-observacao').value;
+  if(observacao !== (f.observacao||'')) mudancas.observacao = observacao;
+  const motivo = document.getElementById('m-motivo').value;
+  if(!Object.keys(mudancas).length){ fecharMaster(); return; }
+  try{
+    const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}/editar-direto`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mudancas, motivo }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharMaster();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+
 function resetarForm(){
   document.getElementById('form-lancar').reset();
-  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-data').value = hojeBrasilia();
   MAQUINAS = []; SAIDAS = [];
   adicionarMaquina();
   renderSaidas();
@@ -446,8 +618,10 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   const isMaster = ME.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (ME.permissions?.sections||[]);
+  IS_MASTER = isMaster;
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-entregas-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
 
   if(!secoes.includes('lancamento')){
     document.getElementById('sem-acesso').classList.remove('hidden');
@@ -459,14 +633,19 @@ async function boot(){
   selUnidade.innerHTML = unidades.length
     ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
-  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
-  document.getElementById('f-data').max = new Date().toISOString().slice(0,10);
+  document.getElementById('f-data').value = hojeBrasilia();
+  document.getElementById('f-data').max = hojeBrasilia();
   adicionarMaquina();
   renderSaidas();
   aplicarFranquia(selUnidade.value);
 
+  document.getElementById('s-unidade').innerHTML = selUnidade.innerHTML;
+  document.getElementById('s-data').value = hojeBrasilia();
+  document.getElementById('s-data').max = hojeBrasilia();
+
   document.getElementById('root').classList.remove('hidden');
   await carregar();
+  await carregarSangrias();
 }
 
 boot();

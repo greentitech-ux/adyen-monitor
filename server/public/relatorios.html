@@ -22,7 +22,12 @@
   @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
   .tab{font-family:var(--mono);font-size:11.5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .tab.active{border-color:var(--accent);color:var(--accent);background:#132029;}
@@ -47,25 +52,42 @@
   select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--sans);}
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
   .hidden{display:none!important;}
-  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .count{font-family:var(--mono);color:var(--muted);font-size:12px;margin-left:8px;}
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-    <h1>Relatórios de disputa</h1>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
+      <h1>Relatórios de disputa</h1>
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
-    <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
-    <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-    <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
+  <div class="header-nav">
+    <div class="nav-links">
+      <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+      <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+      <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+      <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+      <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+      <a class="back active" id="nav-relatorios-self" href="/relatorios.html">📊 Relatórios</a>
+      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
   </div>
 </header>
 
@@ -95,7 +117,8 @@ let ORDERS_BY_ID = {};
 let FILTRO = 'TODOS';
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toFixed(2).replace('.',','); }
-function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+const FUSO_BR = 'America/Sao_Paulo';
+function fmtDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('pt-BR',{timeZone:FUSO_BR})+' '+d.toLocaleTimeString('pt-BR',{timeZone:FUSO_BR,hour:'2-digit',minute:'2-digit'}); }
 
 function prazoInfo(prazoISO){
   if(!prazoISO) return { texto:'sem prazo informado', cor:'var(--muted)' };
@@ -170,6 +193,7 @@ function render(){
             <span class="badge ${d.status}">${d.status}</span>
             <select onchange="atualizarStatus('${d.id}', this.value)">
               ${STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+              <option value="__REMOVER__">Remover</option>
             </select>
           </div>
           ${(d.nomeContato||d.telefoneContato)?`<div class="notas">${d.nomeContato||'—'}${d.telefoneContato?(' · '+d.telefoneContato):''}</div>`:''}
@@ -185,7 +209,15 @@ function render(){
 }
 
 async function atualizarStatus(id, status){
-  await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  if(status === '__REMOVER__'){
+    if(!confirm('Remover este registro? A tag de acompanhamento some e o pedido sai deste relatório.')){
+      await carregar(); // desfaz a selecao no <select>
+      return;
+    }
+    await fetch('/api/disputes/'+id, { method:'DELETE' });
+  } else {
+    await fetch('/api/disputes/'+id+'/status', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+  }
   await carregar();
 }
 
@@ -194,11 +226,13 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (me.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
 

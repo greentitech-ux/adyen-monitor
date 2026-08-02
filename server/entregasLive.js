@@ -1,24 +1,21 @@
-// fechamentosLive.js
-// Fechamentos de caixa lançados direto pela loja (substitui o processo manual
-// via AppSheet + planilha). Um documento por unidade+data (nao deixa lançar
-// duas vezes o mesmo dia sem querer). Depois de lançado, o registro NAO pode
-// ser editado direto - qualquer correção passa por um pedido de edição
-// (fechamentoEdicoes) que só é aplicado quando o Master aprova; o valor
-// anterior sempre fica guardado no historico do proprio fechamento.
+// entregasLive.js
+// Lançamento de entregas pelas próprias lojas (substitui o AppSheet de
+// entregas dos motoboys): cada lançamento é uma corrida/turno de um
+// entregador numa unidade, num dia. Diferente do fechamento (1 por
+// unidade+data), aqui é normal ter vários lançamentos no mesmo dia/unidade -
+// um por entregador. Depois de lançado o registro NÃO pode ser editado
+// direto - qualquer correção passa por um pedido de edição (entregaEdicoes)
+// que só é aplicado quando o Master aprova; o valor anterior sempre fica
+// guardado no histórico do próprio lançamento.
 const db = require('./firestore');
+const storage = require('./storage');
 
-const COLLECTION = db.collection('fechamentosLive');
-const EDITS = db.collection('fechamentoEdicoes');
-
-function docId(unidade, data) {
-  return `${unidade}__${data}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
-}
+const COLLECTION = db.collection('entregasLive');
+const EDITS = db.collection('entregaEdicoes');
 
 const CAMPOS_NUMERICOS = [
-  'caixaInicial', 'caixaFinal', 'delivery', 'carryout', 'pickup', 'loja',
-  'adyen', 'ifood', 'food99', 'pix', 'pixCnpj', 'outros', 'totalSaida',
-  'faturamento', 'totalDeclarado', 'quebra', 'tc', 'cancelados',
-  'entradaDinheiro', 'deposito',
+  'entrega', 'retorno', 'extra', 'bonus', 'pos00hs', 'foraDeArea',
+  'ajudaCusto', 'valor', 'coopRecebe', 'quantTotal',
 ];
 
 function num(v) {
@@ -26,33 +23,22 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// itens informativos (maquininhas e saidas de caixa detalhadas) - guardados
-// pra dar transparencia/auditoria, mas quem soma pro fechamento e o cliente
-// (campos.adyen e campos.totalSaida ja vem com a soma pronta)
-function sanitizarItens(lista) {
-  if (!Array.isArray(lista)) return [];
-  return lista
-    .map((item) => ({ descricao: String(item?.descricao || '').slice(0, 200), valor: num(item?.valor) }))
-    .filter((item) => item.descricao || item.valor);
-}
-
-async function create({ unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
+async function create({ unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, etiquetaFile, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
+  if (!entregador || !String(entregador).trim()) throw new Error('Nome do entregador é obrigatório.');
 
-  const id = docId(unidade, data);
-  const ref = COLLECTION.doc(id);
-  const existente = await ref.get();
-  if (existente.exists) {
-    throw new Error('Já existe um fechamento lançado para essa unidade nessa data. Peça uma correção em vez de lançar de novo.');
-  }
-
-  const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
+  const ref = COLLECTION.doc();
+  const registro = { id: ref.id, unidade, unidadeNome: unidadeNome || unidade, data, entregador: String(entregador).trim() };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
-  registro.diferenca = +(registro.totalDeclarado - registro.faturamento).toFixed(2);
+  registro.obsRetorno = obsRetorno || null;
+  registro.obsExtra = obsExtra || null;
   registro.observacao = observacao || null;
-  registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
-  registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
+  registro.etiquetaPath = null;
+
+  if (etiquetaFile) {
+    registro.etiquetaPath = await storage.salvarArquivo(ref.id, etiquetaFile, 'entregas');
+  }
 
   const agora = new Date().toISOString();
   registro.criadoPorId = criadoPorId;
@@ -84,9 +70,9 @@ async function getOne(id) {
   return doc.exists ? doc.data() : null;
 }
 
-async function solicitarEdicao({ fechamentoId, mudancas, motivo, solicitadoPorId, solicitadoPorEmail }) {
-  const atual = await getOne(fechamentoId);
-  if (!atual) throw new Error('Fechamento não encontrado.');
+async function solicitarEdicao({ entregaId, mudancas, motivo, solicitadoPorId, solicitadoPorEmail }) {
+  const atual = await getOne(entregaId);
+  if (!atual) throw new Error('Lançamento não encontrado.');
   if (!motivo || !String(motivo).trim()) throw new Error('Descreva o motivo da correção.');
   const camposValidos = {};
   Object.entries(mudancas || {}).forEach(([campo, valor]) => {
@@ -98,10 +84,11 @@ async function solicitarEdicao({ fechamentoId, mudancas, motivo, solicitadoPorId
   const agora = new Date().toISOString();
   const pedido = {
     id: ref.id,
-    fechamentoId,
+    entregaId,
     unidade: atual.unidade,
     unidadeNome: atual.unidadeNome,
     data: atual.data,
+    entregador: atual.entregador,
     mudancas: camposValidos,
     motivo: String(motivo).trim(),
     status: 'PENDENTE',
@@ -116,18 +103,14 @@ async function solicitarEdicao({ fechamentoId, mudancas, motivo, solicitadoPorId
   return pedido;
 }
 
-// campos de texto (alem dos numericos) que o Master tambem pode corrigir
-// direto - unidade/data ficam de fora de proposito (mudar isso e apagar e
-// relancar, nao "corrigir")
-const CAMPOS_TEXTO = ['gerente', 'observacao'];
+// campos de texto (alem dos numericos) que o Master tambem pode corrigir direto
+const CAMPOS_TEXTO = ['entregador', 'obsRetorno', 'obsExtra', 'observacao'];
 
 // edicao direta: so o Master usa isso (o resto passa por solicitarEdicao +
-// decidirEdicao). Como o Master e quem aprovaria a propria solicitacao,
-// pedir-e-aprovar pra si mesmo e so atrito - aqui a mudanca e aplicada na
-// hora, mas ainda fica registrada no historico do fechamento pra auditoria
-async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail }) {
-  const atual = await getOne(fechamentoId);
-  if (!atual) throw new Error('Fechamento não encontrado.');
+// decidirEdicao) - aplicada na hora, mas fica registrada no historico
+async function editarDireto({ entregaId, mudancas, motivo, editadoPorEmail }) {
+  const atual = await getOne(entregaId);
+  if (!atual) throw new Error('Lançamento não encontrado.');
   const camposValidos = {};
   Object.entries(mudancas || {}).forEach(([campo, valor]) => {
     if (CAMPOS_NUMERICOS.includes(campo)) camposValidos[campo] = num(valor);
@@ -137,10 +120,6 @@ async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail })
 
   const valoresAnteriores = {};
   Object.keys(camposValidos).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
-  const novosValores = { ...camposValidos };
-  const faturamentoFinal = novosValores.faturamento ?? atual.faturamento;
-  const declaradoFinal = novosValores.totalDeclarado ?? atual.totalDeclarado;
-  novosValores.diferenca = +(declaradoFinal - faturamentoFinal).toFixed(2);
 
   const historico = [...(atual.historico || []), {
     em: new Date().toISOString(),
@@ -150,9 +129,9 @@ async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail })
     valoresNovos: camposValidos,
   }];
 
-  const ref = COLLECTION.doc(fechamentoId);
-  await ref.update({ ...novosValores, historico, atualizadoEm: new Date().toISOString() });
-  return { ...atual, ...novosValores, historico };
+  const ref = COLLECTION.doc(entregaId);
+  await ref.update({ ...camposValidos, historico, atualizadoEm: new Date().toISOString() });
+  return { ...atual, ...camposValidos, historico };
 }
 
 async function listarEdicoes() {
@@ -176,16 +155,12 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
   });
 
   if (status === 'APROVADO') {
-    const fechRef = COLLECTION.doc(pedido.fechamentoId);
-    const fechDoc = await fechRef.get();
-    if (fechDoc.exists) {
-      const atual = fechDoc.data();
+    const entRef = COLLECTION.doc(pedido.entregaId);
+    const entDoc = await entRef.get();
+    if (entDoc.exists) {
+      const atual = entDoc.data();
       const valoresAnteriores = {};
       Object.keys(pedido.mudancas).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
-      const novosValores = { ...pedido.mudancas };
-      const faturamentoFinal = novosValores.faturamento ?? atual.faturamento;
-      const declaradoFinal = novosValores.totalDeclarado ?? atual.totalDeclarado;
-      novosValores.diferenca = +(declaradoFinal - faturamentoFinal).toFixed(2);
       const historico = [...(atual.historico || []), {
         em: new Date().toISOString(),
         por: decididoPorEmail,
@@ -193,7 +168,7 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
         valoresAnteriores,
         valoresNovos: pedido.mudancas,
       }];
-      await fechRef.update({ ...novosValores, historico, atualizadoEm: new Date().toISOString() });
+      await entRef.update({ ...pedido.mudancas, historico, atualizadoEm: new Date().toISOString() });
     }
   }
   return { ...pedido, status };
