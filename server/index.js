@@ -20,6 +20,7 @@ const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
+const entregasLive = require('./entregasLive');
 const backup = require('./backup');
 const sheetsSync = require('./sheetsSync');
 
@@ -343,17 +344,32 @@ const FECHAMENTO_UNIDADES_NOMES = {
   'São Braz IL': 'São Braz IL',
 };
 
+// unidades do app de entregas (motoboys) - nomes como aparecem nas planilhas
+// atuais do AppSheet ("MOTOS BRAVO"); igual ao Fechamento, ficam fixas aqui
+// pra ja aparecerem no checklist de permissoes mesmo antes de qualquer
+// lançamento. O Master pode liberar mais conforme novas unidades entrarem
+// (o app de entregas ainda esta sendo migrado loja a loja do AppSheet).
+const ENTREGAS_UNIDADES_NOMES = {
+  'Tirol Natal': 'Tirol Natal (Entregas)',
+  'MMTirol Natal': 'Milky Moo Tirol Natal (Entregas)',
+  Bessa: 'Bessa (Entregas)',
+  Caruaru: 'Caruaru (Entregas)',
+  Garanhuns: 'Garanhuns (Entregas)',
+};
+
 // lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
 // junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
-// com as unidades fixas de Fechamento/Lançamento (espaco de codigos
-// diferente, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
+// com as unidades fixas de Fechamento/Lançamento/Entregas (espacos de codigo
+// diferentes, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
 // dados importados/lançados, pra nunca faltar opcao no checklist do Master
 app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   const mapa = {};
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
+  Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  (await entregasLive.listAll()).forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   const lista = Object.entries(mapa)
     .map(([codigo, nome]) => ({ codigo, nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -820,6 +836,114 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
     });
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- entregas (motoboys) - substitui o app de entregas do AppSheet ----------
+// mesmo desenho do fechamento: secao "entregas-lancamento" e onde a loja
+// lança as corridas dos entregadores do dia (varias por unidade+data, uma por
+// entregador/turno); secao "entregas" e o dashboard de acompanhamento
+// (Master ve tudo, cada loja so ve as suas unidades). Etiqueta (foto do
+// comprovante/etiquetas do entregador) e opcional, guardada no mesmo Storage
+// dos anexos de disputa.
+app.post('/api/entregas/lancar', requireSection('entregas-lancamento'), upload.single('etiqueta'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao } = JSON.parse(req.body.payload || '{}');
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await entregasLive.create({
+      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao,
+      etiquetaFile: req.file || null,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('entrega-lancada', registro, 'entregas-lancamento');
+    broadcast('entrega-lancada', registro, 'entregas');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/entregas/meus', requireSection('entregas-lancamento'), async (req, res) => {
+  if (req.isMaster) return res.json(await entregasLive.listAll());
+  res.json(await entregasLive.listByUnidades(req.permissions.unidades || []));
+});
+
+// dashboard de acompanhamento (secao separada - pode ser liberada sem dar
+// acesso de lançamento, e vice-versa)
+app.get('/api/entregas', requireSection('entregas'), async (req, res) => {
+  res.json(auth.filterByUnidade(req, await entregasLive.listAll()));
+});
+
+app.get('/api/entregas/etiqueta/:id', (req, res, next) => {
+  if (!req.isMaster && !auth.hasSection(req, 'entregas') && !auth.hasSection(req, 'entregas-lancamento')) {
+    return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+  }
+  next();
+}, async (req, res) => {
+  const registro = await entregasLive.getOne(req.params.id);
+  if (!registro || !registro.etiquetaPath) return res.sendStatus(404);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(registro.unidade)) return res.sendStatus(404);
+  storage.streamArquivo(registro.etiquetaPath, null, res);
+});
+
+app.post('/api/entregas/:id/solicitar-edicao', requireSection('entregas-lancamento'), async (req, res) => {
+  try {
+    const atual = await entregasLive.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Lançamento não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const pedido = await entregasLive.solicitarEdicao({
+      entregaId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      solicitadoPorId: req.user.id,
+      solicitadoPorEmail: req.user.email,
+    });
+    broadcast('entrega-edicao-solicitada', pedido, 'entregas-lancamento');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// edicao direta - so o Master, sem fila de aprovacao (ainda fica no historico)
+app.patch('/api/entregas/:id/editar-direto', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await entregasLive.editarDireto({
+      entregaId: req.params.id,
+      mudancas: req.body.mudancas,
+      motivo: req.body.motivo,
+      editadoPorEmail: req.user.email,
+    });
+    broadcast('entrega-editada-direto', registro, 'entregas-lancamento');
+    broadcast('entrega-editada-direto', registro, 'entregas');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/entregas/edicoes', requireSection('entregas-lancamento'), async (req, res) => {
+  const todas = await entregasLive.listarEdicoes();
+  if (req.isMaster) return res.json(todas);
+  res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
+});
+
+app.patch('/api/entregas/edicoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const pedido = await entregasLive.decidirEdicao(req.params.id, req.body.status, {
+      decididoPorEmail: req.user.email,
+      motivoDecisao: req.body.motivoDecisao,
+    });
+    broadcast('entrega-edicao-decidida', pedido, 'entregas-lancamento');
+    broadcast('entrega-edicao-decidida', pedido, 'entregas');
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });

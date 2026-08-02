@@ -97,9 +97,15 @@ outros acessos com permissões granulares:
 
 - **Seções**: `monitor` (este dashboard), `disputas` (`/relatorios.html`),
   `cofre` (`/cofre.html`, senhas da equipe - URL, usuário, senha, observação,
-  organizadas em grupos/unidades, criptografadas com `ENCRYPTION_KEY`).
-- **Unidades**: filtra quais `merchantAccountCode` cada acesso vê no monitor
-  e nas disputas.
+  organizadas em grupos/unidades, criptografadas com `ENCRYPTION_KEY`),
+  `fechamentos`/`lancamento` (fechamento de caixa, ver acima) e
+  `entregas`/`entregas-lancamento` (entregas dos motoboys - substitui o app
+  de entregas do AppSheet: `/entrega-lancamento.html` é onde a loja lança
+  cada corrida/turno de um entregador, `/entregas.html` é o painel de
+  acompanhamento; o Master sempre vê tudo, cada loja só vê e lança nas
+  próprias unidades).
+- **Unidades**: filtra quais `merchantAccountCode`/código de unidade cada
+  acesso vê no monitor, nas disputas, nos fechamentos e nas entregas.
 - **Grupos do cofre**: quais grupos de senha cada acesso pode ver/gerenciar.
 
 Ver `server/auth.js`, `server/users.js` e `server/vault*.js`.
