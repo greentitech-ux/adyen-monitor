@@ -11,6 +11,7 @@ const { lookupBank } = require('./binLookup');
 const push = require('./push');
 const cardTesting = require('./cardTesting');
 const disputes = require('./disputes');
+const fraudMarks = require('./fraudMarks');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
@@ -269,6 +270,43 @@ app.get('/api/orders/changed', requireSection('monitor'), (req, res) => {
 
 app.get('/api/chargebacks', requireSection('monitor'), (req, res) => {
   res.json(auth.filterByUnidade(req, store.chargebacks()));
+});
+
+// ---------- marcacao manual de suspeita/fraude por pedido (monitoramento
+// efetivo, separado do status que vem da Adyen - esse continua intacto) ----------
+app.get('/api/fraude', requireSection('monitor'), (req, res) => {
+  fraudMarks.listAll().then((lista) => res.json(auth.filterByUnidade(req, lista)));
+});
+
+app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
+  try {
+    const { pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor } = req.body;
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await fraudMarks.marcar({
+      pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor,
+      marcadoPorEmail: req.user.email,
+    });
+    broadcast('fraude-marcada', registro, 'monitor');
+    if (nivel === 'FRAUDE') {
+      push.notifyRaw(
+        '🚫 Pedido marcado como fraude',
+        `${registro.clienteNome || 'Cliente'} · ${registro.unidade || ''}${registro.motivo ? ' · ' + registro.motivo : ''}`,
+        `fraude-${registro.pedidoId}`,
+        registro.unidade
+      );
+    }
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/fraude/:pedidoId', requireSection('monitor'), async (req, res) => {
+  await fraudMarks.remover(decodeURIComponent(req.params.pedidoId));
+  broadcast('fraude-removida', { pedidoId: req.params.pedidoId }, 'monitor');
+  res.json({ ok: true });
 });
 
 app.get('/api/summary', requireSection('monitor'), (req, res) => {
