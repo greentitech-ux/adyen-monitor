@@ -21,6 +21,7 @@ const vaultEntries = require('./vaultEntries');
 const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
+const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
 const sheetsSync = require('./sheetsSync');
@@ -807,7 +808,9 @@ async function sincronizarPlanilhasFechamento() {
 
 app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   const lancados = await fechamentosLive.listAll();
-  res.json(auth.filterByUnidade(req, [...fechamentosData, ...lancados]));
+  const sangriasLancadas = (await sangrias.listAll()).map(sangrias.comoFechamento);
+  const combinado = sheetsSync.mesclarLancamentosDoMesmoDia([...fechamentosData, ...lancados, ...sangriasLancadas]);
+  res.json(auth.filterByUnidade(req, combinado));
 });
 
 app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
@@ -848,6 +851,34 @@ app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, re
 app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) => {
   if (req.isMaster) return res.json(await fechamentosLive.listAll());
   res.json(await fechamentosLive.listByUnidades(req.permissions.unidades || []));
+});
+
+// ---------- sangria (retirada de caixa) registrada em campo, ao longo do
+// dia - pensado pra quem visita varias lojas (ex: supervisor) e nao ta
+// esperando o fechamento do dia sair pra lancar a retirada. Fica separado do
+// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos) ----------
+app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, grupo, data, valor, descricao } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await sangrias.criar({
+      unidade, unidadeNome, grupo, data, valor, descricao,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('sangria-lancada', registro, 'lancamento');
+    broadcast('sangria-lancada', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/sangrias/minhas', requireSection('lancamento'), async (req, res) => {
+  if (req.isMaster) return res.json(await sangrias.listAll());
+  res.json(await sangrias.listByUnidades(req.permissions.unidades || []));
 });
 
 app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {

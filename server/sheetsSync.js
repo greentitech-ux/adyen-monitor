@@ -193,10 +193,15 @@ const CAMPOS_SOMA = [
 // dia numa linha so: soma os campos monetarios (seguro, pois a linha da
 // sangria tem os outros campos zerados) e usa como base a linha de maior
 // faturamento (o fechamento "de verdade") pro gerente/caixa inicial/final.
+// agrupa so por unidade+data (nao por grupo) - os codigos de unidade da
+// ARCFOOD e os nomes de loja do Grupo Bravo nunca se repetem entre si, e
+// isso deixa a funcao reutilizavel tambem pra mesclar sangrias lancadas
+// direto no sistema (server/sangrias.js), cujo campo "grupo" pode nao bater
+// 100% com o do fechamento se alguem digitar/computar diferente
 function mesclarLancamentosDoMesmoDia(fechamentos) {
   const grupos = new Map();
   fechamentos.forEach((f) => {
-    const chave = `${f.grupo}__${f.unidade}__${f.data}`;
+    const chave = `${f.unidade}__${f.data}`;
     if (!grupos.has(chave)) grupos.set(chave, []);
     grupos.get(chave).push(f);
   });

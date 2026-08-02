@@ -1,0 +1,76 @@
+// sangrias.js
+// Sangrias (retiradas de caixa) registradas em campo - normalmente por quem
+// visita as lojas ao longo do dia, ANTES do fechamento do dia ser lançado.
+// Fica numa coleção separada, e só é mesclada com o fechamento do dia na
+// hora da leitura (mesma lógica usada pra juntar as sangrias que vêm do
+// AppSheet, em sheetsSync.js/mesclarLancamentosDoMesmoDia) - porque na hora
+// que a sangria é registrada pode ainda não existir nenhum fechamento pra
+// aquele dia.
+const db = require('./firestore');
+
+const COLLECTION = db.collection('sangrias');
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, criadoPorId, criadoPorEmail }) {
+  if (!unidade) throw new Error('Unidade é obrigatória.');
+  if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
+  const v = num(valor);
+  if (v <= 0) throw new Error('Informe o valor retirado.');
+
+  const ref = COLLECTION.doc();
+  const registro = {
+    id: ref.id,
+    unidade,
+    unidadeNome: unidadeNome || unidade,
+    grupo: grupo || 'MANUAL',
+    data,
+    valor: v,
+    descricao: (descricao || '').slice(0, 300),
+    criadoPorId,
+    criadoPorEmail,
+    criadoEm: new Date().toISOString(),
+  };
+  await ref.set(registro);
+  return registro;
+}
+
+async function listAll() {
+  const snap = await COLLECTION.orderBy('data', 'desc').get();
+  return snap.docs.map((d) => d.data());
+}
+
+// Firestore "in" aceita no maximo 30 valores por consulta
+async function listByUnidades(unidades) {
+  if (!unidades || !unidades.length) return [];
+  const lotes = [];
+  for (let i = 0; i < unidades.length; i += 30) lotes.push(unidades.slice(i, i + 30));
+  const resultados = await Promise.all(lotes.map((lote) => COLLECTION.where('unidade', 'in', lote).get()));
+  return resultados.flatMap((snap) => snap.docs.map((d) => d.data()));
+}
+
+// formata a sangria como um "fechamento" mínimo (mesmo formato usado no
+// resto do sistema), só com o valor retirado em totalSaida - assim dá pra
+// mesclar com o fechamento real do dia usando a mesma função já validada
+function comoFechamento(s) {
+  return {
+    id: `sangria-${s.id}`,
+    gerente: s.criadoPorEmail || '',
+    unidadeNome: s.unidadeNome,
+    unidade: s.unidade,
+    grupo: s.grupo,
+    data: s.data,
+    caixaInicial: 0, caixaFinal: 0, delivery: 0, carryout: 0, pickup: 0, loja: 0,
+    adyen: 0, ifood: 0, food99: 0, pix: 0, pixCnpj: 0, outros: 0,
+    somaMaq: 0, somaPOS: 0, entradaDinheiro: 0, deposito: 0,
+    totalSaida: s.valor, faturamento: 0, totalDeclarado: 0, diferenca: 0,
+    obsDif: null,
+    observacao: s.descricao ? `Sangria: ${s.descricao}` : 'Sangria',
+    quebra: 0, tc: 0, cancelados: 0,
+  };
+}
+
+module.exports = { criar, listAll, listByUnidades, comoFechamento };
