@@ -186,4 +186,4 @@ async function sincronizar() {
   return resultado;
 }
 
-module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo };
+module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, getAccessToken, buscarAba };

@@ -23,6 +23,7 @@ const fechamentosLive = require('./fechamentosLive');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
 const sheetsSync = require('./sheetsSync');
+const entregasSync = require('./entregasSync');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -369,6 +370,7 @@ app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
+  entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   (await entregasLive.listAll()).forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   const lista = Object.entries(mapa)
     .map(([codigo, nome]) => ({ codigo, nome }))
@@ -849,6 +851,49 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
 // (Master ve tudo, cada loja so ve as suas unidades). Etiqueta (foto do
 // comprovante/etiquetas do entregador) e opcional, guardada no mesmo Storage
 // dos anexos de disputa.
+//
+// entregasHistoricoData: historico importado direto da planilha "MOTOS
+// BRAVO" (AppSheet) via entregasSync - comeca vazio (so aparece depois da 1a
+// sincronizacao, no boot) e e somente leitura (nao tem dono/permissao de
+// edicao, so o Master ve as diferencas na planilha em si). A aba "BDMotos"
+// fica de fora por enquanto (sem coluna Data preenchida - ver entregasSync.js).
+let entregasHistoricoData = [];
+let statusSincronizacaoEntregas = { ultimaEm: null, ultimoErro: null, sincronizando: false };
+
+async function sincronizarPlanilhaEntregas() {
+  if (statusSincronizacaoEntregas.sincronizando) return statusSincronizacaoEntregas;
+  statusSincronizacaoEntregas.sincronizando = true;
+  try {
+    const dados = await entregasSync.sincronizar();
+    if (dados.length) {
+      entregasHistoricoData = dados;
+      statusSincronizacaoEntregas.ultimaEm = new Date().toISOString();
+      statusSincronizacaoEntregas.ultimoErro = null;
+      console.log(`Entregas: sincronizados ${dados.length} registros historicos da planilha do Google Sheets.`);
+    } else {
+      statusSincronizacaoEntregas.ultimoErro = 'A sincronização rodou mas não retornou nenhuma linha - histórico continua com os dados anteriores.';
+      console.warn(statusSincronizacaoEntregas.ultimoErro);
+    }
+  } catch (err) {
+    statusSincronizacaoEntregas.ultimoErro = err.message;
+    console.error('Erro ao sincronizar planilha de entregas:', err.message);
+  } finally {
+    statusSincronizacaoEntregas.sincronizando = false;
+  }
+  return statusSincronizacaoEntregas;
+}
+
+app.get('/api/entregas/sincronizacao', requireSection('entregas'), (req, res) => {
+  res.json(statusSincronizacaoEntregas);
+});
+
+// forca uma sincronizacao imediata - so o Master (evita chamadas extras na API do Google sem necessidade)
+app.post('/api/entregas/sincronizar-planilha', auth.requireMaster, async (req, res) => {
+  const status = await sincronizarPlanilhaEntregas();
+  if (status.ultimoErro) return res.status(502).json(status);
+  res.json(status);
+});
+
 app.post('/api/entregas/lancar', requireSection('entregas-lancamento'), upload.single('etiqueta'), async (req, res) => {
   try {
     const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao } = JSON.parse(req.body.payload || '{}');
@@ -875,9 +920,10 @@ app.get('/api/entregas/meus', requireSection('entregas-lancamento'), async (req,
 });
 
 // dashboard de acompanhamento (secao separada - pode ser liberada sem dar
-// acesso de lançamento, e vice-versa)
+// acesso de lançamento, e vice-versa) - junta o historico da planilha
+// (AppSheet, somente leitura) com os lançamentos ao vivo pela loja
 app.get('/api/entregas', requireSection('entregas'), async (req, res) => {
-  res.json(auth.filterByUnidade(req, await entregasLive.listAll()));
+  res.json(auth.filterByUnidade(req, [...entregasHistoricoData, ...(await entregasLive.listAll())]));
 });
 
 app.get('/api/entregas/etiqueta/:id', (req, res, next) => {
@@ -997,5 +1043,9 @@ app.use((err, req, res, next) => {
     sincronizarPlanilhasFechamento();
     const intervaloSync = Number(process.env.SHEETS_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
     setInterval(sincronizarPlanilhasFechamento, intervaloSync);
+
+    // mesma logica pro historico de entregas (planilha "MOTOS BRAVO" do AppSheet)
+    sincronizarPlanilhaEntregas();
+    setInterval(sincronizarPlanilhaEntregas, intervaloSync);
   });
 })();
