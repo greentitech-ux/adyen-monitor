@@ -125,7 +125,9 @@
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
   .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
   .btn-disputa:hover{border-color:var(--accent);}
-  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;}
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
   .back:hover{color:var(--text);border-color:var(--accent);}
   .dispute-item{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;}
   .dispute-item .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
@@ -241,6 +243,7 @@
   </div>
   <div class="header-nav">
     <div class="nav-links">
+      <a class="back active" id="nav-monitor" href="/">📈 Monitor</a>
       <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
       <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
       <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
@@ -253,6 +256,7 @@
       <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
       <button class="btn-notif" id="btn-som" onclick="toggleSom()" title="Som/vibração de alerta">🔊</button>
       <button class="btn-notif" id="btn-refresh" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
       <button class="btn-notif btn-sair" id="btn-logout" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
     </div>
   </div>
