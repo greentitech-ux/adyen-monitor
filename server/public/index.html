@@ -283,7 +283,7 @@
     </div>
     <input id="f-search" placeholder="Buscar pedido, cliente, últimos dígitos...">
   </div>
-  <div class="tablewrap" id="tx-table-wrap" style="max-height:360px;">
+  <div class="tablewrap" id="tx-table-wrap" style="max-height:518px;">
     <table>
       <thead><tr><th>Hora/Data</th><th>Unid.</th><th>Nome do Cliente</th><th class="statuscell">Status</th><th>Nome do Cartão</th><th>Método</th><th>Valor</th><th>Final do Cartão</th><th>Qtd. Pedidos</th><th>Aprovados</th><th>Recusados</th><th>Estornados</th><th>Fraude</th><th>Banco</th></tr></thead>
       <tbody id="tx-body"></tbody>
@@ -1475,19 +1475,22 @@ function removerOfferClosedSuperado(pedidos){
             const unidadeEsc = (d.unidade||'').replace(/'/g,"\\'");
             const chaveClienteEsc = (chaveCliente||'').replace(/'/g,"\\'");
             const nomeClienteEsc = (d.nomeCliente||d.cardHolder||'').replace(/'/g,"\\'");
-            const fraudeHtml = infoFraude && infoFraude.direto
+            // Suspeito fica sob a coluna de Data/Hora, Fraude sob a coluna de
+            // Unidade - visual mais limpo que os dois empilhados na mesma celula
+            const fraudeRemoverHtml = infoFraude && infoFraude.direto
               ? `<div class="tx-comentario" onclick="event.stopPropagation(); removerMarcaFraude('${pedidoIdEsc}')">✕ remover marcação</div>`
-              : `<div style="display:flex;gap:10px;">
-                   <div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">⚠️ Marcar suspeito</div>
-                   <div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">🚫 Marcar fraude</div>
-                 </div>`;
+              : '';
+            const fraudeSuspeitoHtml = (infoFraude && infoFraude.direto) ? '' :
+              `<div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">⚠️ Suspeito</div>`;
+            const fraudeFraudeHtml = (infoFraude && infoFraude.direto) ? '' :
+              `<div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">🚫 Fraude</div>`;
             const fraudeBadge = !infoFraude ? '' : infoFraude.nivel==='FRAUDE'
               ? `<span class="flag" style="background:var(--bad-dim);color:var(--bad);">🚫 FRAUDE${infoFraude.direto?'':' (recorrente)'}</span>`
               : `<span class="flag" style="background:var(--warn-dim);color:var(--warn);">⚠️ SUSPEITO</span>`;
             return `
                 <tr class="${novo?'row-novo ':''}${REPEATED_PSPS.has(d.pspReference)?'row-alerta ':''}${statusCls}" onclick="showClient('${clientKeyOf(d).replace(/'/g,"\\'")}','${String(orderKeyOf(d)).replace(/'/g,"\\'")}','${(d.unidade||'').replace(/'/g,"\\'")}')">
-                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}${fraudeHtml}</td>
-                            <td class="valor">${soNumero(d.unidade)}</td>
+                      <td>${fmtDT(d.dataHora)}${comentarioHtml}${estornoHtml}${fraudeRemoverHtml}${fraudeSuspeitoHtml}</td>
+                            <td class="valor">${soNumero(d.unidade)}${fraudeFraudeHtml}</td>
                                   <td class="truncate" title="${d.nomeCliente||''}">${d.nomeCliente||'—'}</td>
                                         <td class="statuscell" title="${d.status}">${novo?'<span class="flag novo">NOVO</span>':''}<span class="badge ${d.status}">${d.status}</span>${fraudeBadge}${d.fraudeSuspeita?'<span class="flag">FRAUDE?</span>':''}${REPEATED_PSPS.has(d.pspReference)?'<span class="flag">REPETIDO?</span>':''}${marcadorDisputa(orderKeyOf(d))}</td>
                                               <td class="truncate" title="${d.cardHolder||''}">${d.cardHolder||'—'}</td>

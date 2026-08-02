@@ -10,6 +10,7 @@ const { normalize } = require('./normalize');
 const { lookupBank } = require('./binLookup');
 const push = require('./push');
 const cardTesting = require('./cardTesting');
+const cardHopping = require('./cardHopping');
 const disputes = require('./disputes');
 const fraudMarks = require('./fraudMarks');
 const storage = require('./storage');
@@ -211,6 +212,40 @@ app.post('/webhooks/adyen', async (req, res) => {
           `card-testing-${tx.unidade}-${tx.last4}`,
           tx.unidade
         );
+      }
+    }
+
+    // mesmo cliente (mesmo nome) testando varios finais de cartao DIFERENTES
+    // ate um aprovar, num intervalo curto -> padrao classico de cartao
+    // clonado/roubado. Quando detecta, marca o pedido aprovado como FRAUDE
+    // automaticamente, na mesma fila do botao manual "Marcar fraude" -
+    // aparece no painel/monitor sem precisar de ninguem clicar
+    if (tx.status === 'RECUSADO' || tx.status === 'APROVADO') {
+      const padraoTroca = cardHopping.registrarTentativa(tx);
+      if (padraoTroca) {
+        try {
+          const pedidoId = tx.merchantReference || tx.originalReference || tx.pspReference;
+          const clienteNome = tx.nomeCliente || tx.cardHolder || null;
+          const registro = await fraudMarks.marcar({
+            pedidoId,
+            unidade: tx.unidade,
+            nivel: 'FRAUDE',
+            motivo: `Detecção automática: ${padraoTroca.cartoesDistintos} finais de cartão diferentes testados pelo mesmo cliente em ${padraoTroca.janelaMinutos} min antes de aprovar.`,
+            clienteChave: clienteNome ? `nome:${clienteNome}` : null,
+            clienteNome,
+            valor: tx.valor,
+            marcadoPorEmail: 'deteccao-automatica@sistema',
+          });
+          broadcast('fraude-marcada', registro, 'monitor');
+          push.notifyRaw(
+            `🚫 Fraude detectada automaticamente — ${tx.unidade || ''}`,
+            `${clienteNome || 'Cliente'} testou ${padraoTroca.cartoesDistintos} cartões diferentes até aprovar`,
+            `fraude-auto-${pedidoId}`,
+            tx.unidade
+          );
+        } catch (err) {
+          console.error('Erro ao marcar fraude automática (troca de cartão):', err.message);
+        }
       }
     }
 
