@@ -170,8 +170,57 @@ function linhaParaFechamento(grupo, header, linha) {
   };
 }
 
+// campos monetarios/contagem que sao seguros de somar quando ha mais de um
+// lancamento pro mesmo dia+loja (ver mesclarLancamentosDoMesmoDia abaixo).
+// "Deposito", "Caixa Inicial" e "Caixa Final" ficam de fora de proposito -
+// sao saldos/movimentos de caixa cujo significado ao somar duas linhas nao e
+// obvio (ex: a linha da sangria registra o Deposito como negativo do valor
+// retirado, o que pode nao refletir o saldo real do dia se somado direto);
+// esses tres vem sempre da linha "principal" (o fechamento de verdade)
+const CAMPOS_SOMA = [
+  'delivery', 'carryout', 'pickup', 'loja', 'adyen', 'ifood', 'food99', 'pix', 'pixCnpj', 'outros',
+  'somaMaq', 'somaPOS', 'entradaDinheiro', 'totalSaida', 'faturamento', 'totalDeclarado',
+  'diferenca', 'quebra', 'tc', 'cancelados',
+];
+
+// o AppSheet permite mais de um lancamento no mesmo dia pra mesma loja - o
+// caso mais comum e uma sangria/retirada de caixa feita separado do
+// fechamento em si (linha com Nome tipo "André SangriaX", faturamento zerado
+// e so o valor da saida preenchido). Sem juntar isso, cada dia com sangria
+// aparecia como "2 fechamentos" no sistema - dava a impressao de faturamento
+// duplicado (mesmo o VALOR do faturamento nao sendo somado em dobro, ja que
+// a linha da sangria tem faturamento R$0). Aqui a gente junta tudo do mesmo
+// dia numa linha so: soma os campos monetarios (seguro, pois a linha da
+// sangria tem os outros campos zerados) e usa como base a linha de maior
+// faturamento (o fechamento "de verdade") pro gerente/caixa inicial/final.
+function mesclarLancamentosDoMesmoDia(fechamentos) {
+  const grupos = new Map();
+  fechamentos.forEach((f) => {
+    const chave = `${f.grupo}__${f.unidade}__${f.data}`;
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(f);
+  });
+
+  const resultado = [];
+  for (const linhas of grupos.values()) {
+    if (linhas.length === 1) {
+      resultado.push(linhas[0]);
+      continue;
+    }
+    const principal = linhas.reduce((a, b) => (b.faturamento > a.faturamento ? b : a));
+    const mesclado = { ...principal };
+    CAMPOS_SOMA.forEach((campo) => {
+      mesclado[campo] = +linhas.reduce((s, l) => s + (l[campo] || 0), 0).toFixed(2);
+    });
+    mesclado.observacao = linhas.map((l) => l.observacao).filter(Boolean).join(' · ') || null;
+    resultado.push(mesclado);
+  }
+  return resultado;
+}
+
 // le as duas planilhas (aba "BD") e devolve a lista combinada de fechamentos,
-// no mesmo formato do fechamentos-snapshot.json
+// no mesmo formato do fechamentos-snapshot.json - ja com os lancamentos do
+// mesmo dia/loja mesclados (ver mesclarLancamentosDoMesmoDia)
 async function sincronizar() {
   const resultado = [];
   for (const planilha of PLANILHAS) {
@@ -183,7 +232,7 @@ async function sincronizar() {
       if (fechamento) resultado.push(fechamento);
     }
   }
-  return resultado;
+  return mesclarLancamentosDoMesmoDia(resultado);
 }
 
-module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo };
+module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, mesclarLancamentosDoMesmoDia };
