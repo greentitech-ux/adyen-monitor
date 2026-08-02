@@ -314,7 +314,13 @@
 </div>
 
 <div class="panel" id="fraude-panel" style="margin-top:16px;">
-  <h2>🚩 Suspeitos e fraudes monitorados <span class="n" id="fraude-count"></span></h2>
+  <h2>
+    <span>🚩 Suspeitos e fraudes monitorados <span class="n" id="fraude-count"></span></span>
+    <span id="fraude-relatorio-btns" class="hidden" style="display:flex;gap:6px;">
+      <button type="button" class="btn-disputa" onclick="baixarRelatorioFraude('csv')">📄 Relatório CSV</button>
+      <button type="button" class="btn-disputa" onclick="baixarRelatorioFraude('pdf')">📄 Relatório PDF</button>
+    </span>
+  </h2>
   <div class="alerts" id="fraude-monitor" style="max-height:320px;"></div>
 </div>
 
@@ -440,6 +446,15 @@ function aplicarNav(){
   // a fila de solicitacoes de estorno e coisa do Master acompanhar - o usuario
   // que solicitou ve o status direto na linha do pedido dele
   document.getElementById('refund-panel').classList.toggle('hidden', ME.role!=='master');
+  document.getElementById('fraude-relatorio-btns').classList.toggle('hidden', ME.role!=='master');
+}
+
+// relatorio de fraude (CSV/PDF) - resumo por cliente com quantidade de
+// tentativas, se algum pedido passou e a acao tomada, pra apresentar
+// incidentes de fraude pra diretoria/CEO. So o Master ve o botao.
+function baixarRelatorioFraude(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  window.location.href = `/api/fraude/relatorio.${formato}?${params.toString()}`;
 }
 
 async function tentarEntrar(){
@@ -1044,6 +1059,15 @@ function chaveClienteIdentificavel(d){
   if(d.nomeCliente) return `nome:${d.nomeCliente}`;
   return null;
 }
+// identidade usada so pra agrupar/consolidar pedidos marcados como FRAUDE
+// (sempre pelo NOME, mesmo com cartao/bandeira - o servidor propaga a
+// marcacao por nome em index.js, ver fraudMarks.normalizarNome) - diferente
+// de chaveClienteIdentificavel (usada nas estatisticas de repeticao, essa
+// prioriza o cartao)
+function identidadeFraudeDoPedido(d){
+  const nome = (d.nomeCliente || d.cardHolder || '').trim().toLowerCase();
+  return nome || null;
+}
 function detectarPedidosRepetidos(rows){
   const aprovadas = rows.filter(d=>d.status==='APROVADO').slice()
     .sort((a,b)=>(a.dataHora||'').localeCompare(b.dataHora||''));
@@ -1070,28 +1094,72 @@ function detectarPedidosRepetidos(rows){
   return grupos;
 }
 
+// alertas do mesmo cliente ficam agrupados numa "thread" (economiza espaco
+// e evita poluir o painel quando o mesmo ataque gera varios alertas
+// seguidos) - guardado fora da funcao pra sobreviver aos re-renders
+let ALERTAS_GRUPOS_EXPANDIDOS = new Set();
+function toggleGrupoAlerta(chave){
+  if(ALERTAS_GRUPOS_EXPANDIDOS.has(chave)) ALERTAS_GRUPOS_EXPANDIDOS.delete(chave);
+  else ALERTAS_GRUPOS_EXPANDIDOS.add(chave);
+  render();
+}
+function renderAlertsAgrupados(alerts){
+  if(!alerts.length) return '<div class="empty">Nenhum alerta no momento.</div>';
+  const grupos = new Map();
+  alerts.forEach(a=>{
+    const chave = (a.nome||'').trim().toLowerCase() || ('psp:'+a.psp);
+    if(!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(a);
+  });
+  const gruposArr = [...grupos.values()].sort((x,y)=>(y[0].dt||'').localeCompare(x[0].dt||''));
+  return gruposArr.map(list=>{
+    const maisRecente = list[0];
+    const chave = (maisRecente.nome||'').trim().toLowerCase() || ('psp:'+maisRecente.psp);
+    const novo = ehNovo('tx:'+maisRecente.psp);
+    if(list.length===1){
+      const a = maisRecente;
+      return `<div class="alert ${novo?'item-novo':''}"><div class="sev ${a.sev}"></div><div class="body"><div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}${a.t1}</div><div class="t2">${a.t2} · ${fmtDT(a.dt)}</div></div></div>`;
+    }
+    const sevAlta = list.some(a=>a.sev==='high');
+    const expandido = ALERTAS_GRUPOS_EXPANDIDOS.has(chave);
+    const detalhes = list.map(a=>`
+        <div style="border-top:1px solid var(--line);padding-top:6px;margin-top:6px;">
+          <div class="t1" style="font-size:12px;">${a.t1}</div>
+          <div class="t2">${a.t2} · ${fmtDT(a.dt)}</div>
+        </div>`).join('');
+    return `<div class="alert ${novo?'item-novo':''}">
+      <div class="sev ${sevAlta?'high':'med'}"></div>
+      <div class="body" style="flex:1;">
+        <div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}${maisRecente.nome||'cliente'} · <span style="color:var(--muted);">${list.length} alertas</span></div>
+        <div class="t2">${maisRecente.t1} · ${fmtDT(maisRecente.dt)}</div>
+        <div style="margin-top:6px;">
+          <button type="button" class="btn-disputa" onclick="toggleGrupoAlerta('${chave.replace(/'/g,"\\'")}')">${expandido?'▾ Ocultar':'▸ Ver'} os ${list.length} alertas</button>
+        </div>
+        ${expandido?detalhes:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderAlerts(rows){
   const alerts = [];
   const recusadas = rows.filter(d=>d.status==='RECUSADO');
   const byClient = {};
   recusadas.forEach(d=>{ const k=clientKeyOf(d); (byClient[k] ||= []).push(d); });
   Object.entries(byClient).forEach(([k,list])=>{
-    if(list.length>=2) alerts.push({sev:'high', t1:`Tentativas repetidas recusadas — ${list[0].cardHolder||k}`, t2:`${list.length} recusas · ${list[0].motivo||'sem motivo'} · ${list[0].unidade}`, dt:list[0].dataHora, psp:list[list.length-1].pspReference});
+    if(list.length>=2) alerts.push({sev:'high', nome:list[0].cardHolder||list[0].nomeCliente||k, t1:`Tentativas repetidas recusadas — ${list[0].cardHolder||k}`, t2:`${list.length} recusas · ${list[0].motivo||'sem motivo'} · ${list[0].unidade}`, dt:list[0].dataHora, psp:list[list.length-1].pspReference});
   });
   // Amex pedido pra ser monitorado de perto: toda tentativa recusada gera
   // alerta individual, mesmo sem repetir (diferente das outras bandeiras,
   // que so alertam a partir de 2 recusas seguidas do mesmo cliente)
-  recusadas.filter(d=>d.metodo==='amex').forEach(d=>alerts.push({sev:'high', t1:`Tentativa de venda Amex recusada — ${d.cardHolder||d.nomeCliente||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.motivo||'sem motivo'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
+  recusadas.filter(d=>d.metodo==='amex').forEach(d=>alerts.push({sev:'high', nome:d.cardHolder||d.nomeCliente||'cliente', t1:`Tentativa de venda Amex recusada — ${d.cardHolder||d.nomeCliente||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.motivo||'sem motivo'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   // chargeback tem painel proprio (com prazo de recorrer, evidencias etc.) -
   // nao entra aqui pra nao duplicar/inflar os alertas de falha/fraude
-  rows.filter(d=>d.fraudeSuspeita && !d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
-  rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
+  rows.filter(d=>d.fraudeSuspeita && !d.status.includes('CHARGEBACK')).forEach(d=>alerts.push({sev:'high', nome:d.cardHolder||d.nomeCliente||'cliente', t1:`Fraude suspeita — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · final ${d.last4||'????'} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
+  rows.filter(d=>d.status==='DISPUTE_DEFENSE_PERIOD_ENDED').forEach(d=>alerts.push({sev:'med', nome:d.cardHolder||d.nomeCliente||'cliente', t1:`Período de disputa encerrado — ${d.cardHolder||'cliente'}`, t2:`${fmtMoney(d.valor)} · ${d.unidade}`, dt:d.dataHora, psp:d.pspReference}));
   alerts.sort((a,b)=>(b.dt||'').localeCompare(a.dt||''));
   document.getElementById('alert-count').textContent = alerts.length;
-  document.getElementById('alerts').innerHTML = alerts.length ? alerts.map(a=>{
-    const novo = ehNovo('tx:'+a.psp);
-    return `<div class="alert ${novo?'item-novo':''}"><div class="sev ${a.sev}"></div><div class="body"><div class="t1">${novo?'<span class="flag novo">NOVO</span> ':''}${a.t1}</div><div class="t2">${a.t2} · ${fmtDT(a.dt)}</div></div></div>`;
-  }).join('') : '<div class="empty">Nenhum alerta no momento.</div>';
+  document.getElementById('alerts').innerHTML = renderAlertsAgrupados(alerts);
 
   const repetidos = [];
   REPEATED_PSPS = new Set();
@@ -1305,14 +1373,14 @@ function fraudeInfoDoPedido(d){
   return null;
 }
 
-async function marcarFraude(pedidoId, unidade, nivel, clienteChave, clienteNome, valor){
+async function marcarFraude(pedidoId, unidade, nivel, clienteChave, clienteNome, valor, statusPedido){
   let motivo = '';
   if(nivel==='FRAUDE'){
     motivo = prompt('Motivo (opcional) — o que indicou fraude nesse pedido?') || '';
   }
   await fetch('/api/fraude/marcar', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor }),
+    body: JSON.stringify({ pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor, statusPedido }),
   });
   await refreshFraudMarks();
 }
@@ -1323,23 +1391,74 @@ async function removerMarcaFraude(pedidoId){
   await refreshFraudMarks();
 }
 
+// pedidos suspeitos/fraude ficam colapsados numa "thread" por cliente (mesmo
+// nome) - abre/fecha guardado aqui pra sobreviver aos re-renders (SSE fica
+// atualizando esse painel o tempo todo)
+let FRAUDE_GRUPOS_EXPANDIDOS = new Set();
+function toggleGrupoFraude(chave){
+  if(FRAUDE_GRUPOS_EXPANDIDOS.has(chave)) FRAUDE_GRUPOS_EXPANDIDOS.delete(chave);
+  else FRAUDE_GRUPOS_EXPANDIDOS.add(chave);
+  renderFraudeMonitor();
+}
+
 function renderFraudeMonitor(){
   const lista = [...FRAUDE_MARKS].sort((a,b)=>(b.atualizadoEm||'').localeCompare(a.atualizadoEm||''));
   const elCount = document.getElementById('fraude-count');
-  if(elCount) elCount.textContent = lista.length;
   const el = document.getElementById('fraude-monitor');
   if(!el) return;
-  el.innerHTML = lista.length ? lista.map(m=>{
-    const alta = m.nivel==='FRAUDE';
+
+  // agrupa por cliente (mesmo nome) - varias tentativas do mesmo ataque
+  // (ex: cartao clonado testando varios finais) viram uma "thread" so, pra
+  // nao lotar o painel de linha em linha - economiza espaco sem esconder
+  // nenhuma tentativa (todas continuam acessiveis expandindo o grupo)
+  const grupos = new Map();
+  lista.forEach(m=>{
+    const chave = (m.clienteNome||'').trim().toLowerCase() || ('pedido:'+m.pedidoId);
+    (grupos.get(chave) || grupos.set(chave, []).get(chave)).push(m);
+  });
+  const gruposArr = [...grupos.values()].sort((a,b)=>(b[0].atualizadoEm||'').localeCompare(a[0].atualizadoEm||''));
+  if(elCount) elCount.textContent = gruposArr.length;
+
+  el.innerHTML = gruposArr.length ? gruposArr.map(marcas=>{
+    const alta = marcas.some(m=>m.nivel==='FRAUDE');
+    const maisRecente = marcas[0];
+    const chave = (maisRecente.clienteNome||'').trim().toLowerCase() || ('pedido:'+maisRecente.pedidoId);
+    const badge = `<span class="badge" style="background:${alta?'var(--bad-dim)':'var(--warn-dim)'};color:${alta?'var(--bad)':'var(--warn)'};">${alta?'🚫 FRAUDE':'⚠️ SUSPEITO'}</span>`;
+
+    if(marcas.length===1){
+      const m = maisRecente;
+      return `
+      <div class="alert">
+        <div class="sev ${alta?'high':'med'}"></div>
+        <div class="body" style="flex:1;">
+          <div class="t1">${badge} ${m.clienteNome||'cliente desconhecido'} · ${m.unidade||'—'} · ${fmtMoney(m.valor)}</div>
+          <div class="t2">Pedido ${m.pedidoId} · marcado por ${m.atualizadoPorEmail||m.criadoPorEmail||'—'} em ${fmtDT(m.atualizadoEm)}${m.motivo?(' · '+m.motivo):''}</div>
+          <div style="margin-top:8px;">
+            <button type="button" class="btn-disputa" onclick="removerMarcaFraude('${String(m.pedidoId).replace(/'/g,"\\'")}')">✕ Remover</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    const unidades = [...new Set(marcas.map(m=>m.unidade).filter(Boolean))].join(', ');
+    const valorTotal = marcas.reduce((s,m)=>s+(m.valor||0),0);
+    const expandido = FRAUDE_GRUPOS_EXPANDIDOS.has(chave);
+    const detalhes = marcas.map(m=>`
+        <div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px;">
+          <div class="t2">Pedido ${m.pedidoId} · ${m.unidade||'—'} · ${fmtMoney(m.valor)} · ${fmtDT(m.atualizadoEm)}${m.motivo?(' · '+m.motivo):''}</div>
+          <button type="button" class="btn-disputa" style="margin-top:4px;" onclick="removerMarcaFraude('${String(m.pedidoId).replace(/'/g,"\\'")}')">✕ Remover</button>
+        </div>`).join('');
+
     return `
     <div class="alert">
       <div class="sev ${alta?'high':'med'}"></div>
       <div class="body" style="flex:1;">
-        <div class="t1"><span class="badge" style="background:${alta?'var(--bad-dim)':'var(--warn-dim)'};color:${alta?'var(--bad)':'var(--warn)'};">${alta?'🚫 FRAUDE':'⚠️ SUSPEITO'}</span> ${m.clienteNome||'cliente desconhecido'} · ${m.unidade||'—'} · ${fmtMoney(m.valor)}</div>
-        <div class="t2">Pedido ${m.pedidoId} · marcado por ${m.atualizadoPorEmail||m.criadoPorEmail||'—'} em ${fmtDT(m.atualizadoEm)}${m.motivo?(' · '+m.motivo):''}</div>
+        <div class="t1">${badge} ${maisRecente.clienteNome||'cliente desconhecido'} · ${unidades||'—'} · <span style="color:var(--muted);">${marcas.length} tentativas</span></div>
+        <div class="t2">Pedido mais recente ${maisRecente.pedidoId} · ${fmtDT(maisRecente.atualizadoEm)} · valor total envolvido ${fmtMoney(valorTotal)}</div>
         <div style="margin-top:8px;">
-          <button type="button" class="btn-disputa" onclick="removerMarcaFraude('${String(m.pedidoId).replace(/'/g,"\\'")}')">✕ Remover</button>
+          <button type="button" class="btn-disputa" onclick="toggleGrupoFraude('${chave.replace(/'/g,"\\'")}')">${expandido?'▾ Ocultar':'▸ Ver'} os ${marcas.length} pedidos</button>
         </div>
+        ${expandido?detalhes:''}
       </div>
     </div>`;
   }).join('') : '<div class="empty">Nenhum pedido suspeito ou marcado como fraude no momento.</div>';
@@ -1371,10 +1490,20 @@ function removerOfferClosedSuperado(pedidos){
       const period = periodFiltered();
       const periodUnidade = filtraPorUnidade(period);
       const periodUnidadeStatus = filtraPorStatusEvento(periodUnidade);
-      renderKpis(computeSummary(periodUnidadeStatus));
+
+      // pedidos marcados como FRAUDE (manual ou automatico) ficam de fora das
+      // metricas de negocio - senao um ataque de cartao clonado infla o total
+      // de transacoes e derruba a taxa de aprovacao artificialmente. Eles
+      // continuam contabilizados/visiveis no painel de Suspeitos e fraudes
+      // (renderFraudeMonitor), so nao entram mais nos KPIs "normais"
+      const semFraudeMarcada = periodUnidadeStatus.filter(t=>{
+        const info = fraudeInfoDoPedido(t);
+        return !(info && info.nivel==='FRAUDE');
+      });
+      renderKpis(computeSummary(semFraudeMarcada));
       renderAlerts(periodUnidadeStatus);
       renderTrendChart(filtraPorUnidade(DATA));
-      renderUnidadesTable(periodUnidadeStatus);
+      renderUnidadesTable(semFraudeMarcada);
       renderOrdersChanged();
       renderChargebacks();
 
@@ -1403,7 +1532,28 @@ function removerOfferClosedSuperado(pedidos){
             (SEL_STATUS.size===0 || SEL_STATUS.has(d.status)) &&
             (!q || (d.nomeCliente||'').toLowerCase().includes(q) || (d.cardHolder||'').toLowerCase().includes(q) || (d.merchantReference||'').toLowerCase().includes(q) || (d.last4||'').includes(q))
                                            ).sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
-      const rows = filtradas;
+
+      // pedidos marcados como FRAUDE da MESMA identidade (mesmo nome) ficam
+      // agrupados: so o mais recente aparece na tabela de Transacoes, pra nao
+      // poluir a lista com varias linhas do mesmo ataque (ex: cartao clonado
+      // testando varios finais). O historico completo de tentativas continua
+      // disponivel, consolidado, no painel "Suspeitos e fraudes monitorados"
+      const maisRecentePorIdentidadeFraude = new Map();
+      filtradas.forEach(d=>{
+            const info = fraudeInfoDoPedido(d);
+            if(!(info && info.nivel==='FRAUDE')) return;
+            const idKey = identidadeFraudeDoPedido(d);
+            if(!idKey) return;
+            const atual = maisRecentePorIdentidadeFraude.get(idKey);
+            if(!atual || (d.dataHora||'') > (atual.dataHora||'')) maisRecentePorIdentidadeFraude.set(idKey, d);
+      });
+      const rows = filtradas.filter(d=>{
+            const info = fraudeInfoDoPedido(d);
+            if(!(info && info.nivel==='FRAUDE')) return true;
+            const idKey = identidadeFraudeDoPedido(d);
+            if(!idKey) return true;
+            return maisRecentePorIdentidadeFraude.get(idKey) === d;
+      });
 
       // contagem historica por cliente (todo o DATA, nao so o periodo filtrado) -
       // pra dar contexto de quantas vezes esse cliente ja comprou/foi recusado/etc.
@@ -1481,9 +1631,9 @@ function removerOfferClosedSuperado(pedidos){
               ? `<div class="tx-comentario" onclick="event.stopPropagation(); removerMarcaFraude('${pedidoIdEsc}')">✕ remover marcação</div>`
               : '';
             const fraudeSuspeitoHtml = (infoFraude && infoFraude.direto) ? '' :
-              `<div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">⚠️ Suspeito</div>`;
+              `<div class="tx-comentario" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','SUSPEITO','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0},'${d.status}')">⚠️ Suspeito</div>`;
             const fraudeFraudeHtml = (infoFraude && infoFraude.direto) ? '' :
-              `<div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0})">🚫 Fraude</div>`;
+              `<div class="tx-comentario" style="color:var(--bad);" onclick="event.stopPropagation(); marcarFraude('${pedidoIdEsc}','${unidadeEsc}','FRAUDE','${chaveClienteEsc}','${nomeClienteEsc}',${d.valor||0},'${d.status}')">🚫 Fraude</div>`;
             const fraudeBadge = !infoFraude ? '' : infoFraude.nivel==='FRAUDE'
               ? `<span class="flag" style="background:var(--bad-dim);color:var(--bad);">🚫 FRAUDE${infoFraude.direto?'':' (recorrente)'}</span>`
               : `<span class="flag" style="background:var(--warn-dim);color:var(--warn);">⚠️ SUSPEITO</span>`;
