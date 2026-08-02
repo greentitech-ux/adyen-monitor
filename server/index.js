@@ -13,6 +13,7 @@ const cardTesting = require('./cardTesting');
 const cardHopping = require('./cardHopping');
 const disputes = require('./disputes');
 const fraudMarks = require('./fraudMarks');
+const fraudReport = require('./fraudReport');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
@@ -233,6 +234,7 @@ app.post('/webhooks/adyen', async (req, res) => {
             motivo: `Detecção automática: ${padraoTroca.cartoesDistintos} finais de cartão diferentes testados pelo mesmo cliente em ${padraoTroca.janelaMinutos} min antes de aprovar.`,
             clienteChave: clienteNome ? `nome:${clienteNome}` : null,
             clienteNome,
+            statusPedido: tx.status,
             valor: tx.valor,
             marcadoPorEmail: 'deteccao-automatica@sistema',
           });
@@ -245,6 +247,50 @@ app.post('/webhooks/adyen', async (req, res) => {
           );
         } catch (err) {
           console.error('Erro ao marcar fraude automática (troca de cartão):', err.message);
+        }
+      }
+    }
+
+    // cliente ja identificado como fraude em algum pedido anterior (mesmo
+    // nome, MESMO SE trocar de bandeira/final de cartao) -> qualquer pedido
+    // novo dele tambem entra automaticamente como FRAUDE, sem precisar
+    // repetir o padrao de troca de cartao de novo. Preferimos alertar
+    // demais a deixar passar batido - o Master sempre pode remover a
+    // marcacao de um pedido especifico se for engano; o nome continua
+    // sendo monitorado pros proximos pedidos mesmo assim
+    {
+      const pedidoIdAtual = tx.merchantReference || tx.originalReference || tx.pspReference;
+      const nomeAtual = tx.nomeCliente || tx.cardHolder || null;
+      if (nomeAtual) {
+        try {
+          const marcasExistentes = await fraudMarks.listAll();
+          const nomeNormalizado = fraudMarks.normalizarNome(nomeAtual);
+          const jaConhecido = marcasExistentes.some(
+            (m) => m.nivel === 'FRAUDE' && fraudMarks.normalizarNome(m.clienteNome) === nomeNormalizado
+          );
+          const jaMarcadoNesse = marcasExistentes.some((m) => m.pedidoId === pedidoIdAtual);
+          if (jaConhecido && !jaMarcadoNesse) {
+            const registro = await fraudMarks.marcar({
+              pedidoId: pedidoIdAtual,
+              unidade: tx.unidade,
+              nivel: 'FRAUDE',
+              motivo: 'Cliente já identificado como fraude em pedido(s) anterior(es) (mesmo nome, outro cartão).',
+              clienteChave: `nome:${nomeAtual}`,
+              clienteNome: nomeAtual,
+              statusPedido: tx.status,
+              valor: tx.valor,
+              marcadoPorEmail: 'deteccao-automatica@sistema',
+            });
+            broadcast('fraude-marcada', registro, 'monitor');
+            push.notifyRaw(
+              `🚫 Fraude (cliente já conhecido) — ${tx.unidade || ''}`,
+              `${nomeAtual} já tinha pedido marcado como fraude antes`,
+              `fraude-auto-${pedidoIdAtual}`,
+              tx.unidade
+            );
+          }
+        } catch (err) {
+          console.error('Erro ao propagar marcação de fraude por nome:', err.message);
         }
       }
     }
@@ -319,12 +365,12 @@ app.get('/api/fraude', requireSection('monitor'), (req, res) => {
 
 app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
   try {
-    const { pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor } = req.body;
+    const { pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, statusPedido, valor } = req.body;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await fraudMarks.marcar({
-      pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor,
+      pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, statusPedido, valor,
       marcadoPorEmail: req.user.email,
     });
     broadcast('fraude-marcada', registro, 'monitor');
@@ -343,9 +389,32 @@ app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
 });
 
 app.delete('/api/fraude/:pedidoId', requireSection('monitor'), async (req, res) => {
-  await fraudMarks.remover(decodeURIComponent(req.params.pedidoId));
+  await fraudMarks.remover(decodeURIComponent(req.params.pedidoId), req.user.email);
   broadcast('fraude-removida', { pedidoId: req.params.pedidoId }, 'monitor');
   res.json({ ok: true });
+});
+
+// ---------- relatorio de fraude (Master) - resumo por cliente pra
+// apresentar incidentes (quantidade, se algum pedido passou, acao tomada) -
+// usa o historico completo (inclui marcacoes ja removidas) ----------
+app.get('/api/fraude/relatorio.csv', auth.requireMaster, async (req, res) => {
+  const { inicio, fim } = req.query;
+  const historico = await fraudMarks.listHistorico();
+  const filtrado = historico.filter((m) => (!inicio || (m.criadoEm || '') >= inicio) && (!fim || (m.criadoEm || '') <= fim + 'T23:59:59'));
+  const linhas = fraudReport.agruparPorCliente(filtrado);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fraudReport.slugify('relatorio-fraude')}.csv"`);
+  res.send(fraudReport.toCSV(linhas));
+});
+
+app.get('/api/fraude/relatorio.pdf', auth.requireMaster, async (req, res) => {
+  const { inicio, fim } = req.query;
+  const historico = await fraudMarks.listHistorico();
+  const filtrado = historico.filter((m) => (!inicio || (m.criadoEm || '') >= inicio) && (!fim || (m.criadoEm || '') <= fim + 'T23:59:59'));
+  const linhas = fraudReport.agruparPorCliente(filtrado);
+  const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+  const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} cliente(s) monitorado(s)`;
+  fraudReport.writePDF(res, { titulo: 'Relatório de Fraude', subtitulo, linhas });
 });
 
 app.get('/api/summary', requireSection('monitor'), (req, res) => {
