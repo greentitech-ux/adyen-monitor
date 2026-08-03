@@ -981,7 +981,7 @@ app.get('/api/backups', auth.requireMaster, async (req, res) => {
 
 app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
   try {
-    res.json(await backup.rodarBackup());
+    res.json(await backup.rodarBackup({ forcar: true }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
