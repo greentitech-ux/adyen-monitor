@@ -213,9 +213,15 @@
 <div class="panel">
   <h2>
     <div class="title-group"><span>Fechamentos</span><span class="n" id="fechamentos-count"></span></div>
-    <div class="daterange">
-      <span class="sep">até</span>
-      <input type="date" id="fech-date-fim" title="Filtrar esta tabela até uma data específica, dentro do período principal">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div class="daterange" title="Opcional: restringe ainda mais esta tabela dentro do período principal selecionado acima">
+        <span class="sep">de</span>
+        <input type="date" id="fech-date-inicio">
+        <span class="sep">até</span>
+        <input type="date" id="fech-date-fim">
+      </div>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('csv')">📄 Relatório CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('pdf')">📄 Relatório PDF</button>
     </div>
   </h2>
   <div class="tablewrap">
@@ -946,11 +952,23 @@ function renderUnidadesTable(rows){
   }).join('') : '<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
 }
 
-function renderTabela(rows){
-  // segue sempre o filtro de data principal; o campo "até" deste painel e
-  // opcional, so pra restringir ainda mais so esta tabela quando desejado
+// intervalo efetivo desta tabela: o periodo principal (f-date-start/f-date-end),
+// estreitado pelos campos opcionais "de"/"até" deste painel quando preenchidos
+function intervaloEfetivoTabela(){
+  let inicio = document.getElementById('f-date-start').value;
+  let fim = document.getElementById('f-date-end').value;
+  const inicioExtra = document.getElementById('fech-date-inicio').value;
   const fimExtra = document.getElementById('fech-date-fim').value;
-  const filtradas = fimExtra ? rows.filter(d=>(d.data||'')<=fimExtra) : rows;
+  if(inicioExtra && (!inicio || inicioExtra>inicio)) inicio = inicioExtra;
+  if(fimExtra && (!fim || fimExtra<fim)) fim = fimExtra;
+  return {inicio, fim};
+}
+
+function renderTabela(rows){
+  // segue sempre o filtro de data principal; os campos "de"/"até" deste
+  // painel sao opcionais, so pra restringir ainda mais so esta tabela
+  const {inicio, fim} = intervaloEfetivoTabela();
+  const filtradas = rows.filter(d=>(!inicio || (d.data||'')>=inicio) && (!fim || (d.data||'')<=fim));
   const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   document.getElementById('fechamentos-count').textContent = ordenadas.length;
   document.getElementById('fechamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>{
@@ -993,7 +1011,25 @@ function render(){
   renderTabela(rows);
 }
 
-document.getElementById('fech-date-fim').addEventListener('input', ()=>{ renderTabela(filtrar()); });
+['fech-date-inicio','fech-date-fim'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', ()=>{ renderTabela(filtrar()); });
+});
+
+// relatorio CSV/PDF do periodo que estiver filtrado na tela agora (mesmo
+// intervalo efetivo da tabela de Fechamentos, incluindo o corte extra
+// opcional de/até deste painel quando preenchido), respeitando tambem
+// grupo/unidades selecionados nos controles principais
+function baixarRelatorioFechamentos(formato){
+  const {inicio, fim} = intervaloEfetivoTabela();
+  const grupo = document.getElementById('f-grupo').value;
+  const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE].join(',') : '';
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(inicio) params.set('inicio', inicio);
+  if(fim) params.set('fim', fim);
+  if(grupo) params.set('grupo', grupo);
+  if(unidades) params.set('unidades', unidades);
+  window.location.href = `/api/fechamentos/relatorio.${formato}?${params.toString()}`;
+}
 
 let resizeTimer = null;
 window.addEventListener('resize', ()=>{

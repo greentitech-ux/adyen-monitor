@@ -25,6 +25,7 @@ const vaultEntries = require('./vaultEntries');
 const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
+const fechamentosReport = require('./fechamentosReport');
 const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
@@ -1010,6 +1011,44 @@ app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   const sangriasLancadas = (await sangrias.listAll()).map(sangrias.comoFechamento);
   const combinado = sheetsSync.mesclarLancamentosDoMesmoDia([...fechamentosData, ...lancados, ...sangriasLancadas]);
   res.json(auth.filterByUnidade(req, combinado));
+});
+
+// monta as mesmas linhas mostradas no painel "Fechamentos" da tela, aplicando
+// os mesmos filtros do front (periodo ja efetivo - o proprio front resolve
+// qualquer corte extra da tabela antes de mandar inicio/fim - mais grupo e
+// unidades) - usado pelos dois formatos de relatorio abaixo
+async function montarLinhasRelatorioFechamentos(req) {
+  const { inicio, fim, grupo, unidades } = req.query;
+  const lancados = await fechamentosLive.listAll();
+  const sangriasLancadas = (await sangrias.listAll()).map(sangrias.comoFechamento);
+  const combinado = sheetsSync.mesclarLancamentosDoMesmoDia([...fechamentosData, ...lancados, ...sangriasLancadas]);
+  const permitido = auth.filterByUnidade(req, combinado);
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  const filtrado = permitido.filter((f) =>
+    (!grupo || f.grupo === grupo) &&
+    (!unidadesSet || unidadesSet.has(f.unidade)) &&
+    (!inicio || (f.data || '') >= inicio) &&
+    (!fim || (f.data || '') <= fim)
+  );
+  return fechamentosReport.prepararLinhas(filtrado);
+}
+
+// ---------- relatorio de Fechamentos (CSV/PDF) do periodo filtrado na tela -
+// mesma secao 'fechamentos' da tela (nao restrito ao Master), respeitando as
+// unidades que o usuario tem permissao de ver ----------
+app.get('/api/fechamentos/relatorio.csv', requireSection('fechamentos'), async (req, res) => {
+  const linhas = await montarLinhasRelatorioFechamentos(req);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fechamentosReport.slugify('relatorio-fechamentos')}.csv"`);
+  res.send(fechamentosReport.toCSV(linhas));
+});
+
+app.get('/api/fechamentos/relatorio.pdf', requireSection('fechamentos'), async (req, res) => {
+  const { inicio, fim } = req.query;
+  const linhas = await montarLinhasRelatorioFechamentos(req);
+  const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+  const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} fechamento(s)`;
+  fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, linhas });
 });
 
 app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
