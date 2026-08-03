@@ -213,17 +213,28 @@
 <div class="panel">
   <h2>
     <div class="title-group"><span>Fechamentos</span><span class="n" id="fechamentos-count"></span></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <div class="daterange" title="Opcional: restringe ainda mais esta tabela dentro do período principal selecionado acima">
-        <span class="sep">de</span>
-        <input type="date" id="fech-date-inicio">
-        <span class="sep">até</span>
-        <input type="date" id="fech-date-fim">
-      </div>
+    <div style="display:flex;gap:8px;">
       <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('csv')">📄 Relatório CSV</button>
       <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('pdf')">📄 Relatório PDF</button>
     </div>
   </h2>
+  <div class="controls" title="Filtro exclusivo desta tabela - a tabela obedece tanto este filtro quanto o filtro principal lá em cima">
+    <div class="presets" id="fech-presets"></div>
+    <div class="daterange">
+      <input type="date" id="fech-date-inicio" title="Data inicial (exclusivo desta tabela)">
+      <span class="sep">até</span>
+      <input type="date" id="fech-date-fim" title="Data final (exclusivo desta tabela)">
+    </div>
+    <select id="fech-grupo">
+      <option value="">Todos os grupos</option>
+      <option id="fech-grupo-arcfood" value="ARCFOOD">ARCFOOD</option>
+      <option id="fech-grupo-bravo" value="BRAVO">Grupo Bravo</option>
+    </select>
+    <div class="multiselect" id="ms-fech-unidade">
+      <button type="button" class="multiselect-btn" id="ms-fech-unidade-btn">Todas as unidades</button>
+      <div class="multiselect-panel" id="ms-fech-unidade-panel"></div>
+    </div>
+  </div>
   <div class="tablewrap">
     <table>
       <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th></tr></thead>
@@ -267,6 +278,10 @@ Object.keys(UNIDADES_NOMES).forEach((u,i)=>{ CORES_UNIDADE[u] = PALETA_CATEGORIC
 const LIMIAR_SMALL_MULTIPLES = 6; // acima disso, facet em vez de multi-linha
 
 const SEL_UNIDADE = new Set();
+// filtro exclusivo da tabela "Fechamentos" (presets/período/grupo/unidades
+// próprios, em paralelo ao filtro principal acima) - a tabela obedece aos
+// DOIS filtros ao mesmo tempo (interseção), ver renderTabela()
+const SEL_UNIDADE_FECH = new Set();
 let UNIDADES_PERMITIDAS = null; // null = sem restrição (Master); senao, Set das unidades liberadas pro usuario
 let GRUPO_VISIVEL = { ARCFOOD:true, BRAVO:true }; // false quando o usuario nao tem nenhuma unidade do grupo
 
@@ -281,6 +296,11 @@ function atualizarVisibilidadeGrupos(){
   if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('f-grupo').value==='ARCFOOD') document.getElementById('f-grupo').value = '';
   if(!GRUPO_VISIVEL.BRAVO && document.getElementById('f-grupo').value==='BRAVO') document.getElementById('f-grupo').value = '';
 
+  document.getElementById('fech-grupo-arcfood').classList.toggle('hidden', !GRUPO_VISIVEL.ARCFOOD);
+  document.getElementById('fech-grupo-bravo').classList.toggle('hidden', !GRUPO_VISIVEL.BRAVO);
+  if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('fech-grupo').value==='ARCFOOD') document.getElementById('fech-grupo').value = '';
+  if(!GRUPO_VISIVEL.BRAVO && document.getElementById('fech-grupo').value==='BRAVO') document.getElementById('fech-grupo').value = '';
+
   const nomes = ['Solutions Ti Tech'];
   if(GRUPO_VISIVEL.ARCFOOD) nomes.push('ARCFOOD');
   if(GRUPO_VISIVEL.BRAVO) nomes.push('Grupo Bravo');
@@ -292,6 +312,15 @@ function codigosDoGrupo(){
   const base = grupo ? (GRUPOS[grupo] || []) : Object.keys(UNIDADES_NOMES);
   // so mostra unidades que o usuario realmente tem acesso (o backend ja
   // filtra os dados, mas o seletor tambem nao deve oferecer as outras)
+  if(!UNIDADES_PERMITIDAS) return base;
+  return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
+}
+
+// mesma logica de codigosDoGrupo(), so que pro seletor de grupo exclusivo
+// da tabela "Fechamentos" (fech-grupo)
+function codigosDoGrupoFech(){
+  const grupo = document.getElementById('fech-grupo').value;
+  const base = grupo ? (GRUPOS[grupo] || []) : Object.keys(UNIDADES_NOMES);
   if(!UNIDADES_PERMITIDAS) return base;
   return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
 }
@@ -364,6 +393,7 @@ async function carregar(){
     : 'nenhum fechamento importado ainda';
   elSyncInfo.title = SYNC_INFO_TITLE;
   setupPresets(); // estado inicial: D-1 nos KPIs/tabelas; o grafico usa os ultimos 30 dias (ver chartRange())
+  setupPresetsFech(); // filtro exclusivo da tabela Fechamentos (em paralelo ao de cima)
   setupMultiselect();
   render();
 }
@@ -507,10 +537,12 @@ function setupPresets(){
   });
 }
 
-function setupMultiselect(){
-  const wrap = document.getElementById('ms-unidade');
-  const btn = document.getElementById('ms-unidade-btn');
-  const panel = document.getElementById('ms-unidade-panel');
+// generico pra montar um multiselect de unidades - usado tanto pro filtro
+// principal (SEL_UNIDADE) quanto pro filtro exclusivo da tabela Fechamentos
+// (SEL_UNIDADE_FECH), cada um com seus proprios ids/estado/callback
+function criarMultiselectUnidade({wrapId, btnId, panelId, selSet, codigosFn, grupoElId, onChange}){
+  const btn = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
   document.body.appendChild(panel);
   function posicionar(){
     const r = btn.getBoundingClientRect();
@@ -518,22 +550,22 @@ function setupMultiselect(){
     panel.style.left = r.left+'px';
   }
   function renderPanel(){
-    const codigos = codigosDoGrupo();
-    for(const v of [...SEL_UNIDADE]) if(!codigos.includes(v)) SEL_UNIDADE.delete(v);
+    const codigos = codigosFn();
+    for(const v of [...selSet]) if(!codigos.includes(v)) selSet.delete(v);
     panel.innerHTML = `
-      <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${SEL_UNIDADE.size===0?'checked':''}></label>
-      ${codigos.map(c=>`<label><span>${escapeHtml(UNIDADES_NOMES[c])} (${escapeHtml(c)})</span><input type="checkbox" value="${escapeHtml(c)}" ${SEL_UNIDADE.has(c)?'checked':''}></label>`).join('')}
+      <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${selSet.size===0?'checked':''}></label>
+      ${codigos.map(c=>`<label><span>${escapeHtml(UNIDADES_NOMES[c])} (${escapeHtml(c)})</span><input type="checkbox" value="${escapeHtml(c)}" ${selSet.has(c)?'checked':''}></label>`).join('')}
     `;
-    panel.querySelector('[data-all]').addEventListener('change', ()=>{ SEL_UNIDADE.clear(); renderPanel(); render(); });
+    panel.querySelector('[data-all]').addEventListener('change', ()=>{ selSet.clear(); renderPanel(); onChange(); });
     panel.querySelectorAll('input[type=checkbox]:not([data-all])').forEach(cb=>{
       cb.addEventListener('change', ()=>{
-        if(cb.checked) SEL_UNIDADE.add(cb.value); else SEL_UNIDADE.delete(cb.value);
-        renderPanel(); render();
+        if(cb.checked) selSet.add(cb.value); else selSet.delete(cb.value);
+        renderPanel(); onChange();
       });
     });
-    btn.textContent = SEL_UNIDADE.size===0 ? 'Todas as unidades'
-      : SEL_UNIDADE.size===1 ? UNIDADES_NOMES[[...SEL_UNIDADE][0]]
-      : `${SEL_UNIDADE.size} unidades selecionadas`;
+    btn.textContent = selSet.size===0 ? 'Todas as unidades'
+      : selSet.size===1 ? UNIDADES_NOMES[[...selSet][0]]
+      : `${selSet.size} unidades selecionadas`;
   }
   btn.addEventListener('click', (e)=>{
     e.stopPropagation();
@@ -545,7 +577,51 @@ function setupMultiselect(){
     if(!panel.contains(e.target) && e.target!==btn) panel.classList.remove('open');
   });
   renderPanel();
-  document.getElementById('f-grupo').addEventListener('change', ()=>{ renderPanel(); render(); });
+  document.getElementById(grupoElId).addEventListener('change', ()=>{ renderPanel(); onChange(); });
+}
+
+function setupMultiselect(){
+  criarMultiselectUnidade({
+    wrapId:'ms-unidade', btnId:'ms-unidade-btn', panelId:'ms-unidade-panel',
+    selSet:SEL_UNIDADE, codigosFn:codigosDoGrupo, grupoElId:'f-grupo', onChange:render,
+  });
+  criarMultiselectUnidade({
+    wrapId:'ms-fech-unidade', btnId:'ms-fech-unidade-btn', panelId:'ms-fech-unidade-panel',
+    selSet:SEL_UNIDADE_FECH, codigosFn:codigosDoGrupoFech, grupoElId:'fech-grupo', onChange:()=>renderTabela(filtrar()),
+  });
+}
+
+// presets/periodo exclusivos da tabela Fechamentos (paralelo ao setupPresets()
+// principal, mas sem o estado "D-1 por padrao" - aqui comeca em branco e so
+// restringe quando o usuario escolhe algo, como o campo "de/ate" ja fazia)
+function setupPresetsFech(){
+  const presets = [
+    {lbl:'Ontem', tipo:'ontem'},
+    {lbl:'Semana', tipo:'semana'},
+    {lbl:'Mês', tipo:'mes'},
+    {lbl:'Trimestre', tipo:'trimestre'},
+  ];
+  const cont = document.getElementById('fech-presets');
+  cont.innerHTML = presets.map(p=>`<button type="button" class="preset-btn" data-tipo="${p.tipo}">${p.lbl}</button>`).join('');
+
+  function aplicarPreset(tipo, btn){
+    cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    const range = calcularPreset(tipo, isoLocal(agoraBrasilia()));
+    document.getElementById('fech-date-inicio').value = range.inicio;
+    document.getElementById('fech-date-fim').value = range.fim;
+    renderTabela(filtrar());
+  }
+  cont.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>aplicarPreset(btn.dataset.tipo, btn));
+  });
+
+  ['fech-date-inicio','fech-date-fim'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>{
+      cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      renderTabela(filtrar());
+    });
+  });
 }
 
 function filtrarPorIntervalo(start, end){
@@ -965,10 +1041,17 @@ function intervaloEfetivoTabela(){
 }
 
 function renderTabela(rows){
-  // segue sempre o filtro de data principal; os campos "de"/"até" deste
-  // painel sao opcionais, so pra restringir ainda mais so esta tabela
+  // "rows" ja vem filtrado pelo filtro principal (periodo/grupo/unidades de
+  // cima); aqui aplicamos, POR CIMA, o filtro exclusivo desta tabela
+  // (presets/periodo/grupo/unidades proprios) - o resultado obedece aos DOIS
+  // filtros ao mesmo tempo (intersecao)
   const {inicio, fim} = intervaloEfetivoTabela();
-  const filtradas = rows.filter(d=>(!inicio || (d.data||'')>=inicio) && (!fim || (d.data||'')<=fim));
+  const grupoFech = document.getElementById('fech-grupo').value;
+  const filtradas = rows.filter(d=>
+    (!inicio || (d.data||'')>=inicio) && (!fim || (d.data||'')<=fim) &&
+    (!grupoFech || d.grupo===grupoFech) &&
+    (SEL_UNIDADE_FECH.size===0 || SEL_UNIDADE_FECH.has(d.unidade))
+  );
   const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   document.getElementById('fechamentos-count').textContent = ordenadas.length;
   document.getElementById('fechamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>{
@@ -1011,22 +1094,25 @@ function render(){
   renderTabela(rows);
 }
 
-['fech-date-inicio','fech-date-fim'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', ()=>{ renderTabela(filtrar()); });
-});
+// unidades que passam nos DOIS filtros ao mesmo tempo (principal ∩
+// exclusivo da tabela) - usado pro relatorio, ja que o backend so aceita
+// uma lista de unidades (nao dois grupos/multiselects separados pra cruzar)
+function unidadesEfetivasParaRelatorio(){
+  const principal = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
+  const local = SEL_UNIDADE_FECH.size ? [...SEL_UNIDADE_FECH] : codigosDoGrupoFech();
+  const setLocal = new Set(local);
+  return principal.filter(c=>setLocal.has(c));
+}
 
-// relatorio CSV/PDF do periodo que estiver filtrado na tela agora (mesmo
-// intervalo efetivo da tabela de Fechamentos, incluindo o corte extra
-// opcional de/até deste painel quando preenchido), respeitando tambem
-// grupo/unidades selecionados nos controles principais
+// relatorio CSV/PDF do periodo/unidades que estiverem filtrados na tela
+// agora - cruza o filtro principal (de cima) com o filtro exclusivo desta
+// tabela, exatamente como renderTabela() faz
 function baixarRelatorioFechamentos(formato){
   const {inicio, fim} = intervaloEfetivoTabela();
-  const grupo = document.getElementById('f-grupo').value;
-  const unidades = SEL_UNIDADE.size ? [...SEL_UNIDADE].join(',') : '';
+  const unidades = unidadesEfetivasParaRelatorio().join(',');
   const params = new URLSearchParams({ token: AUTH_TOKEN });
   if(inicio) params.set('inicio', inicio);
   if(fim) params.set('fim', fim);
-  if(grupo) params.set('grupo', grupo);
   if(unidades) params.set('unidades', unidades);
   window.location.href = `/api/fechamentos/relatorio.${formato}?${params.toString()}`;
 }
