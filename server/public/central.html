@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Central de Solicitações · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:720px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-add:hover{border-color:var(--accent);}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .card{border-top:1px solid var(--line);padding:12px 0;cursor:pointer;}
+  .card:first-child{border-top:none;padding-top:0;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.PENDENTE{background:var(--warn-dim);color:var(--warn);}
+  .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
+  .badge.REJEITADO{background:var(--bad-dim);color:var(--bad);}
+  .tipo-badge{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+  .tipos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .tipo-btn{font-family:var(--sans);font-size:12px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .tipo-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .anexo-item{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-top:6px;}
+  .anexo-item a{color:var(--accent);text-decoration:none;}
+  .filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .filtro-btn{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:16px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .filtro-btn.active{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:600;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
+      <h1>Central de Solicitações</h1>
+    </div>
+  </div>
+  <div class="header-nav">
+    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+    <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
+  </div>
+</header>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso à Central de Solicitações. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<div class="panel">
+  <h2>Nova solicitação</h2>
+  <div class="tipos" id="tipos-btns"></div>
+
+  <form id="form-nova">
+    <div id="campos-comuns">
+      <label>Unidade</label>
+      <select id="f-unidade" required></select>
+    </div>
+
+    <!-- ESTORNO -->
+    <div id="campos-estorno" class="hidden">
+      <label>Nº do pedido (pspReference/merchantReference)</label>
+      <input type="text" id="e-pedidoId">
+      <label>Observação (motivo do estorno)</label>
+      <textarea id="e-observacao"></textarea>
+      <label>Sua senha (confirmação)</label>
+      <input type="password" id="e-senha" autocomplete="current-password">
+    </div>
+
+    <!-- AJUSTE DE FECHAMENTO -->
+    <div id="campos-ajuste" class="hidden">
+      <label>Qual fechamento?</label>
+      <select id="a-fechamento"></select>
+      <label>Tipo de correção</label>
+      <div class="tipos">
+        <button type="button" class="tipo-btn active" data-tipocorrecao="campo" onclick="selecionarTipoCorrecao('campo')">Corrigir um campo</button>
+        <button type="button" class="tipo-btn" data-tipocorrecao="item" onclick="selecionarTipoCorrecao('item')">Adicionar item esquecido</button>
+      </div>
+      <div id="ajuste-campo">
+        <label>Qual campo</label>
+        <select id="a-campo"></select>
+        <label>Valor correto</label>
+        <input type="number" step="0.01" id="a-valor">
+      </div>
+      <div id="ajuste-item" class="hidden">
+        <label>O que foi esquecido</label>
+        <div class="tipos">
+          <button type="button" class="tipo-btn active" data-itemtipo="maquininha" onclick="selecionarItemTipo('maquininha')">Maquininha</button>
+          <button type="button" class="tipo-btn" data-itemtipo="saida" onclick="selecionarItemTipo('saida')">Saída de dinheiro</button>
+        </div>
+        <label>Descrição</label>
+        <input type="text" id="a-item-descricao" placeholder="ex: Maquininha Cielo extra">
+        <label>Valor</label>
+        <input type="number" step="0.01" id="a-item-valor">
+      </div>
+      <label>Motivo da correção</label>
+      <textarea id="a-motivo" placeholder="explique o que aconteceu"></textarea>
+    </div>
+
+    <!-- COMPRA / MANUTENCAO / SUPORTE TI -->
+    <div id="campos-gerais" class="hidden">
+      <label id="g-titulo-label">Título</label>
+      <input type="text" id="g-titulo" placeholder="ex: comprar papel térmico">
+      <label id="g-valor-label">Valor estimado (opcional)</label>
+      <input type="number" step="0.01" id="g-valor">
+      <label>Observação</label>
+      <textarea id="g-observacao" placeholder="detalhe o que precisa"></textarea>
+    </div>
+
+    <div id="campos-anexo">
+      <label>Anexar foto/arquivo (opcional)</label>
+      <input type="file" id="f-anexos" multiple accept="image/*,application/pdf">
+    </div>
+
+    <div class="msg hidden" id="msg-nova"></div>
+    <button class="btn-primary" type="submit" id="btn-nova">Enviar solicitação</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
+  <div class="filtros" id="filtros-status"></div>
+  <div id="lista-cards"><div class="empty">carregando...</div></div>
+</div>
+
+</div><!-- /#root -->
+
+<div class="overlay hidden" id="overlay-detalhe">
+  <div class="sheet">
+    <h3 id="d-titulo"></h3>
+    <div class="sub" id="d-sub"></div>
+    <div id="d-corpo" style="font-size:13px;display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="d-master-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div id="d-tecnico-wrap" class="hidden">
+        <label>Técnico responsável</label>
+        <select id="d-tecnico"></select>
+      </div>
+      <label>Observação da decisão (opcional)</label>
+      <textarea id="d-motivo-decisao"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button type="button" class="btn-primary" style="margin-top:0;background:var(--ok);" onclick="decidir('APROVADO')">✓ Aprovar</button>
+        <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
+      </div>
+    </div>
+    <div class="msg hidden" id="msg-detalhe"></div>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharDetalhe()">Fechar</button>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+
+const ARCFOOD_UNIDADES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
+const BRAVO_UNIDADES_NOMES = {
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dominos Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+};
+const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
+
+const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','quebra','tc','cancelados','entradaDinheiro','deposito'];
+const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'iFood', food99:'99Food', pix:'Pix', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
+
+const TIPOS_INFO = {
+  'estorno': { label:'Estorno', secaoNecessaria:'monitor' },
+  'ajuste-fechamento': { label:'Ajuste de fechamento', secaoNecessaria:'lancamento' },
+  'compra': { label:'Compra', secaoNecessaria:null },
+  'manutencao': { label:'Manutenção', secaoNecessaria:null },
+  'suporte-ti': { label:'Suporte de TI', secaoNecessaria:null },
+};
+
+let ME = null;
+let IS_MASTER = false;
+let SECOES = [];
+let MEUS_FECHAMENTOS = [];
+let TECNICOS = [];
+let CARDS = [];
+let TIPO_SELECIONADO = 'compra';
+let TIPO_CORRECAO = 'campo';
+let ITEM_TIPO = 'maquininha';
+let FILTRO_STATUS = 'PENDENTE';
+let DETALHE_ATUAL = null;
+
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+const FUSO_BR = 'America/Sao_Paulo';
+function fmtDataHora(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('pt-BR',{timeZone:FUSO_BR}); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function hojeBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
+function selecionarTipo(tipo){
+  TIPO_SELECIONADO = tipo;
+  document.querySelectorAll('#tipos-btns .tipo-btn').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
+  document.getElementById('campos-estorno').classList.toggle('hidden', tipo!=='estorno');
+  document.getElementById('campos-ajuste').classList.toggle('hidden', tipo!=='ajuste-fechamento');
+  document.getElementById('campos-gerais').classList.toggle('hidden', !['compra','manutencao','suporte-ti'].includes(tipo));
+  document.getElementById('campos-comuns').classList.toggle('hidden', tipo==='ajuste-fechamento');
+  const labels = { compra:['Título','O que precisa comprar','Valor estimado (opcional)'], manutencao:['Título','O que precisa de manutenção','Valor estimado (opcional)'], 'suporte-ti':['Título','Qual o problema','Valor estimado (opcional)'] };
+  if(labels[tipo]){
+    document.getElementById('g-titulo').placeholder = labels[tipo][1];
+    document.getElementById('g-valor-label').textContent = labels[tipo][2];
+  }
+  if(tipo==='ajuste-fechamento') montarSelectFechamento();
+}
+
+function selecionarTipoCorrecao(tipo){
+  TIPO_CORRECAO = tipo;
+  document.querySelectorAll('#campos-ajuste [data-tipocorrecao]').forEach(b=>b.classList.toggle('active', b.dataset.tipocorrecao===tipo));
+  document.getElementById('ajuste-campo').classList.toggle('hidden', tipo!=='campo');
+  document.getElementById('ajuste-item').classList.toggle('hidden', tipo!=='item');
+}
+function selecionarItemTipo(tipo){
+  ITEM_TIPO = tipo;
+  document.querySelectorAll('#ajuste-item [data-itemtipo]').forEach(b=>b.classList.toggle('active', b.dataset.itemtipo===tipo));
+}
+
+async function montarSelectFechamento(){
+  if(!MEUS_FECHAMENTOS.length){
+    try{ MEUS_FECHAMENTOS = await fetch('/api/fechamentos/meus').then(r=>r.json()); }catch(e){ MEUS_FECHAMENTOS = []; }
+  }
+  const ordenados = [...MEUS_FECHAMENTOS].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const sel = document.getElementById('a-fechamento');
+  sel.innerHTML = ordenados.length
+    ? ordenados.map(f=>`<option value="${f.id}">${escapeHtml(f.unidadeNome||f.unidade)} · ${f.data}</option>`).join('')
+    : '<option value="" disabled selected>nenhum fechamento lançado ainda</option>';
+}
+
+function montarSelectCampo(){
+  document.getElementById('a-campo').innerHTML = CAMPOS_NUMERICOS.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]}</option>`).join('');
+}
+
+document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const btn = document.getElementById('btn-nova');
+  const msg = document.getElementById('msg-nova');
+  msg.classList.add('hidden');
+  btn.disabled = true;
+  try{
+    let resp;
+    const anexosInput = document.getElementById('f-anexos');
+
+    if(TIPO_SELECIONADO === 'estorno'){
+      resp = await fetch('/api/refund-requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+        pedidoId: document.getElementById('e-pedidoId').value,
+        unidade: document.getElementById('f-unidade').value,
+        observacao: document.getElementById('e-observacao').value,
+        password: document.getElementById('e-senha').value,
+      })});
+    } else if(TIPO_SELECIONADO === 'ajuste-fechamento'){
+      const fechamentoId = document.getElementById('a-fechamento').value;
+      if(!fechamentoId) throw new Error('Escolha o fechamento.');
+      const payload = { tipoCorrecao: TIPO_CORRECAO, motivo: document.getElementById('a-motivo').value };
+      if(TIPO_CORRECAO==='campo'){
+        payload.mudancas = { [document.getElementById('a-campo').value]: document.getElementById('a-valor').value };
+      } else {
+        payload.itemNovo = { tipo: ITEM_TIPO, descricao: document.getElementById('a-item-descricao').value, valor: document.getElementById('a-item-valor').value };
+      }
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      for(const file of anexosInput.files) fd.append('anexos', file);
+      resp = await fetch(`/api/fechamentos/${fechamentoId}/solicitar-edicao`, { method:'POST', body: fd });
+    } else {
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify({
+        tipo: TIPO_SELECIONADO,
+        unidade: document.getElementById('f-unidade').value,
+        unidadeNome: UNIDADES_NOMES[document.getElementById('f-unidade').value] || document.getElementById('f-unidade').value,
+        titulo: document.getElementById('g-titulo').value,
+        valorEstimado: document.getElementById('g-valor').value,
+        observacao: document.getElementById('g-observacao').value,
+      }));
+      for(const file of anexosInput.files) fd.append('anexos', file);
+      resp = await fetch('/api/solicitacoes', { method:'POST', body: fd });
+    }
+
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar solicitação.');
+    msg.textContent = 'Solicitação enviada com sucesso.'; msg.className = 'msg ok';
+    document.getElementById('form-nova').reset();
+    await carregarCentral();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+});
+
+function renderFiltros(){
+  const opcoes = [['PENDENTE','Pendentes'],['APROVADO','Aprovados'],['REJEITADO','Rejeitados'],['TODOS','Todos']];
+  document.getElementById('filtros-status').innerHTML = opcoes.map(([v,l])=>
+    `<button type="button" class="filtro-btn ${FILTRO_STATUS===v?'active':''}" onclick="aplicarFiltro('${v}')">${l}</button>`
+  ).join('');
+}
+function aplicarFiltro(v){ FILTRO_STATUS = v; renderFiltros(); renderLista(); }
+
+function iconeTipo(tipo){
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
+}
+
+function renderLista(){
+  const filtradas = FILTRO_STATUS==='TODOS' ? CARDS : CARDS.filter(c=>c.status===FILTRO_STATUS);
+  document.getElementById('lista-count').textContent = filtradas.length;
+  document.getElementById('lista-cards').innerHTML = filtradas.length ? filtradas.map(c=>`
+    <div class="card" onclick="abrirDetalhe('${c.tipo}','${c.id}')">
+      <div class="linha1">
+        <span><span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span> ${escapeHtml(c.titulo)}</span>
+        <span class="badge ${c.status}">${c.status}</span>
+      </div>
+      <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
+    </div>`).join('') : '<div class="empty">Nenhuma solicitação aqui.</div>';
+}
+
+async function carregarCentral(){
+  CARDS = await fetch('/api/central').then(r=>r.json());
+  renderLista();
+}
+
+function abrirDetalhe(tipo, id){
+  const c = CARDS.find(x=>x.tipo===tipo && x.id===id);
+  if(!c) return;
+  DETALHE_ATUAL = c;
+  document.getElementById('d-titulo').textContent = `${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}`;
+  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}`;
+
+  let corpo = `<div><b>${escapeHtml(c.titulo)}</b></div>`;
+  if(c.observacao) corpo += `<div style="white-space:pre-wrap;">${escapeHtml(c.observacao)}</div>`;
+  if(c.valorEstimado) corpo += `<div>Valor estimado: <b>${fmtMoney(c.valorEstimado)}</b></div>`;
+  if(c.anexos && c.anexos.length){
+    const rota = c.tipo==='ajuste-fechamento' ? `/api/fechamentos/edicoes/anexo/${c.id}` : `/api/solicitacoes/anexo/${c.id}`;
+    corpo += c.anexos.map((a,i)=>`<div class="anexo-item">📎 <a href="${rota}/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(a.nome)}</a></div>`).join('');
+  }
+  if(c.status!=='PENDENTE'){
+    corpo += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;">
+      <div><b>Decisão:</b> <span class="badge ${c.status}">${c.status}</span> · ${escapeHtml(c.decididoPorEmail||'')} · ${fmtDataHora(c.decididoEm)}</div>
+      ${c.motivoDecisao ? `<div style="white-space:pre-wrap;margin-top:4px;">${escapeHtml(c.motivoDecisao)}</div>` : ''}
+      ${c.chamadoId ? '<div style="margin-top:4px;color:var(--ok);">🔧 Chamado de TI criado</div>' : ''}
+    </div>`;
+  }
+  document.getElementById('d-corpo').innerHTML = corpo;
+
+  const podeDecidir = IS_MASTER && c.status==='PENDENTE';
+  document.getElementById('d-master-acoes').classList.toggle('hidden', !podeDecidir);
+  document.getElementById('d-tecnico-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='suporte-ti'));
+  if(podeDecidir && c.tipo==='suporte-ti'){
+    document.getElementById('d-tecnico').innerHTML = TECNICOS.length
+      ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}">${escapeHtml(t.email)}</option>`).join('')
+      : '<option value="" disabled selected>nenhum técnico cadastrado</option>';
+  }
+  document.getElementById('d-motivo-decisao').value = '';
+  document.getElementById('msg-detalhe').classList.add('hidden');
+  document.getElementById('overlay-detalhe').classList.remove('hidden');
+}
+function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
+
+async function decidir(status){
+  if(!DETALHE_ATUAL) return;
+  const c = DETALHE_ATUAL;
+  const msg = document.getElementById('msg-detalhe');
+  msg.classList.add('hidden');
+  try{
+    let resp;
+    const motivoDecisao = document.getElementById('d-motivo-decisao').value;
+    if(c.tipo==='estorno'){
+      resp = await fetch(`/api/refund-requests/${c.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
+    } else if(c.tipo==='ajuste-fechamento'){
+      resp = await fetch(`/api/fechamentos/edicoes/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
+    } else {
+      const body = { status, motivoDecisao };
+      if(c.tipo==='suporte-ti' && status==='APROVADO'){
+        const sel = document.getElementById('d-tecnico');
+        if(!sel.value) throw new Error('Escolha o técnico responsável.');
+        body.tecnicoId = sel.value;
+        body.tecnicoEmail = sel.options[sel.selectedIndex].dataset.email;
+      }
+      resp = await fetch(`/api/solicitacoes/${c.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao decidir.');
+    fecharDetalhe();
+    await carregarCentral();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  IS_MASTER = ME.role==='master';
+  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
+
+  if(!SECOES.includes('solicitacoes')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+  document.getElementById('titulo-lista').textContent = IS_MASTER ? 'Solicitações recebidas' : 'Minhas solicitações';
+
+  const unidades = IS_MASTER ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>UNIDADES_NOMES[u]);
+  document.getElementById('f-unidade').innerHTML = unidades.length
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+
+  const tiposDisponiveis = Object.entries(TIPOS_INFO).filter(([tipo,info])=>!info.secaoNecessaria || SECOES.includes(info.secaoNecessaria));
+  document.getElementById('tipos-btns').innerHTML = tiposDisponiveis.map(([tipo,info])=>
+    `<button type="button" class="tipo-btn" data-tipo="${tipo}" onclick="selecionarTipo('${tipo}')">${iconeTipo(tipo)} ${info.label}</button>`
+  ).join('');
+  montarSelectCampo();
+  if(tiposDisponiveis.length) selecionarTipo(tiposDisponiveis[0][0]);
+
+  if(IS_MASTER){
+    try{
+      const todos = await fetch('/api/users').then(r=>r.json());
+      TECNICOS = todos.filter(u=>u.permissions && (u.permissions.sections||[]).includes('tecnico'));
+    }catch(e){ TECNICOS = []; }
+  }
+
+  renderFiltros();
+  await carregarCentral();
+}
+
+boot();
+</script>
+</body>
+</html>

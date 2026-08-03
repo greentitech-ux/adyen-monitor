@@ -92,6 +92,7 @@
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
     <a class="back active" id="nav-self" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Entregas</a>
+    <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
     <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
     <div class="nav-divider"></div>
     <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
@@ -691,6 +692,7 @@ async function boot(){
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-entregas-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
 
   const podeLancamento = secoes.includes('lancamento');
   const podeSangria = secoes.includes('sangria');
