@@ -34,6 +34,8 @@ const entregasSync = require('./entregasSync');
 const ifoodClient = require('./ifoodClient');
 const ifoodStore = require('./ifoodStore');
 const ifoodSync = require('./ifoodSync');
+const solicitacoes = require('./solicitacoes');
+const chamadosTI = require('./chamadosTI');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -1228,25 +1230,44 @@ app.get('/api/sangrias/do-dia', requireAnySection('lancamento', 'sangria'), asyn
   res.json(todas.filter((s) => s.data === data));
 });
 
-app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {
+app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), upload.array('anexos', 4), async (req, res) => {
   try {
     const atual = await fechamentosLive.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Fechamento não encontrado.' });
     if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'fechamento-edicoes');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
     const pedido = await fechamentosLive.solicitarEdicao({
       fechamentoId: req.params.id,
-      mudancas: req.body.mudancas,
-      motivo: req.body.motivo,
+      tipoCorrecao: payload.tipoCorrecao,
+      mudancas: payload.mudancas,
+      itemNovo: payload.itemNovo,
+      motivo: payload.motivo,
+      anexos,
       solicitadoPorId: req.user.id,
       solicitadoPorEmail: req.user.email,
     });
     broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
+    broadcast('fechamento-edicao-solicitada', pedido, 'solicitacoes');
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+app.get('/api/fechamentos/edicoes/anexo/:edicaoId/:index', requireSection('lancamento'), async (req, res) => {
+  const pedido = await fechamentosLive.getEdicao(req.params.edicaoId);
+  if (!pedido) return res.sendStatus(404);
+  if (!req.isMaster && pedido.solicitadoPorId !== req.user.id) return res.sendStatus(404);
+  const anexo = pedido.anexos && pedido.anexos[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
 });
 
 // edicao direta de um lancamento - so o Master, sem passar pela fila de
@@ -1284,10 +1305,206 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
     });
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    broadcast('fechamento-edicao-decidida', pedido, 'solicitacoes');
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// ---------- Compra / Manutenção / Suporte de TI (secao "solicitacoes") -
+// mesmo fluxo de fila-com-aprovacao do Estorno e do Ajuste de Fechamento,
+// so que pra pedidos que nao tem uma secao propria ja existente. Aprovar um
+// pedido de Suporte de TI ja cria o Chamado (ver chamadosTI.js) ----------
+app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao } = payload;
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(unidade || 'geral', file, 'solicitacoes');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const registro = await solicitacoes.create({
+      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, anexos,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+    });
+    broadcast('solicitacao-criada', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), async (req, res) => {
+  const registro = await solicitacoes.getOne(req.params.id);
+  if (!registro) return res.sendStatus(404);
+  if (!req.isMaster && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
+  const anexo = registro.anexos && registro.anexos[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
+});
+
+// aprovar/rejeitar - so o Master. Se for suporte-ti e for aprovado, ja cria
+// o Chamado vinculado (precisa escolher o tecnico no corpo da requisicao)
+app.patch('/api/solicitacoes/:id/status', auth.requireMaster, async (req, res) => {
+  try {
+    const { status, motivoDecisao, tecnicoId, tecnicoEmail } = req.body;
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (status === 'APROVADO' && atual.tipo === 'suporte-ti' && !tecnicoId) {
+      return res.status(400).json({ error: 'Escolha o técnico responsável pelo chamado.' });
+    }
+    const registro = await solicitacoes.updateStatus(req.params.id, status, { motivoDecisao, decidedByEmail: req.user.email });
+
+    let chamado = null;
+    if (status === 'APROVADO' && atual.tipo === 'suporte-ti') {
+      chamado = await chamadosTI.create({
+        unidade: atual.unidade,
+        unidadeNome: atual.unidadeNome,
+        titulo: atual.titulo,
+        descricao: atual.observacao,
+        tecnicoId,
+        tecnicoEmail,
+        solicitacaoId: atual.id,
+        criadoPorEmail: req.user.email,
+      });
+      await solicitacoes.vincularChamado(atual.id, chamado.id);
+      broadcast('chamado-criado', chamado, 'tecnico');
+    }
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json({ ...registro, chamado });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// leitura unificada pra Central: junta Estorno (refunds.js) + Ajuste de
+// Fechamento (fechamentosLive.js) + Compra/Manutenção/Suporte de TI
+// (solicitacoes.js) num feed so, cada card ja normalizado no mesmo formato -
+// cada usuario ve exatamente o que veria nas rotas individuais de cada tipo
+// (Master ve tudo, loja ve so o que ela mesma pediu)
+function normalizarCard(tipo, r) {
+  if (tipo === 'estorno') {
+    return {
+      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidade, status: r.status, criadoEm: r.criadoEm,
+      titulo: `Estorno · pedido ${r.pedidoId}`, observacao: r.observacao, anexos: [], valorEstimado: null,
+      criadoPorId: r.requestedById, criadoPorEmail: r.requestedByEmail,
+      motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decidedByEmail, decididoEm: r.decidedEm,
+      chamadoId: null,
+    };
+  }
+  if (tipo === 'ajuste-fechamento') {
+    const desc = r.tipoCorrecao === 'item'
+      ? `adicionar ${r.itemNovo?.tipo === 'maquininha' ? 'maquininha' : 'saída'} "${r.itemNovo?.descricao || ''}" (${fmtMoneyServer(r.itemNovo?.valor)})`
+      : `corrigir ${Object.keys(r.mudancas || {}).join(', ')}`;
+    return {
+      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
+      titulo: `Ajuste de fechamento (${r.data}) - ${desc}`, observacao: r.motivo, anexos: r.anexos || [], valorEstimado: null,
+      criadoPorId: r.solicitadoPorId, criadoPorEmail: r.solicitadoPorEmail,
+      motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
+      chamadoId: null, fechamentoId: r.fechamentoId,
+    };
+  }
+  return {
+    tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
+    titulo: r.titulo, observacao: r.observacao, anexos: r.anexos || [], valorEstimado: r.valorEstimado,
+    criadoPorId: r.criadoPorId, criadoPorEmail: r.criadoPorEmail,
+    motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
+    chamadoId: r.chamadoId,
+  };
+}
+function fmtMoneyServer(v) {
+  return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
+  const [estornos, ajustes, gerais] = await Promise.all([
+    refunds.listAll(),
+    fechamentosLive.listarEdicoes(),
+    solicitacoes.listAll(),
+  ]);
+  let cards = [
+    ...estornos.map((r) => normalizarCard('estorno', r)),
+    ...ajustes.map((r) => normalizarCard('ajuste-fechamento', r)),
+    ...gerais.map((r) => normalizarCard(r.tipo, r)),
+  ];
+  if (!req.isMaster) cards = cards.filter((c) => c.criadoPorId === req.user.id);
+  cards.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
+  res.json(cards);
+});
+
+// ---------- Chamados de TI (secao "tecnico") - o tecnico so ve os chamados
+// atribuidos a ele; Master ve/cria todos. Nasce vinculado a uma solicitacao
+// de Suporte de TI aprovada (rota acima) ou criado direto pelo Master ----------
+app.get('/api/chamados', requireSection('tecnico'), async (req, res) => {
+  const todos = await chamadosTI.listAll();
+  if (req.isMaster) return res.json(todos);
+  res.json(todos.filter((c) => c.tecnicoId === req.user.id));
+});
+
+app.post('/api/chamados', auth.requireMaster, async (req, res) => {
+  try {
+    const { unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail } = req.body;
+    const chamado = await chamadosTI.create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, criadoPorEmail: req.user.email });
+    broadcast('chamado-criado', chamado, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// check-in: tecnico chegou na loja, registra as fotos de "como esta antes"
+app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('fotosAntes', 6), async (req, res) => {
+  try {
+    const fotosAntes = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-antes');
+      fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosTI.iniciar(req.params.id, { fotosAntes, tecnicoId: req.user.id });
+    broadcast('chamado-atualizado', chamado, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// finalizar: fotos do "depois", observacao do que foi feito e pecas compradas (se precisou)
+app.post('/api/chamados/:id/concluir', requireSection('tecnico'), upload.array('fotosDepois', 6), async (req, res) => {
+  try {
+    const payload = JSON.parse(req.body.payload || '{}');
+    const fotosDepois = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-depois');
+      fotosDepois.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosTI.concluir(req.params.id, {
+      fotosDepois,
+      observacaoTecnico: payload.observacaoTecnico,
+      pecas: payload.pecas,
+      tecnicoId: req.user.id,
+    });
+    broadcast('chamado-atualizado', chamado, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/chamados/foto/:chamadoId/:campo/:index', requireSection('tecnico'), async (req, res) => {
+  const chamado = await chamadosTI.getOne(req.params.chamadoId);
+  if (!chamado) return res.sendStatus(404);
+  if (!req.isMaster && chamado.tecnicoId !== req.user.id) return res.sendStatus(404);
+  const campo = ['fotosAntes', 'fotosDepois'].includes(req.params.campo) ? req.params.campo : null;
+  if (!campo) return res.status(400).end();
+  const foto = chamado[campo] && chamado[campo][Number(req.params.index)];
+  if (!foto) return res.sendStatus(404);
+  storage.streamArquivo(foto.path, foto.tipo, res);
 });
 
 // ---------- entregas (motoboys) - substitui o app de entregas do AppSheet ----------

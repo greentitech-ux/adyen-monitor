@@ -85,6 +85,8 @@
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
     <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
     <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+    <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+    <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
     <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
   </div>
@@ -488,7 +490,7 @@ async function boot(){
   const me = await res.json();
   const isMaster = me.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
@@ -497,6 +499,8 @@ async function boot(){
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
   document.getElementById('btn-sincronizar-planilha').classList.toggle('hidden', !isMaster);

@@ -75,6 +75,7 @@
   <div style="display:flex;align-items:center;gap:6px;">
     <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+    <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
     <button class="back" onclick="logout()">🚪 Sair</button>
   </div>
 </header>
@@ -446,6 +447,7 @@ async function boot(){
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
 
   if(!secoes.includes('entregas-lancamento')){
     document.getElementById('sem-acesso').classList.remove('hidden');
