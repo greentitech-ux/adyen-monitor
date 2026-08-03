@@ -407,7 +407,9 @@ function abrirDetalhe(tipo, id){
   if(c.observacao) corpo += `<div style="white-space:pre-wrap;">${escapeHtml(c.observacao)}</div>`;
   if(c.valorEstimado) corpo += `<div>Valor estimado: <b>${fmtMoney(c.valorEstimado)}</b></div>`;
   if(c.anexos && c.anexos.length){
-    const rota = c.tipo==='ajuste-fechamento' ? `/api/fechamentos/edicoes/anexo/${c.id}` : `/api/solicitacoes/anexo/${c.id}`;
+    const rota = c.tipo==='ajuste-fechamento' ? `/api/fechamentos/edicoes/anexo/${c.id}`
+      : c.tipo==='estorno' ? `/api/refund-requests/anexo/${c.id}`
+      : `/api/solicitacoes/anexo/${c.id}`;
     corpo += c.anexos.map((a,i)=>`<div class="anexo-item">📎 <a href="${rota}/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(a.nome)}</a></div>`).join('');
   }
   if(c.status!=='PENDENTE'){
