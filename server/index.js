@@ -31,6 +31,9 @@ const entregasLive = require('./entregasLive');
 const backup = require('./backup');
 const sheetsSync = require('./sheetsSync');
 const entregasSync = require('./entregasSync');
+const ifoodClient = require('./ifoodClient');
+const ifoodStore = require('./ifoodStore');
+const ifoodSync = require('./ifoodSync');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -138,6 +141,16 @@ app.get('/api/me', (req, res) => {
 function requireSection(section) {
   return (req, res, next) => {
     if (!auth.hasSection(req, section)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    next();
+  };
+}
+
+// passa se o usuario tiver QUALQUER uma das secoes pedidas - usado pra rotas
+// de leitura compartilhadas entre dois papeis diferentes (ex: ver a sangria
+// do dia dentro do Fechamento, sem ter a secao "sangria" pra criar/editar)
+function requireAnySection(...sections) {
+  return (req, res, next) => {
+    if (!sections.some((s) => auth.hasSection(req, s))) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
     next();
   };
 }
@@ -592,6 +605,7 @@ app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
   Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
+  Object.entries(ifoodClient.IFOOD_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
@@ -1116,8 +1130,11 @@ app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) 
 // ---------- sangria (retirada de caixa) registrada em campo, ao longo do
 // dia - pensado pra quem visita varias lojas (ex: supervisor) e nao ta
 // esperando o fechamento do dia sair pra lancar a retirada. Fica separado do
-// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos) ----------
-app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
+// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos).
+// Secao propria "sangria" (independente de "lancamento") - permite liberar
+// alguem so pra registrar sangria, em unidades especificas, sem dar acesso
+// as demais secoes do Fechamento (Faturamento, Declarado, etc) ----------
+app.post('/api/sangrias', requireSection('sangria'), async (req, res) => {
   try {
     const { unidade, unidadeNome, grupo, data, valor, descricao } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
@@ -1128,6 +1145,7 @@ app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
+    broadcast('sangria-lancada', registro, 'sangria');
     broadcast('sangria-lancada', registro, 'lancamento');
     broadcast('sangria-lancada', registro, 'fechamentos');
     res.json(registro);
@@ -1136,9 +1154,23 @@ app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
   }
 });
 
-app.get('/api/sangrias/minhas', requireSection('lancamento'), async (req, res) => {
+app.get('/api/sangrias/minhas', requireSection('sangria'), async (req, res) => {
   if (req.isMaster) return res.json(await sangrias.listAll());
   res.json(await sangrias.listByUnidades(req.permissions.unidades || []));
+});
+
+// leitura somente-informativa da sangria de um dia/unidade especifico -
+// usada pelo formulario de Fechamento (secao "lancamento") pra mostrar a
+// saida de caixa ja registrada, sem dar acesso de criar/editar sangria (que
+// exige a secao "sangria" separada, ver rotas acima)
+app.get('/api/sangrias/do-dia', requireAnySection('lancamento', 'sangria'), async (req, res) => {
+  const { unidade, data } = req.query;
+  if (!unidade || !data) return res.status(400).json({ error: 'unidade e data são obrigatórios.' });
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+    return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  }
+  const todas = await sangrias.listByUnidades([unidade]);
+  res.json(todas.filter((s) => s.data === data));
 });
 
 app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {
@@ -1355,6 +1387,26 @@ app.patch('/api/entregas/edicoes/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
+// ---------- vendas do iFood (secao "ifood") ----------
+// so leitura - dados financeiros da Sales API do iFood (nao tem lançamento
+// manual nem edição, diferente de Fechamentos/Entregas), sincronizados
+// periodicamente por ifoodSync (ver boot mais abaixo). Mesmo espaco de
+// "unidade" das outras seções (o merchantId do iFood vira o código
+// filtrado por permissao, igual FECHAMENTO_UNIDADES_NOMES/ENTREGAS_UNIDADES_NOMES).
+app.get('/api/ifood/vendas', requireSection('ifood'), async (req, res) => {
+  res.json(auth.filterByUnidade(req, await ifoodStore.listAllCached()));
+});
+
+app.get('/api/ifood/sincronizacao', requireSection('ifood'), (req, res) => {
+  res.json(ifoodSync.getStatus());
+});
+
+// forca uma sincronizacao imediata - so o Master (evita chamadas extras na API do iFood sem necessidade)
+app.post('/api/ifood/sincronizar', auth.requireMaster, async (req, res) => {
+  const status = await ifoodSync.sincronizarVendasIfood();
+  res.json(status);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // mensagens amigaveis pros erros mais comuns de upload (arquivo grande demais,
@@ -1420,5 +1472,16 @@ app.use((err, req, res, next) => {
     // mesma logica pro historico de entregas (planilha "MOTOS BRAVO" do AppSheet)
     sincronizarPlanilhaEntregas();
     setInterval(sincronizarPlanilhaEntregas, intervaloSync);
+
+    // sincroniza as vendas do iFood (Sales API - so leitura, ver
+    // server/ifoodClient.js): roda no start e depois periodicamente. Padrao
+    // bem mais espaçado que o Sheets Sync (1h) porque a Sales API e um
+    // relatorio financeiro que so fecha de vez em D+1/D+2 - nao ha ganho em
+    // consultar com mais frequencia que isso.
+    ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
+    const intervaloIfood = Number(process.env.IFOOD_SYNC_INTERVAL_MS) || 60 * 60 * 1000;
+    setInterval(() => {
+      ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
+    }, intervaloIfood);
   });
 })();

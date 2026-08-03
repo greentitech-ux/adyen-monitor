@@ -94,6 +94,7 @@
       <a class="back" href="/entrega-lancamento.html">📦 Lançar entrega</a>
       <a class="back" href="/relatorios.html">📊 Relatórios</a>
       <a class="back" href="/cofre.html">🔐 Cofre</a>
+      <a class="back" href="/ifood.html">🍔 iFood</a>
       <a class="back active" href="/usuarios.html">👤 Usuários</a>
     </div>
     <div class="nav-actions">
@@ -127,7 +128,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Unidades (monitor/disputas/fechamentos/lançamento/entregas)</legend>
+        <legend>Unidades (monitor/disputas/fechamentos/lançamento/sangria/entregas)</legend>
         <div class="checks" id="c-unidades"></div>
       </fieldset>
 
@@ -189,7 +190,7 @@ window.fetch = (url, opts = {}) => {
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'] ];
 const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];

@@ -121,6 +121,7 @@
       <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
       <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
       <a class="back active" id="nav-cofre-self" href="/cofre.html">🔐 Cofre</a>
+      <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
       <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     </div>
     <div class="nav-actions">
@@ -240,7 +241,7 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   const isMaster = ME.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
@@ -248,6 +249,7 @@ async function boot(){
   document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
   document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('cofre')){
