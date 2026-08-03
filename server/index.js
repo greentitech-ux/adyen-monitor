@@ -41,7 +41,26 @@ const upload = multer({
 
 const app = express();
 
+// ---------- resiliencia contra falhas temporarias do Firestore/rede ----------
+// antes disso, qualquer erro nao tratado (ex: "RESOURCE_EXHAUSTED: Quota
+// exceeded" do Firestore, ou uma falha de rede momentanea) derrubava o
+// processo inteiro (Node encerra sozinho em uncaughtException/
+// unhandledRejection sem handler). No Render isso reinicia a instancia, o
+// boot roda de novo (store.init() releem tudo), e se a causa for cota
+// estourada, o restart nao resolve nada - so entra num ciclo de crash-loop
+// que ainda piora a propria cota (mais leituras a cada restart). Logamos o
+// erro e mantemos o processo de pe; requisicoes que dependiam daquela
+// chamada especifica falham com erro 500 (tratado nas rotas via try/catch),
+// mas o servidor inteiro continua no ar pros outros usuarios/telas.
+process.on('unhandledRejection', (err) => {
+  console.error('Erro nao tratado (unhandledRejection) - processo continua rodando:', err && err.message ? err.message : err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Excecao nao tratada (uncaughtException) - processo continua rodando:', err && err.message ? err.message : err);
+});
+
 // ---------- autenticacao basica pro dashboard/API ----------
+
 // protege tudo (dashboard, APIs, imagens/videos anexados) atras de usuario e
 // senha - o webhook da Adyen fica de fora (ja e verificado por assinatura
 // HMAC, e a Adyen nao manda esse header). Sem DASHBOARD_USER/PASSWORD
@@ -188,7 +207,8 @@ function hmacValid(item) {
 async function escalarClusterParaFraude(nomes, motivo) {
   if (!nomes || !nomes.length) return;
   const nomesNorm = new Set(nomes.map(fraudMarks.normalizarNome));
-  const marcas = await fraudMarks.listAll();
+  const marcas = await fraudMarks.listAllCached();
+
   const suspeitosDoCluster = marcas.filter((m) => m.nivel === 'SUSPEITO' && nomesNorm.has(fraudMarks.normalizarNome(m.clienteNome)));
   for (const m of suspeitosDoCluster) {
     const registro = await fraudMarks.marcar({
@@ -322,8 +342,9 @@ app.post('/webhooks/adyen', async (req, res) => {
     // remover a marcacao de um pedido especifico se for engano.
     if (clusterInfo) {
       try {
-        const marcasExistentes = await fraudMarks.listAll();
+        const marcasExistentes = await fraudMarks.listAllCached();
         const jaMarcadoNesse = marcasExistentes.some((m) => m.pedidoId === pedidoIdAtual);
+
         const nomesClusterNorm = new Set(clusterInfo.nomes.map(fraudMarks.normalizarNome));
         const marcaFraudeCluster = marcasExistentes.find(
           (m) => m.nivel === 'FRAUDE' && nomesClusterNorm.has(fraudMarks.normalizarNome(m.clienteNome))
@@ -436,8 +457,9 @@ app.get('/api/chargebacks', requireSection('monitor'), (req, res) => {
 // ---------- marcacao manual de suspeita/fraude por pedido (monitoramento
 // efetivo, separado do status que vem da Adyen - esse continua intacto) ----------
 app.get('/api/fraude', requireSection('monitor'), (req, res) => {
-  fraudMarks.listAll().then((lista) => res.json(auth.filterByUnidade(req, lista)));
+  fraudMarks.listAllCached().then((lista) => res.json(auth.filterByUnidade(req, lista)));
 });
+
 
 app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
   try {
@@ -1350,12 +1372,26 @@ app.use((err, req, res, next) => {
 });
 
 (async () => {
-  await store.init(); // carrega o historico do Firestore antes de aceitar trafego
-  await auth.ensureMaster(); // garante que existe um acesso Master pra logar
+  try {
+    await store.init(); // carrega o historico do Firestore antes de aceitar trafego
+  } catch (err) {
+    // se o Firestore estiver temporariamente indisponivel (ex: cota
+    // estourada, RESOURCE_EXHAUSTED) o app ainda sobe com o cache vazio
+    // (em vez de nao subir de jeito nenhum) - assim que o Firestore
+    // normalizar, as proximas leituras/gravacoes voltam a funcionar
+    // sozinhas, sem precisar de um redeploy manual.
+    console.error('Falha ao carregar historico do Firestore no boot (app sobe mesmo assim, com cache vazio):', err.message);
+  }
+  try {
+    await auth.ensureMaster(); // garante que existe um acesso Master pra logar
+  } catch (err) {
+    console.error('Falha ao garantir usuario Master no boot:', err.message);
+  }
 
   app.listen(PORT, async () => {
     console.log(`Zenith Ops rodando em http://localhost:${PORT}`);
     console.log(`Webhook: POST http://localhost:${PORT}/webhooks/adyen`);
+
     const contas = Object.keys(HMAC_KEYS);
     if (contas.length) console.log(`HMAC configurada para: ${contas.join(', ')}`);
     else if (!LEGACY_HMAC_KEY) console.warn('AVISO: nenhuma ADYEN_HMAC_KEYS/ADYEN_HMAC_KEY configurada - assinatura nao esta sendo verificada.');

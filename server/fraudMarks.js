@@ -46,6 +46,7 @@ async function marcar({ pedidoId, unidade, nivel, motivo, clienteChave, clienteN
     atualizadoEm: agora,
   };
   await ref.set(registro);
+  invalidarCache();
   return registro;
 }
 
@@ -58,13 +59,56 @@ async function remover(pedidoId, removidoPorEmail) {
     removidoEm: new Date().toISOString(),
     removidoPorEmail: removidoPorEmail || null,
   });
+  invalidarCache();
 }
+
 
 // so as marcacoes ativas (usado no painel/monitor e na propagacao por nome)
 async function listAll() {
   const snap = await COLLECTION.orderBy('atualizadoEm', 'desc').get();
   return snap.docs.map((d) => d.data()).filter((m) => !m.removido);
 }
+
+// cache em memoria de curta duracao (TTL) por cima de listAll() - essa
+// funcao e chamada MUITAS vezes por segundo em picos de trafego (uma ou
+// mais vezes por notificacao de webhook da Adyen, alem de toda vez que
+// alguem abre/atualiza o painel de Monitor), e cada chamada relia a
+// colecao INTEIRA do Firestore do zero. Isso multiplica muito rapido o
+// numero de leituras e foi a causa mais provavel do "RESOURCE_EXHAUSTED"
+// (cota diaria de leitura do Firestore estourada) que derrubava o app em
+// crash-loop no Render. Com o cache, varias chamadas dentro da mesma
+// janela de tempo reaproveitam o mesmo resultado em memoria, sem bater no
+// Firestore de novo - e qualquer marcacao nova/removida invalida o cache
+// na hora (ver marcar()/remover() abaixo), entao ninguem ve dado
+// desatualizado por mais que TTL_MS.
+const TTL_MS = 30 * 1000; // 30s: curto o suficiente pra nao atrasar o dashboard perceptivelmente
+let cache = { valor: null, expiraEm: 0, emAndamento: null };
+
+function invalidarCache() {
+  cache = { valor: null, expiraEm: 0, emAndamento: null };
+}
+
+async function listAllCached() {
+  const agora = Date.now();
+  if (cache.valor && agora < cache.expiraEm) return cache.valor;
+  // se ja tem uma leitura em andamento (varias notificacoes de webhook
+  // chegando juntas), todo mundo espera a MESMA leitura em vez de cada
+  // uma disparar sua propria chamada ao Firestore em paralelo
+  if (cache.emAndamento) return cache.emAndamento;
+
+  const promessa = listAll()
+    .then((valor) => {
+      cache = { valor, expiraEm: Date.now() + TTL_MS, emAndamento: null };
+      return valor;
+    })
+    .catch((err) => {
+      cache.emAndamento = null;
+      throw err;
+    });
+  cache.emAndamento = promessa;
+  return promessa;
+}
+
 
 // historico completo, incluindo as removidas - so pro Relatorio de Fraude
 async function listHistorico() {
@@ -93,4 +137,6 @@ async function listFraudeNomes() {
   return nomes;
 }
 
-module.exports = { NIVEIS, marcar, remover, listAll, listHistorico, listFraudeNomes, normalizarNome };
+module.exports = { NIVEIS, marcar, remover, listAll, listAllCached, listHistorico, listFraudeNomes, normalizarNome };
+
+

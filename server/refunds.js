@@ -5,9 +5,11 @@
 // o registro). O Master acompanha essa fila e Aprova (e executa o estorno na
 // Adyen por fora) ou Rejeita (com um motivo).
 const db = require('./firestore');
+const { createCache } = require('./liveCache');
 
 const refundsRef = db.collection('refundRequests');
 const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO'];
+
 
 async function create({ pedidoId, unidade, observacao, requestedById, requestedByEmail }) {
   if (!pedidoId) throw new Error('pedidoId é obrigatório.');
@@ -29,13 +31,17 @@ async function create({ pedidoId, unidade, observacao, requestedById, requestedB
     decidedEm: null,
   };
   await doc.set(registro);
+  refundsCache.invalidar();
   return registro;
 }
 
-async function listAll() {
+async function listAllUncached() {
   const snap = await refundsRef.orderBy('criadoEm', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const refundsCache = createCache(listAllUncached, 20 * 1000);
+const listAll = refundsCache.cached;
+
 
 async function getOne(id) {
   const doc = await refundsRef.doc(id).get();
@@ -53,7 +59,9 @@ async function updateStatus(id, status, { motivoDecisao, decidedByEmail }) {
     decidedByEmail,
     decidedEm: new Date().toISOString(),
   });
+  refundsCache.invalidar();
   return getOne(id);
 }
+
 
 module.exports = { STATUSES, create, listAll, getOne, updateStatus };

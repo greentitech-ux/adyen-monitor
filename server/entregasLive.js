@@ -9,9 +9,11 @@
 // guardado no histórico do próprio lançamento.
 const db = require('./firestore');
 const storage = require('./storage');
+const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('entregasLive');
 const EDITS = db.collection('entregaEdicoes');
+
 
 const CAMPOS_NUMERICOS = [
   'entrega', 'retorno', 'extra', 'bonus', 'pos00hs', 'foraDeArea',
@@ -48,13 +50,17 @@ async function create({ unidade, unidadeNome, data, entregador, campos, obsRetor
   registro.historico = [];
 
   await ref.set(registro);
+  entregasCache.invalidar();
   return registro;
 }
 
-async function listAll() {
+async function listAllUncached() {
   const snap = await COLLECTION.orderBy('data', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const entregasCache = createCache(listAllUncached, 20 * 1000);
+const listAll = entregasCache.cached;
+
 
 // Firestore "in" aceita no maximo 30 valores por consulta
 async function listByUnidades(unidades) {
@@ -131,8 +137,10 @@ async function editarDireto({ entregaId, mudancas, motivo, editadoPorEmail }) {
 
   const ref = COLLECTION.doc(entregaId);
   await ref.update({ ...camposValidos, historico, atualizadoEm: new Date().toISOString() });
+  entregasCache.invalidar();
   return { ...atual, ...camposValidos, historico };
 }
+
 
 async function listarEdicoes() {
   const snap = await EDITS.orderBy('criadoEm', 'desc').get();
@@ -169,9 +177,11 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
         valoresNovos: pedido.mudancas,
       }];
       await entRef.update({ ...pedido.mudancas, historico, atualizadoEm: new Date().toISOString() });
+      entregasCache.invalidar();
     }
   }
   return { ...pedido, status };
 }
+
 
 module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, decidirEdicao, editarDireto };

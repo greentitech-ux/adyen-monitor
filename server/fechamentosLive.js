@@ -6,9 +6,11 @@
 // (fechamentoEdicoes) que só é aplicado quando o Master aprova; o valor
 // anterior sempre fica guardado no historico do proprio fechamento.
 const db = require('./firestore');
+const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('fechamentosLive');
 const EDITS = db.collection('fechamentoEdicoes');
+
 
 function docId(unidade, data) {
   return `${unidade}__${data}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
@@ -62,13 +64,17 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, obse
   registro.historico = [];
 
   await ref.set(registro);
+  fechamentosCache.invalidar();
   return registro;
 }
 
-async function listAll() {
+async function listAllUncached() {
   const snap = await COLLECTION.orderBy('data', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const fechamentosCache = createCache(listAllUncached, 20 * 1000);
+const listAll = fechamentosCache.cached;
+
 
 // Firestore "in" aceita no maximo 30 valores por consulta
 async function listByUnidades(unidades) {
@@ -152,8 +158,10 @@ async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail })
 
   const ref = COLLECTION.doc(fechamentoId);
   await ref.update({ ...novosValores, historico, atualizadoEm: new Date().toISOString() });
+  fechamentosCache.invalidar();
   return { ...atual, ...novosValores, historico };
 }
+
 
 async function listarEdicoes() {
   const snap = await EDITS.orderBy('criadoEm', 'desc').get();
@@ -194,9 +202,11 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
         valoresNovos: pedido.mudancas,
       }];
       await fechRef.update({ ...novosValores, historico, atualizadoEm: new Date().toISOString() });
+      fechamentosCache.invalidar();
     }
   }
   return { ...pedido, status };
 }
+
 
 module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, decidirEdicao, editarDireto };

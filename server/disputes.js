@@ -8,7 +8,9 @@
 // Firestore, igual ao resto do app.
 const db = require('./firestore');
 const storage = require('./storage');
+const { createCache } = require('./liveCache');
 const COLLECTION = db.collection('disputes');
+
 
 // MONITORANDO: pedido ainda nao e chargeback, so esta sendo acompanhado.
 // ABERTA -> ENVIADA -> GANHA/PERDIDA: fluxo da disputa formal do chargeback.
@@ -30,13 +32,17 @@ async function create({ pedidoId, unidade, nomeContato, telefoneContato, notas, 
     atualizadoEm: agora,
   };
   await doc.set(registro);
+  disputesCache.invalidar();
   return registro;
 }
 
-async function listAll() {
+async function listAllUncached() {
   const snap = await COLLECTION.orderBy('criadoEm', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const disputesCache = createCache(listAllUncached, 20 * 1000);
+const listAll = disputesCache.cached;
+
 
 async function listByPedido(pedidoId) {
   const snap = await COLLECTION.where('pedidoId', '==', pedidoId).get();
@@ -51,6 +57,7 @@ async function getOne(id) {
 async function updateStatus(id, status) {
   if (!STATUSES.includes(status)) throw new Error('status invalido');
   await COLLECTION.doc(id).update({ status, atualizadoEm: new Date().toISOString() });
+  disputesCache.invalidar();
   return getOne(id);
 }
 
@@ -59,6 +66,8 @@ async function remove(id) {
   if (!registro) return;
   await Promise.all((registro.anexos || []).map((a) => storage.apagarArquivo(a.path)));
   await COLLECTION.doc(id).delete();
+  disputesCache.invalidar();
 }
+
 
 module.exports = { STATUSES, create, listAll, listByPedido, getOne, updateStatus, remove };

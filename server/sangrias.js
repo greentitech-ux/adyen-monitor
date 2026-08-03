@@ -7,8 +7,10 @@
 // que a sangria é registrada pode ainda não existir nenhum fechamento pra
 // aquele dia.
 const db = require('./firestore');
+const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('sangrias');
+
 
 function num(v) {
   const n = Number(v);
@@ -35,13 +37,17 @@ async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, cria
     criadoEm: new Date().toISOString(),
   };
   await ref.set(registro);
+  sangriasCache.invalidar();
   return registro;
 }
 
-async function listAll() {
+async function listAllUncached() {
   const snap = await COLLECTION.orderBy('data', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const sangriasCache = createCache(listAllUncached, 20 * 1000);
+const listAll = sangriasCache.cached;
+
 
 // Firestore "in" aceita no maximo 30 valores por consulta
 async function listByUnidades(unidades) {
