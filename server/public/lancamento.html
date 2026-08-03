@@ -43,6 +43,7 @@
   label:first-child{margin-top:0;}
   input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  input[readonly]{opacity:.7;cursor:default;}
   textarea{resize:vertical;min-height:56px;}
   .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
   @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
@@ -84,12 +85,12 @@
   <div class="header-top">
     <div>
       <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-      <h1>Lançamento de fechamento</h1>
+      <h1 id="titulo-pagina">Lançamento de fechamento</h1>
     </div>
   </div>
   <div class="header-nav">
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back active" href="/lancamento.html">🧾 Fechamento</a>
+    <a class="back active" id="nav-self" href="/lancamento.html">🧾 Fechamento</a>
     <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Entregas</a>
     <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
     <div class="nav-divider"></div>
@@ -119,7 +120,7 @@
   <div id="lista-sangrias" style="margin-top:4px;"></div>
 </div>
 
-<div class="panel">
+<div class="panel" id="painel-fechamento">
   <h2>Novo fechamento</h2>
   <form id="form-lancar">
 
@@ -197,16 +198,16 @@
     </div>
 
     <div class="secao">
-      <div class="secao-titulo">Saídas de caixa (sangrias) <span id="saida-total" style="color:var(--text);"></span></div>
-      <div id="lista-saidas"></div>
-      <button type="button" class="btn-add" onclick="adicionarSaida()">+ Adicionar saída</button>
+      <div class="secao-titulo">Saída de dinheiro (sangria) <span id="sangria-dia-total" style="color:var(--text);"></span></div>
+      <div class="sub" style="margin:-2px 0 8px;">Preenchida automaticamente com as sangrias registradas pra essa unidade/data - somente leitura aqui. Quem tem permissão de Sangria lança pelo painel próprio.</div>
+      <div id="sangria-dia-info"><div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div></div>
     </div>
 
     <div class="secao">
       <div class="secao-titulo">Fechamento</div>
       <div class="grid2">
-        <div><label>Faturamento total</label><input type="number" step="0.01" inputmode="decimal" id="f-faturamento"></div>
-        <div><label>Total declarado</label><input type="number" step="0.01" inputmode="decimal" id="f-totalDeclarado"></div>
+        <div><label>Faturamento total <span class="sub" style="display:inline;margin:0;">(calculado)</span></label><input type="number" step="0.01" inputmode="decimal" id="f-faturamento" readonly></div>
+        <div><label>Total declarado <span class="sub" style="display:inline;margin:0;">(calculado)</span></label><input type="number" step="0.01" inputmode="decimal" id="f-totalDeclarado" readonly></div>
       </div>
       <div class="grid2">
         <div><label>TC (tíquete médio)</label><input type="number" step="0.01" inputmode="decimal" id="f-tc"></div>
@@ -214,7 +215,7 @@
       </div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
-        <div class="linha"><span>Soma saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
+        <div class="linha"><span>Sangria do dia (automática)</span><b id="resumo-saidas">R$ 0,00</b></div>
         <div class="linha"><span>Diferença (declarado − faturamento)</span><b id="resumo-diferenca" class="dif">R$ 0,00</b></div>
       </div>
     </div>
@@ -229,7 +230,7 @@
   </form>
 </div>
 
-<div class="panel">
+<div class="panel" id="painel-meus-lancamentos">
   <h2>Meus últimos lançamentos</h2>
   <div id="lista-lancamentos"><div class="empty">carregando...</div></div>
 </div>
@@ -307,8 +308,8 @@ let EDICOES = [];
 let EDITANDO_ID = null;
 let EDITANDO_MASTER_ID = null;
 let MAQUINAS = [];
-let SAIDAS = [];
 let SEQ = 0;
+let SANGRIA_DO_DIA = [];
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
@@ -330,7 +331,7 @@ function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
-// ---------- linhas repetíveis: maquininhas e saídas de caixa ----------
+// ---------- linhas repetíveis: maquininhas ----------
 function adicionarMaquina(valor){
   MAQUINAS.push({ id: ++SEQ, descricao: `Maquininha ${MAQUINAS.length+1}`, valor: valor||'' });
   renderMaquinas();
@@ -345,36 +346,52 @@ function renderMaquinas(){
     </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma maquininha adicionada.</div>';
   atualizarResumo();
 }
-function adicionarSaida(valor, descricao){
-  SAIDAS.push({ id: ++SEQ, descricao: descricao||'', valor: valor||'' });
-  renderSaidas();
-}
-function removerSaida(id){ SAIDAS = SAIDAS.filter(s=>s.id!==id); renderSaidas(); }
-function renderSaidas(){
-  document.getElementById('lista-saidas').innerHTML = SAIDAS.map(s=>`
-    <div class="linha-item">
-      <input type="text" value="${escapeHtml(s.descricao)}" oninput="SAIDAS.find(x=>x.id===${s.id}).descricao=this.value" placeholder="motivo da saída">
-      <input type="number" step="0.01" inputmode="decimal" value="${s.valor}" oninput="SAIDAS.find(x=>x.id===${s.id}).valor=this.value; atualizarResumo();" placeholder="R$">
-      <button type="button" class="btn-remover" onclick="removerSaida(${s.id})">✕</button>
-    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma saída registrada.</div>';
+
+// ---------- sangria do dia (leitura automática, ver carregarSangriaDoDia) ----------
+async function carregarSangriaDoDia(){
+  const unidade = document.getElementById('f-unidade').value;
+  const data = document.getElementById('f-data').value;
+  const el = document.getElementById('sangria-dia-info');
+  if(!unidade || !data){ SANGRIA_DO_DIA = []; el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div>'; atualizarResumo(); return; }
+  try{
+    SANGRIA_DO_DIA = await fetch(`/api/sangrias/do-dia?unidade=${encodeURIComponent(unidade)}&data=${encodeURIComponent(data)}`).then(r=>r.json());
+  }catch(e){ SANGRIA_DO_DIA = []; }
+  if(!SANGRIA_DO_DIA.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Nenhuma sangria registrada pra esse dia.</div>';
+  }else{
+    el.innerHTML = SANGRIA_DO_DIA.map(s=>`
+      <div class="card" style="padding:6px 0;">
+        <div class="linha1" style="font-size:12.5px;"><span>${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</span><b>${fmtMoney(s.valor)}</b></div>
+        ${s.descricao?`<div class="sub">${escapeHtml(s.descricao)}</div>`:''}
+      </div>`).join('');
+  }
   atualizarResumo();
 }
 
 function atualizarResumo(){
   const somaMaquinas = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
-  const somaSaidas = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
+  const somaSangria = SANGRIA_DO_DIA.reduce((s,x)=>s+num(x.valor),0);
   document.getElementById('maq-total').textContent = somaMaquinas ? fmtMoney(somaMaquinas) : '';
-  document.getElementById('saida-total').textContent = somaSaidas ? fmtMoney(somaSaidas) : '';
+  document.getElementById('sangria-dia-total').textContent = somaSangria ? fmtMoney(somaSangria) : '';
   document.getElementById('resumo-maquinas').textContent = fmtMoney(somaMaquinas);
-  document.getElementById('resumo-saidas').textContent = fmtMoney(somaSaidas);
-  const faturamento = num(document.getElementById('f-faturamento').value);
-  const declarado = num(document.getElementById('f-totalDeclarado').value);
-  const dif = +(declarado - faturamento).toFixed(2);
+  document.getElementById('resumo-saidas').textContent = fmtMoney(somaSangria);
+
+  // Faturamento = soma dos canais de venda; Total declarado = soma das
+  // formas de pagamento (maquininhas + iFood + 99Food + Pix + Pix CNPJ +
+  // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
+  // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
+  const g = (id)=>num(document.getElementById(id).value);
+  const faturamento = +(g('f-delivery')+g('f-carryout')+g('f-pickup')+g('f-loja')).toFixed(2);
+  const totalDeclarado = +(somaMaquinas+g('f-ifood')+g('f-food99')+g('f-pix')+g('f-pixCnpj')+g('f-outros')+g('f-entradaDinheiro')).toFixed(2);
+  document.getElementById('f-faturamento').value = faturamento;
+  document.getElementById('f-totalDeclarado').value = totalDeclarado;
+
+  const dif = +(totalDeclarado - faturamento).toFixed(2);
   const elDif = document.getElementById('resumo-diferenca');
   elDif.textContent = fmtMoney(dif);
   elDif.className = 'dif ' + (Math.abs(dif) < 0.01 ? 'ok' : 'bad');
 }
-['f-faturamento','f-totalDeclarado'].forEach(id=>{
+['f-delivery','f-carryout','f-pickup','f-loja','f-ifood','f-food99','f-pix','f-pixCnpj','f-outros','f-entradaDinheiro'].forEach(id=>{
   document.getElementById(id).addEventListener('input', atualizarResumo);
 });
 
@@ -382,7 +399,8 @@ function aplicarFranquia(unidade){
   const grupo = grupoDaUnidade(unidade);
   document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
 }
-document.getElementById('f-unidade').addEventListener('change', (ev)=>aplicarFranquia(ev.target.value));
+document.getElementById('f-unidade').addEventListener('change', (ev)=>{ aplicarFranquia(ev.target.value); carregarSangriaDoDia(); });
+document.getElementById('f-data').addEventListener('input', carregarSangriaDoDia);
 
 async function carregar(){
   const [meus, edicoes] = await Promise.all([
@@ -564,10 +582,10 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
 function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
-  MAQUINAS = []; SAIDAS = [];
+  MAQUINAS = [];
   adicionarMaquina();
-  renderSaidas();
   aplicarFranquia(document.getElementById('f-unidade').value);
+  carregarSangriaDoDia();
 }
 
 document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
@@ -585,7 +603,6 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       campos[c] = el ? el.value : 0;
     });
     campos.adyen = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
-    campos.totalSaida = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
     if(grupo!=='ARCFOOD') campos.food99 = 0;
 
     const body = {
@@ -597,7 +614,6 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       campos,
       observacao: document.getElementById('f-observacao').value,
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
-      detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
     const res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
@@ -613,39 +629,59 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   }
 });
 
+function opcoesUnidades(unidades){
+  return unidades.length
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+}
+
 async function boot(){
   const res = await fetch('/api/me');
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-entregas-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
 
-  if(!secoes.includes('lancamento')){
+  const podeLancamento = secoes.includes('lancamento');
+  const podeSangria = secoes.includes('sangria');
+
+  if(!podeLancamento && !podeSangria){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
 
-  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
-  const selUnidade = document.getElementById('f-unidade');
-  selUnidade.innerHTML = unidades.length
-    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
-    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
-  document.getElementById('f-data').value = hojeBrasilia();
-  document.getElementById('f-data').max = hojeBrasilia();
-  adicionarMaquina();
-  renderSaidas();
-  aplicarFranquia(selUnidade.value);
+  const tituloPagina = podeLancamento ? 'Lançamento de fechamento' : 'Registrar sangria';
+  document.getElementById('titulo-pagina').textContent = tituloPagina;
+  document.getElementById('nav-self').textContent = podeLancamento ? '🧾 Fechamento' : '💰 Sangria';
 
-  document.getElementById('s-unidade').innerHTML = selUnidade.innerHTML;
-  document.getElementById('s-data').value = hojeBrasilia();
-  document.getElementById('s-data').max = hojeBrasilia();
+  document.getElementById('painel-sangria').classList.toggle('hidden', !podeSangria);
+  document.getElementById('painel-fechamento').classList.toggle('hidden', !podeLancamento);
+  document.getElementById('painel-meus-lancamentos').classList.toggle('hidden', !podeLancamento);
+
+  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
+
+  if(podeLancamento){
+    const selUnidade = document.getElementById('f-unidade');
+    selUnidade.innerHTML = opcoesUnidades(unidades);
+    document.getElementById('f-data').value = hojeBrasilia();
+    document.getElementById('f-data').max = hojeBrasilia();
+    adicionarMaquina();
+    aplicarFranquia(selUnidade.value);
+    await carregarSangriaDoDia();
+  }
+
+  if(podeSangria){
+    document.getElementById('s-unidade').innerHTML = opcoesUnidades(unidades);
+    document.getElementById('s-data').value = hojeBrasilia();
+    document.getElementById('s-data').max = hojeBrasilia();
+  }
 
   document.getElementById('root').classList.remove('hidden');
-  await carregar();
-  await carregarSangrias();
+  if(podeLancamento) await carregar();
+  if(podeSangria) await carregarSangrias();
 }
 
 boot();

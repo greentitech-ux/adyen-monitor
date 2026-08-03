@@ -145,6 +145,16 @@ function requireSection(section) {
   };
 }
 
+// passa se o usuario tiver QUALQUER uma das secoes pedidas - usado pra rotas
+// de leitura compartilhadas entre dois papeis diferentes (ex: ver a sangria
+// do dia dentro do Fechamento, sem ter a secao "sangria" pra criar/editar)
+function requireAnySection(...sections) {
+  return (req, res, next) => {
+    if (!sections.some((s) => auth.hasSection(req, s))) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    next();
+  };
+}
+
 // ---------- clientes SSE conectados (para empurrar atualizacoes ao vivo pro dashboard) ----------
 // cada cliente guarda suas proprias permissoes, pra so receber eventos das
 // unidades/secoes que ele pode ver
@@ -1120,8 +1130,11 @@ app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) 
 // ---------- sangria (retirada de caixa) registrada em campo, ao longo do
 // dia - pensado pra quem visita varias lojas (ex: supervisor) e nao ta
 // esperando o fechamento do dia sair pra lancar a retirada. Fica separado do
-// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos) ----------
-app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
+// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos).
+// Secao propria "sangria" (independente de "lancamento") - permite liberar
+// alguem so pra registrar sangria, em unidades especificas, sem dar acesso
+// as demais secoes do Fechamento (Faturamento, Declarado, etc) ----------
+app.post('/api/sangrias', requireSection('sangria'), async (req, res) => {
   try {
     const { unidade, unidadeNome, grupo, data, valor, descricao } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
@@ -1132,6 +1145,7 @@ app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
+    broadcast('sangria-lancada', registro, 'sangria');
     broadcast('sangria-lancada', registro, 'lancamento');
     broadcast('sangria-lancada', registro, 'fechamentos');
     res.json(registro);
@@ -1140,9 +1154,23 @@ app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
   }
 });
 
-app.get('/api/sangrias/minhas', requireSection('lancamento'), async (req, res) => {
+app.get('/api/sangrias/minhas', requireSection('sangria'), async (req, res) => {
   if (req.isMaster) return res.json(await sangrias.listAll());
   res.json(await sangrias.listByUnidades(req.permissions.unidades || []));
+});
+
+// leitura somente-informativa da sangria de um dia/unidade especifico -
+// usada pelo formulario de Fechamento (secao "lancamento") pra mostrar a
+// saida de caixa ja registrada, sem dar acesso de criar/editar sangria (que
+// exige a secao "sangria" separada, ver rotas acima)
+app.get('/api/sangrias/do-dia', requireAnySection('lancamento', 'sangria'), async (req, res) => {
+  const { unidade, data } = req.query;
+  if (!unidade || !data) return res.status(400).json({ error: 'unidade e data são obrigatórios.' });
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+    return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  }
+  const todas = await sangrias.listByUnidades([unidade]);
+  res.json(todas.filter((s) => s.data === data));
 });
 
 app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {

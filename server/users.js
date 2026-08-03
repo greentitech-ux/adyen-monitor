@@ -8,7 +8,7 @@ const { emptyPermissions } = require('./auth');
 
 const usersRef = db.collection('users');
 
-const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'entregas', 'entregas-lancamento'];
+const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood'];
 
 function sanitizePermissions(input) {
   const p = input || {};

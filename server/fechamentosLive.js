@@ -51,6 +51,13 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, obse
 
   const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
+  // Faturamento e Total Declarado sao sempre calculados aqui (nao confiamos
+  // no que o cliente mandar pra esses dois campos) - garante que o numero
+  // batido nunca diverge da soma real das secoes do formulario:
+  // Faturamento = canais de venda; Total Declarado = formas de pagamento
+  // (maquininhas + iFood + 99Food + Pix + Pix CNPJ + Outros) + dinheiro
+  registro.faturamento = +(registro.delivery + registro.carryout + registro.pickup + registro.loja).toFixed(2);
+  registro.totalDeclarado = +(registro.adyen + registro.ifood + registro.food99 + registro.pix + registro.pixCnpj + registro.outros + registro.entradaDinheiro).toFixed(2);
   registro.diferenca = +(registro.totalDeclarado - registro.faturamento).toFixed(2);
   registro.observacao = observacao || null;
   registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
