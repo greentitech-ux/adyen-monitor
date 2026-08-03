@@ -131,6 +131,55 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ---------- pedido de estorno feito pelo CLIENTE FINAL (sem login, ver
+// estorno-cliente.html) - unicas rotas publicas alem do login e do webhook
+// da Adyen, por isso registradas antes do portao de autenticacao abaixo.
+// O pedido cai na mesma fila que a loja ja usa (refunds.js), com origem
+// "cliente" - o Master avalia em Central de Solicitações ou no Monitor. ----------
+app.get('/api/meta/unidades-publico', async (req, res) => {
+  const mapa = await construirUnidadesMapa();
+  const porNome = new Map();
+  Object.entries(mapa).forEach(([codigo, nome]) => {
+    const secao = classificarUnidade(codigo).secao;
+    const atual = porNome.get(nome);
+    if (!atual || (secao === 'Fechamento' && atual.secao !== 'Fechamento')) {
+      porNome.set(nome, { codigo, nome, secao });
+    }
+  });
+  const lista = [...porNome.values()]
+    .map(({ codigo, nome }) => ({ codigo, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  res.json(lista);
+});
+
+app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const {
+      unidade, motivoEstorno, motivoOutro, valorVenda, formaPagamento, bandeira, ultimos4,
+      dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente,
+    } = payload;
+
+    const mapa = await construirUnidadesMapa();
+    const unidadeNome = mapa[unidade] || unidade;
+
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(unidade || 'geral', file, 'estornos-cliente');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+
+    const registro = await refunds.create({
+      origem: 'cliente', unidade, unidadeNome, motivoEstorno, motivoOutro, valorVenda, formaPagamento,
+      bandeira, ultimos4, dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente, anexos,
+    });
+    broadcast('refund-requested', registro, 'monitor');
+    res.json({ ok: true, id: registro.id });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // tudo abaixo daqui exige um usuario logado (token JWT, via header ou
 // ?token= - o EventSource do SSE usa a query porque nao manda headers custom)
 app.use('/api', auth.requireAuth);
@@ -649,7 +698,7 @@ function classificarUnidade(codigo) {
 // com as unidades fixas de Fechamento/Lançamento/Entregas (espacos de codigo
 // diferentes, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
 // dados importados/lançados, pra nunca faltar opcao no checklist do Master
-app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
+async function construirUnidadesMapa() {
   const mapa = {};
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
@@ -662,6 +711,11 @@ app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   // por ultimo, sempre - garante o nome unificado mesmo que algum dado
   // importado (planilha, fechamento antigo) tenha trazido um nome diferente
   Object.entries(UNIDADES_APELIDOS).forEach(([codigo, nome]) => { if (mapa[codigo]) mapa[codigo] = nome; });
+  return mapa;
+}
+
+app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
+  const mapa = await construirUnidadesMapa();
   const SECAO_ORDEM = ['Fechamento', 'Entregas', 'Monitor / Disputas (Adyen)', 'iFood'];
   const lista = Object.entries(mapa)
     .map(([codigo, nome]) => ({ codigo, nome, ...classificarUnidade(codigo) }))
@@ -993,6 +1047,16 @@ app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// comprovante anexado pelo cliente final no pedido de estorno publico - so
+// o Master ve (dado sensivel do cliente: nome, telefone, foto do comprovante)
+app.get('/api/refund-requests/anexo/:id/:index', auth.requireMaster, async (req, res) => {
+  const registro = await refunds.getOne(req.params.id);
+  if (!registro) return res.sendStatus(404);
+  const anexo = (registro.anexos || [])[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
 });
 
 // ---------- gestao de usuarios (so o Master) ----------
@@ -1390,10 +1454,25 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMaster, async (req, res) =
 // (Master ve tudo, loja ve so o que ela mesma pediu)
 function normalizarCard(tipo, r) {
   if (tipo === 'estorno') {
+    const ehCliente = r.origem === 'cliente';
+    const titulo = ehCliente
+      ? `Estorno (cliente) · ${r.nomeCliente || 'sem nome informado'}`
+      : `Estorno · pedido ${r.pedidoId}`;
+    let observacao = r.observacao || '';
+    if (ehCliente) {
+      const linhas = [
+        `Motivo: ${r.motivoEstorno}${r.motivoOutro ? ' - ' + r.motivoOutro : ''}`,
+        `Valor da venda: ${fmtMoneyServer(r.valorVenda)} · Valor a estornar: ${fmtMoneyServer(r.valorEstornar)}`,
+        `Forma de pagamento: ${r.formaPagamento}${r.bandeira ? ' · ' + r.bandeira : ''}${r.ultimos4 ? ' final ' + r.ultimos4 : ''}`,
+        `Venda em ${r.dataVenda}${r.horaVenda ? ' às ' + r.horaVenda : ''}`,
+        r.telefoneCliente ? `Telefone do cliente: ${r.telefoneCliente}` : null,
+      ].filter(Boolean);
+      observacao = linhas.join('\n');
+    }
     return {
-      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidade, status: r.status, criadoEm: r.criadoEm,
-      titulo: `Estorno · pedido ${r.pedidoId}`, observacao: r.observacao, anexos: [], valorEstimado: null,
-      criadoPorId: r.requestedById, criadoPorEmail: r.requestedByEmail,
+      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome || r.unidade, status: r.status, criadoEm: r.criadoEm,
+      titulo, observacao, anexos: r.anexos || [], valorEstimado: null,
+      criadoPorId: r.requestedById, criadoPorEmail: r.requestedByEmail || (ehCliente ? 'pedido do cliente final' : ''),
       motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decidedByEmail, decididoEm: r.decidedEm,
       chamadoId: null,
     };

@@ -626,6 +626,7 @@ async function refreshRefundRequests(){
   REFUND_REQUESTS = await fetch('/api/refund-requests').then(r=>r.json());
   const mapa = {};
   REFUND_REQUESTS.forEach(r=>{
+    if(!r.pedidoId) return; // pedido do cliente final nao tem pspReference - so aparece na fila, nao marca linha da tabela
     const atual = mapa[r.pedidoId];
     if(!atual || (r.criadoEm||'') > (atual.criadoEm||'')) mapa[r.pedidoId] = r;
   });
@@ -638,17 +639,23 @@ function renderRefundPanel(){
   if(ME.role!=='master') return;
   const pendentes = REFUND_REQUESTS.filter(r=>r.status==='PENDENTE');
   document.getElementById('refund-count').textContent = pendentes.length;
-  document.getElementById('refund-requests').innerHTML = pendentes.length ? pendentes.map(r=>`
+  document.getElementById('refund-requests').innerHTML = pendentes.length ? pendentes.map(r=>{
+    const ehCliente = r.origem === 'cliente';
+    const titulo = ehCliente ? `Estorno (cliente) · ${r.nomeCliente||'sem nome informado'} · ${r.unidadeNome||r.unidade||'—'}` : `Pedido ${r.pedidoId} · ${r.unidade||'—'}`;
+    const sub = ehCliente ? `${r.telefoneCliente||'sem telefone'} em ${fmtDT(r.criadoEm)} · veja o resto na Central de Solicitações` : `Solicitado por ${r.requestedByEmail} em ${fmtDT(r.criadoEm)}`;
+    const obs = ehCliente ? `${r.motivoEstorno||''}${r.motivoOutro?(' - '+r.motivoOutro):''} · valor a estornar ${fmtMoney(r.valorEstornar)}` : (r.observacao||'');
+    return `
     <div class="refund-item">
-      <div class="t1">Pedido ${r.pedidoId} · ${r.unidade||'—'}</div>
-      <div class="t2">Solicitado por ${r.requestedByEmail} em ${fmtDT(r.criadoEm)}</div>
-      <div class="obs">${(r.observacao||'').replace(/</g,'&lt;')}</div>
+      <div class="t1">${titulo}</div>
+      <div class="t2">${sub}</div>
+      <div class="obs">${obs.replace(/</g,'&lt;')}</div>
       <div class="acts">
         <button type="button" class="aprovar" onclick="decidirEstorno('${r.id}','APROVADO')">✓ Aprovar</button>
         <button type="button" class="rejeitar" onclick="decidirEstorno('${r.id}','REJEITADO')">✕ Rejeitar</button>
       </div>
     </div>
-  `).join('') : '<div class="empty">Nenhuma solicitação pendente.</div>';
+  `;
+  }).join('') : '<div class="empty">Nenhuma solicitação pendente.</div>';
 }
 
 async function decidirEstorno(id, status){
