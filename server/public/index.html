@@ -265,13 +265,7 @@
 <div class="kpis" id="kpis"></div>
 
 <div class="panel">
-  <h2>
-    <span>Transações <span class="n" id="tx-count"></span></span>
-    <span style="display:flex;gap:6px;">
-      <button type="button" class="btn-disputa" onclick="baixarRelatorioMonitor('transacoes','csv')">📄 Relatório CSV</button>
-      <button type="button" class="btn-disputa" onclick="baixarRelatorioMonitor('transacoes','pdf')">📄 Relatório PDF</button>
-    </span>
-  </h2>
+  <h2>Transações <span class="n" id="tx-count"></span></h2>
   <div class="controls">
     <button type="button" class="multiselect-btn" id="btn-hoje" onclick="filtrarHoje()" title="Volta o período pra hoje">Hoje</button>
     <div class="daterange">
@@ -299,35 +293,17 @@
 
 <div class="grid3" style="margin-top:16px;">
   <div class="panel">
-    <h2>
-      <span>Pedidos que mudaram de status <span class="n" id="orders-count"></span></span>
-      <span style="display:flex;gap:4px;">
-        <button type="button" class="btn-disputa" title="Baixar CSV" onclick="baixarRelatorioMonitor('mudaram-status','csv')">📄 CSV</button>
-        <button type="button" class="btn-disputa" title="Baixar PDF" onclick="baixarRelatorioMonitor('mudaram-status','pdf')">📄 PDF</button>
-      </span>
-    </h2>
+    <h2>Pedidos que mudaram de status <span class="n" id="orders-count"></span></h2>
     <div class="orders" id="orders"></div>
   </div>
 
   <div class="panel">
-    <h2>
-      <span>Pedidos repetidos <span class="n" id="repetidos-count"></span></span>
-      <span style="display:flex;gap:4px;">
-        <button type="button" class="btn-disputa" title="Baixar CSV" onclick="baixarRelatorioMonitor('repetidos','csv')">📄 CSV</button>
-        <button type="button" class="btn-disputa" title="Baixar PDF" onclick="baixarRelatorioMonitor('repetidos','pdf')">📄 PDF</button>
-      </span>
-    </h2>
+    <h2>Pedidos repetidos <span class="n" id="repetidos-count"></span></h2>
     <div class="alerts" id="repetidos"></div>
   </div>
 
   <div class="panel">
-    <h2>
-      <span>Chargebacks <span class="n" id="chargebacks-count"></span></span>
-      <span style="display:flex;gap:4px;">
-        <button type="button" class="btn-disputa" title="Baixar CSV" onclick="baixarRelatorioMonitor('chargebacks','csv')">📄 CSV</button>
-        <button type="button" class="btn-disputa" title="Baixar PDF" onclick="baixarRelatorioMonitor('chargebacks','pdf')">📄 PDF</button>
-      </span>
-    </h2>
+    <h2>Chargebacks <span class="n" id="chargebacks-count"></span></h2>
     <div class="alerts" id="chargebacks"></div>
   </div>
 </div>
@@ -378,13 +354,7 @@
     </div>
   </div>
   <div class="panel">
-    <h2>
-      <span>Comparativo por unidade <span class="n" id="unidades-count"></span></span>
-      <span style="display:flex;gap:6px;">
-        <button type="button" class="btn-disputa" onclick="baixarRelatorioMonitor('comparativo-unidade','csv')">📄 Relatório CSV</button>
-        <button type="button" class="btn-disputa" onclick="baixarRelatorioMonitor('comparativo-unidade','pdf')">📄 Relatório PDF</button>
-      </span>
-    </h2>
+    <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
     <div class="tablewrap" style="max-height:260px;">
       <table>
         <thead><tr><th>Unid.</th><th>Transações</th><th>Taxa aprov.</th><th>Volume aprovado</th><th>Recusadas</th><th>Estornos</th><th>Fraudes</th><th>Chargebacks</th></tr></thead>
@@ -505,23 +475,6 @@ function baixarRelatorioFraude(formato){
 function baixarRelatorioAlertas(formato){
   const params = new URLSearchParams({ token: AUTH_TOKEN });
   window.location.href = `/api/alertas/relatorio.${formato}?${params.toString()}`;
-}
-
-// relatorios (CSV/PDF) dos paineis do Monitor de transacoes (Transacoes,
-// Pedidos repetidos, Chargeback, Pedidos que mudaram de status, Comparativo
-// por unidade) - cada botao usa o MESMO filtro (periodo/status/unidades) que
-// esta ativo na tela no momento, igual os relatorios de fraude/alertas acima
-function baixarRelatorioMonitor(tipo, formato){
-  const inicio = document.getElementById('f-date-start').value;
-  const fim = document.getElementById('f-date-end').value;
-  const status = [...SEL_STATUS].join(',');
-  const unidades = [...SEL_UNIDADE].join(',');
-  const params = new URLSearchParams({ token: AUTH_TOKEN });
-  if(inicio) params.set('inicio', inicio);
-  if(fim) params.set('fim', fim);
-  if(status) params.set('status', status);
-  if(unidades) params.set('unidades', unidades);
-  window.location.href = `/api/monitor/relatorio-${tipo}.${formato}?${params.toString()}`;
 }
 
 async function tentarEntrar(){

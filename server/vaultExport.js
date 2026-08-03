@@ -12,13 +12,10 @@ function slugify(text) {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'cofre';
 }
 
-const FUSO_BR = 'America/Sao_Paulo';
-
 function fmtData(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  if (isNaN(d)) return '';
-  return d.toLocaleDateString('pt-BR', { timeZone: FUSO_BR }) + ' ' + d.toLocaleTimeString('pt-BR', { timeZone: FUSO_BR, hour: '2-digit', minute: '2-digit' });
+  return isNaN(d) ? '' : d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 const COLUNAS = [
