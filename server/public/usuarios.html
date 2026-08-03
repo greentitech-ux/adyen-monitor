@@ -140,7 +140,7 @@
 
       <fieldset>
         <legend>Unidades</legend>
-        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria e entregas</div>
+        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria e entregas. Chamados de TI não depende de unidade (marca todas automaticamente - o técnico vê os chamados atribuídos a ele em qualquer loja).</div>
         <div id="c-unidades"></div>
       </fieldset>
 
@@ -443,6 +443,15 @@ async function excluirUsuario(id, email){
   await fetch('/api/users/'+id, {method:'DELETE'});
   await carregarUsuarios();
 }
+
+// tecnico atende chamado em qualquer loja (manutencao ou suporte de TI) -
+// os chamados dele sao filtrados por quem esta atribuido, nao por unidade,
+// entao marcar essa secao ja marca todas as unidades pra deixar isso claro
+document.addEventListener('change', (e)=>{
+  if(!e.target.matches('input[name=sections][value=tecnico]') || !e.target.checked) return;
+  const unidadesContainer = e.target.closest('#c-sections') ? document.getElementById('c-unidades') : document.getElementById('p-unidades');
+  unidadesContainer.querySelectorAll('input[name=unidades]').forEach(cb=>{ cb.checked = true; });
+});
 
 boot();
 </script>
