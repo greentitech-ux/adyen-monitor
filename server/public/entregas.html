@@ -165,7 +165,7 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
 let DATA = [];
 let EDICOES = [];
-let UNIDADES_NOMES = { 'Tirol Natal':'Tirol Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Bessa', Caruaru:'Caruaru', Garanhuns:'Garanhuns' };
+let UNIDADES_NOMES = { 'Tirol Natal':'Dom Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Dom Bessa', Caruaru:'Dom Caruaru', Garanhuns:'Dom Garanhuns' };
 let UNIDADES_PERMITIDAS = null; // null = Master (sem restrição)
 const SEL_UNIDADE = new Set();
 let IS_MASTER = false;
