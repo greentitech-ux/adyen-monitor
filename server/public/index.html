@@ -498,6 +498,9 @@ async function tentarEntrar(){
     if(podeSecao('entregas-lancamento')) return location.href='/entrega-lancamento.html';
     if(podeSecao('cofre')) return location.href='/cofre.html';
     if(podeSecao('disputas')) return location.href='/relatorios.html';
+    if(podeSecao('ifood')) return location.href='/ifood.html';
+    if(podeSecao('solicitacoes')) return location.href='/central.html';
+    if(podeSecao('tecnico')) return location.href='/tecnico.html';
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
