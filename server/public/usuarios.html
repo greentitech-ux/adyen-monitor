@@ -53,6 +53,11 @@
   .badge.locked{background:var(--bad-dim);color:var(--bad);}
   .checks .group-heading{width:100%;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
   .checks .group-heading:first-child{margin-top:0;}
+  .unidades-secao{margin-top:14px;}
+  .unidades-secao:first-child{margin-top:0;}
+  .unidades-secao-titulo{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--line);}
+  .unidades-grupo-titulo{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px;}
+  .unidades-grupo-titulo:first-of-type{margin-top:0;}
   .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:280px;}
   .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
   .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
@@ -134,7 +139,7 @@
       <fieldset>
         <legend>Unidades</legend>
         <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria e entregas</div>
-        <div class="checks" id="c-unidades"></div>
+        <div id="c-unidades"></div>
       </fieldset>
 
       <fieldset>
@@ -170,7 +175,7 @@
     </fieldset>
     <fieldset style="margin-top:10px;">
       <legend>Unidades</legend>
-      <div class="checks" id="p-unidades"></div>
+      <div id="p-unidades"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
       <legend>Cofre (subgrupos)</legend>
@@ -225,6 +230,31 @@ function subgroupChecksHtml(checkedSet){
   }).join('');
   return html || `<span style="color:var(--muted);font-size:11.5px;">Nenhum subgrupo criado ainda no Cofre.</span>`;
 }
+// unidades agrupadas por Seção (Fechamento/Entregas/Monitor-Adyen) e, dentro
+// de cada seção, por Grupo (ARCFOOD/Grupo Bravo) - a mesma loja física pode
+// ter mais de um código (um por sistema, ver server/index.js) e por isso
+// pode aparecer mais de uma vez, mas assim fica claro o porquê de cada uma
+function unidadesChecksHtml(checkedSet){
+  if(!UNIDADES.length) return `<span style="color:var(--muted);font-size:11.5px;">Nenhuma opção disponível ainda.</span>`;
+  const porSecao = new Map();
+  UNIDADES.forEach(u=>{
+    if(!porSecao.has(u.secao)) porSecao.set(u.secao, new Map());
+    const porGrupo = porSecao.get(u.secao);
+    const grupo = u.grupo || '—';
+    if(!porGrupo.has(grupo)) porGrupo.set(grupo, []);
+    porGrupo.get(grupo).push(u);
+  });
+  return [...porSecao.entries()].map(([secao, porGrupo])=>{
+    const blocos = [...porGrupo.entries()].map(([grupo, itens])=>{
+      const itensHtml = itens.map(u=>{
+        const checked = checkedSet.has(u.codigo) ? 'checked' : '';
+        return `<label><input type="checkbox" name="unidades" value="${escapeHtml(u.codigo)}" ${checked}> ${escapeHtml(u.nome)}</label>`;
+      }).join('');
+      return `<div class="unidades-grupo-titulo">${escapeHtml(grupo)}</div><div class="checks">${itensHtml}</div>`;
+    }).join('');
+    return `<div class="unidades-secao"><div class="unidades-secao-titulo">${escapeHtml(secao)}</div>${blocos}</div>`;
+  }).join('');
+}
 function readChecked(container){
   return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
 }
@@ -251,7 +281,7 @@ async function boot(){
   UNIDADES.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
 
   document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
+  document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
 
   await carregarUsuarios();
@@ -352,7 +382,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     if(!res.ok) throw new Error(data.error || 'Erro ao criar acesso.');
     document.getElementById('create-form').reset();
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
+    document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
     document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
@@ -366,7 +396,7 @@ function editarPermissoes(id){
   document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
   const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
   document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
-  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x.codigo, x=>x.nome, new Set(perms.unidades));
+  document.getElementById('p-unidades').innerHTML = unidadesChecksHtml(new Set(perms.unidades));
   document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');

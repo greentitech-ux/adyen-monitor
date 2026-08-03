@@ -625,6 +625,23 @@ const UNIDADES_APELIDOS = {
   'Milky Moo Tirol': 'MilkyMoo Tirol',
 };
 
+// classificacao de cada codigo por secao (de qual sistema ele vem - isso que
+// explica a mesma loja ter mais de um codigo) e grupo (franquia/rede a que
+// pertence) - so pra organizar o checklist de permissoes na tela de
+// Usuarios; nao afeta em nada o filtro de permissao em si
+const ARCFOOD_FECHAMENTO = new Set(['19821', '19855', '19888', '19889']);
+const ARCFOOD_MONITOR = new Set(['Mooca', 'Tatuape', 'Carrao', 'Sao Miguel', 'DOM___19888', 'DOM_19889', 'DOM__19821', 'DOM__19855']);
+const GBE_MONITOR = new Set(['DOM19940', 'DOM_19798', 'DOM19911', 'DOM_19706', 'DOM_19633']);
+function classificarUnidade(codigo) {
+  if (ARCFOOD_FECHAMENTO.has(codigo)) return { secao: 'Fechamento', grupo: 'ARCFOOD' };
+  if (ARCFOOD_MONITOR.has(codigo)) return { secao: 'Monitor / Disputas (Adyen)', grupo: 'ARCFOOD' };
+  if (GBE_MONITOR.has(codigo)) return { secao: 'Monitor / Disputas (Adyen)', grupo: 'Grupo Bravo (GBE)' };
+  if (codigo in ENTREGAS_UNIDADES_NOMES) return { secao: 'Entregas', grupo: 'Grupo Bravo (GBE)' };
+  if (codigo in FECHAMENTO_UNIDADES_NOMES) return { secao: 'Fechamento', grupo: 'Grupo Bravo (GBE)' };
+  if (codigo in ifoodClient.IFOOD_UNIDADES_NOMES) return { secao: 'iFood', grupo: null };
+  return { secao: 'Monitor / Disputas (Adyen)', grupo: 'Outras' };
+}
+
 // lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
 // junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
 // com as unidades fixas de Fechamento/Lançamento/Entregas (espacos de codigo
@@ -643,9 +660,14 @@ app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   // por ultimo, sempre - garante o nome unificado mesmo que algum dado
   // importado (planilha, fechamento antigo) tenha trazido um nome diferente
   Object.entries(UNIDADES_APELIDOS).forEach(([codigo, nome]) => { if (mapa[codigo]) mapa[codigo] = nome; });
+  const SECAO_ORDEM = ['Fechamento', 'Entregas', 'Monitor / Disputas (Adyen)', 'iFood'];
   const lista = Object.entries(mapa)
-    .map(([codigo, nome]) => ({ codigo, nome }))
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    .map(([codigo, nome]) => ({ codigo, nome, ...classificarUnidade(codigo) }))
+    .sort((a, b) =>
+      (SECAO_ORDEM.indexOf(a.secao) - SECAO_ORDEM.indexOf(b.secao)) ||
+      String(a.grupo).localeCompare(String(b.grupo), 'pt-BR') ||
+      a.nome.localeCompare(b.nome, 'pt-BR')
+    );
   res.json(lista);
 });
 
