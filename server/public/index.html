@@ -250,6 +250,7 @@
       <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
       <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
       <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+      <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
       <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     </div>
     <div class="nav-actions">
@@ -453,6 +454,7 @@ function aplicarNav(){
   document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !podeSecao('entregas-lancamento'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !podeSecao('ifood'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
   // a fila de solicitacoes de estorno e coisa do Master acompanhar - o usuario
   // que solicitou ve o status direto na linha do pedido dele

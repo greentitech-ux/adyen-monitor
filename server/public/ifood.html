@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entregas · Zenith Ops</title>
+<title>iFood · Zenith Ops</title>
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -25,9 +25,11 @@
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
   a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:600;}
   .hidden{display:none!important;}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
   .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
+  .aviso{background:var(--warn-dim);border:1px solid #4a3a1a;color:var(--warn);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px;}
 
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -72,34 +74,30 @@
 
 <header>
   <div>
-    <div class="eyebrow">Solutions Ti Tech · Entregas</div>
-    <h1>Entregas (motoboys)</h1>
+    <div class="eyebrow">Solutions Ti Tech · iFood</div>
+    <h1>Vendas iFood</h1>
     <div class="sub" id="header-info">carregando...</div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <button class="back hidden" id="btn-sincronizar-planilha" onclick="sincronizarPlanilha()" style="cursor:pointer;">🔄 Sincronizar agora</button>
+    <button class="back hidden" id="btn-sincronizar" onclick="sincronizar()" style="cursor:pointer;">🔄 Sincronizar agora</button>
     <button class="back hidden" id="btn-recarregar" onclick="carregar()" style="cursor:pointer;">🔄 Atualizar</button>
     <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">🛵 Lançar entrega</a>
     <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+    <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
     <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
     <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-    <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
     <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
     <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
   </div>
 </header>
 
-<div id="sem-acesso" class="empty hidden">Você não tem acesso ao painel de Entregas. Fale com o administrador (Master).</div>
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao painel de iFood. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
 
-<div class="kpis" id="kpis"></div>
+<div class="aviso">⚠️ Os dados seguem a conciliação do próprio iFood e podem sofrer pequenos ajustes em até 48h - não é um feed em tempo real como o Monitor da Adyen.</div>
 
-<div class="panel hidden" id="edicoes-panel">
-  <h2><div class="title-group"><span>Pedidos de correção de entregas</span><span class="n" id="edicoes-count"></span></div></h2>
-  <div id="edicoes-lista" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
-</div>
+<div class="kpis" id="kpis"></div>
 
 <div class="panel">
   <div class="controls">
@@ -117,20 +115,10 @@
 </div>
 
 <div class="panel">
-  <h2>Por entregador <span class="n" id="entregadores-count"></span></h2>
-  <div class="tablewrap" style="max-height:none;overflow:visible;">
-    <table>
-      <thead><tr><th>Entregador</th><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Extra</th><th>Valor pago</th><th>COOP recebe</th></tr></thead>
-      <tbody id="entregadores-body"></tbody>
-    </table>
-  </div>
-</div>
-
-<div class="panel">
   <h2>Por unidade <span class="n" id="unidades-count"></span></h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
-      <thead><tr><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Extra</th><th>Valor pago</th><th>COOP recebe</th></tr></thead>
+      <thead><tr><th>Unid.</th><th>Vendas</th><th>Valor bruto</th><th>Comissão</th><th>Valor líquido</th><th>Ticket médio</th></tr></thead>
       <tbody id="unidades-body"></tbody>
     </table>
   </div>
@@ -138,12 +126,12 @@
 
 <div class="panel">
   <h2>
-    <div class="title-group"><span>Lançamentos</span><span class="n" id="lancamentos-count"></span></div>
+    <div class="title-group"><span>Vendas</span><span class="n" id="vendas-count"></span></div>
   </h2>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Data</th><th>Unid.</th><th>Entregador</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Pos 00hs</th><th>Fora área</th><th>Bônus</th><th>Ajuda custo</th><th>Valor</th><th>COOP</th><th>Qtd. total</th><th>Etiqueta</th><th>Observação</th></tr></thead>
-      <tbody id="lancamentos-body"></tbody>
+      <thead><tr><th>Data</th><th>Unid.</th><th>Nº pedido</th><th>Valor bruto</th><th>Comissão</th><th>Valor líquido</th><th>Forma pagto</th><th>Status</th></tr></thead>
+      <tbody id="vendas-body"></tbody>
     </table>
   </div>
 </div>
@@ -164,14 +152,13 @@ window.fetch = (url, opts = {}) => {
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
 let DATA = [];
-let EDICOES = [];
-let UNIDADES_NOMES = { 'Tirol Natal':'Tirol Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Bessa', Caruaru:'Caruaru', Garanhuns:'Garanhuns' };
+let UNIDADES_NOMES = {};
 let UNIDADES_PERMITIDAS = null; // null = Master (sem restrição)
 const SEL_UNIDADE = new Set();
 let IS_MASTER = false;
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+function fmtData(iso){ if(!iso) return '—'; const d = new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}); }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 const FUSO_BR = 'America/Sao_Paulo';
 function agoraBrasilia(){
@@ -196,16 +183,17 @@ let SYNC_INFO_SUFIXO = '';
 let SYNC_INFO_TITLE = '';
 async function carregarStatusSincronizacao(){
   try{
-    const status = await fetch('/api/entregas/sincronizacao').then(r=>r.json());
+    const status = await fetch('/api/ifood/sincronizacao').then(r=>r.json());
     if(status.ultimoErro){
-      SYNC_INFO_SUFIXO = ' · ⚠️ planilha não sincronizada';
-      SYNC_INFO_TITLE = `Falha na última tentativa de sincronização: ${status.ultimoErro}`;
+      SYNC_INFO_SUFIXO = ' · ⚠️ ' + status.ultimoErro;
+      SYNC_INFO_TITLE = status.ultimoErro;
     } else if(status.ultimaEm){
       const dt = new Date(status.ultimaEm);
-      SYNC_INFO_SUFIXO = ' · ✅ histórico sincronizado';
-      SYNC_INFO_TITLE = `Última sincronização automática do histórico (planilha MOTOS BRAVO): ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
+      const falhas = Object.values(status.porLoja||{}).filter(l=>!l.ok).length;
+      SYNC_INFO_SUFIXO = falhas ? ` · ⚠️ ${falhas} loja(s) com erro na última sincronização` : ' · ✅ vendas sincronizadas';
+      SYNC_INFO_TITLE = `Última sincronização: ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
     } else {
-      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização do histórico';
+      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização';
       SYNC_INFO_TITLE = '';
     }
   }catch(e){
@@ -213,16 +201,14 @@ async function carregarStatusSincronizacao(){
   }
 }
 
-async function sincronizarPlanilha(){
-  const btn = document.getElementById('btn-sincronizar-planilha');
+async function sincronizar(){
+  const btn = document.getElementById('btn-sincronizar');
   btn.disabled = true; btn.textContent = '🔄 Sincronizando...';
   try{
-    const resp = await fetch('/api/entregas/sincronizar-planilha', { method:'POST' });
-    const status = await resp.json();
-    if(!resp.ok) throw new Error(status.ultimoErro || 'Erro ao sincronizar.');
+    await fetch('/api/ifood/sincronizar', { method:'POST' });
     await carregar();
   }catch(err){
-    alert('Não foi possível sincronizar a planilha: ' + err.message);
+    alert('Não foi possível sincronizar: ' + err.message);
   }finally{
     btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
   }
@@ -230,49 +216,22 @@ async function sincronizarPlanilha(){
 
 async function carregar(){
   const [dados, unidadesMeta] = await Promise.all([
-    fetch('/api/entregas').then(r=>r.json()),
+    fetch('/api/ifood/vendas').then(r=>r.json()),
     IS_MASTER ? fetch('/api/meta/unidades').then(r=>r.json()).catch(()=>[]) : Promise.resolve([]),
   ]);
   DATA = dados;
   unidadesMeta.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
   await carregarStatusSincronizacao();
-  const datas = DATA.map(d=>d.data).filter(Boolean).sort();
+  const datas = DATA.map(d=>d.dataHora).filter(Boolean).sort();
   const elHeaderInfo = document.getElementById('header-info');
   elHeaderInfo.textContent = datas.length
-    ? `${DATA.length} lançamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
-    : `nenhuma entrega lançada ainda${SYNC_INFO_SUFIXO}`;
+    ? `${DATA.length} vendas · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
+    : `nenhuma venda sincronizada ainda${SYNC_INFO_SUFIXO}`;
   elHeaderInfo.title = SYNC_INFO_TITLE;
   const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
   setupPresets(isoLocal(ontem));
   setupMultiselect();
   render();
-}
-
-async function carregarEdicoes(){
-  EDICOES = await fetch('/api/entregas/edicoes').then(r=>r.json());
-  const pendentes = EDICOES.filter(e=>e.status==='PENDENTE');
-  document.getElementById('edicoes-panel').classList.toggle('hidden', pendentes.length===0);
-  document.getElementById('edicoes-count').textContent = pendentes.length;
-  document.getElementById('edicoes-lista').innerHTML = pendentes.map(p=>`
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;">
-      <div style="font-size:12.5px;font-weight:600;">${escapeHtml(p.entregador)} · ${escapeHtml(p.unidadeNome||p.unidade)} · ${fmtData(p.data)}</div>
-      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</div>
-      <div style="font-size:12px;margin-bottom:6px;">${Object.entries(p.mudancas).map(([campo,valor])=>`<div>${campo}: <b>${valor}</b></div>`).join('')}</div>
-      <div style="font-size:12px;color:var(--text);margin-bottom:8px;white-space:pre-wrap;">${escapeHtml(p.motivo)}</div>
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="preset-btn" style="color:var(--ok);border-color:var(--ok-dim);" onclick="decidirEdicaoEntrega('${p.id}','APROVADO')">✓ Aprovar</button>
-        <button type="button" class="preset-btn" style="color:var(--bad);border-color:var(--bad-dim);" onclick="decidirEdicaoEntrega('${p.id}','REJEITADO')">✕ Rejeitar</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-async function decidirEdicaoEntrega(id, status){
-  let motivoDecisao = '';
-  if(status==='REJEITADO'){ motivoDecisao = prompt('Motivo da rejeição (opcional):') || ''; }
-  await fetch(`/api/entregas/edicoes/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
-  await carregarEdicoes();
-  await carregar();
 }
 
 function calcularPreset(tipo, refIso){
@@ -380,104 +339,73 @@ function setupMultiselect(){
 function filtrar(){
   const start = document.getElementById('f-date-start').value;
   const end = document.getElementById('f-date-end').value;
-  return DATA.filter(d=>
-    (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
-    (!start || (d.data||'') >= start) &&
-    (!end || (d.data||'') <= end)
-  );
+  return DATA.filter(d=>{
+    const dataVenda = (d.dataHora||'').slice(0,10);
+    return (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
+      (!start || dataVenda >= start) &&
+      (!end || dataVenda <= end);
+  });
 }
 
 function renderKpis(rows){
   const soma = (list,campo) => +list.reduce((s,d)=>s+(d[campo]||0),0).toFixed(2);
-  const entregadores = new Set(rows.map(r=>r.entregador)).size;
+  const lojas = new Set(rows.map(r=>r.unidade)).size;
+  const bruto = soma(rows,'valorBruto');
+  const liquido = soma(rows,'valorLiquido');
   const kpis = [
-    {lbl:'Corridas lançadas', val:rows.length, cls:''},
-    {lbl:'Entregadores ativos', val:entregadores, cls:''},
-    {lbl:'Entregas', val:soma(rows,'entrega').toFixed(0), cls:'ok'},
-    {lbl:'Extra', val:soma(rows,'extra').toFixed(0), cls:''},
-    {lbl:'Valor pago', val:fmtMoney(soma(rows,'valor')), cls:'ok'},
-    {lbl:'COOP recebe', val:fmtMoney(soma(rows,'coopRecebe')), cls:''},
+    {lbl:'Vendas', val:rows.length, cls:''},
+    {lbl:'Lojas com venda', val:lojas, cls:''},
+    {lbl:'Valor bruto', val:fmtMoney(bruto), cls:'ok'},
+    {lbl:'Comissão iFood', val:fmtMoney(soma(rows,'taxaComissao')), cls:'warn'},
+    {lbl:'Valor líquido', val:fmtMoney(liquido), cls:'ok'},
+    {lbl:'Ticket médio', val:fmtMoney(rows.length ? bruto/rows.length : 0), cls:''},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`
   ).join('');
 }
 
-function renderEntregadoresTable(rows){
-  const porEntregador = {};
-  rows.forEach(r=>{
-    const chave = r.entregador+'::'+r.unidade;
-    const c = (porEntregador[chave] ||= {entregador:r.entregador, unidade:r.unidade, corridas:0, entrega:0, extra:0, valor:0, coopRecebe:0});
-    c.corridas++;
-    c.entrega += r.entrega||0;
-    c.extra += r.extra||0;
-    c.valor += r.valor||0;
-    c.coopRecebe += r.coopRecebe||0;
-  });
-  const linhas = Object.values(porEntregador).sort((a,b)=>b.valor-a.valor);
-  document.getElementById('entregadores-count').textContent = linhas.length;
-  document.getElementById('entregadores-body').innerHTML = linhas.length ? linhas.map(c=>`
-    <tr>
-      <td>${escapeHtml(c.entregador)}</td>
-      <td>${escapeHtml(UNIDADES_NOMES[c.unidade]||c.unidade)}</td>
-      <td class="valor">${c.corridas}</td>
-      <td class="valor">${c.entrega}</td>
-      <td class="valor">${c.extra}</td>
-      <td class="valor">${fmtMoney(c.valor)}</td>
-      <td class="valor">${fmtMoney(c.coopRecebe)}</td>
-    </tr>`).join('') : '<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
-}
-
 function renderUnidadesTable(rows){
   const porUnidade = {};
   rows.forEach(r=>{
-    const c = (porUnidade[r.unidade] ||= {corridas:0, entrega:0, extra:0, valor:0, coopRecebe:0});
-    c.corridas++;
-    c.entrega += r.entrega||0;
-    c.extra += r.extra||0;
-    c.valor += r.valor||0;
-    c.coopRecebe += r.coopRecebe||0;
+    const c = (porUnidade[r.unidade] ||= {vendas:0, bruto:0, comissao:0, liquido:0});
+    c.vendas++;
+    c.bruto += r.valorBruto||0;
+    c.comissao += r.taxaComissao||0;
+    c.liquido += r.valorLiquido||0;
   });
-  const linhas = Object.entries(porUnidade).sort((a,b)=>b[1].valor-a[1].valor);
+  const linhas = Object.entries(porUnidade).sort((a,b)=>b[1].bruto-a[1].bruto);
   document.getElementById('unidades-count').textContent = linhas.length;
   document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>`
     <tr>
       <td>${escapeHtml(UNIDADES_NOMES[u]||u)}</td>
-      <td class="valor">${c.corridas}</td>
-      <td class="valor">${c.entrega}</td>
-      <td class="valor">${c.extra}</td>
-      <td class="valor">${fmtMoney(c.valor)}</td>
-      <td class="valor">${fmtMoney(c.coopRecebe)}</td>
+      <td class="valor">${c.vendas}</td>
+      <td class="valor">${fmtMoney(c.bruto)}</td>
+      <td class="valor">${fmtMoney(c.comissao)}</td>
+      <td class="valor">${fmtMoney(c.liquido)}</td>
+      <td class="valor">${fmtMoney(c.vendas ? c.bruto/c.vendas : 0)}</td>
     </tr>`).join('') : '<tr><td colspan="6" class="empty">Sem dados no período.</td></tr>';
 }
 
 function renderTabela(rows){
-  const ordenadas = [...rows].sort((a,b)=>(b.data||'').localeCompare(a.data||'') || (b.criadoEm||'').localeCompare(a.criadoEm||''));
-  document.getElementById('lancamentos-count').textContent = ordenadas.length;
-  document.getElementById('lancamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>`
+  const ordenadas = [...rows].sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+  document.getElementById('vendas-count').textContent = ordenadas.length;
+  document.getElementById('vendas-body').innerHTML = ordenadas.length ? ordenadas.map(d=>`
     <tr>
-      <td>${fmtData(d.data)}</td>
+      <td>${fmtData(d.dataHora)}</td>
       <td>${escapeHtml(UNIDADES_NOMES[d.unidade]||d.unidade)}</td>
-      <td>${escapeHtml(d.entregador)}</td>
-      <td class="valor">${d.entrega}</td>
-      <td class="valor" title="${escapeHtml(d.obsRetorno||'')}">${d.retorno}</td>
-      <td class="valor" title="${escapeHtml(d.obsExtra||'')}">${d.extra}</td>
-      <td class="valor">${d.pos00hs}</td>
-      <td class="valor">${d.foraDeArea}</td>
-      <td class="valor">${fmtMoney(d.bonus)}</td>
-      <td class="valor">${fmtMoney(d.ajudaCusto)}</td>
-      <td class="valor">${fmtMoney(d.valor)}</td>
-      <td class="valor">${fmtMoney(d.coopRecebe)}</td>
-      <td class="valor">${d.quantTotal}</td>
-      <td>${d.etiquetaPath ? `<a href="/api/entregas/etiqueta/${d.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank" style="color:var(--accent);">📎 ver</a>` : (d.etiquetaOrigem ? `<span class="sub" title="Ainda não migrada pro app - referência original do AppSheet/Drive">📎 ${escapeHtml(d.etiquetaOrigem)}</span>` : '—')}</td>
-      <td class="truncate" title="${escapeHtml(d.observacao||'')}">${escapeHtml(d.observacao||'—')}</td>
-    </tr>`).join('') : '<tr><td colspan="15" class="empty">Nenhuma entrega no período/unidade selecionados.</td></tr>';
+      <td>${escapeHtml(d.numeroPedido||'—')}</td>
+      <td class="valor">${fmtMoney(d.valorBruto)}</td>
+      <td class="valor">${fmtMoney(d.taxaComissao)}</td>
+      <td class="valor">${fmtMoney(d.valorLiquido)}</td>
+      <td>${escapeHtml(d.formaPagamento||'—')}</td>
+      <td>${escapeHtml(d.status||'—')}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Nenhuma venda no período/unidade selecionados.</td></tr>';
 }
 
 function render(){
   const rows = filtrar();
   renderKpis(rows);
-  renderEntregadoresTable(rows);
   renderUnidadesTable(rows);
   renderTabela(rows);
 }
@@ -492,22 +420,20 @@ async function boot(){
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
-  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
-  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
-  document.getElementById('btn-sincronizar-planilha').classList.toggle('hidden', !isMaster);
+  document.getElementById('btn-sincronizar').classList.toggle('hidden', !isMaster);
 
-  if(!secoes.includes('entregas')){
+  if(!secoes.includes('ifood')){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
   document.getElementById('root').classList.remove('hidden');
   await carregar();
-  if(isMaster) await carregarEdicoes();
 }
 
 boot();

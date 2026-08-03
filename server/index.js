@@ -31,6 +31,9 @@ const entregasLive = require('./entregasLive');
 const backup = require('./backup');
 const sheetsSync = require('./sheetsSync');
 const entregasSync = require('./entregasSync');
+const ifoodClient = require('./ifoodClient');
+const ifoodStore = require('./ifoodStore');
+const ifoodSync = require('./ifoodSync');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -592,6 +595,7 @@ app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
   Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
+  Object.entries(ifoodClient.IFOOD_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
@@ -1355,6 +1359,26 @@ app.patch('/api/entregas/edicoes/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
+// ---------- vendas do iFood (secao "ifood") ----------
+// so leitura - dados financeiros da Sales API do iFood (nao tem lançamento
+// manual nem edição, diferente de Fechamentos/Entregas), sincronizados
+// periodicamente por ifoodSync (ver boot mais abaixo). Mesmo espaco de
+// "unidade" das outras seções (o merchantId do iFood vira o código
+// filtrado por permissao, igual FECHAMENTO_UNIDADES_NOMES/ENTREGAS_UNIDADES_NOMES).
+app.get('/api/ifood/vendas', requireSection('ifood'), async (req, res) => {
+  res.json(auth.filterByUnidade(req, await ifoodStore.listAllCached()));
+});
+
+app.get('/api/ifood/sincronizacao', requireSection('ifood'), (req, res) => {
+  res.json(ifoodSync.getStatus());
+});
+
+// forca uma sincronizacao imediata - so o Master (evita chamadas extras na API do iFood sem necessidade)
+app.post('/api/ifood/sincronizar', auth.requireMaster, async (req, res) => {
+  const status = await ifoodSync.sincronizarVendasIfood();
+  res.json(status);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // mensagens amigaveis pros erros mais comuns de upload (arquivo grande demais,
@@ -1420,5 +1444,16 @@ app.use((err, req, res, next) => {
     // mesma logica pro historico de entregas (planilha "MOTOS BRAVO" do AppSheet)
     sincronizarPlanilhaEntregas();
     setInterval(sincronizarPlanilhaEntregas, intervaloSync);
+
+    // sincroniza as vendas do iFood (Sales API - so leitura, ver
+    // server/ifoodClient.js): roda no start e depois periodicamente. Padrao
+    // bem mais espaçado que o Sheets Sync (1h) porque a Sales API e um
+    // relatorio financeiro que so fecha de vez em D+1/D+2 - nao ha ganho em
+    // consultar com mais frequencia que isso.
+    ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
+    const intervaloIfood = Number(process.env.IFOOD_SYNC_INTERVAL_MS) || 60 * 60 * 1000;
+    setInterval(() => {
+      ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
+    }, intervaloIfood);
   });
 })();
