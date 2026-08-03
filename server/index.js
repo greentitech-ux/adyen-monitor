@@ -567,19 +567,23 @@ app.get('/api/summary', requireSection('monitor'), (req, res) => {
 // Adyen. Ficam fixos aqui porque uma unidade pode precisar de permissao
 // mesmo antes de ter qualquer transacao Adyen ou fechamento lancado.
 const FECHAMENTO_UNIDADES_NOMES = {
-  '19821': 'São Miguel (Fechamento)', '19855': 'Carrão (Fechamento)', '19888': 'Mooca (Fechamento)', '19889': 'Tatuapé (Fechamento)',
-  "Domino's Carrinho Aeroporto Recife": "Domino's Carrinho Aeroporto Recife",
-  'Dominos Bessa': 'Dominos Bessa',
-  'Dominos Campina Grande': 'Dominos Campina Grande',
-  'Dominos Caruaru': 'Dominos Caruaru',
-  'Dominos Garanhuns': 'Dominos Garanhuns',
-  'Dominos Praça Aeroporto Recife': 'Dominos Praça Aeroporto Recife',
+  '19821': 'Dom Sao Miguel', '19855': 'Dom Carrão', '19888': 'Dom Mooca', '19889': 'Dom Tatuape',
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dominos Tirol',
-  'Milky Moo Tirol': 'Milky Moo Tirol',
-  'Spoleto Praça Aeroporto Recife': 'Spoleto Praça Aeroporto Recife',
-  'Spoleto Shopping Recife': 'Spoleto Shopping Recife',
-  'Spoleto Shopping Tacaruna': 'Spoleto Shopping Tacaruna',
-  'São Braz IL': 'São Braz IL',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+  // lojas novas, sem conta Adyen prevista - ficam fixas aqui so pra ja
+  // aparecerem no checklist de permissoes do Master antes do 1o lançamento
+  'Spo Shop Midway': 'Spo Shop Midway',
+  'Saltiverso Patteo': 'Saltiverso Patteo',
 };
 
 // unidades do app de entregas (motoboys) - nomes como aparecem nas planilhas
@@ -588,11 +592,37 @@ const FECHAMENTO_UNIDADES_NOMES = {
 // lançamento. O Master pode liberar mais conforme novas unidades entrarem
 // (o app de entregas ainda esta sendo migrado loja a loja do AppSheet).
 const ENTREGAS_UNIDADES_NOMES = {
-  'Tirol Natal': 'Tirol Natal (Entregas)',
+  'Tirol Natal': 'Dom Natal',
   'MMTirol Natal': 'Milky Moo Tirol Natal (Entregas)',
-  Bessa: 'Bessa (Entregas)',
-  Caruaru: 'Caruaru (Entregas)',
-  Garanhuns: 'Garanhuns (Entregas)',
+  Bessa: 'Dom Bessa',
+  Caruaru: 'Dom Caruaru',
+  Garanhuns: 'Dom Garanhuns',
+};
+
+// apelidos - a mesma loja fisica as vezes aparece com codigos diferentes em
+// espacos de dados diferentes (ex: "19888" no Fechamento, "DOM___19888" e
+// "Mooca" como merchantAccountCode direto na Adyen - reflexo de como cada
+// conta foi configurada la, fora do nosso controle). Nao dá pra unificar os
+// CODIGOS sem risco de desalinhar permissao/dado ja gravado, mas o NOME
+// exibido pode e deve ser sempre o mesmo - aplicado por ultimo, sempre
+// sobrescrevendo, pra nao depender da ordem dos merges acima
+const UNIDADES_APELIDOS = {
+  '19888': 'Dom Mooca', 'DOM___19888': 'Dom Mooca', Mooca: 'Dom Mooca',
+  '19889': 'Dom Tatuape', 'DOM_19889': 'Dom Tatuape', Tatuape: 'Dom Tatuape',
+  '19821': 'Dom Sao Miguel', 'DOM__19821': 'Dom Sao Miguel', 'Sao Miguel': 'Dom Sao Miguel',
+  '19855': 'Dom Carrão', 'DOM__19855': 'Dom Carrão', Carrao: 'Dom Carrão',
+  DOM19940: 'Dom Natal', 'Tirol Natal': 'Dom Natal',
+  DOM_19798: 'Dom Caruaru', Caruaru: 'Dom Caruaru', 'Dominos Caruaru': 'Dom Caruaru',
+  DOM19911: 'Dom Garanhuns', Garanhuns: 'Dom Garanhuns', 'Dominos Garanhuns': 'Dom Garanhuns',
+  DOM_19706: 'Dom Bessa', Bessa: 'Dom Bessa', 'Dominos Bessa': 'Dom Bessa',
+  DOM_19633: 'Dom Campina Grande', 'Dominos Campina Grande': 'Dom Campina Grande',
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
 };
 
 // lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
@@ -604,12 +634,15 @@ app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   const mapa = {};
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
-  Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
+  Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
   Object.entries(ifoodClient.IFOOD_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   (await entregasLive.listAll()).forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
+  // por ultimo, sempre - garante o nome unificado mesmo que algum dado
+  // importado (planilha, fechamento antigo) tenha trazido um nome diferente
+  Object.entries(UNIDADES_APELIDOS).forEach(([codigo, nome]) => { if (mapa[codigo]) mapa[codigo] = nome; });
   const lista = Object.entries(mapa)
     .map(([codigo, nome]) => ({ codigo, nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));

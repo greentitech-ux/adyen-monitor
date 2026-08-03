@@ -266,8 +266,22 @@ const GRUPOS = {
   ARCFOOD: ['19821','19855','19888','19889'],
   BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
 };
-const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
-GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = u; });
+const UNIDADES_NOMES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
+const BRAVO_UNIDADES_NOMES = {
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dominos Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+};
+GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = BRAVO_UNIDADES_NOMES[u] || u; });
 
 // paleta categorica validada (8 tons, ordem fixa - ver color-formula.md do
 // skill de dataviz). Usada so quando ate 6 series aparecem juntas no mesmo
