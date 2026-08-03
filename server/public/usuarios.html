@@ -39,8 +39,10 @@
   .hidden{display:none!important;}
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  @media(max-width:640px){ .panel{padding:14px;} }
   .panel h2{font-size:13px;margin:0 0 14px;}
-  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .tablewrap{overflow-x:auto;}
+  table{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px;}
   thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
   tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;}
@@ -60,7 +62,7 @@
   form.create label{font-size:11.5px;color:var(--muted);}
   form.create input{width:100%;margin-top:4px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
   fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;}
-  legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;padding:0 6px;}
+  legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;padding:0 6px;max-width:100%;overflow-wrap:break-word;}
   .checks{display:flex;flex-wrap:wrap;gap:10px;}
   .checks label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text);white-space:nowrap;}
   .checks input{width:auto;margin:0;}
@@ -110,10 +112,12 @@
 <div id="root" class="hidden">
   <div class="panel">
     <h2>Acessos cadastrados</h2>
-    <table>
-      <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
-      <tbody id="users-body"></tbody>
-    </table>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel">
@@ -128,7 +132,8 @@
       </fieldset>
 
       <fieldset>
-        <legend>Unidades (monitor/disputas/fechamentos/lançamento/sangria/entregas)</legend>
+        <legend>Unidades</legend>
+        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria e entregas</div>
         <div class="checks" id="c-unidades"></div>
       </fieldset>
 
@@ -147,10 +152,12 @@
     <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Backup automático todo dia, guardado no Storage por 30 dias. Use "Fazer backup agora" antes de qualquer mudança grande, por segurança.</p>
     <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
     <p class="ok-msg hidden" id="backup-msg" style="margin-top:10px;"></p>
-    <table style="margin-top:14px;">
-      <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
-      <tbody id="backups-body"></tbody>
-    </table>
+    <div class="tablewrap" style="margin-top:14px;">
+      <table style="min-width:420px;">
+        <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
+        <tbody id="backups-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
