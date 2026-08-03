@@ -204,18 +204,24 @@
     </div>
 
     <div class="secao">
+      <div class="secao-titulo">Outras saídas de caixa <span id="saida-total" style="color:var(--text);"></span></div>
+      <div class="sub" style="margin:-2px 0 8px;">Saídas que não passaram pela Sangria (ex: pequena despesa paga direto do caixa).</div>
+      <div id="lista-saidas"></div>
+      <button type="button" class="btn-add" onclick="adicionarSaida()">+ Adicionar saída</button>
+    </div>
+
+    <div class="secao">
       <div class="secao-titulo">Fechamento</div>
-      <div class="grid2">
-        <div><label>Faturamento total <span class="sub" style="display:inline;margin:0;">(calculado)</span></label><input type="number" step="0.01" inputmode="decimal" id="f-faturamento" readonly></div>
-        <div><label>Total declarado <span class="sub" style="display:inline;margin:0;">(calculado)</span></label><input type="number" step="0.01" inputmode="decimal" id="f-totalDeclarado" readonly></div>
-      </div>
       <div class="grid2">
         <div><label>TC (tíquete médio)</label><input type="number" step="0.01" inputmode="decimal" id="f-tc"></div>
         <div><label>Cancelados</label><input type="number" step="0.01" inputmode="decimal" id="f-cancelados"></div>
       </div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
-        <div class="linha"><span>Sangria do dia (automática)</span><b id="resumo-saidas">R$ 0,00</b></div>
+        <div class="linha"><span>Sangria do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
+        <div class="linha"><span>Soma outras saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
+        <div class="linha"><span>Faturamento total</span><b id="resumo-faturamento">R$ 0,00</b></div>
+        <div class="linha"><span>Total declarado</span><b id="resumo-declarado">R$ 0,00</b></div>
         <div class="linha"><span>Diferença (declarado − faturamento)</span><b id="resumo-diferenca" class="dif">R$ 0,00</b></div>
       </div>
     </div>
@@ -308,6 +314,7 @@ let EDICOES = [];
 let EDITANDO_ID = null;
 let EDITANDO_MASTER_ID = null;
 let MAQUINAS = [];
+let SAIDAS = [];
 let SEQ = 0;
 let SANGRIA_DO_DIA = [];
 
@@ -347,6 +354,22 @@ function renderMaquinas(){
   atualizarResumo();
 }
 
+// ---------- linhas repetíveis: outras saídas de caixa (nao vem da Sangria) ----------
+function adicionarSaida(valor, descricao){
+  SAIDAS.push({ id: ++SEQ, descricao: descricao||'', valor: valor||'' });
+  renderSaidas();
+}
+function removerSaida(id){ SAIDAS = SAIDAS.filter(s=>s.id!==id); renderSaidas(); }
+function renderSaidas(){
+  document.getElementById('lista-saidas').innerHTML = SAIDAS.map(s=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(s.descricao)}" oninput="SAIDAS.find(x=>x.id===${s.id}).descricao=this.value" placeholder="motivo da saída">
+      <input type="number" step="0.01" inputmode="decimal" value="${s.valor}" oninput="SAIDAS.find(x=>x.id===${s.id}).valor=this.value; atualizarResumo();" placeholder="R$">
+      <button type="button" class="btn-remover" onclick="removerSaida(${s.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma saída adicionada.</div>';
+  atualizarResumo();
+}
+
 // ---------- sangria do dia (leitura automática, ver carregarSangriaDoDia) ----------
 async function carregarSangriaDoDia(){
   const unidade = document.getElementById('f-unidade').value;
@@ -371,10 +394,13 @@ async function carregarSangriaDoDia(){
 function atualizarResumo(){
   const somaMaquinas = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
   const somaSangria = SANGRIA_DO_DIA.reduce((s,x)=>s+num(x.valor),0);
+  const somaOutrasSaidas = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
   document.getElementById('maq-total').textContent = somaMaquinas ? fmtMoney(somaMaquinas) : '';
   document.getElementById('sangria-dia-total').textContent = somaSangria ? fmtMoney(somaSangria) : '';
+  document.getElementById('saida-total').textContent = somaOutrasSaidas ? fmtMoney(somaOutrasSaidas) : '';
   document.getElementById('resumo-maquinas').textContent = fmtMoney(somaMaquinas);
-  document.getElementById('resumo-saidas').textContent = fmtMoney(somaSangria);
+  document.getElementById('resumo-sangria').textContent = fmtMoney(somaSangria);
+  document.getElementById('resumo-saidas').textContent = fmtMoney(somaOutrasSaidas);
 
   // Faturamento = soma dos canais de venda; Total declarado = soma das
   // formas de pagamento (maquininhas + iFood + 99Food + Pix + Pix CNPJ +
@@ -383,8 +409,8 @@ function atualizarResumo(){
   const g = (id)=>num(document.getElementById(id).value);
   const faturamento = +(g('f-delivery')+g('f-carryout')+g('f-pickup')+g('f-loja')).toFixed(2);
   const totalDeclarado = +(somaMaquinas+g('f-ifood')+g('f-food99')+g('f-pix')+g('f-pixCnpj')+g('f-outros')+g('f-entradaDinheiro')).toFixed(2);
-  document.getElementById('f-faturamento').value = faturamento;
-  document.getElementById('f-totalDeclarado').value = totalDeclarado;
+  document.getElementById('resumo-faturamento').textContent = fmtMoney(faturamento);
+  document.getElementById('resumo-declarado').textContent = fmtMoney(totalDeclarado);
 
   const dif = +(totalDeclarado - faturamento).toFixed(2);
   const elDif = document.getElementById('resumo-diferenca');
@@ -582,8 +608,9 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
 function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
-  MAQUINAS = [];
+  MAQUINAS = []; SAIDAS = [];
   adicionarMaquina();
+  renderSaidas();
   aplicarFranquia(document.getElementById('f-unidade').value);
   carregarSangriaDoDia();
 }
@@ -603,7 +630,13 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       campos[c] = el ? el.value : 0;
     });
     campos.adyen = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
+    campos.totalSaida = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
     if(grupo!=='ARCFOOD') campos.food99 = 0;
+    // Faturamento/Total declarado sao sempre recalculados no servidor (ver
+    // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
+    // completude do payload, nao por confiança nesse numero
+    campos.faturamento = num(campos.delivery) + num(campos.carryout) + num(campos.pickup) + num(campos.loja);
+    campos.totalDeclarado = num(campos.adyen) + num(campos.ifood) + num(campos.food99) + num(campos.pix) + num(campos.pixCnpj) + num(campos.outros) + num(campos.entradaDinheiro);
 
     const body = {
       unidade,
@@ -614,6 +647,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       campos,
       observacao: document.getElementById('f-observacao').value,
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
+      detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
     const res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
@@ -669,6 +703,7 @@ async function boot(){
     document.getElementById('f-data').value = hojeBrasilia();
     document.getElementById('f-data').max = hojeBrasilia();
     adicionarMaquina();
+    renderSaidas();
     aplicarFranquia(selUnidade.value);
     await carregarSangriaDoDia();
   }
