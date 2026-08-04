@@ -40,4 +40,8 @@ async function addMessage({ tipo, cardId, autorId, autorEmail, texto }) {
   return registro;
 }
 
-module.exports = { listByCard, addMessage };
+async function removeMessage(id) {
+  await COLLECTION.doc(id).delete();
+}
+
+module.exports = { listByCard, addMessage, removeMessage };

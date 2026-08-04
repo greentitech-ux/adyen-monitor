@@ -1259,7 +1259,7 @@ async function abrirEdicaoFechamento(id){
   const avisoSangria = document.getElementById('fech-aviso-sangria');
   const diferencaSaida = linhaMesclada ? +(num(linhaMesclada.totalSaida) - num(d.totalSaida)).toFixed(2) : 0;
   if(diferencaSaida > 0){
-    avisoSangria.textContent = `⚠️ Esse dia também tem ${fmtMoney(diferencaSaida)} de sangria registrada à parte - some no total exibido na tabela, mas não é editável aqui. Gerencie em Lançamento de fechamento › Últimas sangrias registradas.`;
+    avisoSangria.textContent = `⚠️ Esse dia também tem ${fmtMoney(diferencaSaida)} de sangria/depósito registrada à parte - some no total exibido na tabela, mas não é editável aqui. Gerencie em Lançamento de fechamento › Últimas sangrias/depósitos registrados.`;
     avisoSangria.classList.remove('hidden');
   } else {
     avisoSangria.classList.add('hidden');

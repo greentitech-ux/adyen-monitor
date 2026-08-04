@@ -499,8 +499,11 @@ async function boot(){
 
   const unidadesMeta = isMaster ? await fetch('/api/meta/unidades').then(r=>r.json()).catch(()=>[]) : null;
   if(unidadesMeta) unidadesMeta.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
-  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
-  if(!isMaster) unidades.forEach(u=>{ if(!UNIDADES_NOMES[u]) UNIDADES_NOMES[u] = u; });
+  // so o codigo canonico de Entregas (ENTREGAS_UNIDADES_NOMES) pode aparecer
+  // aqui - permissions.unidades pode ter codigos de outros dominios que por
+  // coincidencia tambem foram liberados; sem filtrar, a loja lançava sob um
+  // codigo diferente do usado nos relatorios, fragmentando os dados dela
+  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>ENTREGAS_UNIDADES_NOMES[u]);
   const selUnidade = document.getElementById('f-unidade');
   selUnidade.innerHTML = unidades.length
     ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')

@@ -2012,6 +2012,17 @@ app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (r
   }
 });
 
+// apagar mensagem - so o Master (nao o Admin, que so participa da conversa)
+app.delete('/api/central/:tipo/:id/chat/:messageId', auth.requireMaster, async (req, res) => {
+  try {
+    await centralChat.removeMessage(req.params.messageId);
+    broadcast('central-chat-removida', { tipo: req.params.tipo, cardId: req.params.id, messageId: req.params.messageId }, 'solicitacoes');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- relatorio (CSV/PDF) do quadro Kanban de central-historico.html -
 // mesmos filtros de loja/grupo/data ativos na tela ----------
 const ARCFOOD_UNIDADES_CODIGOS = new Set(['19821', '19855', '19888', '19889']);
