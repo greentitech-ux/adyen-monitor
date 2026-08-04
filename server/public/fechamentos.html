@@ -181,6 +181,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
 </nav>
@@ -332,6 +333,8 @@
       <div><label>Depósito</label><input type="number" step="0.01" id="ef-deposito"></div>
     </div>
 
+    <div class="fech-grid hidden" id="ef-kpis-extras"></div>
+
     <label>Observação</label>
     <textarea id="ef-observacao"></textarea>
     <label>Motivo da edição (opcional, fica no histórico)</label>
@@ -365,7 +368,7 @@ let DATA = [];
 let IS_MASTER = false;
 const GRUPOS = {
   ARCFOOD: ['19821','19855','19888','19889'],
-  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
+  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Natal","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
 };
 const UNIDADES_NOMES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
 const BRAVO_UNIDADES_NOMES = {
@@ -374,6 +377,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dominos Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
@@ -1203,6 +1207,12 @@ function renderTabela(rows){
 // tem botao (ver renderTabela) ----------
 const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','quebra','tc','cancelados','entradaDinheiro','deposito'];
 let FECHAMENTO_EDITANDO_ID = null;
+// grupos (franquias) cadastrados em /grupos.html - cada um pode ter KPI's
+// extras proprios, alem de TC/Cancelados (ver grupos.js/fechamentosLive.js)
+let GRUPOS_KPI = [];
+function grupoKpiDaUnidade(unidade){
+  return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
+}
 
 async function abrirEdicaoFechamento(id){
   // busca o registro BRUTO (sem mesclar com sangria/planilha) - editar em
@@ -1222,6 +1232,19 @@ async function abrirEdicaoFechamento(id){
   CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ document.getElementById('ef-'+c).value = d[c] ?? 0; });
   document.getElementById('ef-observacao').value = d.observacao || '';
   document.getElementById('ef-motivo').value = '';
+
+  const grupoKpi = grupoKpiDaUnidade(d.unidade);
+  const kpisDef = grupoKpi ? (grupoKpi.kpisExtras||[]) : [];
+  const kpisContainer = document.getElementById('ef-kpis-extras');
+  if(kpisDef.length){
+    kpisContainer.classList.remove('hidden');
+    kpisContainer.innerHTML = kpisDef.map(k=>
+      `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-kpi-campo="${escapeHtml(k.campo)}" class="ef-kpi-extra-input" value="${num((d.kpisExtras||{})[k.campo])}"></div>`
+    ).join('');
+  } else {
+    kpisContainer.classList.add('hidden');
+    kpisContainer.innerHTML = '';
+  }
 
   const linhaMesclada = DATA.find(x=>x.id===id);
   const avisoSangria = document.getElementById('fech-aviso-sangria');
@@ -1247,10 +1270,12 @@ async function salvarEdicaoFechamento(){
   msg.classList.add('hidden');
   const mudancas = { gerente: document.getElementById('ef-gerente').value, observacao: document.getElementById('ef-observacao').value };
   CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
+  const mudancasKpis = {};
+  document.querySelectorAll('.ef-kpi-extra-input').forEach(el=>{ mudancasKpis[el.dataset.kpiCampo] = el.value; });
   try{
     const resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, motivo: document.getElementById('ef-motivo').value }),
+      body: JSON.stringify({ mudancas, mudancasKpis, motivo: document.getElementById('ef-motivo').value }),
     });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
@@ -1344,11 +1369,15 @@ async function boot(){
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('btn-sincronizar-planilhas').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('fechamentos')){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
+  }
+  if(isMaster){
+    try{ GRUPOS_KPI = await fetch('/api/grupos').then(r=>r.json()); }catch(e){ GRUPOS_KPI = []; }
   }
   document.getElementById('root').classList.remove('hidden');
   await carregar();

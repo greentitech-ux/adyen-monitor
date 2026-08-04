@@ -36,6 +36,7 @@ const ifoodStore = require('./ifoodStore');
 const ifoodSync = require('./ifoodSync');
 const solicitacoes = require('./solicitacoes');
 const chamadosTI = require('./chamadosTI');
+const grupos = require('./grupos');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -624,6 +625,7 @@ const FECHAMENTO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dominos Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
@@ -1267,12 +1269,12 @@ app.post('/api/fechamentos/sincronizar-planilhas', auth.requireMaster, async (re
 // que so o Master pode aprovar (fechamentosLive.js guarda o historico).
 app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas } = req.body;
+    const { unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, observacao, detalhesMaquinas, detalhesSaidas } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await fechamentosLive.create({
-      unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas,
+      unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, observacao, detalhesMaquinas, detalhesSaidas,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
@@ -1286,6 +1288,39 @@ app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, re
 app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) => {
   if (req.isMaster) return res.json(await fechamentosLive.listAll());
   res.json(await fechamentosLive.listByUnidades(req.permissions.unidades || []));
+});
+
+// ---------- grupos (franquias) - cada uma pode ter seus proprios KPI's
+// extras no fechamento (ver grupos.js). Leitura liberada pra quem lanca
+// fechamento (precisa saber quais campos extras preencher) ou corrige
+// (central.html); so o Master cria/edita/apaga grupo ----------
+app.get('/api/grupos', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
+  res.json(await grupos.list());
+});
+
+app.post('/api/grupos', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await grupos.create(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/grupos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await grupos.update(req.params.id, req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/grupos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await grupos.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ---------- sangria (retirada de caixa) registrada em campo, ao longo do
@@ -1410,6 +1445,7 @@ app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, 
     const registro = await fechamentosLive.editarDireto({
       fechamentoId: req.params.id,
       mudancas: req.body.mudancas,
+      mudancasKpis: req.body.mudancasKpis,
       motivo: req.body.motivo,
       editadoPorEmail: req.user.email,
     });

@@ -278,6 +278,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
 </nav>
@@ -486,6 +487,7 @@ function aplicarNav(){
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !podeSecao('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !podeSecao('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
+  document.getElementById('nav-grupos').classList.toggle('hidden', ME.role!=='master');
   // a fila de solicitacoes de estorno e coisa do Master acompanhar - o usuario
   // que solicitou ve o status direto na linha do pedido dele
   document.getElementById('refund-panel').classList.toggle('hidden', ME.role!=='master');
