@@ -55,6 +55,7 @@
   .pcard .pcard-link{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-decoration:none;white-space:nowrap;}
   .pcard .pcard-link:hover{text-decoration:underline;}
   .pstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
+  .pstat.wide{grid-column:1 / -1;}
   .pstat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);}
   .pstat .val{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;}
   .pstat .val.ok{color:var(--ok);} .pstat .val.bad{color:var(--bad);} .pstat .val.warn{color:var(--warn);}
@@ -146,8 +147,8 @@ function ontemBrasilia(){
 
 const TIPOS_CENTRAL_LABEL = { estorno:'Estorno', 'ajuste-fechamento':'Correção de fechamento', compra:'Compra', manutencao:'Manutenção', 'suporte-ti':'Suporte de TI' };
 
-function statRow(label, valor, classe){
-  return `<div class="pstat"><div class="lbl">${escapeHtml(label)}</div><div class="val ${classe||''}">${valor}</div></div>`;
+function statRow(label, valor, classe, wide){
+  return `<div class="pstat${wide?' wide':''}"><div class="lbl">${escapeHtml(label)}</div><div class="val ${classe||''}">${valor}</div></div>`;
 }
 
 function pcardWrap(icone, titulo, link, corpoHtml){
@@ -173,7 +174,7 @@ async function cardMonitor(){
     ${statRow('Aprovadas', aprovadas.length,'ok')}
     ${statRow('Recusadas', recusadas.length, recusadas.length ? 'bad' : '')}
     ${statRow('Taxa aprov.', taxa+'%')}
-    ${statRow('Volume aprovado', fmtMoney(volume))}
+    ${statRow('Volume aprovado', fmtMoney(volume), '', true)}
     ${statRow('Chargebacks', chargebacks.length, chargebacks.length ? 'warn' : '')}
     ${statRow('Fraude suspeita', fraude.length, fraude.length ? 'bad' : '')}
   </div>`);
