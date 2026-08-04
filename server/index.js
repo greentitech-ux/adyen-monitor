@@ -197,7 +197,7 @@ app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, 
 app.use('/api', auth.requireAuth);
 
 app.get('/api/me', (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions });
+  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions, isAdmin: req.isAdmin });
 });
 
 // so a secao pedida bloqueia quem nao tem permissao - Master sempre passa
@@ -1211,7 +1211,7 @@ app.get('/api/refund-requests', requireSection('monitor'), async (req, res) => {
   res.json(todas.filter((r) => r.requestedById === req.user.id));
 });
 
-app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res) => {
+app.patch('/api/refund-requests/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const registro = await refunds.updateStatus(req.params.id, req.body.status, {
       motivoDecisao: req.body.motivoDecisao,
@@ -1226,7 +1226,7 @@ app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res
 
 // comprovante anexado pelo cliente final no pedido de estorno publico - so
 // o Master ve (dado sensivel do cliente: nome, telefone, foto do comprovante)
-app.get('/api/refund-requests/anexo/:id/:index', auth.requireMaster, async (req, res) => {
+app.get('/api/refund-requests/anexo/:id/:index', auth.requireMasterOrAdmin, async (req, res) => {
   const registro = await refunds.getOne(req.params.id);
   if (!registro) return res.sendStatus(404);
   const anexo = (registro.anexos || [])[Number(req.params.index)];
@@ -1258,7 +1258,9 @@ app.delete('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
 });
 
 // ---------- gestao de usuarios (so o Master) ----------
-app.get('/api/users', auth.requireMaster, async (req, res) => {
+// leitura tambem libera pro Admin, que precisa da lista de tecnicos pra
+// decidir solicitacoes de Suporte de TI; escrita continua so-Master
+app.get('/api/users', auth.requireMasterOrAdmin, async (req, res) => {
   res.json(await users.list());
 });
 
@@ -1316,6 +1318,14 @@ app.put('/api/users/:id/active', auth.requireMaster, async (req, res) => {
 app.put('/api/users/:id/horario-permitido', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.updateHorarioPermitido(req.params.id, req.body.horarioPermitido));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/is-admin', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateIsAdmin(req.params.id, req.body.isAdmin));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -1736,11 +1746,11 @@ app.delete('/api/fechamentos/:id', auth.requireMaster, async (req, res) => {
 // pediu pode acompanhar o status do proprio pedido
 app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {
   const todas = await fechamentosLive.listarEdicoes();
-  if (req.isMaster) return res.json(todas);
+  if (req.isMaster || req.isAdmin) return res.json(todas);
   res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
 });
 
-app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) => {
+app.patch('/api/fechamentos/edicoes/:id', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const pedido = await fechamentosLive.decidirEdicao(req.params.id, req.body.status, {
       decididoPorEmail: req.user.email,
@@ -1800,7 +1810,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
 app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), async (req, res) => {
   const registro = await solicitacoes.getOne(req.params.id);
   if (!registro) return res.sendStatus(404);
-  if (!req.isMaster && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
+  if (!req.isMaster && !req.isAdmin && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
   const anexo = registro.anexos && registro.anexos[Number(req.params.index)];
   if (!anexo) return res.sendStatus(404);
   storage.streamArquivo(anexo.path, anexo.tipo, res);
@@ -1808,7 +1818,7 @@ app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), as
 
 // aprovar/rejeitar - so o Master. Se for suporte-ti e for aprovado, ja cria
 // o Chamado vinculado (precisa escolher o tecnico no corpo da requisicao)
-app.patch('/api/solicitacoes/:id/status', auth.requireMaster, async (req, res) => {
+app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const { status, motivoDecisao, tecnicoId, tecnicoEmail } = req.body;
     const atual = await solicitacoes.getOne(req.params.id);
@@ -1931,7 +1941,7 @@ async function todosCardsCentral(req) {
     ...ajustes.map((r) => normalizarCard('ajuste-fechamento', r)),
     ...gerais.map((r) => normalizarCard(r.tipo, r)),
   ];
-  if (!req.isMaster) cards = cards.filter((c) => c.criadoPorId === req.user.id);
+  if (!req.isMaster && !req.isAdmin) cards = cards.filter((c) => c.criadoPorId === req.user.id);
   cards.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
   return cards;
 }

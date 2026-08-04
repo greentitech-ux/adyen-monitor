@@ -86,6 +86,16 @@ async function updateHorarioPermitido(id, horarioPermitido) {
   return toPublic(await ref.get());
 }
 
+async function updateIsAdmin(id, isAdmin) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master já pode tudo, não precisa da tag Admin.');
+  await ref.update({ isAdmin: !!isAdmin });
+  invalidarUsuario(id);
+  return toPublic(await ref.get());
+}
+
 async function resetPassword(id, password) {
   if (!password || password.length < 8) throw new Error('A senha deve ter pelo menos 8 caracteres.');
   const ref = usersRef.doc(id);
@@ -117,8 +127,9 @@ function toPublic(doc) {
     locked: !!data.locked,
     permissions: data.role === 'master' ? null : data.permissions || emptyPermissions(),
     horarioPermitido: data.role === 'master' ? null : data.horarioPermitido || { ativo: false, inicio: '', fim: '' },
+    isAdmin: data.role === 'master' ? null : !!data.isAdmin,
     createdAt: data.createdAt,
   };
 }
 
-module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, resetPassword, remove };
+module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, updateIsAdmin, resetPassword, remove };

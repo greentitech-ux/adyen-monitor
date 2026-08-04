@@ -176,6 +176,7 @@ function requireAuth(req, res, next) {
       }
       req.user = user;
       req.isMaster = user.role === 'master';
+      req.isAdmin = !!user.isAdmin;
       req.permissions = req.isMaster ? null : user.permissions || emptyPermissions();
       next();
     })
@@ -185,6 +186,14 @@ function requireAuth(req, res, next) {
 // so deixa passar quem e Master - usado nas rotas de gestao de usuarios
 function requireMaster(req, res, next) {
   if (!req.isMaster) return res.status(403).json({ error: 'Apenas o acesso Master pode fazer isso.' });
+  next();
+}
+
+// Master ou usuario com a tag Admin (atribuida pelo Master em usuarios.html) -
+// usado nas rotas de aprovar/rejeitar solicitacoes da Central, pra permitir
+// que Admins decidam sem precisar do acesso Master completo
+function requireMasterOrAdmin(req, res, next) {
+  if (!req.isMaster && !req.isAdmin) return res.status(403).json({ error: 'Apenas Master ou Admin pode fazer isso.' });
   next();
 }
 
@@ -209,6 +218,7 @@ module.exports = {
   toPublicUser,
   requireAuth,
   requireMaster,
+  requireMasterOrAdmin,
   hasSection,
   filterByUnidade,
   emptyPermissions,
