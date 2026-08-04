@@ -196,29 +196,33 @@
 
     <div class="secao">
       <div class="secao-titulo">Canais de venda</div>
-      <div class="grid2">
-        <div><label>Delivery</label><input type="number" step="0.01" inputmode="decimal" id="f-delivery"></div>
-        <div><label>Carryout</label><input type="number" step="0.01" inputmode="decimal" id="f-carryout"></div>
-      </div>
-      <div class="grid2">
-        <div><label>Pickup</label><input type="number" step="0.01" inputmode="decimal" id="f-pickup"></div>
-        <div><label>Loja (salão)</label><input type="number" step="0.01" inputmode="decimal" id="f-loja"></div>
+      <div id="canais-fixos">
+        <div class="grid2">
+          <div><label>Delivery</label><input type="number" step="0.01" inputmode="decimal" id="f-delivery"></div>
+          <div><label>Carryout</label><input type="number" step="0.01" inputmode="decimal" id="f-carryout"></div>
+        </div>
+        <div class="grid2">
+          <div><label>Pickup</label><input type="number" step="0.01" inputmode="decimal" id="f-pickup"></div>
+          <div><label>Loja (salão)</label><input type="number" step="0.01" inputmode="decimal" id="f-loja"></div>
+        </div>
       </div>
       <div class="grid2 hidden" id="canais-extras-container" style="margin-top:6px;"></div>
     </div>
 
     <div class="secao">
       <div class="secao-titulo">Formas de pagamento</div>
-      <div class="grid2">
-        <div><label>Ifood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
-        <div id="wrap-food99"><label>99Food</label><input type="number" step="0.01" inputmode="decimal" id="f-food99"></div>
+      <div id="formas-fixos">
+        <div class="grid2">
+          <div><label>Ifood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
+          <div id="wrap-food99"><label>99Food</label><input type="number" step="0.01" inputmode="decimal" id="f-food99"></div>
+        </div>
+        <div class="grid2">
+          <div><label>Adyen</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
+          <div><label>Pix CNPJ</label><input type="number" step="0.01" inputmode="decimal" id="f-pixCnpj"></div>
+        </div>
+        <label>Outros</label>
+        <input type="number" step="0.01" inputmode="decimal" id="f-outros">
       </div>
-      <div class="grid2">
-        <div><label>Adyen</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
-        <div><label>Pix CNPJ</label><input type="number" step="0.01" inputmode="decimal" id="f-pixCnpj"></div>
-      </div>
-      <label>Outros</label>
-      <input type="number" step="0.01" inputmode="decimal" id="f-outros">
       <div class="grid2 hidden" id="formas-extras-container" style="margin-top:6px;"></div>
     </div>
 
@@ -536,9 +540,34 @@ function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
 function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'forma-extra-input'); }
 function lerFormasExtras(){ return lerExtrasGrupo('forma-extra-input'); }
 
+// os campos fixos (Delivery/Carryout/... e Ifood/Adyen/.../Outros) sao o
+// padrao pra quem nao configurou nada no grupo - assim que o grupo define os
+// proprios campos de Canais de venda/Formas de pagamento, os fixos saem de
+// cena (senao contam junto no Faturamento/Total declarado e da o valor em
+// dobro). Limpa o valor ao esconder pra nao sobrar lixo de uma loja anterior.
+const CAMPOS_FIXOS_CANAIS = ['delivery','carryout','pickup','loja'];
+const CAMPOS_FIXOS_FORMAS = ['ifood','food99','pix','pixCnpj','outros'];
+function usaCanaisCustom(unidade){ const g = grupoKpiDaUnidade(unidade); return !!(g && (g.canaisVendaExtras||[]).length); }
+function usaFormasCustom(unidade){ const g = grupoKpiDaUnidade(unidade); return !!(g && (g.formasPagamentoExtras||[]).length); }
+function toggleCamposFixos(containerId, esconder){
+  const el = document.getElementById(containerId);
+  el.classList.toggle('hidden', esconder);
+  if(esconder) el.querySelectorAll('input').forEach(i=>i.value='');
+}
+function camposFixosAplicaveis(unidade){
+  const semCanais = usaCanaisCustom(unidade);
+  const semFormas = usaFormasCustom(unidade);
+  return CAMPOS_NUMERICOS.filter(c=>
+    !(semCanais && CAMPOS_FIXOS_CANAIS.includes(c)) &&
+    !(semFormas && CAMPOS_FIXOS_FORMAS.includes(c))
+  );
+}
+
 function aplicarFranquia(unidade){
   const grupo = grupoDaUnidade(unidade);
   document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
+  toggleCamposFixos('canais-fixos', usaCanaisCustom(unidade));
+  toggleCamposFixos('formas-fixos', usaFormasCustom(unidade));
   renderKpisExtras(unidade);
   renderCanaisExtras(unidade);
   renderFormasExtras(unidade);
@@ -696,7 +725,7 @@ function abrirEdicao(id){
   EDITANDO_ID = id;
   const f = MEUS.find(x=>x.id===id);
   document.getElementById('edicao-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado o fechamento não pode ser mudado direto; o pedido vai para aprovação do Master.`;
-  document.getElementById('e-campo').innerHTML = CAMPOS_NUMERICOS.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
+  document.getElementById('e-campo').innerHTML = camposFixosAplicaveis(f.unidade).map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
   document.getElementById('e-valor').value = '';
   document.getElementById('e-motivo').value = '';
   document.getElementById('msg-edicao').classList.add('hidden');
@@ -733,7 +762,7 @@ function abrirEditarMaster(id){
   document.getElementById('m-gerente').value = f.gerente || '';
   document.getElementById('m-observacao').value = f.observacao || '';
   document.getElementById('m-motivo').value = '';
-  document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS.map(c=>
+  document.getElementById('m-campos-numericos').innerHTML = camposFixosAplicaveis(f.unidade).map(c=>
     `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="0.01" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
   ).join('');
   const grupoKpi = grupoKpiDaUnidade(f.unidade);
@@ -776,7 +805,7 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
   msg.classList.add('hidden');
   const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
   const mudancas = {};
-  CAMPOS_NUMERICOS.forEach(c=>{
+  camposFixosAplicaveis(f.unidade).forEach(c=>{
     const v = num(document.getElementById('m-'+c).value);
     if(v !== num(f[c])) mudancas[c] = v;
   });
