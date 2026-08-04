@@ -9,6 +9,7 @@ const { normalize } = require('./normalize');
 const { lookupBank } = require('./binLookup');
 const push = require('./push');
 const cardTesting = require('./cardTesting');
+const fechamento = require('./fechamento');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -97,6 +98,13 @@ app.post('/webhooks/adyen', async (req, res) => {
     broadcast('transaction', tx);
     push.notify(tx); // estorno, estorno agendado, chargeback ou fraude -> push no celular/navegador
 
+    // fechamento agregado por dia/unidade, sem prazo de expiracao - permite
+    // comparar faturamento entre anos mesmo depois que o detalhe da
+    // transacao ja foi podado de "transactions" (retencao de 90 dias)
+    fechamento.registrarFechamento(tx).catch((err) =>
+      console.error('Erro ao registrar fechamento diario:', err.message)
+    );
+
     // recusas seguidas do mesmo cartao em poucos minutos -> possivel teste de cartao clonado
     if (tx.status === 'RECUSADO') {
       const alerta = cardTesting.registrarRecusa(tx);
@@ -156,6 +164,23 @@ app.get('/api/orders/changed', (req, res) => {
 
 app.get('/api/chargebacks', (req, res) => {
   res.json(store.chargebacks());
+});
+
+// fechamento agregado por periodo (ex: comparar ano atual vs ano-1/ano-2) -
+// le direto do Firestore, sem passar pelo cache em memoria, ja que esses
+// documentos nao tem prazo de expiracao e nao precisam ficar sempre carregados
+app.get('/api/fechamentos', async (req, res) => {
+  const { unidade, de, ate } = req.query;
+  if (!de || !ate) {
+    return res.status(400).json({ erro: 'informe os parametros "de" e "ate" (AAAA-MM-DD)' });
+  }
+  try {
+    const dados = await fechamento.fechamentosNoPeriodo(unidade, de, ate);
+    res.json(dados);
+  } catch (err) {
+    console.error('Erro ao consultar fechamentos:', err.message);
+    res.status(500).json({ erro: 'falha ao consultar fechamentos' });
+  }
 });
 
 // ---------- notificacoes push (estorno, estorno agendado, chargeback, fraude) ----------
