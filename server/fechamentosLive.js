@@ -213,6 +213,14 @@ async function getEdicao(id) {
   return doc.exists ? doc.data() : null;
 }
 
+// exclui so o PEDIDO de ajuste (o registro na fila de solicitacoes) - poder
+// do Master de limpar a fila. Se o pedido ja tinha sido aprovado, o
+// fechamento em si (ja alterado por decidirEdicao) nao e desfeito; pra
+// corrigir o fechamento depois disso o Master usa editarDireto normalmente.
+async function removerEdicao(id) {
+  await EDITS.doc(id).delete();
+}
+
 async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
   if (!['APROVADO', 'REJEITADO'].includes(status)) throw new Error('Status inválido.');
   const ref = EDITS.doc(id);
@@ -279,4 +287,4 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
 }
 
 
-module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto };
+module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao };

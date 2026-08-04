@@ -104,4 +104,30 @@ async function updateStatus(id, status, { motivoDecisao, decidedByEmail }) {
 }
 
 
-module.exports = { STATUSES, create, listAll, getOne, updateStatus };
+// edicao direta pelo Master - poder de corrigir qualquer campo do pedido de
+// estorno (dado errado digitado pelo cliente, unidade errada, etc.),
+// independente do status. So mexe no que vier em `campos`.
+const CAMPOS_TEXTO = ['pedidoId', 'unidade', 'unidadeNome', 'observacao', 'motivoEstorno', 'motivoOutro', 'formaPagamento', 'bandeira', 'ultimos4', 'dataVenda', 'horaVenda', 'nomeCliente', 'telefoneCliente'];
+const CAMPOS_NUMERICOS = ['valorVenda', 'valorEstornar'];
+async function update(id, campos) {
+  const ref = refundsRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  const patch = {};
+  CAMPOS_TEXTO.forEach((campo) => { if (campos[campo] != null) patch[campo] = String(campos[campo]).trim() || null; });
+  CAMPOS_NUMERICOS.forEach((campo) => {
+    if (Object.prototype.hasOwnProperty.call(campos, campo)) {
+      patch[campo] = campos[campo] != null && campos[campo] !== '' ? Number(campos[campo]) || 0 : null;
+    }
+  });
+  await ref.update(patch);
+  refundsCache.invalidar();
+  return getOne(id);
+}
+
+async function remove(id) {
+  await refundsRef.doc(id).delete();
+  refundsCache.invalidar();
+}
+
+module.exports = { STATUSES, create, listAll, getOne, updateStatus, update, remove };

@@ -1059,6 +1059,29 @@ app.get('/api/refund-requests/anexo/:id/:index', auth.requireMaster, async (req,
   storage.streamArquivo(anexo.path, anexo.tipo, res);
 });
 
+// edicao/exclusao direta pelo Master - corrigir um dado errado no pedido de
+// estorno (loja errada, valor digitado errado pelo cliente, etc.) ou
+// remove-lo de vez da fila, independente do status
+app.patch('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await refunds.update(req.params.id, req.body);
+    broadcast('refund-request-changed', registro, 'monitor');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await refunds.remove(req.params.id);
+    broadcast('refund-request-changed', { id: req.params.id, excluido: true }, 'monitor');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- gestao de usuarios (so o Master) ----------
 app.get('/api/users', auth.requireMaster, async (req, res) => {
   res.json(await users.list());
@@ -1376,6 +1399,20 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
   }
 });
 
+// exclui so o PEDIDO de ajuste da fila - poder do Master de limpar a fila.
+// Se ja tinha sido aprovado, o fechamento em si nao e desfeito (ele ja foi
+// alterado quando decidirEdicao rodou); pra corrigir o fechamento depois
+// disso o Master usa /editar-direto normalmente.
+app.delete('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await fechamentosLive.removerEdicao(req.params.id);
+    broadcast('fechamento-edicao-decidida', { id: req.params.id, excluido: true }, 'solicitacoes');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- Compra / Manutenção / Suporte de TI (secao "solicitacoes") -
 // mesmo fluxo de fila-com-aprovacao do Estorno e do Ajuste de Fechamento,
 // so que pra pedidos que nao tem uma secao propria ja existente. Aprovar um
@@ -1447,6 +1484,29 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMaster, async (req, res) =
   }
 });
 
+// edicao/exclusao direta pelo Master - corrigir um dado errado no pedido
+// (titulo, valor, observacao, itens, unidade) ou remove-lo de vez da fila,
+// independente do status
+app.patch('/api/solicitacoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await solicitacoes.update(req.params.id, req.body);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/solicitacoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await solicitacoes.remove(req.params.id);
+    broadcast('solicitacao-decidida', { id: req.params.id, excluido: true }, 'solicitacoes');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // leitura unificada pra Central: junta Estorno (refunds.js) + Ajuste de
 // Fechamento (fechamentosLive.js) + Compra/Manutenção/Suporte de TI
 // (solicitacoes.js) num feed so, cada card ja normalizado no mesmo formato -
@@ -1470,6 +1530,7 @@ function normalizarCard(tipo, r) {
       observacao = linhas.join('\n');
     }
     return {
+      ...r,
       tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome || r.unidade, status: r.status, criadoEm: r.criadoEm,
       titulo, observacao, anexos: r.anexos || [], valorEstimado: null,
       criadoPorId: r.requestedById, criadoPorEmail: r.requestedByEmail || (ehCliente ? 'pedido do cliente final' : ''),
@@ -1482,6 +1543,7 @@ function normalizarCard(tipo, r) {
       ? `adicionar ${r.itemNovo?.tipo === 'maquininha' ? 'maquininha' : 'saída'} "${r.itemNovo?.descricao || ''}" (${fmtMoneyServer(r.itemNovo?.valor)})`
       : `corrigir ${Object.keys(r.mudancas || {}).join(', ')}`;
     return {
+      ...r,
       tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
       titulo: `Ajuste de fechamento (${r.data}) - ${desc}`, observacao: r.motivo, anexos: r.anexos || [], valorEstimado: null,
       criadoPorId: r.solicitadoPorId, criadoPorEmail: r.solicitadoPorEmail,
@@ -1490,6 +1552,7 @@ function normalizarCard(tipo, r) {
     };
   }
   return {
+    ...r,
     tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
     titulo: r.titulo, observacao: r.observacao, anexos: r.anexos || [], valorEstimado: r.valorEstimado, itens: r.itens || [],
     criadoPorId: r.criadoPorId, criadoPorEmail: r.criadoPorEmail,
