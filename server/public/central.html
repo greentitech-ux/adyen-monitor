@@ -158,6 +158,12 @@
     <div id="campos-gerais" class="hidden">
       <label id="g-titulo-label">Título</label>
       <input type="text" id="g-titulo" placeholder="ex: comprar papel térmico">
+      <div id="compra-itens" class="secao hidden" style="border-top:none;margin-top:10px;padding-top:0;">
+        <div class="secao-titulo">Itens da compra</div>
+        <div class="sub" style="margin:-2px 0 8px;">O que precisa comprar, item por item, com a quantidade de cada um.</div>
+        <div id="lista-itens-compra"></div>
+        <button type="button" class="btn-add" onclick="adicionarItemCompra()">+ Adicionar item</button>
+      </div>
       <label id="g-valor-label">Valor estimado (opcional)</label>
       <input type="number" step="0.01" id="g-valor">
       <label>Observação</label>
@@ -256,6 +262,8 @@ let TIPO_CORRECAO = 'campo';
 let ITEM_TIPO = 'maquininha';
 let FILTRO_STATUS = 'PENDENTE';
 let DETALHE_ATUAL = null;
+let ITENS_COMPRA = [];
+let SEQ_ITEM_COMPRA = 0;
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 const FUSO_BR = 'America/Sao_Paulo';
@@ -275,12 +283,31 @@ function selecionarTipo(tipo){
   document.getElementById('campos-ajuste').classList.toggle('hidden', tipo!=='ajuste-fechamento');
   document.getElementById('campos-gerais').classList.toggle('hidden', !['compra','manutencao','suporte-ti'].includes(tipo));
   document.getElementById('campos-comuns').classList.toggle('hidden', tipo==='ajuste-fechamento');
+  document.getElementById('compra-itens').classList.toggle('hidden', tipo!=='compra');
+  if(tipo==='compra') renderItensCompra();
   const labels = { compra:['Título','O que precisa comprar','Valor estimado (opcional)'], manutencao:['Título','O que precisa de manutenção','Valor estimado (opcional)'], 'suporte-ti':['Título','Qual o problema','Valor estimado (opcional)'] };
   if(labels[tipo]){
     document.getElementById('g-titulo').placeholder = labels[tipo][1];
     document.getElementById('g-valor-label').textContent = labels[tipo][2];
   }
   if(tipo==='ajuste-fechamento') montarSelectFechamento();
+}
+
+// ---------- linhas repetíveis: itens da compra (nome + quantidade, mesmo
+// padrão de Maquininhas/Saídas do lançamento - so que quantidade no lugar
+// do valor, ja que aqui e uma lista do que precisa comprar) ----------
+function adicionarItemCompra(){
+  ITENS_COMPRA.push({ id: ++SEQ_ITEM_COMPRA, descricao:'', quantidade:'' });
+  renderItensCompra();
+}
+function removerItemCompra(id){ ITENS_COMPRA = ITENS_COMPRA.filter(i=>i.id!==id); renderItensCompra(); }
+function renderItensCompra(){
+  document.getElementById('lista-itens-compra').innerHTML = ITENS_COMPRA.map(i=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(i.descricao)}" oninput="ITENS_COMPRA.find(x=>x.id===${i.id}).descricao=this.value" placeholder="nome do item">
+      <input type="number" step="1" min="0" value="${i.quantidade}" oninput="ITENS_COMPRA.find(x=>x.id===${i.id}).quantidade=this.value" placeholder="qtd.">
+      <button type="button" class="btn-remover" onclick="removerItemCompra(${i.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum item adicionado.</div>';
 }
 
 function selecionarTipoCorrecao(tipo){
@@ -348,6 +375,7 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
         titulo: document.getElementById('g-titulo').value,
         valorEstimado: document.getElementById('g-valor').value,
         observacao: document.getElementById('g-observacao').value,
+        itens: TIPO_SELECIONADO==='compra' ? ITENS_COMPRA.map(i=>({descricao:i.descricao, quantidade:i.quantidade})) : [],
       }));
       for(const file of anexosInput.files) fd.append('anexos', file);
       resp = await fetch('/api/solicitacoes', { method:'POST', body: fd });
@@ -357,6 +385,7 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
     if(!resp.ok) throw new Error(data.error || 'Erro ao enviar solicitação.');
     msg.textContent = 'Solicitação enviada com sucesso.'; msg.className = 'msg ok';
     document.getElementById('form-nova').reset();
+    ITENS_COMPRA = []; renderItensCompra();
     await carregarCentral();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
@@ -404,6 +433,11 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}`;
 
   let corpo = `<div><b>${escapeHtml(c.titulo)}</b></div>`;
+  if(c.itens && c.itens.length){
+    corpo += `<div><b>Itens:</b></div><ul style="margin:0;padding-left:18px;">${c.itens.map(i=>
+      `<li>${escapeHtml(i.descricao)}${i.quantidade!=null && i.quantidade!=='' ? ` · qtd. ${escapeHtml(String(i.quantidade))}` : ''}</li>`
+    ).join('')}</ul>`;
+  }
   if(c.observacao) corpo += `<div style="white-space:pre-wrap;">${escapeHtml(c.observacao)}</div>`;
   if(c.valorEstimado) corpo += `<div>Valor estimado: <b>${fmtMoney(c.valorEstimado)}</b></div>`;
   if(c.anexos && c.anexos.length){

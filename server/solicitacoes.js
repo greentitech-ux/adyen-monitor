@@ -13,7 +13,21 @@ const COLLECTION = db.collection('solicitacoes');
 const TIPOS = ['compra', 'manutencao', 'suporte-ti'];
 const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO'];
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, anexos, criadoPorId, criadoPorEmail }) {
+// itens da lista de compra (nome do que comprar + quantidade) - so pra
+// tipo "compra", mesmo padrao repetivel de MAQUINAS/SAIDAS do lancamento.
+// O valor estimado continua existindo a parte (campo unico, opcional, pra
+// quando o pedido ja tem um total definido)
+function sanitizarItens(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((item) => ({
+      descricao: String(item?.descricao || '').trim().slice(0, 200),
+      quantidade: item?.quantidade != null && item.quantidade !== '' ? Number(item.quantidade) || 0 : null,
+    }))
+    .filter((item) => item.descricao);
+}
+
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, criadoPorId, criadoPorEmail }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
@@ -28,6 +42,7 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     titulo: String(titulo).trim().slice(0, 200),
     valorEstimado: valorEstimado != null && valorEstimado !== '' ? Number(valorEstimado) || 0 : null,
     observacao: observacao || '',
+    itens: tipo === 'compra' ? sanitizarItens(itens) : [], // [{ descricao, quantidade }]
     anexos: Array.isArray(anexos) ? anexos : [], // [{ nome, path, tipo }]
     status: 'PENDENTE',
     criadoPorId,
