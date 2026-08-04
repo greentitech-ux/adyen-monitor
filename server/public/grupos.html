@@ -135,7 +135,13 @@
 
 <div id="root" class="hidden">
   <div class="panel">
-    <h2>Grupos cadastrados</h2>
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>Grupos cadastrados</span>
+      <span style="display:flex;gap:4px;">
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioGrupos('csv')">📄 CSV</button>
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioGrupos('pdf')">📄 PDF</button>
+      </span>
+    </h2>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Nome</th><th>Lojas</th><th>Canais extras</th><th>Formas extras</th><th>KPI's extras</th><th></th></tr></thead>
@@ -383,6 +389,11 @@ async function excluirGrupo(id, nome){
   const res = await fetch('/api/grupos/'+id, {method:'DELETE'});
   if(!res.ok){ const data = await res.json().catch(()=>({})); alert(data.error||'Erro ao excluir.'); return; }
   await carregarGrupos();
+}
+
+function baixarRelatorioGrupos(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  window.location.href = `/api/grupos/relatorio.${formato}?${params.toString()}`;
 }
 
 async function carregarGrupos(){

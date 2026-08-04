@@ -137,7 +137,13 @@
 
 <div id="root" class="hidden">
   <div class="panel">
-    <h2>Acessos cadastrados</h2>
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>Acessos cadastrados</span>
+      <span style="display:flex;gap:4px;">
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('csv')">📄 CSV</button>
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('pdf')">📄 PDF</button>
+      </span>
+    </h2>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
@@ -339,6 +345,11 @@ async function boot(){
 
   await carregarUsuarios();
   await carregarBackups();
+}
+
+function baixarRelatorioUsuarios(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  window.location.href = `/api/users/relatorio.${formato}?${params.toString()}`;
 }
 
 async function carregarUsuarios(){

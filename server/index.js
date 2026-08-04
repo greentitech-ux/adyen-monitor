@@ -1230,6 +1230,33 @@ app.get('/api/users', auth.requireMaster, async (req, res) => {
   res.json(await users.list());
 });
 
+// relatorio (CSV/PDF) da tabela "Acessos cadastrados" de usuarios.html -
+// mesma tela, sem filtro (a lista inteira, ja que so o Master ve isso)
+app.get('/api/users/relatorio.:formato(csv|pdf)', auth.requireMaster, async (req, res) => {
+  const unidadesMapa = await construirUnidadesMapa();
+  const colunas = [
+    { key: 'email', label: 'Email' }, { key: 'papel', label: 'Papel' }, { key: 'status', label: 'Status' },
+    { key: 'secoes', label: 'Seções' }, { key: 'unidades', label: 'Unidades' }, { key: 'subgrupos', label: 'Cofre (subgrupos)' },
+  ];
+  const linhas = (await users.list()).map((u) => {
+    const perms = u.permissions || { sections: [], unidades: [], vaultSubgroups: [] };
+    const isMaster = u.role === 'master';
+    return {
+      email: u.email, papel: u.role,
+      status: u.locked ? 'bloqueado' : (u.active ? 'ativo' : 'desativado'),
+      secoes: isMaster ? 'tudo' : (perms.sections || []).join(', ') || '—',
+      unidades: isMaster ? 'tudo' : (perms.unidades || []).map((c) => unidadesMapa[c] || c).join(', ') || '—',
+      subgrupos: isMaster ? 'tudo' : (perms.vaultSubgroups || []).join(', ') || '—',
+    };
+  });
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('usuarios-acessos')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Usuários · Acessos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} acesso(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('usuarios-acessos') });
+});
+
 app.post('/api/users', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.create(req.body));
@@ -1474,6 +1501,27 @@ app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) 
 // (central.html); so o Master cria/edita/apaga grupo ----------
 app.get('/api/grupos', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
   res.json(await grupos.list());
+});
+
+// relatorio (CSV/PDF) da tabela "Grupos cadastrados" de grupos.html
+app.get('/api/grupos/relatorio.:formato(csv|pdf)', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
+  const unidadesMapa = await construirUnidadesMapa();
+  const colunas = [
+    { key: 'nome', label: 'Nome' }, { key: 'unidades', label: 'Unidades' },
+    { key: 'canais', label: 'Canais de venda extras' }, { key: 'formas', label: 'Formas de pagamento extras' }, { key: 'kpis', label: 'KPIs extras' },
+  ];
+  const listaExtras = (lista) => (lista || []).map((k) => k.label).join(', ') || '—';
+  const linhas = (await grupos.list()).map((g) => ({
+    nome: g.nome,
+    unidades: (g.unidades || []).map((u) => unidadesMapa[u] || u).join(', ') || '—',
+    canais: listaExtras(g.canaisVendaExtras), formas: listaExtras(g.formasPagamentoExtras), kpis: listaExtras(g.kpisExtras),
+  }));
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('grupos')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Grupos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} grupo(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('grupos') });
 });
 
 app.post('/api/grupos', auth.requireMaster, async (req, res) => {
@@ -2197,6 +2245,74 @@ app.patch('/api/entregas/edicoes/:id', auth.requireMaster, async (req, res) => {
 // filtrado por permissao, igual FECHAMENTO_UNIDADES_NOMES/ENTREGAS_UNIDADES_NOMES).
 app.get('/api/ifood/vendas', requireSection('ifood'), async (req, res) => {
   res.json(auth.filterByUnidade(req, await ifoodStore.listAllCached()));
+});
+
+// ---------- relatorios (CSV/PDF) do dashboard de iFood: Por unidade, Vendas -
+// mesmos 2 paineis de ifood.html, com os mesmos filtros de periodo/unidades
+// ativos na tela ----------
+function filtrarVendasIfoodPeriodo(lista, req) {
+  const { inicio, fim, unidades } = req.query;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  return lista.filter((d) => {
+    const dataVenda = (d.dataHora || '').slice(0, 10);
+    return (!unidadesSet || unidadesSet.has(d.unidade)) &&
+      (!inicio || dataVenda >= inicio) &&
+      (!fim || dataVenda <= fim);
+  });
+}
+
+function prepararIfoodPorUnidade(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unid.' }, { key: 'vendas', label: 'Vendas' }, { key: 'bruto', label: 'Valor bruto' },
+    { key: 'comissao', label: 'Comissão' }, { key: 'liquido', label: 'Valor líquido' }, { key: 'tm', label: 'Ticket médio' },
+  ];
+  const porUnidade = {};
+  rows.forEach((r) => {
+    const c = (porUnidade[r.unidade] ||= { vendas: 0, bruto: 0, comissao: 0, liquido: 0 });
+    c.vendas++; c.bruto += r.valorBruto || 0; c.comissao += r.taxaComissao || 0; c.liquido += r.valorLiquido || 0;
+  });
+  const linhas = Object.entries(porUnidade).sort((a, b) => b[1].bruto - a[1].bruto).map(([u, c]) => ({
+    unidade: ifoodClient.IFOOD_UNIDADES_NOMES[u] || u, vendas: c.vendas, bruto: reportUtil.fmtMoneyBR(c.bruto),
+    comissao: reportUtil.fmtMoneyBR(c.comissao), liquido: reportUtil.fmtMoneyBR(c.liquido),
+    tm: reportUtil.fmtMoneyBR(c.vendas ? c.bruto / c.vendas : 0),
+  }));
+  return { colunas, linhas };
+}
+
+function prepararIfoodVendas(rows) {
+  const colunas = [
+    { key: 'data', label: 'Data' }, { key: 'unidade', label: 'Unid.' }, { key: 'numeroPedido', label: 'Nº pedido' },
+    { key: 'bruto', label: 'Valor bruto' }, { key: 'comissao', label: 'Comissão' }, { key: 'liquido', label: 'Valor líquido' },
+    { key: 'formaPagamento', label: 'Forma pagto' }, { key: 'status', label: 'Status' },
+  ];
+  const linhas = [...rows].sort((a, b) => (b.dataHora || '').localeCompare(a.dataHora || '')).map((d) => ({
+    data: reportUtil.fmtDataHoraBR(d.dataHora), unidade: ifoodClient.IFOOD_UNIDADES_NOMES[d.unidade] || d.unidade || '—',
+    numeroPedido: d.numeroPedido || '—', bruto: reportUtil.fmtMoneyBR(d.valorBruto), comissao: reportUtil.fmtMoneyBR(d.taxaComissao),
+    liquido: reportUtil.fmtMoneyBR(d.valorLiquido), formaPagamento: d.formaPagamento || '—', status: d.status || '—',
+  }));
+  return { colunas, linhas };
+}
+
+app.get('/api/ifood/relatorio-unidades.:formato(csv|pdf)', requireSection('ifood'), async (req, res) => {
+  const rows = filtrarVendasIfoodPeriodo(auth.filterByUnidade(req, await ifoodStore.listAllCached()), req);
+  const { colunas, linhas } = prepararIfoodPorUnidade(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('ifood-por-unidade')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'iFood · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('ifood-por-unidade') });
+});
+
+app.get('/api/ifood/relatorio-vendas.:formato(csv|pdf)', requireSection('ifood'), async (req, res) => {
+  const rows = filtrarVendasIfoodPeriodo(auth.filterByUnidade(req, await ifoodStore.listAllCached()), req);
+  const { colunas, linhas } = prepararIfoodVendas(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('ifood-vendas')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'iFood · Vendas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} venda(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('ifood-vendas') });
 });
 
 app.get('/api/ifood/sincronizacao', requireSection('ifood'), (req, res) => {
