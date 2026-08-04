@@ -60,6 +60,7 @@
   .badge.off{background:var(--bad-dim);color:var(--bad);}
   .badge.locked{background:var(--bad-dim);color:var(--bad);}
   .badge.horario{background:#132029;color:var(--accent);border:1px solid var(--line);}
+  .badge.admin{background:#2a1a3d;color:#c299ff;border:1px solid var(--line);}
   .checks .group-heading{width:100%;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
   .checks .group-heading:first-child{margin-top:0;}
   .unidades-secao{margin-top:14px;}
@@ -407,7 +408,8 @@ function renderUsers(){
     const statusBadges = (u.locked
       ? `<span class="badge locked" title="Bloqueado após 3 tentativas de senha erradas - use \"Nova senha\" pra destravar">bloqueado</span>`
       : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`)
-      + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '');
+      + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '')
+      + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '');
     return `
     <tr>
       <td>${escapeHtml(u.email)}</td>
@@ -421,6 +423,7 @@ function renderUsers(){
         <div class="rowacts">
           <button type="button" onclick="editarPermissoes('${u.id}')">Permissões</button>
           <button type="button" onclick="abrirHorario('${u.id}')">Horário</button>
+          <button type="button" onclick="alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'Remover admin':'Tornar admin'}</button>
           <button type="button" onclick="resetarSenha('${u.id}')">Nova senha</button>
           <button type="button" onclick="alternarAtivo('${u.id}', ${!u.active})">${u.active?'Desativar':'Ativar'}</button>
           <button type="button" onclick="excluirUsuario('${u.id}','${escapeHtml(u.email)}')">Excluir</button>
@@ -534,6 +537,13 @@ async function resetarSenha(id){
 
 async function alternarAtivo(id, active){
   await fetch('/api/users/'+id+'/active', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
+  await carregarUsuarios();
+}
+
+async function alternarAdmin(id, isAdmin){
+  const res = await fetch('/api/users/'+id+'/is-admin', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({isAdmin})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao atualizar tag admin.'); return; }
   await carregarUsuarios();
 }
 
