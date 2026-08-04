@@ -93,6 +93,13 @@
   .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
   .kanban-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:12px;}
   @media(max-width:760px){ .kanban-col{min-width:82vw;max-height:none;} }
+  .tipo-filtro-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .tipo-filtro-btn{font-family:var(--sans);font-size:11.5px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:112px;transition:border-color .15s ease,background .15s ease;}
+  .tipo-filtro-btn:hover{border-color:var(--accent);}
+  .tipo-filtro-btn.active{border-color:var(--accent);background:rgba(92,200,255,.1);}
+  .tipo-filtro-btn .tf-label{font-weight:600;white-space:nowrap;}
+  .tipo-filtro-btn .tf-counts{font-family:var(--mono);font-size:10px;white-space:nowrap;}
+  .tipo-filtro-btn .tf-counts b{font-weight:600;}
 </style>
 </head>
 <body>
@@ -107,6 +114,7 @@
       </div>
     </div>
   </div>
+  <div class="tipo-filtro-row" id="tipo-filtro-row"></div>
   <div class="header-nav">
     <a class="back" href="/central.html">+ Nova solicitação</a>
     <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
@@ -264,6 +272,7 @@ let FILTRO_UNIDADE = '';
 let FILTRO_GRUPO = '';
 let FILTRO_DATA_DE = '';
 let FILTRO_DATA_ATE = '';
+let FILTRO_TIPO = '';
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
 let DETALHE_ATUAL = null;
 
@@ -311,12 +320,36 @@ function kcardHtml(c){
     </div>`;
 }
 
+function contagemStatus(lista){
+  return {
+    P: lista.filter(c=>c.status==='PENDENTE').length,
+    A: lista.filter(c=>c.status==='APROVADO').length,
+    R: lista.filter(c=>c.status==='REJEITADO').length,
+  };
+}
+function renderFiltroTipoRow(base){
+  const botaoHtml = (tipo, label, contagem) => `
+    <button type="button" class="tipo-filtro-btn ${FILTRO_TIPO===tipo?'active':''}" onclick="selecionarFiltroTipo('${tipo}')">
+      <span class="tf-label">${tipo?iconeTipo(tipo)+' '+label:label}</span>
+      <span class="tf-counts"><b style="color:var(--warn);">${contagem.P}</b> pend · <b style="color:var(--ok);">${contagem.A}</b> aprov · <b style="color:var(--bad);">${contagem.R}</b> rej</span>
+    </button>`;
+  document.getElementById('tipo-filtro-row').innerHTML =
+    botaoHtml('', 'Todas', contagemStatus(base)) +
+    Object.keys(TIPOS_INFO).map(tipo=>botaoHtml(tipo, TIPOS_INFO[tipo].label, contagemStatus(base.filter(c=>c.tipo===tipo)))).join('');
+}
+function selecionarFiltroTipo(tipo){
+  FILTRO_TIPO = tipo;
+  renderKanban();
+}
+
 function renderKanban(){
-  let filtradas = CARDS;
-  if(FILTRO_UNIDADE) filtradas = filtradas.filter(c=>c.unidade===FILTRO_UNIDADE);
-  if(FILTRO_GRUPO) filtradas = filtradas.filter(c=>grupoDaUnidade(c.unidade)===FILTRO_GRUPO);
-  if(FILTRO_DATA_DE) filtradas = filtradas.filter(c=>dataBrasilia(c.criadoEm) >= FILTRO_DATA_DE);
-  if(FILTRO_DATA_ATE) filtradas = filtradas.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
+  let base = CARDS;
+  if(FILTRO_UNIDADE) base = base.filter(c=>c.unidade===FILTRO_UNIDADE);
+  if(FILTRO_GRUPO) base = base.filter(c=>grupoDaUnidade(c.unidade)===FILTRO_GRUPO);
+  if(FILTRO_DATA_DE) base = base.filter(c=>dataBrasilia(c.criadoEm) >= FILTRO_DATA_DE);
+  if(FILTRO_DATA_ATE) base = base.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
+  renderFiltroTipoRow(base);
+  let filtradas = FILTRO_TIPO ? base.filter(c=>c.tipo===FILTRO_TIPO) : base;
   document.getElementById('lista-count').textContent = filtradas.length;
 
   STATUS_COLUNAS.forEach(status=>{
