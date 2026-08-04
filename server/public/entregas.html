@@ -290,8 +290,7 @@ async function carregar(){
     ? `${DATA.length} lançamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
     : `nenhuma entrega lançada ainda${SYNC_INFO_SUFIXO}`;
   elHeaderInfo.title = SYNC_INFO_TITLE;
-  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
-  setupPresets(isoLocal(ontem));
+  setupPresets();
   setupMultiselect();
   render();
 }
@@ -325,6 +324,10 @@ async function decidirEdicaoEntrega(id, status){
 
 function calcularPreset(tipo, refIso){
   const ref = new Date(refIso+'T00:00:00');
+  if(tipo==='ontem'){
+    const ontem = new Date(ref); ontem.setDate(ontem.getDate()-1);
+    return {inicio:isoLocal(ontem), fim:isoLocal(ontem)};
+  }
   if(tipo==='semana'){
     const dow = ref.getDay();
     const inicio = new Date(ref); inicio.setDate(ref.getDate()-dow);
@@ -341,9 +344,15 @@ function calcularPreset(tipo, refIso){
   return {inicio:isoLocal(inicio), fim:isoLocal(fim)};
 }
 
+// mesmo padrao de server/public/fechamentos.html: por padrao nenhum preset
+// ativo e os campos mostram D-1 (ontem) - so passa a seguir um preset quando
+// o usuario escolhe um explicitamente; editar os campos de data na mao
+// sempre desativa o preset (intervalo livre, inclusive um unico dia) em vez
+// de "re-encaixar" no periodo cheio
 let presetAtivo = null;
-function setupPresets(refPadraoIso){
+function setupPresets(){
   const presets = [
+    {lbl:'Ontem', tipo:'ontem'},
     {lbl:'Semana', tipo:'semana'},
     {lbl:'Mês', tipo:'mes'},
     {lbl:'Trimestre', tipo:'trimestre'},
@@ -362,25 +371,23 @@ function setupPresets(refPadraoIso){
   }
 
   cont.querySelectorAll('.preset-btn').forEach(btn=>{
+    // ao clicar num preset a referencia e sempre hoje (nao a data ja
+    // selecionada) - Ontem/Semana/Mes/Trimestre sempre voltam pro periodo atual
     btn.addEventListener('click', ()=>{
       aplicarPreset(btn.dataset.tipo, isoLocal(agoraBrasilia()), btn);
     });
   });
 
-  aplicarPreset('mes', refPadraoIso, cont.children[1]);
+  presetAtivo = null;
+  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
+  const ontemIso = isoLocal(ontem);
+  document.getElementById('f-date-start').value = ontemIso;
+  document.getElementById('f-date-end').value = ontemIso;
 
   ['f-date-start','f-date-end'].forEach(id=>{
     document.getElementById(id).addEventListener('input', ()=>{
-      if(presetAtivo){
-        const refIso = document.getElementById(id).value;
-        if(refIso){
-          const range = calcularPreset(presetAtivo, refIso);
-          document.getElementById('f-date-start').value = range.inicio;
-          document.getElementById('f-date-end').value = range.fim;
-        }
-      } else {
-        cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-      }
+      presetAtivo = null;
+      cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
       render();
     });
   });
