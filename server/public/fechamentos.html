@@ -306,38 +306,25 @@
     </div>
 
     <div class="secao-titulo">Canais de venda</div>
-    <div class="fech-grid" id="ef-canais-fixos">
-      <div><label>Delivery</label><input type="number" step="0.01" id="ef-delivery"></div>
-      <div><label>Carryout</label><input type="number" step="0.01" id="ef-carryout"></div>
-      <div><label>Pickup</label><input type="number" step="0.01" id="ef-pickup"></div>
-      <div><label>Loja (salão)</label><input type="number" step="0.01" id="ef-loja"></div>
-    </div>
     <div class="fech-grid hidden" id="ef-canais-extras"></div>
+    <div class="fech-msg hidden" id="ef-canais-vazio">Nenhum campo configurado pra essa loja - configure em Grupos.</div>
 
     <div class="secao-titulo">Formas de pagamento</div>
     <div class="fech-grid">
       <div><label>Adyen</label><input type="number" step="0.01" id="ef-adyen"></div>
     </div>
-    <div class="fech-grid" id="ef-formas-fixos">
-      <div><label>Ifood</label><input type="number" step="0.01" id="ef-ifood"></div>
-      <div><label>99Food</label><input type="number" step="0.01" id="ef-food99"></div>
-      <div><label>Pix</label><input type="number" step="0.01" id="ef-pix"></div>
-      <div><label>Pix CNPJ</label><input type="number" step="0.01" id="ef-pixCnpj"></div>
-      <div><label>Outros</label><input type="number" step="0.01" id="ef-outros"></div>
-    </div>
     <div class="fech-grid hidden" id="ef-formas-extras"></div>
+    <div class="fech-msg hidden" id="ef-formas-vazio">Nenhum campo configurado pra essa loja - configure em Grupos.</div>
 
     <div class="secao-titulo">KPI's</div>
     <div class="fech-grid">
       <div><label>Total de saída</label><input type="number" step="0.01" id="ef-totalSaida"></div>
       <div><label>Quebra de caixa</label><input type="number" step="0.01" id="ef-quebra"></div>
-      <div><label>TC (tíquete médio)</label><input type="number" step="0.01" id="ef-tc"></div>
-      <div><label>Cancelados</label><input type="number" step="0.01" id="ef-cancelados"></div>
       <div><label>Entrada em dinheiro</label><input type="number" step="0.01" id="ef-entradaDinheiro"></div>
       <div><label>Depósito</label><input type="number" step="0.01" id="ef-deposito"></div>
     </div>
-
     <div class="fech-grid hidden" id="ef-kpis-extras"></div>
+    <div class="fech-msg hidden" id="ef-kpis-vazio">Nenhum KPI extra configurado pra essa loja - configure em Grupos.</div>
 
     <label>Observação</label>
     <textarea id="ef-observacao"></textarea>
@@ -1209,41 +1196,31 @@ function renderTabela(rows){
 // tabela - so vale pra fechamento de verdade (lancado pelo app, tem
 // criadoPorId); linha vinda de planilha importada ou sangria mapeada nao
 // tem botao (ver renderTabela) ----------
-const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','quebra','tc','cancelados','entradaDinheiro','deposito'];
+// os fixos de Canais de venda/Formas de pagamento/KPI's (Delivery/Carryout/
+// .../Outros, TC, Cancelados) nao existem mais - cada loja so tem os campos
+// que o grupo dela define em /grupos.html (ver lancamento.html, mesma
+// logica). So sobra aqui o que nao faz parte dessas 3 secoes.
+const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','adyen','totalSaida','quebra','entradaDinheiro','deposito'];
 let FECHAMENTO_EDITANDO_ID = null;
-let FECHAMENTO_EDITANDO_GRUPO = null;
-// grupos (franquias) cadastrados em /grupos.html - cada um pode ter KPI's
-// extras proprios, alem de TC/Cancelados (ver grupos.js/fechamentosLive.js)
+// grupos (franquias) cadastrados em /grupos.html - cada loja so mostra os
+// campos que o Master cadastrou pro grupo dela (ver grupos.js/fechamentosLive.js)
 let GRUPOS_KPI = [];
 function grupoKpiDaUnidade(unidade){
   return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
 }
-// generico pras 3 frentes de campo extra do fechamento (Canais de venda,
-// Formas de pagamento, KPI's) no modal de edição direta do Master - mesmo
-// padrão usado em lancamento.html
-function renderExtrasEdicaoFechamento(grupo, chaveGrupo, mapaAtual, containerId, classe, datasetKey){
+// generico pras 3 frentes de campo do fechamento (Canais de venda, Formas de
+// pagamento, KPI's) no modal de edição direta do Master - mesmo padrão usado
+// em lancamento.html
+function renderExtrasEdicaoFechamento(grupo, chaveGrupo, mapaAtual, containerId, vazioId, classe, datasetKey){
   const campos = grupo ? (grupo[chaveGrupo]||[]) : [];
   const container = document.getElementById(containerId);
+  document.getElementById(vazioId).classList.toggle('hidden', !!campos.length);
   if(!campos.length){ container.classList.add('hidden'); container.innerHTML = ''; return; }
   container.classList.remove('hidden');
   const attr = datasetKey.replace(/[A-Z]/g, c=>'-'+c.toLowerCase());
   container.innerHTML = campos.map(k=>
     `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-${attr}="${escapeHtml(k.campo)}" class="${classe}" value="${num((mapaAtual||{})[k.campo])}"></div>`
   ).join('');
-}
-// mesma logica de lancamento.html: quando o grupo da loja define os proprios
-// campos de Canais de venda/Formas de pagamento, os fixos saem de cena aqui
-// tambem (senao dava pra editar um campo que nao conta mais em nada, ou pior,
-// reintroduzir o valor dobrado no Faturamento/Total declarado)
-const CAMPOS_FIXOS_CANAIS = ['delivery','carryout','pickup','loja'];
-const CAMPOS_FIXOS_FORMAS = ['ifood','food99','pix','pixCnpj','outros'];
-function camposEdicaoAplicaveis(grupo){
-  const semCanais = !!(grupo && (grupo.canaisVendaExtras||[]).length);
-  const semFormas = !!(grupo && (grupo.formasPagamentoExtras||[]).length);
-  return CAMPOS_EDICAO_FECHAMENTO.filter(c=>
-    !(semCanais && CAMPOS_FIXOS_CANAIS.includes(c)) &&
-    !(semFormas && CAMPOS_FIXOS_FORMAS.includes(c))
-  );
 }
 
 async function abrirEdicaoFechamento(id){
@@ -1266,12 +1243,9 @@ async function abrirEdicaoFechamento(id){
   document.getElementById('ef-motivo').value = '';
 
   const grupoKpi = grupoKpiDaUnidade(d.unidade);
-  FECHAMENTO_EDITANDO_GRUPO = grupoKpi;
-  renderExtrasEdicaoFechamento(grupoKpi, 'kpisExtras', d.kpisExtras, 'ef-kpis-extras', 'ef-kpi-extra-input', 'kpiCampo');
-  renderExtrasEdicaoFechamento(grupoKpi, 'canaisVendaExtras', d.canaisVendaExtras, 'ef-canais-extras', 'ef-canal-extra-input', 'canalCampo');
-  renderExtrasEdicaoFechamento(grupoKpi, 'formasPagamentoExtras', d.formasPagamentoExtras, 'ef-formas-extras', 'ef-forma-extra-input', 'formaCampo');
-  document.getElementById('ef-canais-fixos').classList.toggle('hidden', !!(grupoKpi && (grupoKpi.canaisVendaExtras||[]).length));
-  document.getElementById('ef-formas-fixos').classList.toggle('hidden', !!(grupoKpi && (grupoKpi.formasPagamentoExtras||[]).length));
+  renderExtrasEdicaoFechamento(grupoKpi, 'kpisExtras', d.kpisExtras, 'ef-kpis-extras', 'ef-kpis-vazio', 'ef-kpi-extra-input', 'kpiCampo');
+  renderExtrasEdicaoFechamento(grupoKpi, 'canaisVendaExtras', d.canaisVendaExtras, 'ef-canais-extras', 'ef-canais-vazio', 'ef-canal-extra-input', 'canalCampo');
+  renderExtrasEdicaoFechamento(grupoKpi, 'formasPagamentoExtras', d.formasPagamentoExtras, 'ef-formas-extras', 'ef-formas-vazio', 'ef-forma-extra-input', 'formaCampo');
 
   const linhaMesclada = DATA.find(x=>x.id===id);
   const avisoSangria = document.getElementById('fech-aviso-sangria');
@@ -1296,7 +1270,7 @@ async function salvarEdicaoFechamento(){
   const msg = document.getElementById('fech-msg');
   msg.classList.add('hidden');
   const mudancas = { gerente: document.getElementById('ef-gerente').value, observacao: document.getElementById('ef-observacao').value };
-  camposEdicaoAplicaveis(FECHAMENTO_EDITANDO_GRUPO).forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
+  CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
   const mudancasKpis = {};
   document.querySelectorAll('.ef-kpi-extra-input').forEach(el=>{ mudancasKpis[el.dataset.kpiCampo] = el.value; });
   const mudancasCanais = {};

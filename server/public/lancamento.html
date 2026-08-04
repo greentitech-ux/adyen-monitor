@@ -196,34 +196,14 @@
 
     <div class="secao">
       <div class="secao-titulo">Canais de venda</div>
-      <div id="canais-fixos">
-        <div class="grid2">
-          <div><label>Delivery</label><input type="number" step="0.01" inputmode="decimal" id="f-delivery"></div>
-          <div><label>Carryout</label><input type="number" step="0.01" inputmode="decimal" id="f-carryout"></div>
-        </div>
-        <div class="grid2">
-          <div><label>Pickup</label><input type="number" step="0.01" inputmode="decimal" id="f-pickup"></div>
-          <div><label>Loja (salão)</label><input type="number" step="0.01" inputmode="decimal" id="f-loja"></div>
-        </div>
-      </div>
       <div class="grid2 hidden" id="canais-extras-container" style="margin-top:6px;"></div>
+      <div class="sub hidden" id="canais-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
     </div>
 
     <div class="secao">
       <div class="secao-titulo">Formas de pagamento</div>
-      <div id="formas-fixos">
-        <div class="grid2">
-          <div><label>Ifood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
-          <div id="wrap-food99"><label>99Food</label><input type="number" step="0.01" inputmode="decimal" id="f-food99"></div>
-        </div>
-        <div class="grid2">
-          <div><label>Adyen</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
-          <div><label>Pix CNPJ</label><input type="number" step="0.01" inputmode="decimal" id="f-pixCnpj"></div>
-        </div>
-        <label>Outros</label>
-        <input type="number" step="0.01" inputmode="decimal" id="f-outros">
-      </div>
       <div class="grid2 hidden" id="formas-extras-container" style="margin-top:6px;"></div>
+      <div class="sub hidden" id="formas-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
     </div>
 
     <div class="secao">
@@ -246,11 +226,8 @@
 
     <div class="secao">
       <div class="secao-titulo">KPI's</div>
-      <div class="grid2">
-        <div><label>TC (tíquete médio)</label><input type="number" step="0.01" inputmode="decimal" id="f-tc"></div>
-        <div><label>Cancelados</label><input type="number" step="0.01" inputmode="decimal" id="f-cancelados"></div>
-      </div>
       <div class="grid2 hidden" id="kpis-extras-container" style="margin-top:6px;"></div>
+      <div class="sub hidden" id="kpis-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
         <div class="linha"><span>Sangria do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
@@ -485,8 +462,8 @@ function atualizarResumo(){
   // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
   // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
   const g = (id)=>num(document.getElementById(id).value);
-  const faturamento = +(g('f-delivery')+g('f-carryout')+g('f-pickup')+g('f-loja')+somaExtras('canal-extra-input')).toFixed(2);
-  const totalDeclarado = +(somaMaquinas+g('f-ifood')+g('f-food99')+g('f-pix')+g('f-pixCnpj')+g('f-outros')+g('f-entradaDinheiro')+somaExtras('forma-extra-input')).toFixed(2);
+  const faturamento = +(somaExtras('canal-extra-input')).toFixed(2);
+  const totalDeclarado = +(somaMaquinas+g('f-entradaDinheiro')+somaExtras('forma-extra-input')).toFixed(2);
   document.getElementById('resumo-faturamento').textContent = fmtMoney(faturamento);
   document.getElementById('resumo-declarado').textContent = fmtMoney(totalDeclarado);
 
@@ -495,27 +472,26 @@ function atualizarResumo(){
   elDif.textContent = fmtMoney(dif);
   elDif.className = 'dif ' + (Math.abs(dif) < 0.01 ? 'ok' : 'bad');
 }
-['f-delivery','f-carryout','f-pickup','f-loja','f-ifood','f-food99','f-pix','f-pixCnpj','f-outros','f-entradaDinheiro'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', atualizarResumo);
-});
+document.getElementById('f-entradaDinheiro').addEventListener('input', atualizarResumo);
 
-// grupos (franquias) cadastrados em /grupos.html - cada um pode ter KPI's
-// extras proprios, alem de TC/Cancelados que sao fixos pra todo mundo (ver
-// grupos.js). Diferente de grupoDaUnidade() acima, que so distingue
-// ARCFOOD x BRAVO pro campo 99Food - aqui e um agrupamento mais fino,
-// configuravel pelo Master, sem precisar de codigo novo por franquia.
+// grupos (franquias) cadastrados em /grupos.html - cada loja so mostra os
+// campos de Canais de venda/Formas de pagamento/KPI's que o Master cadastrou
+// pro grupo dela em /grupos.html - nao existe mais campo fixo/padrao pra
+// ninguem (nem ARCFOOD): loja sem grupo configurado nao tem nenhuma opcao
+// nessas 3 secoes ate o Master cadastrar (ver "vazio" abaixo).
 let GRUPOS_KPI = [];
 function grupoKpiDaUnidade(unidade){
   return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
 }
-// generico pras 3 frentes de campo extra (Canais de venda, Formas de
-// pagamento, KPI's) - so muda a chave lida do grupo, o id do container e a
-// classe usada pra achar os inputs depois (leitura no submit e soma no
+// generico pras 3 frentes de campo (Canais de venda, Formas de pagamento,
+// KPI's) - so muda a chave lida do grupo, o id do container/mensagem-vazia e
+// a classe usada pra achar os inputs depois (leitura no submit e soma no
 // resumo). Ver grupos.js/fechamentosLive.js pro mesmo padrao no servidor.
-function renderExtrasGrupo(unidade, chaveGrupo, containerId, classe){
+function renderExtrasGrupo(unidade, chaveGrupo, containerId, vazioId, classe){
   const grupo = grupoKpiDaUnidade(unidade);
   const campos = grupo ? (grupo[chaveGrupo]||[]) : [];
   const container = document.getElementById(containerId);
+  document.getElementById(vazioId).classList.toggle('hidden', !!campos.length);
   if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
   container.classList.remove('hidden');
   container.innerHTML = campos.map(k=>`
@@ -533,41 +509,18 @@ function somaExtras(classe){
   document.querySelectorAll('.'+classe).forEach(el=>{ s += num(el.value); });
   return s;
 }
-function renderKpisExtras(unidade){ renderExtrasGrupo(unidade, 'kpisExtras', 'kpis-extras-container', 'kpi-extra-input'); }
+function renderKpisExtras(unidade){ renderExtrasGrupo(unidade, 'kpisExtras', 'kpis-extras-container', 'kpis-vazio', 'kpi-extra-input'); }
 function lerKpisExtras(){ return lerExtrasGrupo('kpi-extra-input'); }
-function renderCanaisExtras(unidade){ renderExtrasGrupo(unidade, 'canaisVendaExtras', 'canais-extras-container', 'canal-extra-input'); }
+function renderCanaisExtras(unidade){ renderExtrasGrupo(unidade, 'canaisVendaExtras', 'canais-extras-container', 'canais-vazio', 'canal-extra-input'); }
 function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
-function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'forma-extra-input'); }
+function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'formas-vazio', 'forma-extra-input'); }
 function lerFormasExtras(){ return lerExtrasGrupo('forma-extra-input'); }
 
-// os campos fixos (Delivery/Carryout/... e Ifood/Adyen/.../Outros) sao o
-// padrao pra quem nao configurou nada no grupo - assim que o grupo define os
-// proprios campos de Canais de venda/Formas de pagamento, os fixos saem de
-// cena (senao contam junto no Faturamento/Total declarado e da o valor em
-// dobro). Limpa o valor ao esconder pra nao sobrar lixo de uma loja anterior.
-const CAMPOS_FIXOS_CANAIS = ['delivery','carryout','pickup','loja'];
-const CAMPOS_FIXOS_FORMAS = ['ifood','food99','pix','pixCnpj','outros'];
-function usaCanaisCustom(unidade){ const g = grupoKpiDaUnidade(unidade); return !!(g && (g.canaisVendaExtras||[]).length); }
-function usaFormasCustom(unidade){ const g = grupoKpiDaUnidade(unidade); return !!(g && (g.formasPagamentoExtras||[]).length); }
-function toggleCamposFixos(containerId, esconder){
-  const el = document.getElementById(containerId);
-  el.classList.toggle('hidden', esconder);
-  if(esconder) el.querySelectorAll('input').forEach(i=>i.value='');
-}
-function camposFixosAplicaveis(unidade){
-  const semCanais = usaCanaisCustom(unidade);
-  const semFormas = usaFormasCustom(unidade);
-  return CAMPOS_NUMERICOS.filter(c=>
-    !(semCanais && CAMPOS_FIXOS_CANAIS.includes(c)) &&
-    !(semFormas && CAMPOS_FIXOS_FORMAS.includes(c))
-  );
-}
+// CAMPOS_NUMERICOS fora dessas 3 secoes: Caixa/Maquininhas/Sangria continuam
+// como antes, so os fixos de Canais/Formas/KPI's saem de cena globalmente
+const CAMPOS_NUMERICOS_MASTER = CAMPOS_NUMERICOS.filter(c=>!['delivery','carryout','pickup','loja','ifood','food99','pix','pixCnpj','outros','tc','cancelados'].includes(c));
 
 function aplicarFranquia(unidade){
-  const grupo = grupoDaUnidade(unidade);
-  document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
-  toggleCamposFixos('canais-fixos', usaCanaisCustom(unidade));
-  toggleCamposFixos('formas-fixos', usaFormasCustom(unidade));
   renderKpisExtras(unidade);
   renderCanaisExtras(unidade);
   renderFormasExtras(unidade);
@@ -725,7 +678,7 @@ function abrirEdicao(id){
   EDITANDO_ID = id;
   const f = MEUS.find(x=>x.id===id);
   document.getElementById('edicao-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado o fechamento não pode ser mudado direto; o pedido vai para aprovação do Master.`;
-  document.getElementById('e-campo').innerHTML = camposFixosAplicaveis(f.unidade).map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
+  document.getElementById('e-campo').innerHTML = CAMPOS_NUMERICOS_MASTER.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
   document.getElementById('e-valor').value = '';
   document.getElementById('e-motivo').value = '';
   document.getElementById('msg-edicao').classList.add('hidden');
@@ -762,7 +715,7 @@ function abrirEditarMaster(id){
   document.getElementById('m-gerente').value = f.gerente || '';
   document.getElementById('m-observacao').value = f.observacao || '';
   document.getElementById('m-motivo').value = '';
-  document.getElementById('m-campos-numericos').innerHTML = camposFixosAplicaveis(f.unidade).map(c=>
+  document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS_MASTER.map(c=>
     `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="0.01" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
   ).join('');
   const grupoKpi = grupoKpiDaUnidade(f.unidade);
@@ -805,7 +758,7 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
   msg.classList.add('hidden');
   const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
   const mudancas = {};
-  camposFixosAplicaveis(f.unidade).forEach(c=>{
+  CAMPOS_NUMERICOS_MASTER.forEach(c=>{
     const v = num(document.getElementById('m-'+c).value);
     if(v !== num(f[c])) mudancas[c] = v;
   });
@@ -873,12 +826,11 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
     });
     campos.adyen = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
     campos.totalSaida = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
-    if(grupo!=='ARCFOOD') campos.food99 = 0;
     // Faturamento/Total declarado sao sempre recalculados no servidor (ver
     // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
     // completude do payload, nao por confiança nesse numero
-    campos.faturamento = num(campos.delivery) + num(campos.carryout) + num(campos.pickup) + num(campos.loja) + somaExtras('canal-extra-input');
-    campos.totalDeclarado = num(campos.adyen) + num(campos.ifood) + num(campos.food99) + num(campos.pix) + num(campos.pixCnpj) + num(campos.outros) + num(campos.entradaDinheiro) + somaExtras('forma-extra-input');
+    campos.faturamento = somaExtras('canal-extra-input');
+    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtras('forma-extra-input');
 
     const body = {
       unidade,
