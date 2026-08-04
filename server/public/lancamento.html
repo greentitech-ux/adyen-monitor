@@ -122,6 +122,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
 </nav>
@@ -243,6 +244,7 @@
         <div><label>TC (tíquete médio)</label><input type="number" step="0.01" inputmode="decimal" id="f-tc"></div>
         <div><label>Cancelados</label><input type="number" step="0.01" inputmode="decimal" id="f-cancelados"></div>
       </div>
+      <div class="grid2 hidden" id="kpis-extras-container" style="margin-top:6px;"></div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
         <div class="linha"><span>Sangria do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
@@ -296,6 +298,7 @@
         <div><label>Gerente responsável</label><input type="text" id="m-gerente"></div>
       </div>
       <div class="grid2" id="m-campos-numericos"></div>
+      <div class="grid2" id="m-kpis-extras" style="margin-top:6px;"></div>
       <label>Observação</label>
       <textarea id="m-observacao"></textarea>
       <label>Motivo da alteração (opcional, fica registrado no histórico do fechamento)</label>
@@ -358,6 +361,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dominos Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
@@ -487,9 +491,35 @@ function atualizarResumo(){
   document.getElementById(id).addEventListener('input', atualizarResumo);
 });
 
+// grupos (franquias) cadastrados em /grupos.html - cada um pode ter KPI's
+// extras proprios, alem de TC/Cancelados que sao fixos pra todo mundo (ver
+// grupos.js). Diferente de grupoDaUnidade() acima, que so distingue
+// ARCFOOD x BRAVO pro campo 99Food - aqui e um agrupamento mais fino,
+// configuravel pelo Master, sem precisar de codigo novo por franquia.
+let GRUPOS_KPI = [];
+function grupoKpiDaUnidade(unidade){
+  return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
+}
+function renderKpisExtras(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('kpis-extras-container');
+  if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>`
+    <div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>
+  `).join('');
+}
+function lerKpisExtras(){
+  const out = {};
+  document.querySelectorAll('.kpi-extra-input').forEach(el=>{ out[el.dataset.kpiCampo] = el.value; });
+  return out;
+}
+
 function aplicarFranquia(unidade){
   const grupo = grupoDaUnidade(unidade);
   document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
+  renderKpisExtras(unidade);
 }
 document.getElementById('f-unidade').addEventListener('change', (ev)=>{ aplicarFranquia(ev.target.value); carregarSangriaDoDia(); });
 document.getElementById('f-data').addEventListener('input', carregarSangriaDoDia);
@@ -683,6 +713,11 @@ function abrirEditarMaster(id){
   document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS.map(c=>
     `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="0.01" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
   ).join('');
+  const grupoKpi = grupoKpiDaUnidade(f.unidade);
+  const kpisDef = grupoKpi ? (grupoKpi.kpisExtras||[]) : [];
+  document.getElementById('m-kpis-extras').innerHTML = kpisDef.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" class="m-kpi-extra-input" value="${num((f.kpisExtras||{})[k.campo])}"></div>`
+  ).join('');
   document.getElementById('msg-master').classList.add('hidden');
   document.getElementById('overlay-master').classList.remove('hidden');
 }
@@ -719,11 +754,17 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
   const observacao = document.getElementById('m-observacao').value;
   if(observacao !== (f.observacao||'')) mudancas.observacao = observacao;
   const motivo = document.getElementById('m-motivo').value;
-  if(!Object.keys(mudancas).length){ fecharMaster(); return; }
+  const mudancasKpis = {};
+  document.querySelectorAll('.m-kpi-extra-input').forEach(el=>{
+    const campo = el.dataset.kpiCampo;
+    const v = num(el.value);
+    if(v !== num((f.kpisExtras||{})[campo])) mudancasKpis[campo] = v;
+  });
+  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length){ fecharMaster(); return; }
   try{
     const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}/editar-direto`, {
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, motivo }),
+      body: JSON.stringify({ mudancas, mudancasKpis, motivo }),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao salvar');
@@ -774,6 +815,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       data: document.getElementById('f-data').value,
       gerente: document.getElementById('f-gerente').value,
       campos,
+      kpisExtras: lerKpisExtras(),
       observacao: document.getElementById('f-observacao').value,
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
       detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
@@ -815,6 +857,7 @@ async function boot(){
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
 
   const podeLancamento = secoes.includes('lancamento');
   const podeSangria = secoes.includes('sangria');
@@ -835,6 +878,7 @@ async function boot(){
   const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
 
   if(podeLancamento){
+    try{ GRUPOS_KPI = await fetch('/api/grupos').then(r=>r.json()); }catch(e){ GRUPOS_KPI = []; }
     const selUnidade = document.getElementById('f-unidade');
     selUnidade.innerHTML = opcoesUnidades(unidades);
     document.getElementById('f-data').value = hojeBrasilia();

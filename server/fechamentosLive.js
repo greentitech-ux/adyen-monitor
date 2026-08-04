@@ -58,7 +58,23 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao || item.valor);
 }
 
-async function create({ unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
+// KPI's extras definidos por grupo (ver grupos.js) - campo:valor livre, nao
+// tem uma lista fixa igual CAMPOS_NUMERICOS porque cada franquia define os
+// proprios (Master monta pela tela de Grupos). Aqui so limita tamanho/tipo,
+// quem decide QUAIS campos fazem sentido pra cada unidade e o cadastro do
+// grupo, nao esse modulo.
+function sanitizarKpisExtras(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  const out = {};
+  Object.entries(obj).slice(0, 40).forEach(([campo, valor]) => {
+    const chave = String(campo).slice(0, 60);
+    if (!chave) return;
+    out[chave] = num(valor);
+  });
+  return out;
+}
+
+async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
 
@@ -72,6 +88,7 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, obse
   const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
   recomputarTotais(registro);
+  registro.kpisExtras = sanitizarKpisExtras(kpisExtras);
   registro.observacao = observacao || null;
   registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
   registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
@@ -172,7 +189,7 @@ const CAMPOS_TEXTO = ['gerente', 'observacao'];
 // decidirEdicao). Como o Master e quem aprovaria a propria solicitacao,
 // pedir-e-aprovar pra si mesmo e so atrito - aqui a mudanca e aplicada na
 // hora, mas ainda fica registrada no historico do fechamento pra auditoria
-async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail }) {
+async function editarDireto({ fechamentoId, mudancas, mudancasKpis, motivo, editadoPorEmail }) {
   const atual = await getOne(fechamentoId);
   if (!atual) throw new Error('Fechamento não encontrado.');
   const camposValidos = {};
@@ -180,7 +197,18 @@ async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail })
     if (CAMPOS_NUMERICOS.includes(campo)) camposValidos[campo] = num(valor);
     else if (CAMPOS_TEXTO.includes(campo)) camposValidos[campo] = String(valor ?? '').slice(0, 500);
   });
-  if (!Object.keys(camposValidos).length) throw new Error('Nenhum campo válido para alterar.');
+  // kpisExtras e um mapa livre (campo definido pelo grupo, ver grupos.js) -
+  // aqui e um PATCH: so os campos informados mudam, o resto do mapa
+  // permanece igual (diferente de mudancas, que sobrescreve campo por campo
+  // mas nao apaga os que nao vieram)
+  const kpisValidos = {};
+  Object.entries(mudancasKpis || {}).forEach(([campo, valor]) => {
+    const chave = String(campo).slice(0, 60);
+    if (chave) kpisValidos[chave] = num(valor);
+  });
+  if (!Object.keys(camposValidos).length && !Object.keys(kpisValidos).length) {
+    throw new Error('Nenhum campo válido para alterar.');
+  }
 
   const valoresAnteriores = {};
   Object.keys(camposValidos).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
@@ -188,12 +216,18 @@ async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail })
   recomputarTotais(merged, camposValidos);
   const novosValores = { ...camposValidos, faturamento: merged.faturamento, totalDeclarado: merged.totalDeclarado, diferenca: merged.diferenca };
 
+  let kpisExtrasNovo = atual.kpisExtras || {};
+  if (Object.keys(kpisValidos).length) {
+    kpisExtrasNovo = { ...kpisExtrasNovo, ...kpisValidos };
+    novosValores.kpisExtras = kpisExtrasNovo;
+  }
+
   const historico = [...(atual.historico || []), {
     em: new Date().toISOString(),
     por: editadoPorEmail,
     motivo: (motivo && String(motivo).trim()) || '(edição direta do Master)',
     valoresAnteriores,
-    valoresNovos: camposValidos,
+    valoresNovos: Object.keys(kpisValidos).length ? { ...camposValidos, kpisExtras: kpisValidos } : camposValidos,
   }];
 
   const ref = COLLECTION.doc(fechamentoId);

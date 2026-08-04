@@ -135,6 +135,7 @@
   <a class="back active" id="nav-solicitacoes-self" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
 </nav>
@@ -303,6 +304,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dominos Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
@@ -827,6 +829,7 @@ async function boot(){
   document.getElementById('nav-ifood').classList.toggle('hidden', !SECOES.includes('ifood'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
 
   if(!SECOES.includes('solicitacoes')){
     document.getElementById('sem-acesso').classList.remove('hidden');
