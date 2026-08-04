@@ -87,6 +87,11 @@
   .tipo-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .anexo-item{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-top:6px;}
   .anexo-item a{color:var(--accent);text-decoration:none;}
+  .link-cliente-box{background:var(--panel2);border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+  .link-cliente-titulo{font-size:12.5px;font-weight:600;margin-bottom:4px;}
+  .link-cliente-sub{font-size:11.5px;color:var(--muted);line-height:1.4;margin-bottom:8px;}
+  .btn-link-cliente{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 12px;border-radius:8px;border:none;background:var(--accent);color:#06202b;cursor:pointer;width:100%;}
+  #link-cliente-msg{margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--ok);word-break:break-all;}
   .kanban-board{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px;align-items:flex-start;}
   .kanban-col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;flex:1 1 300px;min-width:270px;max-width:420px;display:flex;flex-direction:column;max-height:calc(100vh - 340px);min-height:220px;}
   .kanban-col-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 10px;border-bottom:1px solid var(--line);flex:none;}
@@ -156,6 +161,12 @@
 
     <!-- ESTORNO -->
     <div id="campos-estorno" class="hidden">
+      <div class="link-cliente-box">
+        <div class="link-cliente-titulo">📱 Prefere que o cliente mesmo preencha?</div>
+        <div class="link-cliente-sub">Gera um link (com a loja selecionada acima já pré-preenchida) pra mandar pelo WhatsApp - o cliente preenche os dados e anexa o comprovante sozinho, sem precisar de acesso ao sistema.</div>
+        <button type="button" class="btn-link-cliente" onclick="copiarLinkCliente()">🔗 Copiar link pro cliente</button>
+        <div id="link-cliente-msg" class="hidden"></div>
+      </div>
       <label>Nº do pedido (pspReference/merchantReference)</label>
       <input type="text" id="e-pedidoId">
       <label>Observação (motivo do estorno)</label>
@@ -363,6 +374,22 @@ function dataBrasilia(iso){
   const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(iso));
   const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
   return `${o.year}-${o.month}-${o.day}`;
+}
+
+// monta o link do formulario publico de estorno (server/public/estorno-cliente.html)
+// com a loja ja selecionada no formulario interno, pra mandar pro cliente
+// preencher sozinho (WhatsApp etc) - ver tambem o ?unidade= lido la
+async function copiarLinkCliente(){
+  const unidade = document.getElementById('f-unidade').value;
+  const url = location.origin + '/estorno-cliente.html' + (unidade ? ('?unidade=' + encodeURIComponent(unidade)) : '');
+  const msg = document.getElementById('link-cliente-msg');
+  try{
+    await navigator.clipboard.writeText(url);
+    msg.textContent = (unidade ? '✅ Link copiado (loja já vem selecionada): ' : '✅ Link copiado (cliente escolhe a loja): ') + url;
+  }catch(e){
+    msg.textContent = 'Não deu pra copiar automático, mas aqui está o link: ' + url;
+  }
+  msg.classList.remove('hidden');
 }
 
 function selecionarTipo(tipo){
