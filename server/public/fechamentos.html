@@ -140,7 +140,7 @@
 <header>
   <div class="header-top">
     <div>
-      <div class="eyebrow" id="eyebrow-grupos">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
+      <div class="eyebrow" id="eyebrow-grupos">ARCFOOD · Grupo Bravo · Solutions Ti Tech</div>
       <h1>Fechamentos de caixa</h1>
       <div class="sub" id="sync-info">carregando...</div>
     </div>
@@ -398,9 +398,10 @@ function atualizarVisibilidadeGrupos(){
   if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('fech-grupo').value==='ARCFOOD') document.getElementById('fech-grupo').value = '';
   if(!GRUPO_VISIVEL.BRAVO && document.getElementById('fech-grupo').value==='BRAVO') document.getElementById('fech-grupo').value = '';
 
-  const nomes = ['Solutions Ti Tech'];
+  const nomes = [];
   if(GRUPO_VISIVEL.ARCFOOD) nomes.push('ARCFOOD');
   if(GRUPO_VISIVEL.BRAVO) nomes.push('Grupo Bravo');
+  nomes.push('Solutions Ti Tech');
   document.getElementById('eyebrow-grupos').textContent = nomes.join(' · ');
 }
 
