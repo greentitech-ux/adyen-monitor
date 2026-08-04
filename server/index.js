@@ -27,6 +27,7 @@ const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
 const fechamentosReport = require('./fechamentosReport');
 const monitorReport = require('./monitorReport');
+const reportUtil = require('./reportUtil');
 const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
@@ -1967,6 +1968,118 @@ app.get('/api/entregas/meus', requireSection('entregas-lancamento'), async (req,
 // (AppSheet, somente leitura) com os lançamentos ao vivo pela loja
 app.get('/api/entregas', requireSection('entregas'), async (req, res) => {
   res.json(auth.filterByUnidade(req, [...entregasHistoricoData, ...(await entregasLive.listAll())]));
+});
+
+// ---------- relatorios (CSV/PDF) do dashboard de Entregas: Por entregador,
+// Por unidade, Lançamentos - mesmos 3 paineis de entregas.html, com os
+// mesmos filtros de periodo/unidades ativos na tela ----------
+function filtrarEntregasPeriodo(lista, req) {
+  const { inicio, fim, unidades } = req.query;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  return lista.filter((d) =>
+    (!unidadesSet || unidadesSet.has(d.unidade)) &&
+    (!inicio || (d.data || '') >= inicio) &&
+    (!fim || (d.data || '') <= fim)
+  );
+}
+function unidadeNomeEntrega(d) { return d.unidadeNome || d.unidade || '—'; }
+
+function prepararEntregasPorEntregador(rows) {
+  const colunas = [
+    { key: 'entregador', label: 'Entregador' }, { key: 'unidade', label: 'Unid.' },
+    { key: 'corridas', label: 'Corridas' }, { key: 'entrega', label: 'Entregas' }, { key: 'extra', label: 'Extra' },
+    { key: 'valor', label: 'Valor pago' }, { key: 'coopRecebe', label: 'COOP recebe' }, { key: 'tm', label: 'TM' },
+  ];
+  const porEntregador = {};
+  rows.forEach((r) => {
+    const chave = r.entregador + '::' + r.unidade;
+    const c = (porEntregador[chave] ||= { entregador: r.entregador, unidade: unidadeNomeEntrega(r), corridas: 0, entrega: 0, extra: 0, valor: 0, coopRecebe: 0 });
+    c.corridas++; c.entrega += r.entrega || 0; c.extra += r.extra || 0; c.valor += r.valor || 0; c.coopRecebe += r.coopRecebe || 0;
+  });
+  const linhas = Object.values(porEntregador).sort((a, b) => b.valor - a.valor).map((c) => ({
+    entregador: c.entregador, unidade: c.unidade, corridas: c.corridas, entrega: c.entrega, extra: c.extra,
+    valor: reportUtil.fmtMoneyBR(c.valor), coopRecebe: reportUtil.fmtMoneyBR(c.coopRecebe),
+    tm: reportUtil.fmtMoneyBR(c.entrega ? c.valor / c.entrega : 0),
+  }));
+  return { colunas, linhas };
+}
+
+function prepararEntregasPorUnidade(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unid.' }, { key: 'corridas', label: 'Corridas' }, { key: 'entrega', label: 'Entregas' },
+    { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' }, { key: 'foraDeArea', label: 'Fora área' },
+    { key: 'bonus', label: 'Bônus' }, { key: 'ajudaCusto', label: 'Ajuda custo' },
+    { key: 'valor', label: 'Valor pago' }, { key: 'coopRecebe', label: 'COOP recebe' }, { key: 'tm', label: 'TM' },
+  ];
+  const porUnidade = {};
+  rows.forEach((r) => {
+    const c = (porUnidade[r.unidade] ||= { nome: unidadeNomeEntrega(r), corridas: 0, entrega: 0, retorno: 0, extra: 0, foraDeArea: 0, bonus: 0, ajudaCusto: 0, valor: 0, coopRecebe: 0 });
+    c.corridas++; c.entrega += r.entrega || 0; c.retorno += r.retorno || 0; c.extra += r.extra || 0;
+    c.foraDeArea += r.foraDeArea || 0; c.bonus += r.bonus || 0; c.ajudaCusto += r.ajudaCusto || 0;
+    c.valor += r.valor || 0; c.coopRecebe += r.coopRecebe || 0;
+  });
+  const linhas = Object.values(porUnidade).sort((a, b) => b.valor - a.valor).map((c) => ({
+    unidade: c.nome, corridas: c.corridas, entrega: c.entrega, retorno: c.retorno, extra: c.extra, foraDeArea: c.foraDeArea,
+    bonus: reportUtil.fmtMoneyBR(c.bonus), ajudaCusto: reportUtil.fmtMoneyBR(c.ajudaCusto),
+    valor: reportUtil.fmtMoneyBR(c.valor), coopRecebe: reportUtil.fmtMoneyBR(c.coopRecebe),
+    tm: reportUtil.fmtMoneyBR(c.entrega ? c.valor / c.entrega : 0),
+  }));
+  return { colunas, linhas };
+}
+
+function prepararEntregasLancamentos(rows) {
+  const colunas = [
+    { key: 'data', label: 'Data' }, { key: 'unidade', label: 'Unid.' }, { key: 'entregador', label: 'Entregador' },
+    { key: 'entrega', label: 'Entregas' }, { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' },
+    { key: 'pos00hs', label: 'Pos 00hs' }, { key: 'foraDeArea', label: 'Fora área' }, { key: 'bonus', label: 'Bônus' },
+    { key: 'ajudaCusto', label: 'Ajuda custo' }, { key: 'valor', label: 'Valor' }, { key: 'coopRecebe', label: 'COOP' },
+    { key: 'quantTotal', label: 'Qtd. total' }, { key: 'observacao', label: 'Observação' },
+  ];
+  const linhas = [...rows].sort((a, b) => (b.data || '').localeCompare(a.data || '')).map((d) => ({
+    data: reportUtil.fmtDataBR(d.data), unidade: unidadeNomeEntrega(d), entregador: d.entregador || '—',
+    entrega: d.entrega || 0, retorno: d.retorno || 0, extra: d.extra || 0, pos00hs: d.pos00hs || 0, foraDeArea: d.foraDeArea || 0,
+    bonus: reportUtil.fmtMoneyBR(d.bonus), ajudaCusto: reportUtil.fmtMoneyBR(d.ajudaCusto),
+    valor: reportUtil.fmtMoneyBR(d.valor), coopRecebe: reportUtil.fmtMoneyBR(d.coopRecebe),
+    quantTotal: d.quantTotal || 0, observacao: d.observacao || '—',
+  }));
+  return { colunas, linhas };
+}
+
+async function todasEntregasPermitidas(req) {
+  return auth.filterByUnidade(req, [...entregasHistoricoData, ...(await entregasLive.listAll())]);
+}
+
+app.get('/api/entregas/relatorio-entregadores.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
+  const rows = filtrarEntregasPeriodo(await todasEntregasPermitidas(req), req);
+  const { colunas, linhas } = prepararEntregasPorEntregador(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-por-entregador')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Entregas · Por Entregador', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} entregador(es)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-por-entregador') });
+});
+
+app.get('/api/entregas/relatorio-unidades.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
+  const rows = filtrarEntregasPeriodo(await todasEntregasPermitidas(req), req);
+  const { colunas, linhas } = prepararEntregasPorUnidade(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-por-unidade')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Entregas · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-por-unidade') });
+});
+
+app.get('/api/entregas/relatorio-lancamentos.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
+  const rows = filtrarEntregasPeriodo(await todasEntregasPermitidas(req), req);
+  const { colunas, linhas } = prepararEntregasLancamentos(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-lancamentos')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Entregas · Lançamentos', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} lançamento(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-lancamentos') });
 });
 
 app.get('/api/entregas/etiqueta/:id', (req, res, next) => {
