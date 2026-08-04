@@ -199,6 +199,15 @@
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
       </div>
     </div>
+    <div id="d-chat" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">💬 Chat</div>
+      <div class="sub" style="margin:-2px 0 8px;">Master e Admin podem questionar antes de decidir; quem pediu pode responder.</div>
+      <div id="d-chat-lista" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="d-chat-texto" placeholder="Escrever uma mensagem..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarChat();}">
+        <button type="button" class="btn-primary" style="margin-top:0;white-space:nowrap;" onclick="enviarChat()">Enviar</button>
+      </div>
+    </div>
     <div class="msg hidden" id="msg-detalhe"></div>
     <button class="link-btn" style="margin-top:12px;" onclick="fecharDetalhe()">Fechar</button>
   </div>
@@ -383,8 +392,40 @@ function abrirDetalhe(tipo, id){
   document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
 
   document.getElementById('overlay-detalhe').classList.remove('hidden');
+  carregarChat(c.tipo, c.id);
 }
 function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
+
+let CHAT_ATUAL = [];
+async function carregarChat(tipo, id){
+  document.getElementById('d-chat-texto').value = '';
+  try{
+    CHAT_ATUAL = await fetch(`/api/central/${tipo}/${id}/chat`).then(r=>r.json());
+  }catch(e){ CHAT_ATUAL = []; }
+  renderChatLista();
+}
+function renderChatLista(){
+  const el = document.getElementById('d-chat-lista');
+  el.innerHTML = (CHAT_ATUAL && CHAT_ATUAL.length)
+    ? CHAT_ATUAL.map(m=>`
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;">
+        <div style="font-size:11px;color:var(--muted);">${escapeHtml(m.autorEmail||'')} · ${fmtDataHora(m.criadoEm)}</div>
+        <div style="white-space:pre-wrap;">${escapeHtml(m.texto)}</div>
+      </div>`).join('')
+    : '<div style="color:var(--muted);font-size:12px;">Nenhuma mensagem ainda.</div>';
+  el.scrollTop = el.scrollHeight;
+}
+async function enviarChat(){
+  const input = document.getElementById('d-chat-texto');
+  const texto = input.value.trim();
+  if(!texto || !DETALHE_ATUAL) return;
+  try{
+    const resp = await fetch(`/api/central/${DETALHE_ATUAL.tipo}/${DETALHE_ATUAL.id}/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({texto}) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar mensagem.');
+    await carregarChat(DETALHE_ATUAL.tipo, DETALHE_ATUAL.id);
+  }catch(err){ alert(err.message); }
+}
 
 // ---------- Master: editar/excluir qualquer solicitacao direto pela pagina,
 // independente do status - poder total sobre a fila, nao so aprovar/rejeitar ----------
