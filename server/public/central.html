@@ -222,6 +222,10 @@
           <label id="g-valor-label">Valor estimado (opcional)</label>
           <input type="number" step="0.01" id="g-valor">
         </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+          <input type="checkbox" id="g-orcamento" style="width:auto;">
+          <label for="g-orcamento" style="margin:0;font-weight:normal;">É um orçamento (precisa de aprovação de um Admin antes de seguir)</label>
+        </div>
       </div>
 
       <div id="campos-anexo">
@@ -449,6 +453,7 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
         valorEstimado: document.getElementById('g-valor').value,
         observacao: document.getElementById('g-observacao').value,
         itens: TIPO_SELECIONADO==='compra' ? ITENS_COMPRA.map(i=>({descricao:i.descricao, quantidade:i.quantidade})) : [],
+        ehOrcamento: document.getElementById('g-orcamento').checked,
       }));
       for(const file of anexosInput.files) fd.append('anexos', file);
       resp = await fetch('/api/solicitacoes', { method:'POST', body: fd });
