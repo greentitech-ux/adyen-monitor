@@ -904,6 +904,38 @@ app.get('/api/disputes', requireSection('disputas'), async (req, res) => {
   res.json(auth.filterByUnidade(req, (await disputes.listAll()).filter((d) => req.isMaster || !d.unidade || (req.permissions.unidades || []).includes(d.unidade))));
 });
 
+// relatorio (CSV/PDF) da tela de Relatórios de disputa (relatorios.html) -
+// agrupado por pedido igual a tela, cruzando com o pedido (cliente/valor/
+// unidade) - mesmo filtro de status (aba ativa) da tela
+app.get('/api/disputes/relatorio.:formato(csv|pdf)', requireSection('disputas'), async (req, res) => {
+  const { status } = req.query;
+  const permitidas = (await disputes.listAll()).filter((d) => req.isMaster || !d.unidade || (req.permissions.unidades || []).includes(d.unidade));
+  const filtradas = auth.filterByUnidade(req, permitidas).filter((d) => !status || status === 'TODOS' || d.status === status);
+  const ordersById = {};
+  store.allOrders().forEach((o) => { ordersById[o.pedidoId] = o; });
+
+  const colunas = [
+    { key: 'pedidoId', label: 'Pedido' }, { key: 'cliente', label: 'Cliente' }, { key: 'unidade', label: 'Unidade' },
+    { key: 'valor', label: 'Valor' }, { key: 'status', label: 'Status' }, { key: 'contato', label: 'Contato' },
+    { key: 'notas', label: 'Notas' }, { key: 'criadoEm', label: 'Registrado em' },
+  ];
+  const linhas = [...filtradas].sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || '')).map((d) => {
+    const o = ordersById[d.pedidoId] || {};
+    return {
+      pedidoId: d.pedidoId, cliente: o.cliente || 'cliente desconhecido', unidade: o.unidade || d.unidade || '—',
+      valor: reportUtil.fmtMoneyBR(o.valor), status: d.status,
+      contato: [d.nomeContato, d.telefoneContato].filter(Boolean).join(' · ') || '—',
+      notas: d.notas || '—', criadoEm: reportUtil.fmtDataHoraBR(d.criadoEm),
+    };
+  });
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('relatorio-disputas')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Relatório de Disputas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} registro(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('relatorio-disputas') });
+});
+
 app.get('/api/disputes/:pedidoId', requireSection('disputas'), async (req, res) => {
   const lista = await disputes.listByPedido(decodeURIComponent(req.params.pedidoId));
   res.json(lista.filter((d) => disputaPermitida(req, d)));
@@ -1888,7 +1920,7 @@ function fmtMoneyServer(v) {
   return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
+async function todosCardsCentral(req) {
   const [estornos, ajustes, gerais] = await Promise.all([
     refunds.listAll(),
     fechamentosLive.listarEdicoes(),
@@ -1901,7 +1933,53 @@ app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
   ];
   if (!req.isMaster) cards = cards.filter((c) => c.criadoPorId === req.user.id);
   cards.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
-  res.json(cards);
+  return cards;
+}
+
+app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
+  res.json(await todosCardsCentral(req));
+});
+
+// ---------- relatorio (CSV/PDF) do quadro Kanban de central-historico.html -
+// mesmos filtros de loja/grupo/data ativos na tela ----------
+const ARCFOOD_UNIDADES_CODIGOS = new Set(['19821', '19855', '19888', '19889']);
+function grupoDaUnidadeServer(u) { return ARCFOOD_UNIDADES_CODIGOS.has(u) ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
+const TIPOS_CENTRAL_LABEL = { estorno: 'Estorno', 'ajuste-fechamento': 'Ajuste de fechamento', compra: 'Compra', manutencao: 'Manutenção', 'suporte-ti': 'Suporte de TI' };
+
+function filtrarCardsCentral(cards, req) {
+  const { unidade, grupo, dataDe, dataAte } = req.query;
+  return cards.filter((c) => {
+    const dataBrasilia = (c.criadoEm || '').slice(0, 10);
+    return (!unidade || c.unidade === unidade) &&
+      (!grupo || grupoDaUnidadeServer(c.unidade) === grupo) &&
+      (!dataDe || dataBrasilia >= dataDe) &&
+      (!dataAte || dataBrasilia <= dataAte);
+  });
+}
+
+function prepararRelatorioCentral(cards) {
+  const colunas = [
+    { key: 'tipo', label: 'Tipo' }, { key: 'unidade', label: 'Unidade' }, { key: 'titulo', label: 'Título' },
+    { key: 'status', label: 'Status' }, { key: 'criadoPor', label: 'Criado por' }, { key: 'criadoEm', label: 'Criado em' },
+    { key: 'decididoPor', label: 'Decidido por' }, { key: 'decididoEm', label: 'Decidido em' }, { key: 'motivoDecisao', label: 'Motivo da decisão' },
+  ];
+  const linhas = cards.map((c) => ({
+    tipo: TIPOS_CENTRAL_LABEL[c.tipo] || c.tipo, unidade: c.unidadeNome || c.unidade || '—', titulo: c.titulo || '—',
+    status: c.status, criadoPor: c.criadoPorEmail || '—', criadoEm: reportUtil.fmtDataHoraBR(c.criadoEm),
+    decididoPor: c.decididoPorEmail || '—', decididoEm: reportUtil.fmtDataHoraBR(c.decididoEm), motivoDecisao: c.motivoDecisao || '—',
+  }));
+  return { colunas, linhas };
+}
+
+app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes'), async (req, res) => {
+  const cards = filtrarCardsCentral(await todosCardsCentral(req), req);
+  const { colunas, linhas } = prepararRelatorioCentral(cards);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('central-solicitacoes')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, nomeArquivo: reportUtil.slugify('central-solicitacoes') });
 });
 
 // ---------- Chamados de TI (secao "tecnico") - o tecnico so ve os chamados

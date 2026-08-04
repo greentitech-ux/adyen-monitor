@@ -72,6 +72,8 @@
   .badge.REJEITADO{background:var(--bad-dim);color:var(--bad);}
   .tipo-badge{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+  .export-btn{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .export-btn:hover{color:var(--text);border-color:var(--accent);}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
   .overlay.hidden{display:none!important;}
   .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
@@ -139,7 +141,13 @@
 <div id="root" class="hidden">
 
 <div class="panel">
-  <h2><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
+  <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+    <span><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></span>
+    <span style="display:flex;gap:6px;">
+      <button type="button" class="export-btn" onclick="baixarRelatorioCentral('csv')">📄 Relatório CSV</button>
+      <button type="button" class="export-btn" onclick="baixarRelatorioCentral('pdf')">📄 Relatório PDF</button>
+    </span>
+  </h2>
   <div class="grid2" id="filtros-extra" style="margin-bottom:10px;">
     <div><label style="margin:0 0 4px;">Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
     <div><label style="margin:0 0 4px;">Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
@@ -307,6 +315,17 @@ function renderKanban(){
       ? doColuna.map(kcardHtml).join('')
       : '<div class="kanban-empty">Nenhuma aqui.</div>';
   });
+}
+
+// relatorio (CSV/PDF) do quadro inteiro - usa os mesmos filtros de loja/
+// grupo/data ativos na tela
+function baixarRelatorioCentral(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(FILTRO_UNIDADE) params.set('unidade', FILTRO_UNIDADE);
+  if(FILTRO_GRUPO) params.set('grupo', FILTRO_GRUPO);
+  if(FILTRO_DATA_DE) params.set('dataDe', FILTRO_DATA_DE);
+  if(FILTRO_DATA_ATE) params.set('dataAte', FILTRO_DATA_ATE);
+  window.location.href = `/api/central/relatorio.${formato}?${params.toString()}`;
 }
 
 async function carregarCentral(){

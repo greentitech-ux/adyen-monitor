@@ -28,6 +28,9 @@
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .export-row{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px;}
+  .export-btn{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .export-btn:hover{color:var(--text);border-color:var(--accent);}
   .tab{font-family:var(--mono);font-size:11.5px;padding:6px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .tab.active{border-color:var(--accent);color:var(--accent);background:#132029;}
   .cards{display:flex;flex-direction:column;gap:12px;}
@@ -116,6 +119,10 @@
 <div id="sem-acesso" class="empty hidden">Você não tem acesso aos Relatórios de disputa. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
+<div class="export-row">
+  <button type="button" class="export-btn" onclick="baixarRelatorioDisputas('csv')">📄 Relatório CSV</button>
+  <button type="button" class="export-btn" onclick="baixarRelatorioDisputas('pdf')">📄 Relatório PDF</button>
+</div>
 <div class="tabs" id="tabs"></div>
 <div class="cards" id="cards"></div>
 </div>
@@ -184,6 +191,13 @@ function renderTabs(){
 }
 
 function mudarFiltro(t){ FILTRO = t; renderTabs(); render(); }
+
+// relatorio (CSV/PDF) da aba de status ativa no momento
+function baixarRelatorioDisputas(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(FILTRO && FILTRO!=='TODOS') params.set('status', FILTRO);
+  window.location.href = `/api/disputes/relatorio.${formato}?${params.toString()}`;
+}
 
 function render(){
   // agrupa os registros por pedido - um pedido pode ter varios registros ao longo do tempo
