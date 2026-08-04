@@ -1383,7 +1383,7 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
 app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
   try {
     const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
-    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao } = payload;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens } = payload;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -1393,7 +1393,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
     }
     const registro = await solicitacoes.create({
-      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, anexos,
+      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
@@ -1491,7 +1491,7 @@ function normalizarCard(tipo, r) {
   }
   return {
     tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
-    titulo: r.titulo, observacao: r.observacao, anexos: r.anexos || [], valorEstimado: r.valorEstimado,
+    titulo: r.titulo, observacao: r.observacao, anexos: r.anexos || [], valorEstimado: r.valorEstimado, itens: r.itens || [],
     criadoPorId: r.criadoPorId, criadoPorEmail: r.criadoPorEmail,
     motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
     chamadoId: r.chamadoId,
