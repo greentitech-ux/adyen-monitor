@@ -275,6 +275,7 @@
   <div class="fech-modal">
     <h3 id="fech-modal-titulo">Editar fechamento</h3>
     <div class="sub" id="fech-modal-sub"></div>
+    <div class="fech-msg hidden" id="fech-aviso-sangria" style="background:var(--warn-dim);color:var(--warn);"></div>
 
     <div class="secao-titulo">Responsável</div>
     <label>Gerente</label>
@@ -319,9 +320,10 @@
     <label>Motivo da edição (opcional, fica no histórico)</label>
     <textarea id="ef-motivo"></textarea>
 
-    <div style="display:flex;gap:8px;margin-top:14px;">
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
       <button type="button" class="back" style="background:var(--accent);color:#06202b;border-color:var(--accent);cursor:pointer;" onclick="salvarEdicaoFechamento()">💾 Salvar</button>
       <button type="button" class="back" style="cursor:pointer;" onclick="fecharEdicaoFechamento()">Cancelar</button>
+      <button type="button" class="back" style="cursor:pointer;color:var(--bad);border-color:var(--bad);margin-left:auto;" onclick="excluirFechamento(FECHAMENTO_EDITANDO_ID)">🗑️ Remover fechamento</button>
     </div>
     <div class="fech-msg hidden" id="fech-msg"></div>
   </div>
@@ -1182,9 +1184,17 @@ function renderTabela(rows){
 const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','quebra','tc','cancelados','entradaDinheiro','deposito'];
 let FECHAMENTO_EDITANDO_ID = null;
 
-function abrirEdicaoFechamento(id){
-  const d = DATA.find(x=>x.id===id);
-  if(!d) return;
+async function abrirEdicaoFechamento(id){
+  // busca o registro BRUTO (sem mesclar com sangria/planilha) - editar em
+  // cima do valor mesclado da tabela faria a sangria do dia entrar e sair
+  // duas vezes (ela ja soma automatico na leitura, ver sangrias.js)
+  let d;
+  try{
+    d = await fetch(`/api/fechamentos/${id}/bruto`).then(r=>{ if(!r.ok) throw new Error(); return r.json(); });
+  }catch(e){
+    alert('Não foi possível carregar esse fechamento pra edição.');
+    return;
+  }
   FECHAMENTO_EDITANDO_ID = id;
   document.getElementById('fech-modal-titulo').textContent = `Editar fechamento`;
   document.getElementById('fech-modal-sub').textContent = `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}`;
@@ -1192,9 +1202,21 @@ function abrirEdicaoFechamento(id){
   CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ document.getElementById('ef-'+c).value = d[c] ?? 0; });
   document.getElementById('ef-observacao').value = d.observacao || '';
   document.getElementById('ef-motivo').value = '';
+
+  const linhaMesclada = DATA.find(x=>x.id===id);
+  const avisoSangria = document.getElementById('fech-aviso-sangria');
+  const diferencaSaida = linhaMesclada ? +(num(linhaMesclada.totalSaida) - num(d.totalSaida)).toFixed(2) : 0;
+  if(diferencaSaida > 0){
+    avisoSangria.textContent = `⚠️ Esse dia também tem ${fmtMoney(diferencaSaida)} de sangria registrada à parte - some no total exibido na tabela, mas não é editável aqui. Gerencie em Lançamento de fechamento › Últimas sangrias registradas.`;
+    avisoSangria.classList.remove('hidden');
+  } else {
+    avisoSangria.classList.add('hidden');
+  }
+
   document.getElementById('fech-msg').classList.add('hidden');
   document.getElementById('fech-overlay').classList.remove('hidden');
 }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function fecharEdicaoFechamento(){
   document.getElementById('fech-overlay').classList.add('hidden');
   FECHAMENTO_EDITANDO_ID = null;
@@ -1219,6 +1241,7 @@ async function salvarEdicaoFechamento(){
   }
 }
 async function excluirFechamento(id){
+  if(!id) return;
   const d = DATA.find(x=>x.id===id);
   const rotulo = d ? `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}` : id;
   if(!confirm(`Excluir o fechamento de ${rotulo}? Essa ação não pode ser desfeita.`)) return;
@@ -1226,6 +1249,7 @@ async function excluirFechamento(id){
     const resp = await fetch(`/api/fechamentos/${id}`, { method:'DELETE' });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
+    fecharEdicaoFechamento();
     await carregar();
   }catch(err){
     alert(err.message);

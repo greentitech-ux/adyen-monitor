@@ -79,4 +79,41 @@ function comoFechamento(s) {
   };
 }
 
-module.exports = { criar, listAll, listByUnidades, comoFechamento };
+async function getOne(id) {
+  const doc = await COLLECTION.doc(id).get();
+  return doc.exists ? doc.data() : null;
+}
+
+// edicao/exclusao direta - poder do Master de corrigir ou apagar uma
+// sangria lançada errado. Como a sangria só existe nessa coleção (o
+// fechamento só a enxerga mesclada na leitura, ver comoFechamento), editar
+// ou excluir aqui já reflete automaticamente em qualquer lugar que mostra
+// o fechamento mesclado - não precisa (nem dá) mexer no fechamento em si
+async function atualizar(id, { valor, descricao, data }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Sangria não encontrada.');
+  const patch = {};
+  if (valor != null && valor !== '') {
+    const v = num(valor);
+    if (v <= 0) throw new Error('Informe o valor retirado.');
+    patch.valor = v;
+  }
+  if (descricao != null) patch.descricao = String(descricao).slice(0, 300);
+  if (data != null) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
+    patch.data = data;
+  }
+  await ref.update(patch);
+  sangriasCache.invalidar();
+  return getOne(id);
+}
+
+async function remover(id) {
+  const snap = await COLLECTION.doc(id).get();
+  if (!snap.exists) throw new Error('Sangria não encontrada.');
+  await COLLECTION.doc(id).delete();
+  sangriasCache.invalidar();
+}
+
+module.exports = { criar, listAll, listByUnidades, comoFechamento, getOne, atualizar, remover };
