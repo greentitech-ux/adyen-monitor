@@ -27,7 +27,7 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao);
 }
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, criadoPorId, criadoPorEmail }) {
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, criadoPorId, criadoPorEmail }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
@@ -44,6 +44,9 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     observacao: observacao || '',
     itens: tipo === 'compra' ? sanitizarItens(itens) : [], // [{ descricao, quantidade }]
     anexos: Array.isArray(anexos) ? anexos : [], // [{ nome, path, tipo }]
+    // destaca que o pedido e um orcamento (precisa de julgamento de quem tem
+    // a tag Admin antes de aprovar, nao so registro de rotina)
+    ehOrcamento: !!ehOrcamento,
     status: 'PENDENTE',
     criadoPorId,
     criadoPorEmail,
@@ -110,6 +113,7 @@ async function update(id, campos) {
   }
   if (campos.observacao != null) patch.observacao = campos.observacao;
   if (campos.itens != null) patch.itens = (atual.tipo === 'compra') ? sanitizarItens(campos.itens) : [];
+  if (campos.ehOrcamento != null) patch.ehOrcamento = !!campos.ehOrcamento;
   await ref.update(patch);
   solicitacoesCache.invalidar();
   return getOne(id);

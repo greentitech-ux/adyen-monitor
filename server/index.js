@@ -1786,7 +1786,7 @@ app.delete('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) 
 app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
   try {
     const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
-    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens } = payload;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento } = payload;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -1796,7 +1796,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
     }
     const registro = await solicitacoes.create({
-      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos,
+      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
