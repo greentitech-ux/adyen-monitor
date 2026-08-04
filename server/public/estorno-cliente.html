@@ -161,12 +161,22 @@
 </form>
 
 <script>
+// link direto da loja (ex: gerado em Central de Solicitações) vem com
+// ?unidade=codigo - pre-seleciona e trava o campo, pra quem recebeu o link
+// pelo WhatsApp/QR code nao precisar (e nao poder errar) escolher a loja
 async function boot(){
+  const unidadeFixa = new URLSearchParams(location.search).get('unidade');
   try{
     const unidades = await fetch('/api/meta/unidades-publico').then(r=>r.json());
     const sel = document.getElementById('unidade');
-    sel.innerHTML = '<option value="" disabled selected>Escolher</option>' +
-      unidades.map(u=>`<option value="${u.codigo}">${escapeHtml(u.nome)}</option>`).join('');
+    if(unidadeFixa && unidades.some(u=>u.codigo===unidadeFixa)){
+      const nome = unidades.find(u=>u.codigo===unidadeFixa).nome;
+      sel.innerHTML = `<option value="${escapeHtml(unidadeFixa)}" selected>${escapeHtml(nome)}</option>`;
+      sel.disabled = true;
+    } else {
+      sel.innerHTML = '<option value="" disabled selected>Escolher</option>' +
+        unidades.map(u=>`<option value="${u.codigo}">${escapeHtml(u.nome)}</option>`).join('');
+    }
   }catch(e){
     document.getElementById('unidade').innerHTML = '<option value="" disabled selected>Erro ao carregar lojas - recarregue a página</option>';
   }
