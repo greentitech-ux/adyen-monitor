@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajuda · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;overflow-x:hidden;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:14px;font-weight:700;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:640px;line-height:1.5;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .busca-wrap{max-width:420px;margin:0 0 18px;}
+  .busca-wrap input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-size:13px;font-family:var(--sans);}
+  .busca-wrap input:focus{outline:none;border-color:var(--accent);}
+  .toc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px;}
+  .toc a{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);white-space:nowrap;}
+  .toc a:hover{color:var(--text);border-color:var(--accent);}
+  .secao-ajuda{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;scroll-margin-top:16px;}
+  .secao-ajuda[open]{border-color:var(--line);}
+  .secao-ajuda summary{list-style:none;cursor:pointer;padding:16px 18px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;}
+  .secao-ajuda summary::-webkit-details-marker{display:none;}
+  .secao-ajuda summary::after{content:'▸';margin-left:auto;color:var(--muted);font-size:12px;transition:transform .15s ease;}
+  .secao-ajuda[open] summary::after{transform:rotate(90deg);}
+  .secao-ajuda .icone{font-size:16px;}
+  .secao-corpo{padding:0 18px 18px;font-size:13px;line-height:1.65;color:var(--text);}
+  .secao-corpo h3{font-size:12px;font-family:var(--mono);color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px;}
+  .secao-corpo h3:first-child{margin-top:0;}
+  .secao-corpo ol,.secao-corpo ul{margin:6px 0;padding-left:20px;}
+  .secao-corpo li{margin:4px 0;}
+  .secao-corpo p{margin:6px 0;color:var(--text);}
+  .dica{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;margin:10px 0;font-size:12.5px;color:var(--muted);}
+  .dica b{color:var(--text);}
+  .tagpill{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);}
+  .tagpill.master{background:var(--warn-dim);color:var(--warn);}
+  .tagpill.admin{background:#2a1a3d;color:#c299ff;}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>❓ Ajuda</h1>
+        <div class="sub-intro">Guia passo a passo (PAP/POP) de como usar cada área do app. Clique num tópico pra abrir.</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-actions">
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back active" id="nav-ajuda-self" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
+<div class="busca-wrap">
+  <input type="text" id="busca" placeholder="Buscar um assunto (ex: estorno, orçamento, senha)..." oninput="buscar(this.value)">
+</div>
+
+<div class="toc" id="toc"></div>
+
+<div id="lista-secoes"></div>
+<div id="busca-vazio" class="empty hidden">Nenhum tópico encontrado pra essa busca.</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+// cada topico vira um <details> colapsavel - id usado tanto no sumario (TOC)
+// quanto na busca por texto (titulo + corpo)
+const TOPICOS = [
+  { id:'login', icone:'🔑', titulo:'Como entrar no sistema', corpo:`
+    <h3>Passo a passo</h3>
+    <ol>
+      <li>Acesse o endereço do Zenith Ops no navegador.</li>
+      <li>Informe o e-mail e a senha cadastrados pelo Master.</li>
+      <li>Clique em <b>Entrar</b>.</li>
+    </ol>
+    <div class="dica"><b>Esqueceu a senha?</b> Só o Master pode trocar - peça pra ele usar "Nova senha" na página Usuários.</div>
+    <div class="dica"><b>Conta bloqueada?</b> Depois de 3 senhas erradas o acesso trava sozinho. O Master destrava trocando a senha.</div>
+  `},
+  { id:'painel', icone:'🏠', titulo:'Painel (visão geral)', corpo:`
+    <p>É a primeira tela depois do login: mostra um resumo rápido de cada área que você tem acesso (Monitor do dia, Fechamentos de ontem, Entregas de ontem, Central de Solicitações pendentes, Chamados de TI, iFood).</p>
+    <ol>
+      <li>Cada cartão mostra os números principais daquela área.</li>
+      <li>Clique em <b>Abrir →</b> no canto do cartão pra ir direto pra tela completa.</li>
+    </ol>
+  `},
+  { id:'monitor', icone:'📈', titulo:'Monitor (transações Adyen)', corpo:`
+    <p>Mostra em tempo real as transações processadas pela Adyen: aprovadas, recusadas, chargebacks e alertas de possível fraude.</p>
+    <h3>O que dá pra fazer</h3>
+    <ul>
+      <li>Filtrar por loja, período e status.</li>
+      <li>Abrir o histórico de um cliente clicando no pedido.</li>
+      <li>Solicitar um estorno direto de um pedido (vai pra fila de aprovação da Central).</li>
+      <li>Exportar qualquer tabela em CSV ou PDF pelos botões no topo de cada uma.</li>
+    </ul>
+  `},
+  { id:'fechamento', icone:'🧾', titulo:'Lançar Fechamento do dia', corpo:`
+    <h3>Passo a passo</h3>
+    <ol>
+      <li>Abra <b>Fechamento</b> no menu.</li>
+      <li>Escolha a loja e a data (normalmente o dia anterior, D-1).</li>
+      <li>Preencha faturamento, formas de pagamento, canais de venda, sangrias, maquininhas e saídas.</li>
+      <li>Confira o resumo no fim da página antes de enviar.</li>
+      <li>Clique em <b>Lançar</b>.</li>
+    </ol>
+    <div class="dica">Errou algo depois de já ter lançado? Não dá pra editar direto - abra <b>Central</b> → <b>Ajustar Fechamento</b> e peça a correção. Ela entra na fila de aprovação do Master/Admin.</div>
+  `},
+  { id:'fechamentos-painel', icone:'💰', titulo:'Acompanhar Fechamentos', corpo:`
+    <p>Painel de conferência com o histórico de todos os fechamentos lançados, comparativo por unidade e gráfico dos últimos 30 dias.</p>
+    <ol>
+      <li>Use os filtros de período (com o atalho "Ontem") e de loja/grupo.</li>
+      <li>Veja o comparativo por unidade na tabela abaixo do gráfico.</li>
+      <li>Exporte em CSV ou PDF pelos botões da tabela.</li>
+    </ol>
+  `},
+  { id:'entregas', icone:'🛵', titulo:'Entregas', corpo:`
+    <h3>Lançar uma entrega</h3>
+    <ol>
+      <li>Abra <b>Lançar entrega</b>, escolha a loja e a data.</li>
+      <li>Preencha quantidade de corridas, valor e entregador.</li>
+      <li>Envie o lançamento.</li>
+    </ol>
+    <h3>Acompanhar (página Entregas)</h3>
+    <ul>
+      <li>Painel "Lançamento de ontem (D-1)" mostra quais lojas já lançaram e quais faltam.</li>
+      <li>Ticket Médio (TM) e tabela completa por unidade, com filtro de data no mesmo padrão de Fechamentos.</li>
+      <li>Exportação em CSV/PDF nas tabelas "Por entregador" e "Por unidade".</li>
+    </ul>
+  `},
+  { id:'central', icone:'📋', titulo:'Central de Solicitações', corpo:`
+    <p>É onde qualquer loja pede Estorno, Ajuste de Fechamento, Compra, Manutenção ou Suporte de TI - e onde Master/Admin aprovam ou rejeitam esses pedidos.</p>
+    <h3>Lançar uma solicitação</h3>
+    <ol>
+      <li>Abra <b>Central</b> e clique em <b>+ Nova solicitação</b>.</li>
+      <li>Escolha o tipo (Estorno, Ajuste de Fechamento, Compra, Manutenção ou Suporte de TI).</li>
+      <li>Preencha os campos pedidos e anexe foto/orçamento se tiver.</li>
+      <li>Em Compra, Manutenção e Suporte de TI, marque <b>"É um orçamento"</b> se o pedido precisa de uma análise mais cuidadosa antes de aprovar.</li>
+      <li>Envie - a solicitação cai na fila de aprovação.</li>
+    </ol>
+    <h3>Acompanhar (página Histórico)</h3>
+    <ul>
+      <li>Quadro Kanban com 3 colunas: Pendente, Aprovado, Rejeitado.</li>
+      <li>Os 6 botões no topo (Todas + os 5 tipos) mostram a contagem de cada status e filtram o quadro quando clicados.</li>
+      <li>Filtros extras de loja, grupo e período de data.</li>
+      <li>Clique num cartão pra ver todos os detalhes, anexos e o chat da solicitação.</li>
+    </ul>
+    <h3>💬 Chat da solicitação</h3>
+    <p>Dentro do detalhe de qualquer solicitação tem um campo de chat: Master e Admin podem perguntar algo antes de decidir, e quem pediu pode responder direto ali - sem precisar de WhatsApp ou ligação.</p>
+    <h3>✓ Aprovar / rejeitar</h3>
+    <p>Só Master e usuários com a <span class="tagpill admin">⭐ tag Admin</span> conseguem aprovar ou rejeitar. Editar ou excluir uma solicitação continua sendo só do <span class="tagpill master">Master</span>.</p>
+  `},
+  { id:'admin-tag', icone:'⭐', titulo:'Tag Admin: o que é e como usar', corpo:`
+    <p>A tag Admin dá pra um usuário comum o poder de aprovar/rejeitar solicitações da Central, sem precisar virar Master (que tem acesso a tudo, incluindo gestão de usuários).</p>
+    <h3>Como o Master ativa</h3>
+    <ol>
+      <li>Abra <b>Usuários</b>.</li>
+      <li>Na linha da pessoa, clique em <b>Tornar admin</b>.</li>
+      <li>O badge <span class="tagpill admin">⭐ admin</span> aparece na linha dela.</li>
+    </ol>
+    <h3>O que quem tem a tag Admin pode fazer</h3>
+    <ul>
+      <li>Ver todas as solicitações da Central (não só as próprias).</li>
+      <li>Aprovar ou rejeitar Estorno, Ajuste de Fechamento, Compra, Manutenção e Suporte de TI.</li>
+      <li>Participar do chat de qualquer solicitação.</li>
+    </ul>
+    <div class="dica">Admin <b>não</b> pode editar/excluir solicitações direto, nem gerenciar outros usuários - isso continua exclusivo do Master.</div>
+  `},
+  { id:'cofre', icone:'🔐', titulo:'Cofre de senhas', corpo:`
+    <p>Guarda de forma organizada as senhas de sistemas usados pela operação, divididas por Grupo → Subgrupo.</p>
+    <ol>
+      <li>Abra <b>Cofre</b> e navegue pelos grupos/subgrupos até achar o sistema.</li>
+      <li>Clique no ícone de olho pra revelar a senha, ou no de copiar pra copiar direto.</li>
+    </ol>
+    <div class="dica">Você só vê os subgrupos liberados pelo Master pro seu acesso.</div>
+  `},
+  { id:'usuarios', icone:'👤', titulo:'Usuários (Master)', corpo:`
+    <p>Tela exclusiva do Master pra criar e administrar todos os acessos do sistema.</p>
+    <h3>Criar um acesso novo</h3>
+    <ol>
+      <li>Preencha e-mail e senha temporária no formulário do topo.</li>
+      <li>Marque as seções, lojas e subgrupos do Cofre que a pessoa vai poder usar.</li>
+      <li>Clique em <b>Criar acesso</b>.</li>
+    </ol>
+    <h3>Gerenciar um acesso existente</h3>
+    <ul>
+      <li><b>Permissões</b>: muda seções/lojas/subgrupos liberados.</li>
+      <li><b>Horário</b>: restringe o login a um intervalo do dia.</li>
+      <li><b>Tornar admin / Remover admin</b>: dá ou tira o poder de aprovar solicitações da Central.</li>
+      <li><b>Nova senha</b>: troca a senha (e destrava a conta, se estiver bloqueada).</li>
+      <li><b>Ativar/Desativar</b>: liga ou desliga o acesso sem excluir.</li>
+      <li><b>Excluir</b>: remove o acesso de vez.</li>
+    </ul>
+  `},
+  { id:'grupos', icone:'🏷️', titulo:'Grupos (Master)', corpo:`
+    <p>Organiza as lojas em franquias/grupos e permite configurar KPIs extras (canais de venda e formas de pagamento) usados no Fechamento.</p>
+    <ol>
+      <li>Crie ou edite um grupo, associando as lojas que fazem parte dele.</li>
+      <li>Adicione canais de venda ou formas de pagamento extras específicos daquele grupo, se precisar.</li>
+    </ol>
+  `},
+  { id:'tecnico', icone:'🔧', titulo:'Chamados de TI', corpo:`
+    <p>Fila de atendimento técnico - nasce automaticamente quando uma solicitação de Suporte de TI é aprovada na Central, ou pode ser criada direto pelo Master.</p>
+    <ul>
+      <li>O técnico responsável vê só os chamados atribuídos a ele.</li>
+      <li>Ao chegar na loja, ele clica em <b>Iniciar chamado</b>.</li>
+      <li>Ao terminar, clica em <b>Concluir chamado</b> e pode anexar foto do serviço feito.</li>
+    </ul>
+  `},
+  { id:'relatorios', icone:'📊', titulo:'Relatórios de disputa', corpo:`
+    <p>Acompanhamento das disputas/chargebacks abertos pela operadora, com prazo de resposta e status.</p>
+    <ol>
+      <li>Filtre por loja e período.</li>
+      <li>Exporte a lista em CSV ou PDF pelos botões no topo da tabela.</li>
+    </ol>
+  `},
+  { id:'ifood', icone:'🍔', titulo:'iFood', corpo:`
+    <p>Painel de vendas feitas pelo iFood, separado do Monitor porque usa uma integração e regras diferentes da Adyen.</p>
+    <ul>
+      <li>Veja o resumo de vendas do dia e o histórico por período.</li>
+      <li>Exporte as tabelas em CSV/PDF pelos botões no topo.</li>
+    </ul>
+  `},
+];
+
+function renderToc(){
+  document.getElementById('toc').innerHTML = TOPICOS.map(t=>`<a href="#${t.id}" onclick="abrirTopico('${t.id}')">${t.icone} ${escapeHtml(t.titulo)}</a>`).join('');
+}
+// clicar num link do indice so rola ate o <details> - por padrao isso nao
+// abre o accordion sozinho, entao abre explicitamente antes de rolar
+function abrirTopico(id){
+  const el = document.getElementById(id);
+  if(el) el.open = true;
+}
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderSecoes(filtro){
+  const termo = (filtro||'').trim().toLowerCase();
+  const visiveis = TOPICOS.filter(t => !termo || (t.titulo + ' ' + t.corpo).toLowerCase().includes(termo));
+  document.getElementById('busca-vazio').classList.toggle('hidden', visiveis.length>0);
+  document.getElementById('lista-secoes').innerHTML = visiveis.map(t=>`
+    <details class="secao-ajuda" id="${t.id}" ${termo?'open':''}>
+      <summary><span class="icone">${t.icone}</span> ${escapeHtml(t.titulo)}</summary>
+      <div class="secao-corpo">${t.corpo}</div>
+    </details>
+  `).join('');
+}
+function buscar(valor){ renderSecoes(valor); }
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  const me = await res.json();
+  const isMaster = me.role==='master';
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (me.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+
+  renderToc();
+  renderSecoes('');
+  if(location.hash){
+    const alvo = document.querySelector(location.hash);
+    if(alvo){ alvo.open = true; alvo.scrollIntoView({behavior:'smooth', block:'start'}); }
+  }
+}
+boot();
+</script>
+</body>
+</html>
