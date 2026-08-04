@@ -5,11 +5,8 @@
 // corromper o Firestore por engano - o Master consegue restaurar a partir
 // de qualquer um desses arquivos. Mantem so os ultimos RETENCAO_DIAS pra nao
 // crescer pra sempre.
-const admin = require('firebase-admin');
 const db = require('./firestore'); // garante que o app do firebase-admin ja foi inicializado
-
-const bucketName = process.env.FIREBASE_STORAGE_BUCKET || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
-const bucket = admin.storage().bucket(bucketName);
+const { resolverBucket } = require('./storageBucket');
 
 const COLECOES = [
   'transactions', 'orders', 'chargebacks', 'disputes', 'users',
@@ -62,6 +59,7 @@ async function rodarBackup({ forcar = false } = {}) {
   }
   const carimbo = agora.replace(/[:.]/g, '-');
   const caminho = `backups/${carimbo}.json`;
+  const bucket = await resolverBucket();
   await bucket.file(caminho).save(JSON.stringify(dump), { contentType: 'application/json' });
   await limparAntigos();
   await META_DOC.set({ ultimoSucessoEm: new Date().toISOString() }, { merge: true });
@@ -72,6 +70,7 @@ async function rodarBackup({ forcar = false } = {}) {
 }
 
 async function limparAntigos() {
+  const bucket = await resolverBucket();
   const [arquivos] = await bucket.getFiles({ prefix: 'backups/' });
   const limite = Date.now() - RETENCAO_DIAS * 24 * 60 * 60 * 1000;
   await Promise.all(
@@ -82,6 +81,7 @@ async function limparAntigos() {
 }
 
 async function listarBackups() {
+  const bucket = await resolverBucket();
   const [arquivos] = await bucket.getFiles({ prefix: 'backups/' });
   return arquivos
     .map((f) => ({ nome: f.name.replace('backups/', ''), criadoEm: f.metadata.timeCreated, tamanhoBytes: Number(f.metadata.size) || 0 }))

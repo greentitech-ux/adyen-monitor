@@ -110,6 +110,7 @@
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back active" id="nav-tecnico-self" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -136,7 +137,7 @@
     <div id="bloco-iniciar" class="hidden">
       <label>Foto de como está antes de mexer</label>
       <input type="file" id="i-fotos" multiple accept="image/*" capture="environment">
-      <button type="button" class="btn-primary" onclick="iniciarChamado()">📍 Fazer check-in / Iniciar chamado</button>
+      <button type="button" class="btn-primary" id="btn-iniciar" onclick="iniciarChamado()">📍 Fazer check-in / Iniciar chamado</button>
     </div>
 
     <!-- INICIADO: concluir -->
@@ -149,7 +150,7 @@
       <textarea id="c-observacao" placeholder="descreva o serviço realizado"></textarea>
       <label>Foto de como ficou depois</label>
       <input type="file" id="c-fotos" multiple accept="image/*" capture="environment">
-      <button type="button" class="btn-primary" onclick="concluirChamado()">✓ Concluir chamado</button>
+      <button type="button" class="btn-primary" id="btn-concluir" onclick="concluirChamado()">✓ Concluir chamado</button>
     </div>
 
     <!-- CONCLUIDO: so leitura -->
@@ -261,7 +262,9 @@ function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.a
 async function iniciarChamado(){
   if(!DETALHE_ATUAL) return;
   const msg = document.getElementById('msg-detalhe');
+  const btn = document.getElementById('btn-iniciar');
   msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Enviando...';
   try{
     const fd = new FormData();
     for(const file of document.getElementById('i-fotos').files) fd.append('fotosAntes', file);
@@ -272,13 +275,17 @@ async function iniciarChamado(){
     await carregarChamados();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = '📍 Fazer check-in / Iniciar chamado';
   }
 }
 
 async function concluirChamado(){
   if(!DETALHE_ATUAL) return;
   const msg = document.getElementById('msg-detalhe');
+  const btn = document.getElementById('btn-concluir');
   msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Enviando...';
   try{
     const fd = new FormData();
     fd.append('payload', JSON.stringify({
@@ -293,6 +300,8 @@ async function concluirChamado(){
     await carregarChamados();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = '✓ Concluir chamado';
   }
 }
 
@@ -312,6 +321,7 @@ async function boot(){
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
 

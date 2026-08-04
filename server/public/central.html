@@ -67,15 +67,6 @@
   .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
   .msg.ok{background:var(--ok-dim);color:var(--ok);}
   .msg.err{background:var(--bad-dim);color:var(--bad);}
-  .card{border-top:1px solid var(--line);padding:12px 0;cursor:pointer;}
-  .card:first-child{border-top:none;padding-top:0;}
-  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
-  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
-  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
-  .badge.PENDENTE{background:var(--warn-dim);color:var(--warn);}
-  .badge.APROVADO{background:var(--ok-dim);color:var(--ok);}
-  .badge.REJEITADO{background:var(--bad-dim);color:var(--bad);}
-  .tipo-badge{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
   .overlay.hidden{display:none!important;}
@@ -85,25 +76,19 @@
   .tipos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
   .tipo-btn{font-family:var(--sans);font-size:12px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .tipo-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
-  .anexo-item{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-top:6px;}
-  .anexo-item a{color:var(--accent);text-decoration:none;}
   .link-cliente-box{background:var(--panel2);border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;}
   .link-cliente-titulo{font-size:12.5px;font-weight:600;margin-bottom:4px;}
   .link-cliente-sub{font-size:11.5px;color:var(--muted);line-height:1.4;margin-bottom:8px;}
   .btn-link-cliente{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 12px;border-radius:8px;border:none;background:var(--accent);color:#06202b;cursor:pointer;width:100%;}
   #link-cliente-msg{margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--ok);word-break:break-all;}
-  .kanban-board{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px;align-items:flex-start;}
-  .kanban-col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;flex:1 1 300px;min-width:270px;max-width:420px;display:flex;flex-direction:column;max-height:calc(100vh - 340px);min-height:220px;}
-  .kanban-col-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 10px;border-bottom:1px solid var(--line);flex:none;}
-  .kanban-col-header .badge{font-size:11px;}
-  .kanban-count{font-family:var(--mono);color:var(--muted);font-size:11.5px;}
-  .kanban-cards{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
-  .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s ease;}
-  .kcard:hover{border-color:var(--accent);}
-  .kcard .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;font-size:12.5px;font-weight:600;}
-  .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
-  .kanban-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:12px;}
-  @media(max-width:760px){ .kanban-col{min-width:82vw;max-height:none;} }
+  .hero{max-width:640px;text-align:center;padding:36px 20px;}
+  .hero .icone{font-size:34px;margin-bottom:10px;}
+  .hero p{color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 18px;}
+  .hero-acoes{display:flex;flex-direction:column;gap:10px;max-width:340px;margin:0 auto;}
+  .sucesso-box{text-align:center;padding:20px 6px;}
+  .sucesso-box .icone{font-size:32px;margin-bottom:8px;}
+  .sucesso-acoes{display:flex;gap:8px;margin-top:14px;}
+  .sucesso-acoes .btn-primary{margin-top:0;}
 </style>
 </head>
 <body>
@@ -138,6 +123,7 @@
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
   <a class="back active" id="nav-solicitacoes-self" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -149,147 +135,114 @@
 
 <div id="root" class="hidden">
 
-<div class="panel form-wrap">
-  <h2>Nova solicitação</h2>
-  <div class="tipos" id="tipos-btns"></div>
-
-  <form id="form-nova">
-    <div id="campos-comuns">
-      <label>Unidade</label>
-      <select id="f-unidade" required></select>
-    </div>
-
-    <!-- ESTORNO -->
-    <div id="campos-estorno" class="hidden">
-      <div class="link-cliente-box">
-        <div class="link-cliente-titulo">📱 Prefere que o cliente mesmo preencha?</div>
-        <div class="link-cliente-sub">Gera um link (com a loja selecionada acima já pré-preenchida) pra mandar pelo WhatsApp - o cliente preenche os dados e anexa o comprovante sozinho, sem precisar de acesso ao sistema.</div>
-        <button type="button" class="btn-link-cliente" onclick="copiarLinkCliente()">🔗 Copiar link pro cliente</button>
-        <div id="link-cliente-msg" class="hidden"></div>
-      </div>
-      <label>Nº do pedido (pspReference/merchantReference)</label>
-      <input type="text" id="e-pedidoId">
-      <label>Observação (motivo do estorno)</label>
-      <textarea id="e-observacao"></textarea>
-      <label>Sua senha (confirmação)</label>
-      <input type="password" id="e-senha" autocomplete="current-password">
-    </div>
-
-    <!-- AJUSTE DE FECHAMENTO -->
-    <div id="campos-ajuste" class="hidden">
-      <label>Qual fechamento?</label>
-      <select id="a-fechamento"></select>
-      <label>Tipo de correção</label>
-      <div class="tipos">
-        <button type="button" class="tipo-btn active" data-tipocorrecao="campo" onclick="selecionarTipoCorrecao('campo')">Corrigir um campo</button>
-        <button type="button" class="tipo-btn" data-tipocorrecao="item" onclick="selecionarTipoCorrecao('item')">Adicionar item esquecido</button>
-      </div>
-      <div id="ajuste-campo">
-        <label>Qual campo</label>
-        <select id="a-campo"></select>
-        <label>Valor correto</label>
-        <input type="number" step="0.01" id="a-valor">
-      </div>
-      <div id="ajuste-item" class="hidden">
-        <label>O que foi esquecido</label>
-        <div class="tipos">
-          <button type="button" class="tipo-btn active" data-itemtipo="maquininha" onclick="selecionarItemTipo('maquininha')">Maquininha</button>
-          <button type="button" class="tipo-btn" data-itemtipo="saida" onclick="selecionarItemTipo('saida')">Saída de dinheiro</button>
-        </div>
-        <label>Descrição</label>
-        <input type="text" id="a-item-descricao" placeholder="ex: Maquininha Cielo extra">
-        <label>Valor</label>
-        <input type="number" step="0.01" id="a-item-valor">
-      </div>
-      <label>Motivo da correção</label>
-      <textarea id="a-motivo" placeholder="explique o que aconteceu"></textarea>
-    </div>
-
-    <!-- COMPRA / MANUTENCAO / SUPORTE TI -->
-    <div id="campos-gerais" class="hidden">
-      <label id="g-titulo-label">Título</label>
-      <input type="text" id="g-titulo" placeholder="ex: comprar papel térmico">
-      <div id="compra-itens" class="secao hidden" style="border-top:none;margin-top:10px;padding-top:0;">
-        <div class="secao-titulo">Itens da compra</div>
-        <div class="sub" style="margin:-2px 0 8px;">O que precisa comprar, item por item, com a quantidade de cada um.</div>
-        <div id="lista-itens-compra"></div>
-        <button type="button" class="btn-add" onclick="adicionarItemCompra()">+ Adicionar item</button>
-      </div>
-      <div id="wrap-g-observacao">
-        <label>Observação</label>
-        <textarea id="g-observacao" placeholder="detalhe o que precisa"></textarea>
-      </div>
-      <div id="wrap-g-valor">
-        <label id="g-valor-label">Valor estimado (opcional)</label>
-        <input type="number" step="0.01" id="g-valor">
-      </div>
-    </div>
-
-    <div id="campos-anexo">
-      <label>Anexar foto/arquivo (opcional)</label>
-      <input type="file" id="f-anexos" multiple accept="image/*,application/pdf">
-    </div>
-
-    <div class="msg hidden" id="msg-nova"></div>
-    <button class="btn-primary" type="submit" id="btn-nova">Enviar solicitação</button>
-  </form>
-</div>
-
-<div class="panel">
-  <h2><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
-  <div class="grid2" id="filtros-extra" style="margin-bottom:10px;">
-    <div><label style="margin:0 0 4px;">Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
-    <div><label style="margin:0 0 4px;">Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
-      <option value="">Todos</option>
-      <option value="ARCFOOD">ARCFOOD</option>
-      <option value="Grupo Bravo (GBE)">Grupo Bravo (GBE)</option>
-    </select></div>
-    <div><label style="margin:0 0 4px;">De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
-    <div><label style="margin:0 0 4px;">Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
-  </div>
-  <button type="button" class="link-btn" style="margin:-4px 0 10px;" onclick="limparFiltrosExtra()">Limpar filtros de loja/grupo/data</button>
-  <div class="kanban-board" id="kanban-board">
-    <div class="kanban-col" data-status="PENDENTE">
-      <div class="kanban-col-header"><span class="badge PENDENTE">Pendente</span><span class="kanban-count" id="kcount-PENDENTE">0</span></div>
-      <div class="kanban-cards" id="kcards-PENDENTE"></div>
-    </div>
-    <div class="kanban-col" data-status="APROVADO">
-      <div class="kanban-col-header"><span class="badge APROVADO">Aprovado</span><span class="kanban-count" id="kcount-APROVADO">0</span></div>
-      <div class="kanban-cards" id="kcards-APROVADO"></div>
-    </div>
-    <div class="kanban-col" data-status="REJEITADO">
-      <div class="kanban-col-header"><span class="badge REJEITADO">Rejeitado</span><span class="kanban-count" id="kcount-REJEITADO">0</span></div>
-      <div class="kanban-cards" id="kcards-REJEITADO"></div>
-    </div>
+<div class="panel hero">
+  <div class="icone">📋</div>
+  <h2 style="font-size:16px;">Lançar uma solicitação</h2>
+  <p>Estorno, compra, manutenção, suporte de TI ou ajuste de fechamento — escolha o tipo, preencha os dados e envie. Acompanhamento e aprovação ficam no Histórico.</p>
+  <div class="hero-acoes">
+    <button type="button" class="btn-primary" style="margin-top:0;" onclick="abrirModalNova()">+ Nova solicitação</button>
+    <a class="back" href="/central-historico.html">📜 Ver histórico de solicitações</a>
   </div>
 </div>
 
 </div><!-- /#root -->
 
-<div class="overlay hidden" id="overlay-detalhe">
+<div class="overlay hidden" id="overlay-nova">
   <div class="sheet">
-    <h3 id="d-titulo"></h3>
-    <div class="sub" id="d-sub"></div>
-    <div id="d-corpo" style="font-size:13px;display:flex;flex-direction:column;gap:8px;"></div>
-    <div id="d-master-crud" class="hidden" style="display:flex;gap:14px;margin-top:10px;">
-      <button type="button" class="link-btn" id="btn-editar-card" onclick="abrirEdicaoCard()">✏️ Editar</button>
-      <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCard()">🗑️ Excluir</button>
-    </div>
-    <div id="d-editar" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;"></div>
-    <div id="d-master-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-      <div id="d-tecnico-wrap" class="hidden">
-        <label>Técnico responsável</label>
-        <select id="d-tecnico"></select>
+    <h3>Nova solicitação</h3>
+    <div class="tipos" id="tipos-btns"></div>
+
+    <form id="form-nova">
+      <div id="campos-comuns">
+        <label>Unidade</label>
+        <select id="f-unidade" required></select>
       </div>
-      <label>Observação da decisão (opcional)</label>
-      <textarea id="d-motivo-decisao"></textarea>
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button type="button" class="btn-primary" style="margin-top:0;background:var(--ok);" onclick="decidir('APROVADO')">✓ Aprovar</button>
-        <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
+
+      <!-- ESTORNO -->
+      <div id="campos-estorno" class="hidden">
+        <div class="link-cliente-box">
+          <div class="link-cliente-titulo">📱 Prefere que o cliente mesmo preencha?</div>
+          <div class="link-cliente-sub">Gera um link (com a loja selecionada acima já pré-preenchida) pra mandar pelo WhatsApp - o cliente preenche os dados e anexa o comprovante sozinho, sem precisar de acesso ao sistema.</div>
+          <button type="button" class="btn-link-cliente" onclick="copiarLinkCliente()">🔗 Copiar link pro cliente</button>
+          <div id="link-cliente-msg" class="hidden"></div>
+        </div>
+        <label>Nº do pedido (pspReference/merchantReference)</label>
+        <input type="text" id="e-pedidoId">
+        <label>Observação (motivo do estorno)</label>
+        <textarea id="e-observacao"></textarea>
+        <label>Sua senha (confirmação)</label>
+        <input type="password" id="e-senha" autocomplete="current-password">
+      </div>
+
+      <!-- AJUSTE DE FECHAMENTO -->
+      <div id="campos-ajuste" class="hidden">
+        <label>Qual fechamento?</label>
+        <select id="a-fechamento"></select>
+        <label>Tipo de correção</label>
+        <div class="tipos">
+          <button type="button" class="tipo-btn active" data-tipocorrecao="campo" onclick="selecionarTipoCorrecao('campo')">Corrigir um campo</button>
+          <button type="button" class="tipo-btn" data-tipocorrecao="item" onclick="selecionarTipoCorrecao('item')">Adicionar item esquecido</button>
+        </div>
+        <div id="ajuste-campo">
+          <label>Qual campo</label>
+          <select id="a-campo"></select>
+          <label>Valor correto</label>
+          <input type="number" step="0.01" id="a-valor">
+        </div>
+        <div id="ajuste-item" class="hidden">
+          <label>O que foi esquecido</label>
+          <div class="tipos">
+            <button type="button" class="tipo-btn active" data-itemtipo="maquininha" onclick="selecionarItemTipo('maquininha')">Maquininha</button>
+            <button type="button" class="tipo-btn" data-itemtipo="saida" onclick="selecionarItemTipo('saida')">Saída de dinheiro</button>
+          </div>
+          <label>Descrição</label>
+          <input type="text" id="a-item-descricao" placeholder="ex: Maquininha Cielo extra">
+          <label>Valor</label>
+          <input type="number" step="0.01" id="a-item-valor">
+        </div>
+        <label>Motivo da correção</label>
+        <textarea id="a-motivo" placeholder="explique o que aconteceu"></textarea>
+      </div>
+
+      <!-- COMPRA / MANUTENCAO / SUPORTE TI -->
+      <div id="campos-gerais" class="hidden">
+        <label id="g-titulo-label">Título</label>
+        <input type="text" id="g-titulo" placeholder="ex: comprar papel térmico">
+        <div id="compra-itens" class="secao hidden" style="border-top:none;margin-top:10px;padding-top:0;">
+          <div class="secao-titulo">Itens da compra</div>
+          <div class="sub" style="margin:-2px 0 8px;">O que precisa comprar, item por item, com a quantidade de cada um.</div>
+          <div id="lista-itens-compra"></div>
+          <button type="button" class="btn-add" onclick="adicionarItemCompra()">+ Adicionar item</button>
+        </div>
+        <div id="wrap-g-observacao">
+          <label>Observação</label>
+          <textarea id="g-observacao" placeholder="detalhe o que precisa"></textarea>
+        </div>
+        <div id="wrap-g-valor">
+          <label id="g-valor-label">Valor estimado (opcional)</label>
+          <input type="number" step="0.01" id="g-valor">
+        </div>
+      </div>
+
+      <div id="campos-anexo">
+        <label>Anexar foto/arquivo (opcional)</label>
+        <input type="file" id="f-anexos" multiple accept="image/*,application/pdf">
+      </div>
+
+      <div class="msg hidden" id="msg-nova"></div>
+      <button class="btn-primary" type="submit" id="btn-nova">Enviar solicitação</button>
+      <button class="link-btn" type="button" style="margin-top:12px;" onclick="fecharModalNova()">Cancelar</button>
+    </form>
+
+    <div id="sucesso-nova" class="sucesso-box hidden">
+      <div class="icone">✅</div>
+      <h3>Solicitação enviada!</h3>
+      <p class="sub" style="font-family:var(--sans);color:var(--muted);">Ela já está na fila de aprovação, disponível no Histórico.</p>
+      <div class="sucesso-acoes">
+        <button type="button" class="btn-primary" onclick="lancarOutra()">+ Lançar outra</button>
+        <a class="back" href="/central-historico.html">📜 Ver histórico</a>
       </div>
     </div>
-    <div class="msg hidden" id="msg-detalhe"></div>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharDetalhe()">Fechar</button>
   </div>
 </div>
 
@@ -307,6 +260,17 @@ window.fetch = (url, opts = {}) => {
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+function abrirModalNova(){
+  document.getElementById('form-nova').classList.remove('hidden');
+  document.getElementById('sucesso-nova').classList.add('hidden');
+  document.getElementById('overlay-nova').classList.remove('hidden');
+}
+function fecharModalNova(){ document.getElementById('overlay-nova').classList.add('hidden'); }
+function lancarOutra(){
+  document.getElementById('sucesso-nova').classList.add('hidden');
+  document.getElementById('form-nova').classList.remove('hidden');
+}
 
 const ARCFOOD_UNIDADES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
 const BRAVO_UNIDADES_NOMES = {
@@ -345,35 +309,16 @@ let ME = null;
 let IS_MASTER = false;
 let SECOES = [];
 let MEUS_FECHAMENTOS = [];
-let TECNICOS = [];
-let CARDS = [];
 let TIPO_SELECIONADO = 'compra';
 let TIPO_CORRECAO = 'campo';
 let ITEM_TIPO = 'maquininha';
-let FILTRO_UNIDADE = '';
-let FILTRO_GRUPO = '';
-let FILTRO_DATA_DE = '';
-let FILTRO_DATA_ATE = '';
-function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
-let DETALHE_ATUAL = null;
 let ITENS_COMPRA = [];
 let SEQ_ITEM_COMPRA = 0;
 
-function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-const FUSO_BR = 'America/Sao_Paulo';
-function fmtDataHora(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('pt-BR',{timeZone:FUSO_BR}); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function pad2(n){ return String(n).padStart(2,'0'); }
-function hojeBrasilia(){
-  const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
-  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
-  return `${o.year}-${o.month}-${o.day}`;
-}
-function dataBrasilia(iso){
-  if(!iso) return '';
-  const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(iso));
-  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
-  return `${o.year}-${o.month}-${o.day}`;
+
+function iconeTipo(tipo){
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
 }
 
 // monta o link do formulario publico de estorno (server/public/estorno-cliente.html)
@@ -511,337 +456,16 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
 
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao enviar solicitação.');
-    msg.textContent = 'Solicitação enviada com sucesso.'; msg.className = 'msg ok';
     document.getElementById('form-nova').reset();
     ITENS_COMPRA = []; renderItensCompra();
-    await carregarCentral();
+    document.getElementById('form-nova').classList.add('hidden');
+    document.getElementById('sucesso-nova').classList.remove('hidden');
   }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err';
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }finally{
-    msg.classList.remove('hidden');
     btn.disabled = false;
   }
 });
-
-function aplicarFiltrosExtra(){
-  FILTRO_UNIDADE = document.getElementById('filtro-unidade').value;
-  FILTRO_GRUPO = document.getElementById('filtro-grupo').value;
-  FILTRO_DATA_DE = document.getElementById('filtro-data-de').value;
-  FILTRO_DATA_ATE = document.getElementById('filtro-data-ate').value;
-  renderKanban();
-}
-function limparFiltrosExtra(){
-  document.getElementById('filtro-unidade').value = '';
-  document.getElementById('filtro-grupo').value = '';
-  document.getElementById('filtro-data-de').value = '';
-  document.getElementById('filtro-data-ate').value = '';
-  aplicarFiltrosExtra();
-}
-
-function iconeTipo(tipo){
-  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
-}
-
-const STATUS_COLUNAS = ['PENDENTE','APROVADO','REJEITADO'];
-
-function kcardHtml(c){
-  return `
-    <div class="kcard" onclick="abrirDetalhe('${c.tipo}','${c.id}')">
-      <div class="linha1">
-        <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
-      </div>
-      <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
-      <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
-    </div>`;
-}
-
-function renderKanban(){
-  let filtradas = CARDS;
-  if(FILTRO_UNIDADE) filtradas = filtradas.filter(c=>c.unidade===FILTRO_UNIDADE);
-  if(FILTRO_GRUPO) filtradas = filtradas.filter(c=>grupoDaUnidade(c.unidade)===FILTRO_GRUPO);
-  if(FILTRO_DATA_DE) filtradas = filtradas.filter(c=>dataBrasilia(c.criadoEm) >= FILTRO_DATA_DE);
-  if(FILTRO_DATA_ATE) filtradas = filtradas.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
-  document.getElementById('lista-count').textContent = filtradas.length;
-
-  STATUS_COLUNAS.forEach(status=>{
-    const doColuna = filtradas.filter(c=>c.status===status);
-    document.getElementById('kcount-'+status).textContent = doColuna.length;
-    document.getElementById('kcards-'+status).innerHTML = doColuna.length
-      ? doColuna.map(kcardHtml).join('')
-      : '<div class="kanban-empty">Nenhuma aqui.</div>';
-  });
-}
-
-async function carregarCentral(){
-  CARDS = await fetch('/api/central').then(r=>r.json());
-  renderKanban();
-}
-
-function abrirDetalhe(tipo, id){
-  const c = CARDS.find(x=>x.tipo===tipo && x.id===id);
-  if(!c) return;
-  DETALHE_ATUAL = c;
-  document.getElementById('d-titulo').textContent = `${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}`;
-  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}`;
-
-  let corpo = `<div><b>${escapeHtml(c.titulo)}</b></div>`;
-  if(c.itens && c.itens.length){
-    corpo += `<div><b>Itens:</b></div><ul style="margin:0;padding-left:18px;">${c.itens.map(i=>
-      `<li>${escapeHtml(i.descricao)}${i.quantidade!=null && i.quantidade!=='' ? ` · qtd. ${escapeHtml(String(i.quantidade))}` : ''}</li>`
-    ).join('')}</ul>`;
-  }
-  if(c.observacao) corpo += `<div style="white-space:pre-wrap;">${escapeHtml(c.observacao)}</div>`;
-  if(c.valorEstimado) corpo += `<div>Valor estimado: <b>${fmtMoney(c.valorEstimado)}</b></div>`;
-  if(c.anexos && c.anexos.length){
-    const rota = c.tipo==='ajuste-fechamento' ? `/api/fechamentos/edicoes/anexo/${c.id}`
-      : c.tipo==='estorno' ? `/api/refund-requests/anexo/${c.id}`
-      : `/api/solicitacoes/anexo/${c.id}`;
-    corpo += c.anexos.map((a,i)=>`<div class="anexo-item">📎 <a href="${rota}/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(a.nome)}</a></div>`).join('');
-  }
-  if(c.status!=='PENDENTE'){
-    corpo += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;">
-      <div><b>Decisão:</b> <span class="badge ${c.status}">${c.status}</span> · ${escapeHtml(c.decididoPorEmail||'')} · ${fmtDataHora(c.decididoEm)}</div>
-      ${c.motivoDecisao ? `<div style="white-space:pre-wrap;margin-top:4px;">${escapeHtml(c.motivoDecisao)}</div>` : ''}
-      ${c.chamadoId ? '<div style="margin-top:4px;color:var(--ok);">🔧 Chamado de TI criado</div>' : ''}
-    </div>`;
-  }
-  document.getElementById('d-corpo').innerHTML = corpo;
-
-  const podeDecidir = IS_MASTER && c.status==='PENDENTE';
-  document.getElementById('d-master-acoes').classList.toggle('hidden', !podeDecidir);
-  document.getElementById('d-tecnico-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='suporte-ti'));
-  if(podeDecidir && c.tipo==='suporte-ti'){
-    document.getElementById('d-tecnico').innerHTML = TECNICOS.length
-      ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}">${escapeHtml(t.email)}</option>`).join('')
-      : '<option value="" disabled selected>nenhum técnico cadastrado</option>';
-  }
-  document.getElementById('d-motivo-decisao').value = '';
-  document.getElementById('msg-detalhe').classList.add('hidden');
-
-  document.getElementById('d-editar').classList.add('hidden');
-  document.getElementById('d-corpo').classList.remove('hidden');
-  document.getElementById('d-master-crud').classList.toggle('hidden', !IS_MASTER);
-  document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
-
-  document.getElementById('overlay-detalhe').classList.remove('hidden');
-}
-function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
-
-// ---------- Master: editar/excluir qualquer solicitacao direto pela Central,
-// independente do status - poder total sobre a fila, nao so aprovar/rejeitar ----------
-const MOTIVOS_ESTORNO_CLIENTE = ['Cobrança em duplicidade (cliente pagou duas vezes)','Valor cobrado errado','Pedido cancelado','Cliente desistiu da compra','Erro de operação no caixa','Outro'];
-const FORMAS_PAGAMENTO_CLIENTE = ['Crédito à vista','Crédito parcelado','Débito','Voucher (vale-refeição ou alimentação)','Pix na maquininha','Não sei informar'];
-const BANDEIRAS_CLIENTE = ['Visa','Mastercard','Elo','Pix','Outra / não sei'];
-let ITENS_EDITAR = [];
-let SEQ_ITEM_EDITAR = 0;
-
-function botoesEdicaoHtml(){
-  return `<div style="display:flex;gap:8px;margin-top:12px;">
-    <button type="button" class="btn-primary" style="margin-top:0;" onclick="salvarEdicaoCard()">💾 Salvar</button>
-    <button type="button" class="link-btn" onclick="cancelarEdicaoCard()">Cancelar</button>
-  </div>`;
-}
-
-function campoEdicaoHtml(c){
-  const unidadeOpts = Object.entries(UNIDADES_NOMES).map(([cod,nome])=>`<option value="${cod}" ${cod===c.unidade?'selected':''}>${escapeHtml(nome)}</option>`).join('');
-  if(c.tipo==='estorno'){
-    if(c.origem==='cliente'){
-      return `
-        <label>Loja</label>
-        <select id="ed-unidade">${unidadeOpts}</select>
-        <label>Motivo do estorno</label>
-        <select id="ed-motivoEstorno">${MOTIVOS_ESTORNO_CLIENTE.map(m=>`<option ${m===c.motivoEstorno?'selected':''}>${escapeHtml(m)}</option>`).join('')}</select>
-        <div id="ed-wrap-motivo-outro" class="${c.motivoEstorno==='Outro'?'':'hidden'}">
-          <label>Explique o motivo</label>
-          <textarea id="ed-motivoOutro">${escapeHtml(c.motivoOutro||'')}</textarea>
-        </div>
-        <div class="grid2">
-          <div><label>Valor da venda (R$)</label><input type="number" step="0.01" id="ed-valorVenda" value="${c.valorVenda??''}"></div>
-          <div><label>Valor a estornar (R$)</label><input type="number" step="0.01" id="ed-valorEstornar" value="${c.valorEstornar??''}"></div>
-        </div>
-        <label>Forma de pagamento</label>
-        <select id="ed-formaPagamento">${FORMAS_PAGAMENTO_CLIENTE.map(f=>`<option ${f===c.formaPagamento?'selected':''}>${escapeHtml(f)}</option>`).join('')}</select>
-        <div class="grid2">
-          <div><label>Bandeira</label><select id="ed-bandeira">${BANDEIRAS_CLIENTE.map(b=>`<option ${b===c.bandeira?'selected':''}>${escapeHtml(b)}</option>`).join('')}</select></div>
-          <div><label>Últimos 4 dígitos</label><input type="text" maxlength="4" id="ed-ultimos4" value="${escapeHtml(c.ultimos4||'')}"></div>
-        </div>
-        <div class="grid2">
-          <div><label>Data da venda</label><input type="date" id="ed-dataVenda" value="${c.dataVenda||''}"></div>
-          <div><label>Hora da venda</label><input type="time" id="ed-horaVenda" value="${c.horaVenda||''}"></div>
-        </div>
-        <div class="grid2">
-          <div><label>Nome do cliente</label><input type="text" id="ed-nomeCliente" value="${escapeHtml(c.nomeCliente||'')}"></div>
-          <div><label>Telefone do cliente</label><input type="text" id="ed-telefoneCliente" value="${escapeHtml(c.telefoneCliente||'')}"></div>
-        </div>
-        ${botoesEdicaoHtml()}
-      `;
-    }
-    return `
-      <label>Nº do pedido (pspReference/merchantReference)</label>
-      <input type="text" id="ed-pedidoId" value="${escapeHtml(c.pedidoId||'')}">
-      <label>Observação</label>
-      <textarea id="ed-observacao">${escapeHtml(c.observacao||'')}</textarea>
-      ${botoesEdicaoHtml()}
-    `;
-  }
-  return `
-    <label>${c.tipo==='compra'?'Título':'Solicitação'}</label>
-    <input type="text" id="ed-titulo" value="${escapeHtml(c.titulo||'')}">
-    <label>Loja</label>
-    <select id="ed-unidade">${unidadeOpts}</select>
-    ${c.tipo==='compra' ? `
-      <div class="secao" style="border-top:none;margin-top:10px;padding-top:0;">
-        <div class="secao-titulo">Itens da compra</div>
-        <div id="lista-itens-editar"></div>
-        <button type="button" class="btn-add" onclick="adicionarItemEditar()">+ Adicionar item</button>
-      </div>` : ''}
-    <label>Observação</label>
-    <textarea id="ed-observacao">${escapeHtml(c.observacao||'')}</textarea>
-    <label>Valor ${c.tipo==='compra'?'estimado':'(orçamento, opcional)'}</label>
-    <input type="number" step="0.01" id="ed-valorEstimado" value="${c.valorEstimado??''}">
-    ${botoesEdicaoHtml()}
-  `;
-}
-
-function adicionarItemEditar(){
-  ITENS_EDITAR.push({ id: ++SEQ_ITEM_EDITAR, descricao:'', quantidade:'' });
-  renderItensEditar();
-}
-function removerItemEditar(id){ ITENS_EDITAR = ITENS_EDITAR.filter(i=>i.id!==id); renderItensEditar(); }
-function renderItensEditar(){
-  const el = document.getElementById('lista-itens-editar');
-  if(!el) return;
-  el.innerHTML = ITENS_EDITAR.map(i=>`
-    <div class="linha-item">
-      <input type="text" value="${escapeHtml(i.descricao)}" oninput="ITENS_EDITAR.find(x=>x.id===${i.id}).descricao=this.value" placeholder="nome do item">
-      <input type="number" step="1" min="0" value="${i.quantidade}" oninput="ITENS_EDITAR.find(x=>x.id===${i.id}).quantidade=this.value" placeholder="qtd.">
-      <button type="button" class="btn-remover" onclick="removerItemEditar(${i.id})">✕</button>
-    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum item adicionado.</div>';
-}
-
-function abrirEdicaoCard(){
-  const c = DETALHE_ATUAL;
-  if(!c) return;
-  document.getElementById('d-corpo').classList.add('hidden');
-  document.getElementById('d-master-crud').classList.add('hidden');
-  document.getElementById('d-master-acoes').classList.add('hidden');
-  document.getElementById('d-editar').classList.remove('hidden');
-  document.getElementById('d-editar').innerHTML = campoEdicaoHtml(c);
-  if(c.tipo==='compra'){
-    ITENS_EDITAR = (c.itens||[]).map(i=>({ id: ++SEQ_ITEM_EDITAR, descricao: i.descricao, quantidade: i.quantidade }));
-    renderItensEditar();
-  }
-  if(c.tipo==='estorno' && c.origem==='cliente'){
-    document.getElementById('ed-motivoEstorno').addEventListener('change', (e)=>{
-      document.getElementById('ed-wrap-motivo-outro').classList.toggle('hidden', e.target.value!=='Outro');
-    });
-  }
-}
-
-function cancelarEdicaoCard(){
-  document.getElementById('d-editar').classList.add('hidden');
-  document.getElementById('d-corpo').classList.remove('hidden');
-  document.getElementById('d-master-crud').classList.remove('hidden');
-  if(DETALHE_ATUAL && DETALHE_ATUAL.status==='PENDENTE') document.getElementById('d-master-acoes').classList.remove('hidden');
-}
-
-async function salvarEdicaoCard(){
-  const c = DETALHE_ATUAL;
-  if(!c) return;
-  const msg = document.getElementById('msg-detalhe');
-  msg.classList.add('hidden');
-  try{
-    let resp;
-    if(c.tipo==='estorno'){
-      const payload = c.origem==='cliente' ? {
-        unidade: document.getElementById('ed-unidade').value,
-        unidadeNome: UNIDADES_NOMES[document.getElementById('ed-unidade').value] || document.getElementById('ed-unidade').value,
-        motivoEstorno: document.getElementById('ed-motivoEstorno').value,
-        motivoOutro: document.getElementById('ed-motivoOutro') ? document.getElementById('ed-motivoOutro').value : '',
-        valorVenda: document.getElementById('ed-valorVenda').value,
-        valorEstornar: document.getElementById('ed-valorEstornar').value,
-        formaPagamento: document.getElementById('ed-formaPagamento').value,
-        bandeira: document.getElementById('ed-bandeira').value,
-        ultimos4: document.getElementById('ed-ultimos4').value,
-        dataVenda: document.getElementById('ed-dataVenda').value,
-        horaVenda: document.getElementById('ed-horaVenda').value,
-        nomeCliente: document.getElementById('ed-nomeCliente').value,
-        telefoneCliente: document.getElementById('ed-telefoneCliente').value,
-      } : {
-        pedidoId: document.getElementById('ed-pedidoId').value,
-        observacao: document.getElementById('ed-observacao').value,
-      };
-      resp = await fetch(`/api/refund-requests/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-    } else {
-      const payload = {
-        titulo: document.getElementById('ed-titulo').value,
-        unidade: document.getElementById('ed-unidade').value,
-        unidadeNome: UNIDADES_NOMES[document.getElementById('ed-unidade').value] || document.getElementById('ed-unidade').value,
-        observacao: document.getElementById('ed-observacao').value,
-        valorEstimado: document.getElementById('ed-valorEstimado').value,
-      };
-      if(c.tipo==='compra') payload.itens = ITENS_EDITAR.map(i=>({descricao:i.descricao, quantidade:i.quantidade}));
-      resp = await fetch(`/api/solicitacoes/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-    }
-    const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
-    await carregarCentral();
-    fecharDetalhe();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-}
-
-async function excluirCard(){
-  const c = DETALHE_ATUAL;
-  if(!c) return;
-  if(!confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) return;
-  const msg = document.getElementById('msg-detalhe');
-  msg.classList.add('hidden');
-  try{
-    const rota = c.tipo==='estorno' ? `/api/refund-requests/${c.id}`
-      : c.tipo==='ajuste-fechamento' ? `/api/fechamentos/edicoes/${c.id}`
-      : `/api/solicitacoes/${c.id}`;
-    const resp = await fetch(rota, { method:'DELETE' });
-    const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
-    fecharDetalhe();
-    await carregarCentral();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-}
-
-async function decidir(status){
-  if(!DETALHE_ATUAL) return;
-  const c = DETALHE_ATUAL;
-  const msg = document.getElementById('msg-detalhe');
-  msg.classList.add('hidden');
-  try{
-    let resp;
-    const motivoDecisao = document.getElementById('d-motivo-decisao').value;
-    if(c.tipo==='estorno'){
-      resp = await fetch(`/api/refund-requests/${c.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
-    } else if(c.tipo==='ajuste-fechamento'){
-      resp = await fetch(`/api/fechamentos/edicoes/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
-    } else {
-      const body = { status, motivoDecisao };
-      if(c.tipo==='suporte-ti' && status==='APROVADO'){
-        const sel = document.getElementById('d-tecnico');
-        if(!sel.value) throw new Error('Escolha o técnico responsável.');
-        body.tecnicoId = sel.value;
-        body.tecnicoEmail = sel.options[sel.selectedIndex].dataset.email;
-      }
-      resp = await fetch(`/api/solicitacoes/${c.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    }
-    const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao decidir.');
-    fecharDetalhe();
-    await carregarCentral();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-}
 
 async function boot(){
   const res = await fetch('/api/me');
@@ -858,6 +482,7 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !SECOES.includes('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !SECOES.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !SECOES.includes('ifood'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
@@ -867,15 +492,11 @@ async function boot(){
     return;
   }
   document.getElementById('root').classList.remove('hidden');
-  document.getElementById('titulo-lista').textContent = IS_MASTER ? 'Solicitações recebidas' : 'Minhas solicitações';
 
   const unidades = IS_MASTER ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>UNIDADES_NOMES[u]);
   document.getElementById('f-unidade').innerHTML = unidades.length
     ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
-  const unidadesOrdenadas = [...unidades].sort((a,b)=>(UNIDADES_NOMES[a]||a).localeCompare(UNIDADES_NOMES[b]||b,'pt-BR'));
-  document.getElementById('filtro-unidade').innerHTML = '<option value="">Todas</option>' +
-    unidadesOrdenadas.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('');
 
   const tiposDisponiveis = Object.entries(TIPOS_INFO).filter(([tipo,info])=>!info.secaoNecessaria || SECOES.includes(info.secaoNecessaria));
   document.getElementById('tipos-btns').innerHTML = tiposDisponiveis.map(([tipo,info])=>
@@ -883,15 +504,6 @@ async function boot(){
   ).join('');
   montarSelectCampo();
   if(tiposDisponiveis.length) selecionarTipo(tiposDisponiveis[0][0]);
-
-  if(IS_MASTER){
-    try{
-      const todos = await fetch('/api/users').then(r=>r.json());
-      TECNICOS = todos.filter(u=>u.permissions && (u.permissions.sections||[]).includes('tecnico'));
-    }catch(e){ TECNICOS = []; }
-  }
-
-  await carregarCentral();
 }
 
 boot();
