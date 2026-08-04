@@ -107,7 +107,7 @@
 <nav class="nav-drawer hidden" id="nav-drawer">
   <div class="nav-drawer-titulo">Zenith Ops</div>
   <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
-  <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back active" id="nav-entregas-self" href="/entregas.html">🛵 Entregas</a>
@@ -166,7 +166,7 @@
   </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
-      <thead><tr><th>Entregador</th><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Extra</th><th>Valor pago</th><th>COOP recebe</th><th>TM</th></tr></thead>
+      <thead><tr><th>Unidade</th><th>Nome</th><th>Quant.</th><th>Valor</th><th>Ajuda de Custo</th><th>Entrega</th><th>Retorno</th><th>Extra</th><th>Valor Gami</th><th>Fora de Área</th><th>COOP recebe</th><th>TM</th></tr></thead>
       <tbody id="entregadores-body"></tbody>
     </table>
   </div>
@@ -528,26 +528,37 @@ function renderEntregadoresTable(rows){
   const porEntregador = {};
   rows.forEach(r=>{
     const chave = r.entregador+'::'+r.unidade;
-    const c = (porEntregador[chave] ||= {entregador:r.entregador, unidade:r.unidade, corridas:0, entrega:0, extra:0, valor:0, coopRecebe:0});
-    c.corridas++;
+    const c = (porEntregador[chave] ||= {entregador:r.entregador, unidade:r.unidade, entrega:0, retorno:0, extra:0, foraDeArea:0, ajudaCusto:0, bonus:0, valor:0, coopRecebe:0});
     c.entrega += r.entrega||0;
+    c.retorno += r.retorno||0;
     c.extra += r.extra||0;
+    c.foraDeArea += r.foraDeArea||0;
+    c.ajudaCusto += r.ajudaCusto||0;
+    c.bonus += r.bonus||0;
     c.valor += r.valor||0;
     c.coopRecebe += r.coopRecebe||0;
   });
-  const linhas = Object.values(porEntregador).sort((a,b)=>b.valor-a.valor);
+  // Quant. = quantidade real de corridas do entregador, somando entrega com
+  // extra/retorno (que tambem sao corridas extras, nao so a entrega em si)
+  const linhas = Object.values(porEntregador)
+    .map(c=>({...c, quant: c.entrega+c.extra+c.retorno}))
+    .sort((a,b)=>b.valor-a.valor);
   document.getElementById('entregadores-count').textContent = linhas.length;
   document.getElementById('entregadores-body').innerHTML = linhas.length ? linhas.map(c=>`
     <tr>
-      <td>${escapeHtml(c.entregador)}</td>
       <td>${escapeHtml(UNIDADES_NOMES[c.unidade]||c.unidade)}</td>
-      <td class="valor">${c.corridas}</td>
-      <td class="valor">${c.entrega}</td>
-      <td class="valor">${c.extra}</td>
+      <td>${escapeHtml(c.entregador)}</td>
+      <td class="valor">${c.quant}</td>
       <td class="valor">${fmtMoney(c.valor)}</td>
+      <td class="valor">${fmtMoney(c.ajudaCusto)}</td>
+      <td class="valor">${c.entrega}</td>
+      <td class="valor">${c.retorno}</td>
+      <td class="valor">${c.extra}</td>
+      <td class="valor">${fmtMoney(c.bonus)}</td>
+      <td class="valor">${c.foraDeArea}</td>
       <td class="valor">${fmtMoney(c.coopRecebe)}</td>
       <td class="valor">${fmtMoney(c.entrega ? c.valor/c.entrega : 0)}</td>
-    </tr>`).join('') : '<tr><td colspan="8" class="empty">Sem dados no período.</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="12" class="empty">Sem dados no período.</td></tr>';
 }
 
 // tabela "Por unidade" cobre o roster inteiro (codigosDisponiveis()), nao so

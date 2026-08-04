@@ -2232,19 +2232,23 @@ function unidadeNomeEntrega(d) { return d.unidadeNome || d.unidade || '—'; }
 
 function prepararEntregasPorEntregador(rows) {
   const colunas = [
-    { key: 'entregador', label: 'Entregador' }, { key: 'unidade', label: 'Unid.' },
-    { key: 'corridas', label: 'Corridas' }, { key: 'entrega', label: 'Entregas' }, { key: 'extra', label: 'Extra' },
-    { key: 'valor', label: 'Valor pago' }, { key: 'coopRecebe', label: 'COOP recebe' }, { key: 'tm', label: 'TM' },
+    { key: 'unidade', label: 'Unidade' }, { key: 'entregador', label: 'Nome' }, { key: 'quant', label: 'Quant.' },
+    { key: 'valor', label: 'Valor' }, { key: 'ajudaCusto', label: 'Ajuda de Custo' }, { key: 'entrega', label: 'Entrega' },
+    { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' }, { key: 'bonus', label: 'Valor Gami' },
+    { key: 'foraDeArea', label: 'Fora de Área' }, { key: 'coopRecebe', label: 'COOP recebe' }, { key: 'tm', label: 'TM' },
   ];
   const porEntregador = {};
   rows.forEach((r) => {
     const chave = r.entregador + '::' + r.unidade;
-    const c = (porEntregador[chave] ||= { entregador: r.entregador, unidade: unidadeNomeEntrega(r), corridas: 0, entrega: 0, extra: 0, valor: 0, coopRecebe: 0 });
-    c.corridas++; c.entrega += r.entrega || 0; c.extra += r.extra || 0; c.valor += r.valor || 0; c.coopRecebe += r.coopRecebe || 0;
+    const c = (porEntregador[chave] ||= { entregador: r.entregador, unidade: unidadeNomeEntrega(r), entrega: 0, retorno: 0, extra: 0, foraDeArea: 0, ajudaCusto: 0, bonus: 0, valor: 0, coopRecebe: 0 });
+    c.entrega += r.entrega || 0; c.retorno += r.retorno || 0; c.extra += r.extra || 0; c.foraDeArea += r.foraDeArea || 0;
+    c.ajudaCusto += r.ajudaCusto || 0; c.bonus += r.bonus || 0; c.valor += r.valor || 0; c.coopRecebe += r.coopRecebe || 0;
   });
   const linhas = Object.values(porEntregador).sort((a, b) => b.valor - a.valor).map((c) => ({
-    entregador: c.entregador, unidade: c.unidade, corridas: c.corridas, entrega: c.entrega, extra: c.extra,
-    valor: reportUtil.fmtMoneyBR(c.valor), coopRecebe: reportUtil.fmtMoneyBR(c.coopRecebe),
+    unidade: c.unidade, entregador: c.entregador, quant: c.entrega + c.extra + c.retorno,
+    valor: reportUtil.fmtMoneyBR(c.valor), ajudaCusto: reportUtil.fmtMoneyBR(c.ajudaCusto),
+    entrega: c.entrega, retorno: c.retorno, extra: c.extra, bonus: reportUtil.fmtMoneyBR(c.bonus),
+    foraDeArea: c.foraDeArea, coopRecebe: reportUtil.fmtMoneyBR(c.coopRecebe),
     tm: reportUtil.fmtMoneyBR(c.entrega ? c.valor / c.entrega : 0),
   }));
   return { colunas, linhas };
