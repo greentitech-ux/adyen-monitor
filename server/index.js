@@ -1376,6 +1376,21 @@ app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, 
   }
 });
 
+// exclui um fechamento lançado de vez - so o Master. Vale so pra fechamentos
+// de verdade (lancados pelo app, tem criadoPorId) - linha vinda da planilha
+// importada ou de sangria mapeada nao existe como documento aqui, entao
+// simplesmente da erro "nao encontrado" se tentarem
+app.delete('/api/fechamentos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await fechamentosLive.remove(req.params.id);
+    broadcast('fechamento-excluido', { id: req.params.id }, 'lancamento');
+    broadcast('fechamento-excluido', { id: req.params.id }, 'fechamentos');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // fila de pedidos de correcao - so o Master decide (aprova/rejeita), mas quem
 // pediu pode acompanhar o status do proprio pedido
 app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {

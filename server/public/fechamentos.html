@@ -112,6 +112,27 @@
   .multiple-card .mc-title{font-size:11px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .multiple-card .mc-total{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;}
   .multiple-card svg{width:100%;height:44px;display:block;margin-top:6px;}
+
+  .acao-btn{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;}
+  .acao-btn:hover{border-color:var(--accent);color:var(--text);}
+  .acao-btn.excluir:hover{border-color:var(--bad);color:var(--bad);}
+
+  .fech-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:3000;padding:20px;}
+  .fech-overlay.hidden{display:none!important;}
+  .fech-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .fech-modal h3{margin:0 0 4px;font-size:15px;}
+  .fech-modal .sub{margin-bottom:14px;}
+  .fech-modal .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px;}
+  .fech-modal .secao-titulo:first-of-type{margin-top:0;}
+  .fech-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
+  @media(max-width:480px){ .fech-grid{grid-template-columns:1fr;} }
+  .fech-modal label{display:block;font-size:11px;color:var(--muted);margin:8px 0 4px;font-family:var(--mono);}
+  .fech-modal input,.fech-modal textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:13.5px;font-family:var(--sans);}
+  .fech-modal input:focus,.fech-modal textarea:focus{outline:none;border-color:var(--accent);}
+  .fech-modal textarea{resize:vertical;min-height:52px;}
+  .fech-msg{margin-top:10px;font-size:12.5px;padding:9px 11px;border-radius:8px;}
+  .fech-msg.err{background:var(--bad-dim);color:var(--bad);}
+  .fech-msg.ok{background:var(--ok-dim);color:var(--ok);}
 </style>
 </head>
 <body>
@@ -240,7 +261,7 @@
   </div>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th><th id="th-acoes" class="hidden">Ações</th></tr></thead>
       <tbody id="fechamentos-body"></tbody>
     </table>
   </div>
@@ -249,6 +270,62 @@
 </div><!-- /#root -->
 
 <div class="viz-tooltip" id="viz-tooltip"></div>
+
+<div class="fech-overlay hidden" id="fech-overlay">
+  <div class="fech-modal">
+    <h3 id="fech-modal-titulo">Editar fechamento</h3>
+    <div class="sub" id="fech-modal-sub"></div>
+
+    <div class="secao-titulo">Responsável</div>
+    <label>Gerente</label>
+    <input type="text" id="ef-gerente">
+
+    <div class="secao-titulo">Caixa</div>
+    <div class="fech-grid">
+      <div><label>Caixa inicial</label><input type="number" step="0.01" id="ef-caixaInicial"></div>
+      <div><label>Caixa final</label><input type="number" step="0.01" id="ef-caixaFinal"></div>
+    </div>
+
+    <div class="secao-titulo">Canais de venda</div>
+    <div class="fech-grid">
+      <div><label>Delivery</label><input type="number" step="0.01" id="ef-delivery"></div>
+      <div><label>Carryout</label><input type="number" step="0.01" id="ef-carryout"></div>
+      <div><label>Pickup</label><input type="number" step="0.01" id="ef-pickup"></div>
+      <div><label>Loja (salão)</label><input type="number" step="0.01" id="ef-loja"></div>
+    </div>
+
+    <div class="secao-titulo">Formas de pagamento</div>
+    <div class="fech-grid">
+      <div><label>Adyen</label><input type="number" step="0.01" id="ef-adyen"></div>
+      <div><label>Ifood</label><input type="number" step="0.01" id="ef-ifood"></div>
+      <div><label>99Food</label><input type="number" step="0.01" id="ef-food99"></div>
+      <div><label>Pix</label><input type="number" step="0.01" id="ef-pix"></div>
+      <div><label>Pix CNPJ</label><input type="number" step="0.01" id="ef-pixCnpj"></div>
+      <div><label>Outros</label><input type="number" step="0.01" id="ef-outros"></div>
+    </div>
+
+    <div class="secao-titulo">Fechamento</div>
+    <div class="fech-grid">
+      <div><label>Total de saída</label><input type="number" step="0.01" id="ef-totalSaida"></div>
+      <div><label>Quebra de caixa</label><input type="number" step="0.01" id="ef-quebra"></div>
+      <div><label>TC (tíquete médio)</label><input type="number" step="0.01" id="ef-tc"></div>
+      <div><label>Cancelados</label><input type="number" step="0.01" id="ef-cancelados"></div>
+      <div><label>Entrada em dinheiro</label><input type="number" step="0.01" id="ef-entradaDinheiro"></div>
+      <div><label>Depósito</label><input type="number" step="0.01" id="ef-deposito"></div>
+    </div>
+
+    <label>Observação</label>
+    <textarea id="ef-observacao"></textarea>
+    <label>Motivo da edição (opcional, fica no histórico)</label>
+    <textarea id="ef-motivo"></textarea>
+
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button type="button" class="back" style="background:var(--accent);color:#06202b;border-color:var(--accent);cursor:pointer;" onclick="salvarEdicaoFechamento()">💾 Salvar</button>
+      <button type="button" class="back" style="cursor:pointer;" onclick="fecharEdicaoFechamento()">Cancelar</button>
+    </div>
+    <div class="fech-msg hidden" id="fech-msg"></div>
+  </div>
+</div>
 
 <script>
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
@@ -264,6 +341,7 @@ window.fetch = (url, opts = {}) => {
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 
 let DATA = [];
+let IS_MASTER = false;
 const GRUPOS = {
   ARCFOOD: ['19821','19855','19888','19889'],
   BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
@@ -1089,8 +1167,69 @@ function renderTabela(rows){
       <td class="valor">${fmtMoney(d.pix)}</td>
       <td class="valor">${fmtMoney(d.loja)}</td>
       <td class="truncate" title="${escapeHtml(d.observacao||d.obsDif||'')}">${escapeHtml(d.observacao||d.obsDif||'—')}</td>
+      ${IS_MASTER ? `<td>${d.criadoPorId ? `
+        <button type="button" class="acao-btn" title="Editar" onclick="abrirEdicaoFechamento('${d.id}')">✏️</button>
+        <button type="button" class="acao-btn excluir" title="Excluir" onclick="excluirFechamento('${d.id}')">🗑️</button>
+      ` : '<span class="sub" style="margin:0;" title="Não lançado pelo sistema - vem de importação/planilha, não pode ser editado aqui">—</span>'}</td>` : ''}
     </tr>`;
-  }).join('') : '<tr><td colspan="14" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
+  }).join('') : `<tr><td colspan="${IS_MASTER ? 15 : 14}" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>`;
+}
+
+// ---------- Master: editar/excluir um fechamento lançado direto pela
+// tabela - so vale pra fechamento de verdade (lancado pelo app, tem
+// criadoPorId); linha vinda de planilha importada ou sangria mapeada nao
+// tem botao (ver renderTabela) ----------
+const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','quebra','tc','cancelados','entradaDinheiro','deposito'];
+let FECHAMENTO_EDITANDO_ID = null;
+
+function abrirEdicaoFechamento(id){
+  const d = DATA.find(x=>x.id===id);
+  if(!d) return;
+  FECHAMENTO_EDITANDO_ID = id;
+  document.getElementById('fech-modal-titulo').textContent = `Editar fechamento`;
+  document.getElementById('fech-modal-sub').textContent = `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}`;
+  document.getElementById('ef-gerente').value = d.gerente || '';
+  CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ document.getElementById('ef-'+c).value = d[c] ?? 0; });
+  document.getElementById('ef-observacao').value = d.observacao || '';
+  document.getElementById('ef-motivo').value = '';
+  document.getElementById('fech-msg').classList.add('hidden');
+  document.getElementById('fech-overlay').classList.remove('hidden');
+}
+function fecharEdicaoFechamento(){
+  document.getElementById('fech-overlay').classList.add('hidden');
+  FECHAMENTO_EDITANDO_ID = null;
+}
+async function salvarEdicaoFechamento(){
+  if(!FECHAMENTO_EDITANDO_ID) return;
+  const msg = document.getElementById('fech-msg');
+  msg.classList.add('hidden');
+  const mudancas = { gerente: document.getElementById('ef-gerente').value, observacao: document.getElementById('ef-observacao').value };
+  CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
+  try{
+    const resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mudancas, motivo: document.getElementById('ef-motivo').value }),
+    });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    fecharEdicaoFechamento();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'fech-msg err'; msg.classList.remove('hidden');
+  }
+}
+async function excluirFechamento(id){
+  const d = DATA.find(x=>x.id===id);
+  const rotulo = d ? `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}` : id;
+  if(!confirm(`Excluir o fechamento de ${rotulo}? Essa ação não pode ser desfeita.`)) return;
+  try{
+    const resp = await fetch(`/api/fechamentos/${id}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
 }
 
 // grafico de faturamento tem intervalo proprio (chartRange()): segue o
@@ -1145,9 +1284,11 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
+  IS_MASTER = isMaster;
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
   atualizarVisibilidadeGrupos();
+  document.getElementById('th-acoes').classList.toggle('hidden', !isMaster);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));

@@ -203,6 +203,15 @@ async function editarDireto({ fechamentoId, mudancas, motivo, editadoPorEmail })
 }
 
 
+// exclui o fechamento lançado de vez - poder do Master, mesma logica de
+// editarDireto (aplicado na hora, sem passar por fila de aprovacao)
+async function remove(id) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Fechamento não encontrado.');
+  await COLLECTION.doc(id).delete();
+  fechamentosCache.invalidar();
+}
+
 async function listarEdicoes() {
   const snap = await EDITS.orderBy('criadoEm', 'desc').get();
   return snap.docs.map((d) => d.data());
@@ -287,4 +296,4 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
 }
 
 
-module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao };
+module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao, remove };
