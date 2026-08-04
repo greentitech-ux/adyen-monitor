@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;overflow-x:hidden;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:14px;font-weight:700;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
+  a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+  .painel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;}
+  .pcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;}
+  .pcard .pcard-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .pcard .pcard-top .titulo{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .pcard .pcard-link{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-decoration:none;white-space:nowrap;}
+  .pcard .pcard-link:hover{text-decoration:underline;}
+  .pstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
+  .pstat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);}
+  .pstat .val{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .pstat .val.ok{color:var(--ok);} .pstat .val.bad{color:var(--bad);} .pstat .val.warn{color:var(--warn);}
+  .ptipos{display:flex;flex-direction:column;gap:6px;font-size:12px;}
+  .ptipos .linha{display:flex;justify-content:space-between;gap:8px;}
+  .ptipos .linha b{font-family:var(--mono);}
+  .pcard-erro{color:var(--bad);font-size:12px;}
+  .pcard-vazio{color:var(--muted);font-size:12px;}
+  .painel-loading{padding:60px 0;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Painel</h1>
+        <div class="sub-intro">Um apanhado da operação como um todo, com base no que você tem acesso.</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-actions">
+      <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back active" id="nav-painel-self" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
+<div id="painel-loading" class="painel-loading">carregando...</div>
+<div id="painel-grid" class="painel-grid hidden"></div>
+<div id="painel-vazio" class="empty hidden">Você ainda não tem nenhuma área liberada. Fale com o administrador (Master).</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const FUSO_BR = 'America/Sao_Paulo';
+function hojeBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
+const TIPOS_CENTRAL_LABEL = { estorno:'Estorno', 'ajuste-fechamento':'Correção de fechamento', compra:'Compra', manutencao:'Manutenção', 'suporte-ti':'Suporte de TI' };
+
+function statRow(label, valor, classe){
+  return `<div class="pstat"><div class="lbl">${escapeHtml(label)}</div><div class="val ${classe||''}">${valor}</div></div>`;
+}
+
+function pcardWrap(icone, titulo, link, corpoHtml){
+  return `<div class="pcard">
+    <div class="pcard-top"><div class="titulo">${icone} ${escapeHtml(titulo)}</div><a class="pcard-link" href="${link}">Abrir →</a></div>
+    ${corpoHtml}
+  </div>`;
+}
+
+async function cardMonitor(){
+  const hoje = hojeBrasilia();
+  const rows = await fetch('/api/transactions').then(r=>r.json());
+  const doDia = rows.filter(t=>(t.dataHora||'').slice(0,10)===hoje);
+  const semChargeback = doDia.filter(t=>!(t.status||'').includes('CHARGEBACK'));
+  const aprovadas = semChargeback.filter(t=>t.status==='APROVADO');
+  const recusadas = semChargeback.filter(t=>t.status==='RECUSADO');
+  const chargebacks = doDia.filter(t=>(t.status||'').includes('CHARGEBACK'));
+  const fraude = semChargeback.filter(t=>t.fraudeSuspeita);
+  const volume = +aprovadas.reduce((s,t)=>s+(t.valor||0),0).toFixed(2);
+  const taxa = semChargeback.length ? Math.round(aprovadas.length/semChargeback.length*100) : 0;
+  return pcardWrap('📈','Monitor (hoje)','/', `<div class="pstats">
+    ${statRow('Transações', semChargeback.length)}
+    ${statRow('Aprovadas', aprovadas.length,'ok')}
+    ${statRow('Recusadas', recusadas.length, recusadas.length ? 'bad' : '')}
+    ${statRow('Taxa aprov.', taxa+'%')}
+    ${statRow('Volume aprovado', fmtMoney(volume))}
+    ${statRow('Chargebacks', chargebacks.length, chargebacks.length ? 'warn' : '')}
+    ${statRow('Fraude suspeita', fraude.length, fraude.length ? 'bad' : '')}
+  </div>`);
+}
+
+async function cardFechamentos(){
+  const hoje = hojeBrasilia();
+  const rows = await fetch('/api/fechamentos').then(r=>r.json());
+  const doDia = rows.filter(d=>d.data===hoje);
+  const faturamento = +doDia.reduce((s,d)=>s+(d.faturamento||0),0).toFixed(2);
+  return pcardWrap('💰','Fechamentos (hoje)','/fechamentos.html', `<div class="pstats">
+    ${statRow('Lojas lançadas', doDia.length)}
+    ${statRow('Faturamento', fmtMoney(faturamento))}
+  </div>`);
+}
+
+async function cardEntregas(){
+  const hoje = hojeBrasilia();
+  const rows = await fetch('/api/entregas').then(r=>r.json());
+  const doDia = rows.filter(d=>d.data===hoje);
+  const valor = +doDia.reduce((s,d)=>s+(d.valor||0),0).toFixed(2);
+  return pcardWrap('🛵','Entregas (hoje)','/entregas.html', `<div class="pstats">
+    ${statRow('Corridas', doDia.length)}
+    ${statRow('Valor', fmtMoney(valor))}
+  </div>`);
+}
+
+async function cardCentral(){
+  const rows = await fetch('/api/central').then(r=>r.json());
+  const pendentes = rows.filter(c=>c.status==='PENDENTE');
+  if(!pendentes.length){
+    return pcardWrap('📋','Central de Solicitações','/central.html', `<div class="pcard-vazio">Nenhuma solicitação pendente. 🎉</div>`);
+  }
+  const porTipo = {};
+  pendentes.forEach(c=>{ porTipo[c.tipo] = (porTipo[c.tipo]||0) + 1; });
+  const linhas = Object.entries(porTipo).sort((a,b)=>b[1]-a[1])
+    .map(([tipo,qtd])=>`<div class="linha"><span>${escapeHtml(TIPOS_CENTRAL_LABEL[tipo]||tipo)}</span><b>${qtd}</b></div>`).join('');
+  return pcardWrap('📋','Central de Solicitações','/central.html', `
+    <div class="pstats">${statRow('Pendentes', pendentes.length, 'warn')}</div>
+    <div class="ptipos">${linhas}</div>
+  `);
+}
+
+async function cardChamados(){
+  const rows = await fetch('/api/chamados').then(r=>r.json());
+  const abertos = rows.filter(c=>c.status==='ABERTO');
+  const emAndamento = rows.filter(c=>c.status==='INICIADO');
+  return pcardWrap('🔧','Chamados de TI','/tecnico.html', `<div class="pstats">
+    ${statRow('Abertos', abertos.length, abertos.length ? 'warn' : '')}
+    ${statRow('Em andamento', emAndamento.length)}
+  </div>`);
+}
+
+async function cardIfood(){
+  const hoje = hojeBrasilia();
+  const rows = await fetch('/api/ifood/vendas').then(r=>r.json());
+  const doDia = rows.filter(d=>(d.dataHora||'').slice(0,10)===hoje);
+  const bruto = +doDia.reduce((s,d)=>s+(d.valorBruto||0),0).toFixed(2);
+  const liquido = +doDia.reduce((s,d)=>s+(d.valorLiquido||0),0).toFixed(2);
+  return pcardWrap('🍔','iFood (hoje)','/ifood.html', `<div class="pstats">
+    ${statRow('Vendas', doDia.length)}
+    ${statRow('Valor bruto', fmtMoney(bruto))}
+    ${statRow('Valor líquido', fmtMoney(liquido))}
+  </div>`);
+}
+
+const CARDS_POR_SECAO = [
+  { secao:'monitor', build:cardMonitor },
+  { secao:'fechamentos', build:cardFechamentos },
+  { secao:'entregas', build:cardEntregas },
+  { secao:'solicitacoes', build:cardCentral },
+  { secao:'tecnico', build:cardChamados },
+  { secao:'ifood', build:cardIfood },
+];
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  const ME = await res.json();
+  const isMaster = ME.role==='master';
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+
+  const aplicaveis = CARDS_POR_SECAO.filter(c=>secoes.includes(c.secao));
+  document.getElementById('painel-loading').classList.add('hidden');
+
+  if(!aplicaveis.length){
+    document.getElementById('painel-vazio').classList.remove('hidden');
+    return;
+  }
+
+  const grid = document.getElementById('painel-grid');
+  grid.classList.remove('hidden');
+  // cada card falha isoladamente - um modulo fora do ar nao derruba o painel inteiro
+  const resultados = await Promise.allSettled(aplicaveis.map(c=>c.build()));
+  grid.innerHTML = resultados.map((r,i)=>{
+    if(r.status==='fulfilled') return r.value;
+    console.error('Painel: erro ao carregar card', aplicaveis[i].secao, r.reason);
+    return pcardWrap('⚠️', aplicaveis[i].secao, '#', `<div class="pcard-erro">Não foi possível carregar esses dados agora.</div>`);
+  }).join('');
+}
+
+boot();
+</script>
+</body>
+</html>
