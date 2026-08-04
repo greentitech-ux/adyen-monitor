@@ -244,7 +244,13 @@
 
 
 <div class="panel">
-  <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
+  <h2>
+    <div class="title-group"><span>Comparativo por unidade</span><span class="n" id="unidades-count"></span></div>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentosUnidades('csv')">📄 Relatório CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentosUnidades('pdf')">📄 Relatório PDF</button>
+    </div>
+  </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
       <thead><tr><th>Unid.</th><th>Previsão (mês)</th><th>Fechamentos</th><th>Faturamento</th><th>Diferença</th><th>TC total</th><th>Cancelados</th></tr></thead>
@@ -1338,6 +1344,21 @@ function unidadesEfetivasParaRelatorio(){
 // relatorio CSV/PDF do periodo/unidades que estiverem filtrados na tela
 // agora - cruza o filtro principal (de cima) com o filtro exclusivo desta
 // tabela, exatamente como renderTabela() faz
+// relatorio CSV/PDF do painel "Comparativo por unidade" - usa so o filtro
+// principal (de cima), igual renderUnidadesTable() ja faz
+function baixarRelatorioFechamentosUnidades(formato){
+  const inicio = document.getElementById('f-date-start').value;
+  const fim = document.getElementById('f-date-end').value;
+  const grupo = document.getElementById('f-grupo').value;
+  const unidades = [...SEL_UNIDADE].join(',');
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(inicio) params.set('inicio', inicio);
+  if(fim) params.set('fim', fim);
+  if(grupo) params.set('grupo', grupo);
+  if(unidades) params.set('unidades', unidades);
+  window.location.href = `/api/fechamentos/relatorio-unidades.${formato}?${params.toString()}`;
+}
+
 function baixarRelatorioFechamentos(formato){
   const {inicio, fim} = intervaloEfetivoTabela();
   const unidades = unidadesEfetivasParaRelatorio().join(',');

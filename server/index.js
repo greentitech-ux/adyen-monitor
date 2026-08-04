@@ -1353,25 +1353,62 @@ app.get('/api/fechamentos/:id/bruto', auth.requireMaster, async (req, res) => {
   res.json(registro);
 });
 
-// monta as mesmas linhas mostradas no painel "Fechamentos" da tela, aplicando
-// os mesmos filtros do front (periodo ja efetivo - o proprio front resolve
-// qualquer corte extra da tabela antes de mandar inicio/fim - mais grupo e
-// unidades) - usado pelos dois formatos de relatorio abaixo
-async function montarLinhasRelatorioFechamentos(req) {
+// aplica os mesmos filtros do front (periodo ja efetivo - o proprio front
+// resolve qualquer corte extra da tabela antes de mandar inicio/fim - mais
+// grupo e unidades) - usado pelos relatorios de Fechamentos e de Comparativo
+// por unidade abaixo
+async function fechamentosFiltrados(req) {
   const { inicio, fim, grupo, unidades } = req.query;
   const lancados = await fechamentosLive.listAll();
   const sangriasLancadas = (await sangrias.listAll()).map(sangrias.comoFechamento);
   const combinado = sheetsSync.mesclarLancamentosDoMesmoDia([...fechamentosData, ...lancados, ...sangriasLancadas]);
   const permitido = auth.filterByUnidade(req, combinado);
   const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
-  const filtrado = permitido.filter((f) =>
+  return permitido.filter((f) =>
     (!grupo || f.grupo === grupo) &&
     (!unidadesSet || unidadesSet.has(f.unidade)) &&
     (!inicio || (f.data || '') >= inicio) &&
     (!fim || (f.data || '') <= fim)
   );
-  return fechamentosReport.prepararLinhas(filtrado);
 }
+
+// monta as mesmas linhas mostradas no painel "Fechamentos" da tela - usado
+// pelos dois formatos de relatorio abaixo
+async function montarLinhasRelatorioFechamentos(req) {
+  return fechamentosReport.prepararLinhas(await fechamentosFiltrados(req));
+}
+
+// mesma agregacao por unidade do painel "Comparativo por unidade" da tela
+// (renderUnidadesTable em fechamentos.html) - a coluna "Previsao (mes)" fica
+// de fora do relatorio de proposito: e uma projecao calculada em cima do
+// historico completo (nao so do periodo filtrado) e nao faz sentido como
+// valor estatico exportado
+function prepararFechamentosPorUnidade(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unid.' }, { key: 'qtd', label: 'Fechamentos' }, { key: 'faturamento', label: 'Faturamento' },
+    { key: 'diferenca', label: 'Diferença' }, { key: 'tc', label: 'TC total' }, { key: 'cancelados', label: 'Cancelados' },
+  ];
+  const porUnidade = {};
+  rows.forEach((r) => {
+    const c = (porUnidade[r.unidade] ||= { nome: r.unidadeNome || r.unidade, qtd: 0, faturamento: 0, diferenca: 0, tc: 0, cancelados: 0 });
+    c.qtd++; c.faturamento += r.faturamento || 0; c.diferenca += r.diferenca || 0; c.tc += r.tc || 0; c.cancelados += r.cancelados || 0;
+  });
+  const linhas = Object.values(porUnidade).sort((a, b) => b.faturamento - a.faturamento).map((c) => ({
+    unidade: c.nome, qtd: c.qtd, faturamento: reportUtil.fmtMoneyBR(c.faturamento), diferenca: reportUtil.fmtMoneyBR(c.diferenca),
+    tc: c.tc.toFixed(0), cancelados: c.cancelados.toFixed(0),
+  }));
+  return { colunas, linhas };
+}
+
+app.get('/api/fechamentos/relatorio-unidades.:formato(csv|pdf)', requireSection('fechamentos'), async (req, res) => {
+  const { colunas, linhas } = prepararFechamentosPorUnidade(await fechamentosFiltrados(req));
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('fechamentos-por-unidade')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Fechamentos · Comparativo por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('fechamentos-por-unidade') });
+});
 
 // ---------- relatorio de Fechamentos (CSV/PDF) do periodo filtrado na tela -
 // mesma secao 'fechamentos' da tela (nao restrito ao Master), respeitando as
