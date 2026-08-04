@@ -17,11 +17,20 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, criadoPorId, criadoPorEmail }) {
+function validarPeriodo(periodoInicio, periodoFim) {
+  if (!periodoInicio && !periodoFim) return { periodoInicio: null, periodoFim: null };
+  if (!periodoInicio || !/^\d{4}-\d{2}-\d{2}$/.test(periodoInicio)) throw new Error('Data inicial do período inválida.');
+  if (!periodoFim || !/^\d{4}-\d{2}-\d{2}$/.test(periodoFim)) throw new Error('Data final do período inválida.');
+  if (periodoFim < periodoInicio) throw new Error('A data final do período não pode ser anterior à data inicial.');
+  return { periodoInicio, periodoFim };
+}
+
+async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
   const v = num(valor);
   if (v <= 0) throw new Error('Informe o valor retirado.');
+  const periodo = validarPeriodo(periodoInicio, periodoFim);
 
   const ref = COLLECTION.doc();
   const registro = {
@@ -32,6 +41,8 @@ async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, cria
     data,
     valor: v,
     descricao: (descricao || '').slice(0, 300),
+    periodoInicio: periodo.periodoInicio,
+    periodoFim: periodo.periodoFim,
     criadoPorId,
     criadoPorEmail,
     criadoEm: new Date().toISOString(),
@@ -89,7 +100,7 @@ async function getOne(id) {
 // fechamento só a enxerga mesclada na leitura, ver comoFechamento), editar
 // ou excluir aqui já reflete automaticamente em qualquer lugar que mostra
 // o fechamento mesclado - não precisa (nem dá) mexer no fechamento em si
-async function atualizar(id, { valor, descricao, data }) {
+async function atualizar(id, { valor, descricao, data, periodoInicio, periodoFim }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Sangria não encontrada.');
@@ -103,6 +114,11 @@ async function atualizar(id, { valor, descricao, data }) {
   if (data != null) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
     patch.data = data;
+  }
+  if (periodoInicio !== undefined || periodoFim !== undefined) {
+    const periodo = validarPeriodo(periodoInicio, periodoFim);
+    patch.periodoInicio = periodo.periodoInicio;
+    patch.periodoFim = periodo.periodoFim;
   }
   await ref.update(patch);
   sangriasCache.invalidar();
