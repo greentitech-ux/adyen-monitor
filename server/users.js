@@ -4,7 +4,7 @@
 // chamar essas funcoes (aplicado nas rotas via auth.requireMaster).
 const bcrypt = require('bcryptjs');
 const db = require('./firestore');
-const { emptyPermissions } = require('./auth');
+const { emptyPermissions, invalidarUsuario } = require('./auth');
 
 const usersRef = db.collection('users');
 
@@ -62,6 +62,7 @@ async function updatePermissions(id, permissions) {
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   if (snap.data().role === 'master') throw new Error('O acesso Master não usa permissões.');
   await ref.update({ permissions: sanitizePermissions(permissions) });
+  invalidarUsuario(id);
   return toPublic(await ref.get());
 }
 
@@ -71,6 +72,7 @@ async function setActive(id, active) {
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   if (snap.data().role === 'master') throw new Error('O acesso Master não pode ser desativado.');
   await ref.update({ active: !!active });
+  invalidarUsuario(id);
   return toPublic(await ref.get());
 }
 
@@ -80,6 +82,7 @@ async function updateHorarioPermitido(id, horarioPermitido) {
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   if (snap.data().role === 'master') throw new Error('O acesso Master não usa horário restrito.');
   await ref.update({ horarioPermitido: sanitizeHorarioPermitido(horarioPermitido) });
+  invalidarUsuario(id);
   return toPublic(await ref.get());
 }
 
@@ -91,6 +94,7 @@ async function resetPassword(id, password) {
   const passwordHash = await bcrypt.hash(password, 12);
   // o Master trocando a senha tambem desbloqueia o acesso (ex: apos 3 tentativas erradas)
   await ref.update({ passwordHash, locked: false, failedAttempts: 0 });
+  invalidarUsuario(id);
   return { ok: true };
 }
 
@@ -100,6 +104,7 @@ async function remove(id) {
   if (!snap.exists) return;
   if (snap.data().role === 'master') throw new Error('O acesso Master não pode ser excluído.');
   await ref.delete();
+  invalidarUsuario(id);
 }
 
 function toPublic(doc) {

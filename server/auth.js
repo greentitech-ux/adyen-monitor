@@ -8,6 +8,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./firestore');
+const { createKeyedCache } = require('./liveCache');
 
 const JWT_SECRET = process.env.JWT_SECRET || '';
 if (!JWT_SECRET) {
@@ -129,10 +130,26 @@ function toPublicUser(id, user) {
   };
 }
 
-async function getUserById(id) {
+// requireAuth chama isso em TODA requisicao autenticada (~90 rotas da API) -
+// sem cache, era 1 leitura no Firestore por chamada, o maior contribuinte pro
+// RESOURCE_EXHAUSTED (cota diaria de leitura estourada) que derrubou o login
+// pra todo mundo, ate o Master. TTL curto: ainda reage rapido a
+// active/locked/horarioPermitido mudando (o Master vendo o proprio efeito na
+// hora importa mais que aqui), mas absorve as varias chamadas que acontecem
+// quase juntas (ex: a pagina Painel dispara 6 chamadas em paralelo). Invalidado
+// na hora sempre que o Master mexe no usuario (ver users.js).
+const usuarioCache = createKeyedCache(async (id) => {
   const doc = await usersRef.doc(id).get();
   if (!doc.exists) return null;
   return { id: doc.id, ...doc.data() };
+}, 15 * 1000);
+
+function getUserById(id) {
+  return usuarioCache.cached(id);
+}
+
+function invalidarUsuario(id) {
+  usuarioCache.invalidar(id);
 }
 
 // exige um token valido (via header Authorization: Bearer, ou ?token= na
@@ -196,4 +213,5 @@ module.exports = {
   filterByUnidade,
   emptyPermissions,
   dentroDoHorarioPermitido,
+  invalidarUsuario,
 };
