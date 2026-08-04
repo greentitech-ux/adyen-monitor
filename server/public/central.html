@@ -18,8 +18,10 @@
   }
   *{box-sizing:border-box;min-width:0;}
   html{overflow-x:hidden;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:720px;margin-inline:auto;overflow-x:hidden;}
-  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;overflow-x:hidden;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .form-wrap{max-width:640px;}
   h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
   .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
   header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
@@ -85,9 +87,18 @@
   .tipo-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .anexo-item{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-top:6px;}
   .anexo-item a{color:var(--accent);text-decoration:none;}
-  .filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-  .filtro-btn{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:16px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
-  .filtro-btn.active{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:600;}
+  .kanban-board{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px;align-items:flex-start;}
+  .kanban-col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;flex:1 1 300px;min-width:270px;max-width:420px;display:flex;flex-direction:column;max-height:calc(100vh - 340px);min-height:220px;}
+  .kanban-col-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 10px;border-bottom:1px solid var(--line);flex:none;}
+  .kanban-col-header .badge{font-size:11px;}
+  .kanban-count{font-family:var(--mono);color:var(--muted);font-size:11.5px;}
+  .kanban-cards{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
+  .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s ease;}
+  .kcard:hover{border-color:var(--accent);}
+  .kcard .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;font-size:12.5px;font-weight:600;}
+  .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
+  .kanban-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:12px;}
+  @media(max-width:760px){ .kanban-col{min-width:82vw;max-height:none;} }
 </style>
 </head>
 <body>
@@ -131,7 +142,7 @@
 
 <div id="root" class="hidden">
 
-<div class="panel">
+<div class="panel form-wrap">
   <h2>Nova solicitação</h2>
   <div class="tipos" id="tipos-btns"></div>
 
@@ -213,7 +224,6 @@
 
 <div class="panel">
   <h2><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
-  <div class="filtros" id="filtros-status"></div>
   <div class="grid2" id="filtros-extra" style="margin-bottom:10px;">
     <div><label style="margin:0 0 4px;">Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
     <div><label style="margin:0 0 4px;">Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
@@ -225,7 +235,20 @@
     <div><label style="margin:0 0 4px;">Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
   </div>
   <button type="button" class="link-btn" style="margin:-4px 0 10px;" onclick="limparFiltrosExtra()">Limpar filtros de loja/grupo/data</button>
-  <div id="lista-cards"><div class="empty">carregando...</div></div>
+  <div class="kanban-board" id="kanban-board">
+    <div class="kanban-col" data-status="PENDENTE">
+      <div class="kanban-col-header"><span class="badge PENDENTE">Pendente</span><span class="kanban-count" id="kcount-PENDENTE">0</span></div>
+      <div class="kanban-cards" id="kcards-PENDENTE"></div>
+    </div>
+    <div class="kanban-col" data-status="APROVADO">
+      <div class="kanban-col-header"><span class="badge APROVADO">Aprovado</span><span class="kanban-count" id="kcount-APROVADO">0</span></div>
+      <div class="kanban-cards" id="kcards-APROVADO"></div>
+    </div>
+    <div class="kanban-col" data-status="REJEITADO">
+      <div class="kanban-col-header"><span class="badge REJEITADO">Rejeitado</span><span class="kanban-count" id="kcount-REJEITADO">0</span></div>
+      <div class="kanban-cards" id="kcards-REJEITADO"></div>
+    </div>
+  </div>
 </div>
 
 </div><!-- /#root -->
@@ -309,7 +332,6 @@ let CARDS = [];
 let TIPO_SELECIONADO = 'compra';
 let TIPO_CORRECAO = 'campo';
 let ITEM_TIPO = 'maquininha';
-let FILTRO_STATUS = 'PENDENTE';
 let FILTRO_UNIDADE = '';
 let FILTRO_GRUPO = '';
 let FILTRO_DATA_DE = '';
@@ -467,20 +489,12 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
   }
 });
 
-function renderFiltros(){
-  const opcoes = [['PENDENTE','Pendentes'],['APROVADO','Aprovados'],['REJEITADO','Rejeitados'],['TODOS','Todos']];
-  document.getElementById('filtros-status').innerHTML = opcoes.map(([v,l])=>
-    `<button type="button" class="filtro-btn ${FILTRO_STATUS===v?'active':''}" onclick="aplicarFiltro('${v}')">${l}</button>`
-  ).join('');
-}
-function aplicarFiltro(v){ FILTRO_STATUS = v; renderFiltros(); renderLista(); }
-
 function aplicarFiltrosExtra(){
   FILTRO_UNIDADE = document.getElementById('filtro-unidade').value;
   FILTRO_GRUPO = document.getElementById('filtro-grupo').value;
   FILTRO_DATA_DE = document.getElementById('filtro-data-de').value;
   FILTRO_DATA_ATE = document.getElementById('filtro-data-ate').value;
-  renderLista();
+  renderKanban();
 }
 function limparFiltrosExtra(){
   document.getElementById('filtro-unidade').value = '';
@@ -494,26 +508,39 @@ function iconeTipo(tipo){
   return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
 }
 
-function renderLista(){
-  let filtradas = FILTRO_STATUS==='TODOS' ? CARDS : CARDS.filter(c=>c.status===FILTRO_STATUS);
+const STATUS_COLUNAS = ['PENDENTE','APROVADO','REJEITADO'];
+
+function kcardHtml(c){
+  return `
+    <div class="kcard" onclick="abrirDetalhe('${c.tipo}','${c.id}')">
+      <div class="linha1">
+        <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
+      </div>
+      <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
+      <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
+    </div>`;
+}
+
+function renderKanban(){
+  let filtradas = CARDS;
   if(FILTRO_UNIDADE) filtradas = filtradas.filter(c=>c.unidade===FILTRO_UNIDADE);
   if(FILTRO_GRUPO) filtradas = filtradas.filter(c=>grupoDaUnidade(c.unidade)===FILTRO_GRUPO);
   if(FILTRO_DATA_DE) filtradas = filtradas.filter(c=>dataBrasilia(c.criadoEm) >= FILTRO_DATA_DE);
   if(FILTRO_DATA_ATE) filtradas = filtradas.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
   document.getElementById('lista-count').textContent = filtradas.length;
-  document.getElementById('lista-cards').innerHTML = filtradas.length ? filtradas.map(c=>`
-    <div class="card" onclick="abrirDetalhe('${c.tipo}','${c.id}')">
-      <div class="linha1">
-        <span><span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span> ${escapeHtml(c.titulo)}</span>
-        <span class="badge ${c.status}">${c.status}</span>
-      </div>
-      <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
-    </div>`).join('') : '<div class="empty">Nenhuma solicitação aqui.</div>';
+
+  STATUS_COLUNAS.forEach(status=>{
+    const doColuna = filtradas.filter(c=>c.status===status);
+    document.getElementById('kcount-'+status).textContent = doColuna.length;
+    document.getElementById('kcards-'+status).innerHTML = doColuna.length
+      ? doColuna.map(kcardHtml).join('')
+      : '<div class="kanban-empty">Nenhuma aqui.</div>';
+  });
 }
 
 async function carregarCentral(){
   CARDS = await fetch('/api/central').then(r=>r.json());
-  renderLista();
+  renderKanban();
 }
 
 function abrirDetalhe(tipo, id){
@@ -829,7 +856,6 @@ async function boot(){
     }catch(e){ TECNICOS = []; }
   }
 
-  renderFiltros();
   await carregarCentral();
 }
 
