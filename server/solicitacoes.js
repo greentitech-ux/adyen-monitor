@@ -90,4 +90,34 @@ async function vincularChamado(id, chamadoId) {
   solicitacoesCache.invalidar();
 }
 
-module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado };
+// edicao direta pelo Master - poder de corrigir qualquer campo do pedido
+// (titulo, valor, observacao, itens, unidade), independente do status.
+// So atualiza o que vier em `campos`, sem mexer em status/decisao/chamado.
+async function update(id, campos) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  const atual = snap.data();
+  const patch = {};
+  if (campos.titulo != null) {
+    if (!String(campos.titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
+    patch.titulo = String(campos.titulo).trim().slice(0, 200);
+  }
+  if (campos.unidade != null) patch.unidade = campos.unidade;
+  if (campos.unidadeNome != null) patch.unidadeNome = campos.unidadeNome;
+  if (Object.prototype.hasOwnProperty.call(campos, 'valorEstimado')) {
+    patch.valorEstimado = campos.valorEstimado != null && campos.valorEstimado !== '' ? Number(campos.valorEstimado) || 0 : null;
+  }
+  if (campos.observacao != null) patch.observacao = campos.observacao;
+  if (campos.itens != null) patch.itens = (atual.tipo === 'compra') ? sanitizarItens(campos.itens) : [];
+  await ref.update(patch);
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+async function remove(id) {
+  await COLLECTION.doc(id).delete();
+  solicitacoesCache.invalidar();
+}
+
+module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove };
