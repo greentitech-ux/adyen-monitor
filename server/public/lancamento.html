@@ -275,9 +275,33 @@
       <label>Motivo da alteração (opcional, fica registrado no histórico do fechamento)</label>
       <textarea id="m-motivo" placeholder="ex: corrigido conforme conferência do caixa"></textarea>
       <div class="msg hidden" id="msg-master"></div>
-      <button class="btn-primary" type="submit">Salvar alterações</button>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:4px;">
+        <button class="btn-primary" style="margin-top:0;flex:1;" type="submit">Salvar alterações</button>
+        <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirFechamentoMaster()">🗑️ Excluir</button>
+      </div>
     </form>
     <button class="link-btn" style="margin-top:12px;" onclick="fecharMaster()">Cancelar</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay-sangria-editar">
+  <div class="sheet">
+    <h3>Editar sangria (Master)</h3>
+    <div class="sub" id="sangria-editar-info"></div>
+    <form id="form-sangria-editar">
+      <label>Valor retirado (R$)</label>
+      <input type="number" step="0.01" inputmode="decimal" id="se-valor" required>
+      <label>Data</label>
+      <input type="date" id="se-data" required>
+      <label>Observação</label>
+      <input type="text" id="se-descricao">
+      <div class="msg hidden" id="msg-sangria-editar"></div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:4px;">
+        <button class="btn-primary" style="margin-top:0;flex:1;" type="submit">Salvar</button>
+        <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirSangria()">🗑️ Excluir</button>
+      </div>
+    </form>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharEditarSangria()">Cancelar</button>
   </div>
 </div>
 
@@ -472,7 +496,54 @@ function renderSangrias(){
         <b>${fmtMoney(s.valor)}</b>
       </div>
       <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
+      ${IS_MASTER ? `<button type="button" class="link-btn" style="margin-top:4px;" onclick="abrirEditarSangria('${s.id}')">✎ Editar/excluir (Master)</button>` : ''}
     </div>`).join('');
+}
+
+// ---------- sangria: edicao/exclusao direta (so Master) ----------
+let EDITANDO_SANGRIA_ID = null;
+function abrirEditarSangria(id){
+  const s = SANGRIAS.find(x=>x.id===id);
+  if(!s) return;
+  EDITANDO_SANGRIA_ID = id;
+  document.getElementById('sangria-editar-info').textContent = `${s.unidadeNome||s.unidade} · registrada em ${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
+  document.getElementById('se-valor').value = s.valor;
+  document.getElementById('se-data').value = s.data;
+  document.getElementById('se-descricao').value = s.descricao || '';
+  document.getElementById('msg-sangria-editar').classList.add('hidden');
+  document.getElementById('overlay-sangria-editar').classList.remove('hidden');
+}
+function fecharEditarSangria(){ document.getElementById('overlay-sangria-editar').classList.add('hidden'); EDITANDO_SANGRIA_ID=null; }
+document.getElementById('form-sangria-editar').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-sangria-editar');
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ valor: document.getElementById('se-valor').value, data: document.getElementById('se-data').value, descricao: document.getElementById('se-descricao').value }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharEditarSangria();
+    await carregarSangrias();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+async function excluirSangria(){
+  if(!EDITANDO_SANGRIA_ID) return;
+  if(!confirm('Excluir essa sangria? Ela vai parar de somar no fechamento do dia. Essa ação não pode ser desfeita.')) return;
+  const msg = document.getElementById('msg-sangria-editar');
+  try{
+    const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, { method:'DELETE' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao excluir');
+    fecharEditarSangria();
+    await carregarSangrias();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
 }
 
 document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
@@ -588,6 +659,22 @@ function abrirEditarMaster(id){
   document.getElementById('overlay-master').classList.remove('hidden');
 }
 function fecharMaster(){ document.getElementById('overlay-master').classList.add('hidden'); EDITANDO_MASTER_ID=null; }
+async function excluirFechamentoMaster(){
+  if(!EDITANDO_MASTER_ID) return;
+  const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
+  const rotulo = f ? `${f.unidadeNome||f.unidade} · ${fmtData(f.data)}` : EDITANDO_MASTER_ID;
+  if(!confirm(`Excluir o fechamento de ${rotulo}? Essa ação não pode ser desfeita.`)) return;
+  const msg = document.getElementById('msg-master');
+  try{
+    const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}`, { method:'DELETE' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao excluir');
+    fecharMaster();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
 
 document.getElementById('form-master').addEventListener('submit', async (ev)=>{
   ev.preventDefault();

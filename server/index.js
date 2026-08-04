@@ -1193,6 +1193,15 @@ app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   res.json(auth.filterByUnidade(req, combinado));
 });
 
+// registro CRU (sem mesclar com sangria/planilha) de um fechamento - usado
+// pela edicao direta do Master, pra nunca editar em cima de um valor que ja
+// vem somado com a sangria do dia (ver sangrias.js/comoFechamento)
+app.get('/api/fechamentos/:id/bruto', auth.requireMaster, async (req, res) => {
+  const registro = await fechamentosLive.getOne(req.params.id);
+  if (!registro) return res.status(404).json({ error: 'Fechamento não encontrado.' });
+  res.json(registro);
+});
+
 // monta as mesmas linhas mostradas no painel "Fechamentos" da tela, aplicando
 // os mesmos filtros do front (periodo ja efetivo - o proprio front resolve
 // qualquer corte extra da tabela antes de mandar inicio/fim - mais grupo e
@@ -1301,6 +1310,34 @@ app.post('/api/sangrias', requireSection('sangria'), async (req, res) => {
 app.get('/api/sangrias/minhas', requireSection('sangria'), async (req, res) => {
   if (req.isMaster) return res.json(await sangrias.listAll());
   res.json(await sangrias.listByUnidades(req.permissions.unidades || []));
+});
+
+// edicao/exclusao direta - so o Master. A sangria so existe nessa colecao
+// (o fechamento so a enxerga mesclada na leitura), entao editar/excluir
+// aqui ja reflete automaticamente em qualquer lugar que mostra o
+// fechamento mesclado (fechamentos.html, "Faturamento" do dia, etc)
+app.patch('/api/sangrias/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await sangrias.atualizar(req.params.id, req.body);
+    broadcast('sangria-atualizada', registro, 'sangria');
+    broadcast('sangria-atualizada', registro, 'lancamento');
+    broadcast('sangria-atualizada', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/sangrias/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await sangrias.remover(req.params.id);
+    broadcast('sangria-excluida', { id: req.params.id }, 'sangria');
+    broadcast('sangria-excluida', { id: req.params.id }, 'lancamento');
+    broadcast('sangria-excluida', { id: req.params.id }, 'fechamentos');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // leitura somente-informativa da sangria de um dia/unidade especifico -
