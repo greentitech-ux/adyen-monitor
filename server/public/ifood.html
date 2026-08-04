@@ -142,7 +142,13 @@
 </div>
 
 <div class="panel">
-  <h2>Por unidade <span class="n" id="unidades-count"></span></h2>
+  <h2>
+    <div class="title-group"><span>Por unidade</span><span class="n" id="unidades-count"></span></div>
+    <div style="display:flex;gap:4px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('unidades','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('unidades','pdf')">📄 PDF</button>
+    </div>
+  </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
       <thead><tr><th>Unid.</th><th>Vendas</th><th>Valor bruto</th><th>Comissão</th><th>Valor líquido</th><th>Ticket médio</th></tr></thead>
@@ -154,6 +160,10 @@
 <div class="panel">
   <h2>
     <div class="title-group"><span>Vendas</span><span class="n" id="vendas-count"></span></div>
+    <div style="display:flex;gap:4px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('vendas','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('vendas','pdf')">📄 PDF</button>
+    </div>
   </h2>
   <div class="tablewrap">
     <table>
@@ -241,6 +251,19 @@ async function sincronizar(){
   }finally{
     btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
   }
+}
+
+// relatorio (CSV/PDF) de uma das 2 tabelas de iFood - usa o mesmo filtro de
+// periodo/unidades ativo na tela
+function baixarRelatorioIfood(tabela, formato){
+  const inicio = document.getElementById('f-date-start').value;
+  const fim = document.getElementById('f-date-end').value;
+  const unidades = [...SEL_UNIDADE].join(',');
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(inicio) params.set('inicio', inicio);
+  if(fim) params.set('fim', fim);
+  if(unidades) params.set('unidades', unidades);
+  window.location.href = `/api/ifood/relatorio-${tabela}.${formato}?${params.toString()}`;
 }
 
 async function carregar(){
