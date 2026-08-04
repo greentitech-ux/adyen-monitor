@@ -134,6 +134,14 @@ function hojeBrasilia(){
   const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
   return `${o.year}-${o.month}-${o.day}`;
 }
+// Fechamento/Entregas so fecham no fim do dia - de manha "hoje" sempre vem
+// vazio, entao esses dois cards mostram o dia anterior (D-1) por padrao, que
+// e o ultimo dia com dado de verdade pra olhar
+function ontemBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(Date.now() - 24*60*60*1000));
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
 
 const TIPOS_CENTRAL_LABEL = { estorno:'Estorno', 'ajuste-fechamento':'Correção de fechamento', compra:'Compra', manutencao:'Manutenção', 'suporte-ti':'Suporte de TI' };
 
@@ -171,22 +179,22 @@ async function cardMonitor(){
 }
 
 async function cardFechamentos(){
-  const hoje = hojeBrasilia();
+  const ontem = ontemBrasilia();
   const rows = await fetch('/api/fechamentos').then(r=>r.json());
-  const doDia = rows.filter(d=>d.data===hoje);
+  const doDia = rows.filter(d=>d.data===ontem);
   const faturamento = +doDia.reduce((s,d)=>s+(d.faturamento||0),0).toFixed(2);
-  return pcardWrap('💰','Fechamentos (hoje)','/fechamentos.html', `<div class="pstats">
+  return pcardWrap('💰','Fechamentos (ontem)','/fechamentos.html', `<div class="pstats">
     ${statRow('Lojas lançadas', doDia.length)}
     ${statRow('Faturamento', fmtMoney(faturamento))}
   </div>`);
 }
 
 async function cardEntregas(){
-  const hoje = hojeBrasilia();
+  const ontem = ontemBrasilia();
   const rows = await fetch('/api/entregas').then(r=>r.json());
-  const doDia = rows.filter(d=>d.data===hoje);
+  const doDia = rows.filter(d=>d.data===ontem);
   const valor = +doDia.reduce((s,d)=>s+(d.valor||0),0).toFixed(2);
-  return pcardWrap('🛵','Entregas (hoje)','/entregas.html', `<div class="pstats">
+  return pcardWrap('🛵','Entregas (ontem)','/entregas.html', `<div class="pstats">
     ${statRow('Corridas', doDia.length)}
     ${statRow('Valor', fmtMoney(valor))}
   </div>`);
