@@ -156,7 +156,13 @@
 </div>
 
 <div class="panel">
-  <h2>Por entregador <span class="n" id="entregadores-count"></span></h2>
+  <h2>
+    <div class="title-group"><span>Por entregador</span><span class="n" id="entregadores-count"></span></div>
+    <div style="display:flex;gap:4px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('entregadores','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('entregadores','pdf')">📄 PDF</button>
+    </div>
+  </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
       <thead><tr><th>Entregador</th><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Extra</th><th>Valor pago</th><th>COOP recebe</th><th>TM</th></tr></thead>
@@ -166,7 +172,13 @@
 </div>
 
 <div class="panel">
-  <h2>Por unidade <span class="n" id="unidades-count"></span></h2>
+  <h2>
+    <div class="title-group"><span>Por unidade</span><span class="n" id="unidades-count"></span></div>
+    <div style="display:flex;gap:4px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('unidades','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('unidades','pdf')">📄 PDF</button>
+    </div>
+  </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
       <thead><tr><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Fora área</th><th>Bônus</th><th>Ajuda custo</th><th>Valor pago</th><th>COOP recebe</th><th>TM</th></tr></thead>
@@ -178,6 +190,10 @@
 <div class="panel">
   <h2>
     <div class="title-group"><span>Lançamentos</span><span class="n" id="lancamentos-count"></span></div>
+    <div style="display:flex;gap:4px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('lancamentos','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('lancamentos','pdf')">📄 PDF</button>
+    </div>
   </h2>
   <div class="tablewrap">
     <table>
@@ -274,6 +290,19 @@ async function sincronizarPlanilha(){
   }finally{
     btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
   }
+}
+
+// relatorio (CSV/PDF) de uma das 3 tabelas de Entregas - usa o mesmo filtro
+// de periodo/unidades ativo na tela no momento
+function baixarRelatorioEntregas(tabela, formato){
+  const inicio = document.getElementById('f-date-start').value;
+  const fim = document.getElementById('f-date-end').value;
+  const unidades = [...SEL_UNIDADE].join(',');
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(inicio) params.set('inicio', inicio);
+  if(fim) params.set('fim', fim);
+  if(unidades) params.set('unidades', unidades);
+  window.location.href = `/api/entregas/relatorio-${tabela}.${formato}?${params.toString()}`;
 }
 
 async function carregar(){
