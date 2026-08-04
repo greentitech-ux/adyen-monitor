@@ -28,21 +28,28 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function somaMapa(mapa) {
+  return Object.values(mapa || {}).reduce((s, v) => s + num(v), 0);
+}
+
 // Faturamento = canais de venda; Total Declarado = formas de pagamento
 // (maquininhas + iFood + 99Food + Pix + Pix CNPJ + Outros) + dinheiro -
 // sempre recalculado a partir dos campos que realmente compoem cada um,
 // nunca confiado do que o cliente mandar. Usado tanto no lançamento quanto
 // em qualquer correção aprovada depois (senao uma correção que mexe em
-// "delivery", por exemplo, deixaria o Faturamento desatualizado)
+// "delivery", por exemplo, deixaria o Faturamento desatualizado). Os campos
+// fixos (Delivery/Carryout/... e Adyen/Ifood/...) sao os mesmos pra todo
+// mundo; canaisVendaExtras/formasPagamentoExtras (definidos por grupo, ver
+// grupos.js) somam POR CIMA desses, nunca substituem.
 // "explicitos" (opcional): campos que uma correcao mudou de proposito - se
 // for justamente faturamento/totalDeclarado, respeita o valor dado em vez
 // de recalcular por cima (escape hatch raro do Master, ver editarDireto)
 function recomputarTotais(r, explicitos) {
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'faturamento')) {
-    r.faturamento = +(num(r.delivery) + num(r.carryout) + num(r.pickup) + num(r.loja)).toFixed(2);
+    r.faturamento = +(num(r.delivery) + num(r.carryout) + num(r.pickup) + num(r.loja) + somaMapa(r.canaisVendaExtras)).toFixed(2);
   }
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'totalDeclarado')) {
-    r.totalDeclarado = +(num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro)).toFixed(2);
+    r.totalDeclarado = +(num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro) + somaMapa(r.formasPagamentoExtras)).toFixed(2);
   }
   r.diferenca = +(r.totalDeclarado - r.faturamento).toFixed(2);
   return r;
@@ -58,12 +65,13 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao || item.valor);
 }
 
-// KPI's extras definidos por grupo (ver grupos.js) - campo:valor livre, nao
+// campos extras definidos por grupo (ver grupos.js) - campo:valor livre, nao
 // tem uma lista fixa igual CAMPOS_NUMERICOS porque cada franquia define os
 // proprios (Master monta pela tela de Grupos). Aqui so limita tamanho/tipo,
 // quem decide QUAIS campos fazem sentido pra cada unidade e o cadastro do
-// grupo, nao esse modulo.
-function sanitizarKpisExtras(obj) {
+// grupo, nao esse modulo. Usado pros 3 mapas: kpisExtras, canaisVendaExtras,
+// formasPagamentoExtras.
+function sanitizarMapaExtras(obj) {
   if (!obj || typeof obj !== 'object') return {};
   const out = {};
   Object.entries(obj).slice(0, 40).forEach(([campo, valor]) => {
@@ -74,7 +82,7 @@ function sanitizarKpisExtras(obj) {
   return out;
 }
 
-async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
+async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
 
@@ -87,8 +95,10 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
 
   const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
+  registro.kpisExtras = sanitizarMapaExtras(kpisExtras);
+  registro.canaisVendaExtras = sanitizarMapaExtras(canaisVendaExtras);
+  registro.formasPagamentoExtras = sanitizarMapaExtras(formasPagamentoExtras);
   recomputarTotais(registro);
-  registro.kpisExtras = sanitizarKpisExtras(kpisExtras);
   registro.observacao = observacao || null;
   registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
   registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
@@ -189,7 +199,19 @@ const CAMPOS_TEXTO = ['gerente', 'observacao'];
 // decidirEdicao). Como o Master e quem aprovaria a propria solicitacao,
 // pedir-e-aprovar pra si mesmo e so atrito - aqui a mudanca e aplicada na
 // hora, mas ainda fica registrada no historico do fechamento pra auditoria
-async function editarDireto({ fechamentoId, mudancas, mudancasKpis, motivo, editadoPorEmail }) {
+// valida um patch de mapa livre (campo:valor) - usado pelos 3 "mudancasXxx"
+// de editarDireto, mesmo formato de sanitizarMapaExtras mas sem limite de
+// quantidade (e so um patch, nao o mapa inteiro)
+function sanitizarPatchMapa(obj) {
+  const out = {};
+  Object.entries(obj || {}).forEach(([campo, valor]) => {
+    const chave = String(campo).slice(0, 60);
+    if (chave) out[chave] = num(valor);
+  });
+  return out;
+}
+
+async function editarDireto({ fechamentoId, mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo, editadoPorEmail }) {
   const atual = await getOne(fechamentoId);
   if (!atual) throw new Error('Fechamento não encontrado.');
   const camposValidos = {};
@@ -197,37 +219,42 @@ async function editarDireto({ fechamentoId, mudancas, mudancasKpis, motivo, edit
     if (CAMPOS_NUMERICOS.includes(campo)) camposValidos[campo] = num(valor);
     else if (CAMPOS_TEXTO.includes(campo)) camposValidos[campo] = String(valor ?? '').slice(0, 500);
   });
-  // kpisExtras e um mapa livre (campo definido pelo grupo, ver grupos.js) -
-  // aqui e um PATCH: so os campos informados mudam, o resto do mapa
-  // permanece igual (diferente de mudancas, que sobrescreve campo por campo
-  // mas nao apaga os que nao vieram)
-  const kpisValidos = {};
-  Object.entries(mudancasKpis || {}).forEach(([campo, valor]) => {
-    const chave = String(campo).slice(0, 60);
-    if (chave) kpisValidos[chave] = num(valor);
-  });
-  if (!Object.keys(camposValidos).length && !Object.keys(kpisValidos).length) {
+  // kpisExtras/canaisVendaExtras/formasPagamentoExtras sao mapas livres
+  // (campos definidos pelo grupo, ver grupos.js) - aqui e um PATCH: so os
+  // campos informados mudam, o resto do mapa permanece igual (diferente de
+  // mudancas, que sobrescreve campo por campo mas nao apaga os que nao vieram)
+  const kpisValidos = sanitizarPatchMapa(mudancasKpis);
+  const canaisValidos = sanitizarPatchMapa(mudancasCanais);
+  const formasValidos = sanitizarPatchMapa(mudancasFormas);
+  if (!Object.keys(camposValidos).length && !Object.keys(kpisValidos).length && !Object.keys(canaisValidos).length && !Object.keys(formasValidos).length) {
     throw new Error('Nenhum campo válido para alterar.');
   }
 
   const valoresAnteriores = {};
   Object.keys(camposValidos).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
-  const merged = { ...atual, ...camposValidos };
+
+  const kpisExtrasNovo = Object.keys(kpisValidos).length ? { ...(atual.kpisExtras || {}), ...kpisValidos } : atual.kpisExtras;
+  const canaisExtrasNovo = Object.keys(canaisValidos).length ? { ...(atual.canaisVendaExtras || {}), ...canaisValidos } : atual.canaisVendaExtras;
+  const formasExtrasNovo = Object.keys(formasValidos).length ? { ...(atual.formasPagamentoExtras || {}), ...formasValidos } : atual.formasPagamentoExtras;
+
+  const merged = { ...atual, ...camposValidos, canaisVendaExtras: canaisExtrasNovo, formasPagamentoExtras: formasExtrasNovo };
   recomputarTotais(merged, camposValidos);
   const novosValores = { ...camposValidos, faturamento: merged.faturamento, totalDeclarado: merged.totalDeclarado, diferenca: merged.diferenca };
+  if (Object.keys(kpisValidos).length) novosValores.kpisExtras = kpisExtrasNovo;
+  if (Object.keys(canaisValidos).length) novosValores.canaisVendaExtras = canaisExtrasNovo;
+  if (Object.keys(formasValidos).length) novosValores.formasPagamentoExtras = formasExtrasNovo;
 
-  let kpisExtrasNovo = atual.kpisExtras || {};
-  if (Object.keys(kpisValidos).length) {
-    kpisExtrasNovo = { ...kpisExtrasNovo, ...kpisValidos };
-    novosValores.kpisExtras = kpisExtrasNovo;
-  }
+  const valoresNovosHistorico = { ...camposValidos };
+  if (Object.keys(kpisValidos).length) valoresNovosHistorico.kpisExtras = kpisValidos;
+  if (Object.keys(canaisValidos).length) valoresNovosHistorico.canaisVendaExtras = canaisValidos;
+  if (Object.keys(formasValidos).length) valoresNovosHistorico.formasPagamentoExtras = formasValidos;
 
   const historico = [...(atual.historico || []), {
     em: new Date().toISOString(),
     por: editadoPorEmail,
     motivo: (motivo && String(motivo).trim()) || '(edição direta do Master)',
     valoresAnteriores,
-    valoresNovos: Object.keys(kpisValidos).length ? { ...camposValidos, kpisExtras: kpisValidos } : camposValidos,
+    valoresNovos: valoresNovosHistorico,
   }];
 
   const ref = COLLECTION.doc(fechamentoId);
