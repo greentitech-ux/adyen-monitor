@@ -19,6 +19,18 @@ function sanitizePermissions(input) {
   };
 }
 
+const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function sanitizeHorarioPermitido(input) {
+  const h = input || {};
+  const ativo = !!h.ativo;
+  if (!ativo) return { ativo: false, inicio: '', fim: '' };
+  if (!HORA_RE.test(h.inicio) || !HORA_RE.test(h.fim)) {
+    throw new Error('Informe início e fim no formato HH:MM.');
+  }
+  return { ativo: true, inicio: h.inicio, fim: h.fim };
+}
+
 async function list() {
   const snap = await usersRef.orderBy('createdAt', 'asc').get();
   return snap.docs.map(toPublic);
@@ -62,6 +74,15 @@ async function setActive(id, active) {
   return toPublic(await ref.get());
 }
 
+async function updateHorarioPermitido(id, horarioPermitido) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master não usa horário restrito.');
+  await ref.update({ horarioPermitido: sanitizeHorarioPermitido(horarioPermitido) });
+  return toPublic(await ref.get());
+}
+
 async function resetPassword(id, password) {
   if (!password || password.length < 8) throw new Error('A senha deve ter pelo menos 8 caracteres.');
   const ref = usersRef.doc(id);
@@ -90,8 +111,9 @@ function toPublic(doc) {
     active: data.active !== false,
     locked: !!data.locked,
     permissions: data.role === 'master' ? null : data.permissions || emptyPermissions(),
+    horarioPermitido: data.role === 'master' ? null : data.horarioPermitido || { ativo: false, inicio: '', fim: '' },
     createdAt: data.createdAt,
   };
 }
 
-module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, resetPassword, remove };
+module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, resetPassword, remove };

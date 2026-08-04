@@ -23,6 +23,40 @@ function emptyPermissions() {
 
 const MAX_TENTATIVAS = 3;
 
+// minutos desde meia-noite, no horario de Brasilia - independente do fuso
+// configurado no SO do servidor (UTC na hospedagem). Mesmo principio do
+// agoraBrasilia() do frontend, so que devolve so a hora/minuto que interessa
+// pra comparar com a janela de horario permitido.
+function minutosAgoraBrasilia() {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const o = {};
+  partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  const hora = o.hour === '24' ? '00' : o.hour;
+  return Number(hora) * 60 + Number(o.minute);
+}
+
+// horarioPermitido: { ativo, inicio:'HH:MM', fim:'HH:MM' } - sem restricao se
+// ativo for falso. Suporta janela que vira a meia-noite (ex: 22:00-06:00).
+// inicio===fim e tratado como "sem restricao" (evita bloquear o dia inteiro
+// por engano de configuracao).
+function dentroDoHorarioPermitido(cfg) {
+  if (!cfg || !cfg.ativo || !cfg.inicio || !cfg.fim) return true;
+  const [hi, mi] = cfg.inicio.split(':').map(Number);
+  const [hf, mf] = cfg.fim.split(':').map(Number);
+  const inicio = hi * 60 + mi;
+  const fim = hf * 60 + mf;
+  if (inicio === fim) return true;
+  const agora = minutosAgoraBrasilia();
+  if (inicio < fim) return agora >= inicio && agora < fim;
+  return agora >= inicio || agora < fim;
+}
+
+function mensagemHorarioPermitido(cfg) {
+  return `Acesso permitido apenas das ${cfg.inicio} às ${cfg.fim}.`;
+}
+
 // garante que existe um Master assim que o servidor sobe. So cria se ainda
 // nao existir nenhum - nao sobrescreve senha em runs seguintes (pra nao
 // travar o Master fora caso o env var mude por engano).
@@ -57,6 +91,9 @@ async function login(email, password) {
   const user = doc.data();
   if (user.active === false) throw new Error('Este acesso foi desativado.');
   if (user.locked) throw new Error('Acesso bloqueado após tentativas de senha erradas. Fale com o Master.');
+  if (user.role !== 'master' && !dentroDoHorarioPermitido(user.horarioPermitido)) {
+    throw new Error(mensagemHorarioPermitido(user.horarioPermitido));
+  }
 
   const ok = await bcrypt.compare(String(password || ''), user.passwordHash);
   if (!ok) {
@@ -117,6 +154,9 @@ function requireAuth(req, res, next) {
   getUserById(payload.sub)
     .then((user) => {
       if (!user || user.active === false) return res.status(401).json({ error: 'Acesso inválido ou desativado.' });
+      if (user.role !== 'master' && !dentroDoHorarioPermitido(user.horarioPermitido)) {
+        return res.status(401).json({ error: mensagemHorarioPermitido(user.horarioPermitido) });
+      }
       req.user = user;
       req.isMaster = user.role === 'master';
       req.permissions = req.isMaster ? null : user.permissions || emptyPermissions();
@@ -155,4 +195,5 @@ module.exports = {
   hasSection,
   filterByUnidade,
   emptyPermissions,
+  dentroDoHorarioPermitido,
 };

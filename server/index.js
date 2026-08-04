@@ -1111,6 +1111,14 @@ app.put('/api/users/:id/active', auth.requireMaster, async (req, res) => {
   }
 });
 
+app.put('/api/users/:id/horario-permitido', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateHorarioPermitido(req.params.id, req.body.horarioPermitido));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/users/:id/reset-password', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.resetPassword(req.params.id, req.body.password));
