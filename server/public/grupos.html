@@ -192,13 +192,19 @@
     <fieldset style="margin-top:10px;">
       <legend>Canais de venda extras</legend>
       <div id="e-canais"></div>
-      <button type="button" class="btn-add" onclick="adicionarKpi('e-canais')">+ Adicionar canal</button>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" onclick="adicionarKpi('e-canais')">+ Adicionar canal</button>
+        <button type="button" class="btn-add" style="color:var(--bad);" onclick="limparExtras('e-canais')">🗑️ Limpar tudo</button>
+      </div>
     </fieldset>
 
     <fieldset style="margin-top:10px;">
       <legend>Formas de pagamento extras</legend>
       <div id="e-formas"></div>
-      <button type="button" class="btn-add" onclick="adicionarKpi('e-formas')">+ Adicionar forma de pagamento</button>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" onclick="adicionarKpi('e-formas')">+ Adicionar forma de pagamento</button>
+        <button type="button" class="btn-add" style="color:var(--bad);" onclick="limparExtras('e-formas')">🗑️ Limpar tudo</button>
+      </div>
     </fieldset>
 
     <fieldset style="margin-top:10px;">
@@ -250,6 +256,12 @@ function lerKpis(containerId){
     .map(i=>i.value.trim())
     .filter(Boolean)
     .map(label=>({label}));
+}
+// remove todos os campos de uma vez (em vez de clicar no ✕ de cada linha) -
+// util quando o Master quer recomecar a configuracao do zero pra um grupo
+function limparExtras(containerId){
+  if(!confirm('Remover todos os campos dessa lista? Isso só é aplicado quando você clicar em Salvar.')) return;
+  document.getElementById(containerId).innerHTML = '';
 }
 
 // lojas agrupadas por Seção/Grupo, igual usuarios.html - a mesma fonte
