@@ -12,8 +12,16 @@ function docId(tx) {
   return `${tx.pspReference}__${tx.eventCode}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
+// retencao: mantem sempre os ultimos 3 meses de historico, descarta o resto
+const RETENTION_DAYS = 90;
+
+// carrega so a janela de retencao (nao a colecao inteira) - alem de ser o
+// unico dado que o app realmente usa, evita reler documentos que ja
+// deveriam ter sido podados por pruneOld(), reduzindo o custo de leitura
+// no Firestore a cada reinicio do processo
 async function init() {
-  const snap = await COLLECTION.get();
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const snap = await COLLECTION.where('dataHora', '>=', cutoff).get();
   cache = snap.docs.map((d) => d.data());
 }
 
@@ -21,8 +29,6 @@ function load() {
   return cache;
 }
 
-// retencao: mantem sempre os ultimos 3 meses de historico, descarta o resto
-const RETENTION_DAYS = 90;
 async function pruneOld() {
   const all = load();
   const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
