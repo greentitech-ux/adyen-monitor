@@ -38,6 +38,7 @@ const ifoodStore = require('./ifoodStore');
 const ifoodSync = require('./ifoodSync');
 const solicitacoes = require('./solicitacoes');
 const chamadosTI = require('./chamadosTI');
+const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 
 const upload = multer({
@@ -1948,6 +1949,54 @@ async function todosCardsCentral(req) {
 
 app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
   res.json(await todosCardsCentral(req));
+});
+
+// busca o card cru (de qualquer um dos 3 modulos) so pra achar quem criou -
+// usado no gate de acesso do chat (dono do pedido, Master ou Admin)
+async function buscarCriadorCard(tipo, id) {
+  if (tipo === 'estorno') {
+    const r = await refunds.getOne(id);
+    return r && r.requestedById;
+  }
+  if (tipo === 'ajuste-fechamento') {
+    const r = await fechamentosLive.getEdicao(id);
+    return r && r.solicitadoPorId;
+  }
+  const r = await solicitacoes.getOne(id);
+  return r && r.criadoPorId;
+}
+
+// chat de uma solicitacao da Central - quem criou o pedido, Master ou Admin
+// podem ver/participar (pra Master/Admin questionar antes de aprovar, e pra
+// quem pediu poder responder)
+app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
+  try {
+    const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
+    if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (!req.isMaster && !req.isAdmin && criadoPorId !== req.user.id) return res.sendStatus(404);
+    res.json(await centralChat.listByCard(req.params.tipo, req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
+  try {
+    const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
+    if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (!req.isMaster && !req.isAdmin && criadoPorId !== req.user.id) return res.sendStatus(404);
+    const mensagem = await centralChat.addMessage({
+      tipo: req.params.tipo,
+      cardId: req.params.id,
+      autorId: req.user.id,
+      autorEmail: req.user.email,
+      texto: req.body.texto,
+    });
+    broadcast('central-chat-nova', mensagem, 'solicitacoes');
+    res.json(mensagem);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ---------- relatorio (CSV/PDF) do quadro Kanban de central-historico.html -
