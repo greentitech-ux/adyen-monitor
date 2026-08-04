@@ -142,8 +142,11 @@ function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidd
 
 // cada topico vira um <details> colapsavel - id usado tanto no sumario (TOC)
 // quanto na busca por texto (titulo + corpo)
+// `secoes`: null = visivel pra qualquer usuario logado; array = precisa de
+// pelo menos uma dessas secoes liberadas; 'master' = so Master (e Admin, que
+// enxerga tudo que e pertinente ao Master aqui na Ajuda)
 const TOPICOS = [
-  { id:'login', icone:'🔑', titulo:'Como entrar no sistema', corpo:`
+  { id:'login', icone:'🔑', secoes:null, titulo:'Como entrar no sistema', corpo:`
     <h3>Passo a passo</h3>
     <ol>
       <li>Acesse o endereço do Zenith Ops no navegador.</li>
@@ -153,14 +156,14 @@ const TOPICOS = [
     <div class="dica"><b>Esqueceu a senha?</b> Só o Master pode trocar - peça pra ele usar "Nova senha" na página Usuários.</div>
     <div class="dica"><b>Conta bloqueada?</b> Depois de 3 senhas erradas o acesso trava sozinho. O Master destrava trocando a senha.</div>
   `},
-  { id:'painel', icone:'🏠', titulo:'Painel (visão geral)', corpo:`
+  { id:'painel', icone:'🏠', secoes:null, titulo:'Painel (visão geral)', corpo:`
     <p>É a primeira tela depois do login: mostra um resumo rápido de cada área que você tem acesso (Monitor do dia, Fechamentos de ontem, Entregas de ontem, Central de Solicitações pendentes, Chamados de TI, iFood).</p>
     <ol>
       <li>Cada cartão mostra os números principais daquela área.</li>
       <li>Clique em <b>Abrir →</b> no canto do cartão pra ir direto pra tela completa.</li>
     </ol>
   `},
-  { id:'monitor', icone:'📈', titulo:'Monitor (transações Adyen)', corpo:`
+  { id:'monitor', icone:'📈', secoes:['monitor'], titulo:'Monitor (transações Adyen)', corpo:`
     <p>Mostra em tempo real as transações processadas pela Adyen: aprovadas, recusadas, chargebacks e alertas de possível fraude.</p>
     <h3>O que dá pra fazer</h3>
     <ul>
@@ -170,18 +173,18 @@ const TOPICOS = [
       <li>Exportar qualquer tabela em CSV ou PDF pelos botões no topo de cada uma.</li>
     </ul>
   `},
-  { id:'fechamento', icone:'🧾', titulo:'Lançar Fechamento do dia', corpo:`
+  { id:'fechamento', icone:'🧾', secoes:['lancamento'], titulo:'Lançar Fechamento do dia', corpo:`
     <h3>Passo a passo</h3>
     <ol>
       <li>Abra <b>Fechamento</b> no menu.</li>
       <li>Escolha a loja e a data (normalmente o dia anterior, D-1).</li>
-      <li>Preencha faturamento, formas de pagamento, canais de venda, sangrias, maquininhas e saídas.</li>
+      <li>Preencha faturamento, formas de pagamento, canais de venda, sangrias/depósitos, maquininhas e saídas.</li>
       <li>Confira o resumo no fim da página antes de enviar.</li>
       <li>Clique em <b>Lançar</b>.</li>
     </ol>
     <div class="dica">Errou algo depois de já ter lançado? Não dá pra editar direto - abra <b>Central</b> → <b>Ajustar Fechamento</b> e peça a correção. Ela entra na fila de aprovação do Master/Admin.</div>
   `},
-  { id:'fechamentos-painel', icone:'💰', titulo:'Acompanhar Fechamentos', corpo:`
+  { id:'fechamentos-painel', icone:'💰', secoes:['fechamentos'], titulo:'Acompanhar Fechamentos', corpo:`
     <p>Painel de conferência com o histórico de todos os fechamentos lançados, comparativo por unidade e gráfico dos últimos 30 dias.</p>
     <ol>
       <li>Use os filtros de período (com o atalho "Ontem") e de loja/grupo.</li>
@@ -189,7 +192,7 @@ const TOPICOS = [
       <li>Exporte em CSV ou PDF pelos botões da tabela.</li>
     </ol>
   `},
-  { id:'entregas', icone:'🛵', titulo:'Entregas', corpo:`
+  { id:'entregas', icone:'🛵', secoes:['entregas','entregas-lancamento'], titulo:'Entregas', corpo:`
     <h3>Lançar uma entrega</h3>
     <ol>
       <li>Abra <b>Lançar entrega</b>, escolha a loja e a data.</li>
@@ -203,7 +206,7 @@ const TOPICOS = [
       <li>Exportação em CSV/PDF nas tabelas "Por entregador" e "Por unidade".</li>
     </ul>
   `},
-  { id:'central', icone:'📋', titulo:'Central de Solicitações', corpo:`
+  { id:'central', icone:'📋', secoes:['solicitacoes'], titulo:'Central de Solicitações', corpo:`
     <p>É onde qualquer loja pede Estorno, Ajuste de Fechamento, Compra, Manutenção ou Suporte de TI - e onde Master/Admin aprovam ou rejeitam esses pedidos.</p>
     <h3>Lançar uma solicitação</h3>
     <ol>
@@ -225,7 +228,7 @@ const TOPICOS = [
     <h3>✓ Aprovar / rejeitar</h3>
     <p>Só Master e usuários com a <span class="tagpill admin">⭐ tag Admin</span> conseguem aprovar ou rejeitar. Editar ou excluir uma solicitação continua sendo só do <span class="tagpill master">Master</span>.</p>
   `},
-  { id:'admin-tag', icone:'⭐', titulo:'Tag Admin: o que é e como usar', corpo:`
+  { id:'admin-tag', icone:'⭐', secoes:'master', titulo:'Tag Admin: o que é e como usar', corpo:`
     <p>A tag Admin dá pra um usuário comum o poder de aprovar/rejeitar solicitações da Central, sem precisar virar Master (que tem acesso a tudo, incluindo gestão de usuários).</p>
     <h3>Como o Master ativa</h3>
     <ol>
@@ -241,7 +244,7 @@ const TOPICOS = [
     </ul>
     <div class="dica">Admin <b>não</b> pode editar/excluir solicitações direto, nem gerenciar outros usuários - isso continua exclusivo do Master.</div>
   `},
-  { id:'cofre', icone:'🔐', titulo:'Cofre de senhas', corpo:`
+  { id:'cofre', icone:'🔐', secoes:['cofre'], titulo:'Cofre de senhas', corpo:`
     <p>Guarda de forma organizada as senhas de sistemas usados pela operação, divididas por Grupo → Subgrupo.</p>
     <ol>
       <li>Abra <b>Cofre</b> e navegue pelos grupos/subgrupos até achar o sistema.</li>
@@ -249,7 +252,7 @@ const TOPICOS = [
     </ol>
     <div class="dica">Você só vê os subgrupos liberados pelo Master pro seu acesso.</div>
   `},
-  { id:'usuarios', icone:'👤', titulo:'Usuários (Master)', corpo:`
+  { id:'usuarios', icone:'👤', secoes:'master', titulo:'Usuários (Master)', corpo:`
     <p>Tela exclusiva do Master pra criar e administrar todos os acessos do sistema.</p>
     <h3>Criar um acesso novo</h3>
     <ol>
@@ -267,14 +270,14 @@ const TOPICOS = [
       <li><b>Excluir</b>: remove o acesso de vez.</li>
     </ul>
   `},
-  { id:'grupos', icone:'🏷️', titulo:'Grupos (Master)', corpo:`
+  { id:'grupos', icone:'🏷️', secoes:'master', titulo:'Grupos (Master)', corpo:`
     <p>Organiza as lojas em franquias/grupos e permite configurar KPIs extras (canais de venda e formas de pagamento) usados no Fechamento.</p>
     <ol>
       <li>Crie ou edite um grupo, associando as lojas que fazem parte dele.</li>
       <li>Adicione canais de venda ou formas de pagamento extras específicos daquele grupo, se precisar.</li>
     </ol>
   `},
-  { id:'tecnico', icone:'🔧', titulo:'Chamados de TI', corpo:`
+  { id:'tecnico', icone:'🔧', secoes:['tecnico'], titulo:'Chamados de TI', corpo:`
     <p>Fila de atendimento técnico - nasce automaticamente quando uma solicitação de Suporte de TI é aprovada na Central, ou pode ser criada direto pelo Master.</p>
     <ul>
       <li>O técnico responsável vê só os chamados atribuídos a ele.</li>
@@ -282,14 +285,14 @@ const TOPICOS = [
       <li>Ao terminar, clica em <b>Concluir chamado</b> e pode anexar foto do serviço feito.</li>
     </ul>
   `},
-  { id:'relatorios', icone:'📊', titulo:'Relatórios de disputa', corpo:`
+  { id:'relatorios', icone:'📊', secoes:['disputas'], titulo:'Relatórios de disputa', corpo:`
     <p>Acompanhamento das disputas/chargebacks abertos pela operadora, com prazo de resposta e status.</p>
     <ol>
       <li>Filtre por loja e período.</li>
       <li>Exporte a lista em CSV ou PDF pelos botões no topo da tabela.</li>
     </ol>
   `},
-  { id:'ifood', icone:'🍔', titulo:'iFood', corpo:`
+  { id:'ifood', icone:'🍔', secoes:['ifood'], titulo:'iFood', corpo:`
     <p>Painel de vendas feitas pelo iFood, separado do Monitor porque usa uma integração e regras diferentes da Adyen.</p>
     <ul>
       <li>Veja o resumo de vendas do dia e o histórico por período.</li>
@@ -298,8 +301,20 @@ const TOPICOS = [
   `},
 ];
 
+let SECOES_USUARIO = [];
+let PODE_TUDO = false; // Master ou Admin - ve todo topico da Ajuda, mesmo os "so Master"
+
+// so mostra o topico se a pessoa realmente tem a secao liberada - sem isso o
+// usuario via documentacao de telas que ele nem consegue abrir
+function topicoVisivel(t){
+  if(!t.secoes) return true;
+  if(PODE_TUDO) return true;
+  if(t.secoes==='master') return false;
+  return t.secoes.some(s=>SECOES_USUARIO.includes(s));
+}
+
 function renderToc(){
-  document.getElementById('toc').innerHTML = TOPICOS.map(t=>`<a href="#${t.id}" onclick="abrirTopico('${t.id}')">${t.icone} ${escapeHtml(t.titulo)}</a>`).join('');
+  document.getElementById('toc').innerHTML = TOPICOS.filter(topicoVisivel).map(t=>`<a href="#${t.id}" onclick="abrirTopico('${t.id}')">${t.icone} ${escapeHtml(t.titulo)}</a>`).join('');
 }
 // clicar num link do indice so rola ate o <details> - por padrao isso nao
 // abre o accordion sozinho, entao abre explicitamente antes de rolar
@@ -311,7 +326,7 @@ function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&'
 
 function renderSecoes(filtro){
   const termo = (filtro||'').trim().toLowerCase();
-  const visiveis = TOPICOS.filter(t => !termo || (t.titulo + ' ' + t.corpo).toLowerCase().includes(termo));
+  const visiveis = TOPICOS.filter(topicoVisivel).filter(t => !termo || (t.titulo + ' ' + t.corpo).toLowerCase().includes(termo));
   document.getElementById('busca-vazio').classList.toggle('hidden', visiveis.length>0);
   document.getElementById('lista-secoes').innerHTML = visiveis.map(t=>`
     <details class="secao-ajuda" id="${t.id}" ${termo?'open':''}>
@@ -328,6 +343,8 @@ async function boot(){
   const me = await res.json();
   const isMaster = me.role==='master';
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (me.permissions?.sections||[]);
+  SECOES_USUARIO = secoes;
+  PODE_TUDO = isMaster || !!me.isAdmin;
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));

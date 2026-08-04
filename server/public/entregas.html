@@ -129,18 +129,6 @@
 
 <div id="root" class="hidden">
 
-<div class="kpis" id="kpis"></div>
-
-<div class="panel">
-  <h2><div class="title-group"><span id="ontem-titulo">Lançamento de ontem (D-1)</span><span class="n" id="ontem-count"></span></div></h2>
-  <div class="ontem-grid" id="ontem-grid"></div>
-</div>
-
-<div class="panel hidden" id="edicoes-panel">
-  <h2><div class="title-group"><span>Pedidos de correção de entregas</span><span class="n" id="edicoes-count"></span></div></h2>
-  <div id="edicoes-lista" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
-</div>
-
 <div class="panel">
   <div class="controls">
     <div class="presets" id="presets"></div>
@@ -154,6 +142,18 @@
       <div class="multiselect-panel" id="ms-unidade-panel"></div>
     </div>
   </div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="panel">
+  <h2><div class="title-group"><span id="ontem-titulo">Lançamento de ontem (D-1)</span><span class="n" id="ontem-count"></span></div></h2>
+  <div class="ontem-grid" id="ontem-grid"></div>
+</div>
+
+<div class="panel hidden" id="edicoes-panel">
+  <h2><div class="title-group"><span>Pedidos de correção de entregas</span><span class="n" id="edicoes-count"></span></div></h2>
+  <div id="edicoes-lista" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
 </div>
 
 <div class="panel">
@@ -479,12 +479,12 @@ function renderKpis(rows){
   const totalValor = soma(rows,'valor');
   const ticketMedio = totalEntregas ? totalValor/totalEntregas : 0;
   const kpis = [
-    {lbl:'Corridas lançadas', val:rows.length, cls:''},
     {lbl:'Entregadores ativos', val:entregadores, cls:''},
     {lbl:'Entregas', val:totalEntregas.toFixed(0), cls:'ok'},
     {lbl:'Extra', val:soma(rows,'extra').toFixed(0), cls:''},
     {lbl:'Valor pago', val:fmtMoney(totalValor), cls:'ok'},
-    {lbl:'COOP recebe', val:fmtMoney(soma(rows,'coopRecebe')), cls:''},
+    {lbl:'Retorno', val:soma(rows,'retorno').toFixed(0), cls:''},
+    {lbl:'Fora de área', val:soma(rows,'foraDeArea').toFixed(0), cls:''},
     {lbl:'Ticket médio (TM)', val:fmtMoney(ticketMedio), cls:''},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>

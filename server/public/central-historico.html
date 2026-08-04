@@ -92,6 +92,13 @@
   .kcard .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;font-size:12.5px;font-weight:600;}
   .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
   .kanban-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:12px;}
+  .notif-chat-wrap{position:fixed;top:14px;right:14px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:min(320px,calc(100vw - 28px));}
+  .notif-chat{background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:11px 13px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;animation:notif-in .18s ease;}
+  .notif-chat:hover{background:var(--panel2);}
+  .notif-chat .notif-titulo{font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .notif-chat .notif-fechar{color:var(--muted);font-size:14px;line-height:1;flex:none;}
+  .notif-chat .notif-corpo{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  @keyframes notif-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
   @media(max-width:760px){ .kanban-col{min-width:82vw;max-height:none;} }
   .tipo-filtro-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
   .tipo-filtro-btn{font-family:var(--sans);font-size:11.5px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:112px;transition:border-color .15s ease,background .15s ease;}
@@ -103,6 +110,8 @@
 </style>
 </head>
 <body>
+
+<div class="notif-chat-wrap" id="notif-chat-wrap"></div>
 
 <header>
   <div class="header-top">
@@ -443,7 +452,10 @@ function renderChatLista(){
   el.innerHTML = (CHAT_ATUAL && CHAT_ATUAL.length)
     ? CHAT_ATUAL.map(m=>`
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;">
-        <div style="font-size:11px;color:var(--muted);">${escapeHtml(m.autorEmail||'')} · ${fmtDataHora(m.criadoEm)}</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="font-size:11px;color:var(--muted);">${escapeHtml(m.autorEmail||'')} · ${fmtDataHora(m.criadoEm)}</div>
+          ${IS_MASTER ? `<button type="button" class="link-btn" style="color:var(--bad);flex:none;" title="Excluir mensagem" onclick="excluirMensagemChat('${m.id}')">🗑️</button>` : ''}
+        </div>
         <div style="white-space:pre-wrap;">${escapeHtml(m.texto)}</div>
       </div>`).join('')
     : '<div style="color:var(--muted);font-size:12px;">Nenhuma mensagem ainda.</div>';
@@ -457,6 +469,16 @@ async function enviarChat(){
     const resp = await fetch(`/api/central/${DETALHE_ATUAL.tipo}/${DETALHE_ATUAL.id}/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({texto}) });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao enviar mensagem.');
+    await carregarChat(DETALHE_ATUAL.tipo, DETALHE_ATUAL.id);
+  }catch(err){ alert(err.message); }
+}
+async function excluirMensagemChat(messageId){
+  if(!DETALHE_ATUAL) return;
+  if(!confirm('Excluir esta mensagem do chat?')) return;
+  try{
+    const resp = await fetch(`/api/central/${DETALHE_ATUAL.tipo}/${DETALHE_ATUAL.id}/chat/${messageId}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao excluir mensagem.');
     await carregarChat(DETALHE_ATUAL.tipo, DETALHE_ATUAL.id);
   }catch(err){ alert(err.message); }
 }
@@ -723,6 +745,49 @@ async function boot(){
   }
 
   await carregarCentral();
+  conectarStreamChat();
+}
+
+// notificacao de mensagem nova no canto superior direito - fica ate a pessoa
+// clicar (nao some sozinha). So notifica se o card da mensagem esta em CARDS
+// (a mesma lista ja filtrada pelo backend por dono/Master/Admin em /api/central
+// - se nao esta la, esse usuario nao tem acesso aquele chat mesmo)
+let NOTIF_SEQ = 0;
+function mostrarNotificacaoChat(msg){
+  const wrap = document.getElementById('notif-chat-wrap');
+  const card = CARDS.find(c=>c.tipo===msg.tipo && c.id===msg.cardId);
+  const tituloCard = card ? (card.titulo || TIPOS_INFO[card.tipo]?.label || card.tipo) : (TIPOS_INFO[msg.tipo]?.label || msg.tipo);
+  const el = document.createElement('div');
+  el.className = 'notif-chat';
+  el.id = 'notif-' + (++NOTIF_SEQ);
+  el.innerHTML = `
+    <div class="notif-titulo"><span>💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</span><span class="notif-fechar">✕</span></div>
+    <div class="notif-corpo"><b>${escapeHtml(msg.autorEmail||'')}:</b> ${escapeHtml(msg.texto)}</div>
+  `;
+  el.onclick = ()=>{
+    el.remove();
+    if(card) abrirDetalhe(card.tipo, card.id);
+  };
+  wrap.appendChild(el);
+}
+
+function conectarStreamChat(){
+  const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
+  es.addEventListener('central-chat-nova', (e)=>{
+    const msg = JSON.parse(e.data);
+    if(msg.autorId === ME.id) return;
+    if(!CARDS.some(c=>c.tipo===msg.tipo && c.id===msg.cardId)) return;
+    mostrarNotificacaoChat(msg);
+    if(DETALHE_ATUAL && DETALHE_ATUAL.tipo===msg.tipo && DETALHE_ATUAL.id===msg.cardId){
+      carregarChat(msg.tipo, msg.cardId);
+    }
+  });
+  es.addEventListener('central-chat-removida', (e)=>{
+    const info = JSON.parse(e.data);
+    if(DETALHE_ATUAL && DETALHE_ATUAL.tipo===info.tipo && DETALHE_ATUAL.id===info.cardId){
+      carregarChat(info.tipo, info.cardId);
+    }
+  });
 }
 
 boot();

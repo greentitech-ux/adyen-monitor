@@ -134,7 +134,7 @@
 <div id="root" class="hidden">
 
 <div class="panel" id="painel-sangria">
-  <h2>💰 Registrar sangria</h2>
+  <h2>💰 Registrar sangria/depósito</h2>
   <div class="sub" style="margin:-2px 0 10px;">Pra retiradas de caixa feitas durante o dia, na visita à loja - sem precisar esperar o fechamento sair. Some automático no fechamento do dia.</div>
   <form id="form-sangria">
     <label>Unidade</label>
@@ -146,7 +146,7 @@
     <label>Observação (opcional)</label>
     <input type="text" id="s-descricao" placeholder="ex: retirada na visita da tarde">
     <div class="msg hidden" id="msg-sangria"></div>
-    <button class="btn-primary" type="submit" id="btn-sangria">Registrar sangria</button>
+    <button class="btn-primary" type="submit" id="btn-sangria">Registrar sangria/depósito</button>
   </form>
   <div id="lista-sangrias" style="margin-top:4px;"></div>
 </div>
@@ -215,13 +215,13 @@
     </div>
 
     <div class="secao">
-      <div class="secao-titulo">Saída de dinheiro (sangria) <span id="sangria-dia-total" style="color:var(--text);"></span></div>
+      <div class="secao-titulo">Saída de dinheiro (sangria/depósito) <span id="sangria-dia-total" style="color:var(--text);"></span></div>
       <div id="sangria-dia-info"><div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div></div>
     </div>
 
     <div class="secao">
       <div class="secao-titulo">Outras saídas de caixa <span id="saida-total" style="color:var(--text);"></span></div>
-      <div class="sub" style="margin:-2px 0 8px;">Saídas que não passaram pela Sangria (ex: pequena despesa paga direto do caixa).</div>
+      <div class="sub" style="margin:-2px 0 8px;">Saídas que não passaram pela Sangria/Depósito (ex: pequena despesa paga direto do caixa).</div>
       <div id="lista-saidas"></div>
       <button type="button" class="btn-add" onclick="adicionarSaida()">+ Adicionar saída</button>
     </div>
@@ -232,7 +232,7 @@
       <div class="sub hidden" id="kpis-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
-        <div class="linha"><span>Sangria do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
+        <div class="linha"><span>Sangria/Depósito do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
         <div class="linha"><span>Soma outras saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
         <div class="linha"><span>Faturamento total</span><b id="resumo-faturamento">R$ 0,00</b></div>
         <div class="linha"><span>Total declarado</span><b id="resumo-declarado">R$ 0,00</b></div>
@@ -302,7 +302,7 @@
 
 <div class="overlay hidden" id="overlay-sangria-editar">
   <div class="sheet">
-    <h3>Editar sangria (Master)</h3>
+    <h3>Editar sangria/depósito (Master)</h3>
     <div class="sub" id="sangria-editar-info"></div>
     <form id="form-sangria-editar">
       <label>Valor retirado (R$)</label>
@@ -437,7 +437,7 @@ async function carregarSangriaDoDia(){
     SANGRIA_DO_DIA = await fetch(`/api/sangrias/do-dia?unidade=${encodeURIComponent(unidade)}&data=${encodeURIComponent(data)}`).then(r=>r.json());
   }catch(e){ SANGRIA_DO_DIA = []; }
   if(!SANGRIA_DO_DIA.length){
-    el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Nenhuma sangria registrada pra esse dia.</div>';
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Nenhuma sangria/depósito registrada pra esse dia.</div>';
   }else{
     el.innerHTML = SANGRIA_DO_DIA.map(s=>`
       <div class="card" style="padding:6px 0;">
@@ -554,7 +554,7 @@ function renderSangrias(){
   const el = document.getElementById('lista-sangrias');
   const recentes = SANGRIAS.slice(0,8);
   if(!recentes.length){ el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="sub" style="margin-bottom:6px;">Últimas sangrias registradas</div>` + recentes.map(s=>`
+  el.innerHTML = `<div class="sub" style="margin-bottom:6px;">Últimas sangrias/depósitos registrados</div>` + recentes.map(s=>`
     <div class="card" style="padding:8px 0;">
       <div class="linha1" style="font-size:12.5px;">
         <span>${escapeHtml(s.unidadeNome||s.unidade)} · ${fmtData(s.data)}</span>
@@ -598,7 +598,7 @@ document.getElementById('form-sangria-editar').addEventListener('submit', async 
 });
 async function excluirSangria(){
   if(!EDITANDO_SANGRIA_ID) return;
-  if(!confirm('Excluir essa sangria? Ela vai parar de somar no fechamento do dia. Essa ação não pode ser desfeita.')) return;
+  if(!confirm('Excluir essa sangria/depósito? Ela vai parar de somar no fechamento do dia. Essa ação não pode ser desfeita.')) return;
   const msg = document.getElementById('msg-sangria-editar');
   try{
     const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, { method:'DELETE' });
@@ -630,8 +630,8 @@ document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
     };
     const res = await fetch('/api/sangrias', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao registrar sangria');
-    msg.textContent = 'Sangria registrada com sucesso.'; msg.className = 'msg ok';
+    if(!res.ok) throw new Error(data.error||'erro ao registrar sangria/depósito');
+    msg.textContent = 'Sangria/depósito registrada com sucesso.'; msg.className = 'msg ok';
     document.getElementById('form-sangria').reset();
     document.getElementById('s-data').value = hojeBrasilia();
     await carregarSangrias();
@@ -896,15 +896,22 @@ async function boot(){
     return;
   }
 
-  const tituloPagina = podeLancamento ? 'Lançamento de fechamento' : 'Registrar sangria';
+  const tituloPagina = podeLancamento ? 'Lançamento de fechamento' : 'Registrar sangria/depósito';
   document.getElementById('titulo-pagina').textContent = tituloPagina;
-  document.getElementById('nav-self').textContent = podeLancamento ? '🧾 Fechamento' : '💰 Sangria';
+  document.getElementById('nav-self').textContent = podeLancamento ? '🧾 Fechamento' : '💰 Sangria/Depósito';
 
   document.getElementById('painel-sangria').classList.toggle('hidden', !podeSangria);
   document.getElementById('painel-fechamento').classList.toggle('hidden', !podeLancamento);
   document.getElementById('painel-meus-lancamentos').classList.toggle('hidden', !podeLancamento);
 
-  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
+  // so o codigo canonico do Fechamento (UNIDADES_NOMES) pode aparecer aqui -
+  // permissions.unidades pode ter codigos de OUTROS dominios (Entregas,
+  // cadastro geral etc, cada um com seu proprio espaco de codigos) que por
+  // coincidencia tambem foram liberados pro usuario; sem esse filtro, a loja
+  // via 2-3 "nomes" parecidos pra escolher (ex: "Dom Garanhuns"/"Garanhuns"/
+  // "DOM19911") e podia lançar o mesmo fechamento sob um codigo errado,
+  // fragmentando os dados da loja entre nomes diferentes
+  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>UNIDADES_NOMES[u]);
 
   if(podeLancamento){
     try{ GRUPOS_KPI = await fetch('/api/grupos').then(r=>r.json()); }catch(e){ GRUPOS_KPI = []; }
