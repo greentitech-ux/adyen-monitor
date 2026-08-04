@@ -181,11 +181,11 @@
     <div class="secao">
       <div class="secao-titulo">Formas de pagamento</div>
       <div class="grid2">
-        <div><label>iFood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
+        <div><label>Ifood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
         <div id="wrap-food99"><label>99Food</label><input type="number" step="0.01" inputmode="decimal" id="f-food99"></div>
       </div>
       <div class="grid2">
-        <div><label>Pix</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
+        <div><label>Adyen</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
         <div><label>Pix CNPJ</label><input type="number" step="0.01" inputmode="decimal" id="f-pixCnpj"></div>
       </div>
       <label>Outros</label>
@@ -319,7 +319,7 @@ const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'BRAVO'; }
 
 const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
-const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'iFood', food99:'99Food', pix:'Pix', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
+const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'Ifood', food99:'99Food', pix:'Adyen', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
 
 let ME = null;
 let IS_MASTER = false;
