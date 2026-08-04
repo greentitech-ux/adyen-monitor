@@ -1614,12 +1614,17 @@ app.delete('/api/grupos/:id', auth.requireMaster, async (req, res) => {
 // as demais secoes do Fechamento (Faturamento, Declarado, etc) ----------
 app.post('/api/sangrias', requireSection('sangria'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim } = req.body;
+    const { unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim, nomeDepositante, password } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    // 400, nao 401 - o wrapper global de fetch das paginas desloga em
+    // qualquer 401 (token invalido), e uma senha de confirmacao errada
+    // aqui nao significa que a sessao do usuario esta invalida
+    const senhaOk = await auth.verifyPassword(req.user.id, password);
+    if (!senhaOk) return res.status(400).json({ error: 'Senha incorreta.' });
     const registro = await sangrias.criar({
-      unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim,
+      unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim, nomeDepositante,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });

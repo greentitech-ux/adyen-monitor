@@ -143,13 +143,17 @@
       <div><label>Data</label><input type="date" id="s-data" required></div>
       <div><label>Valor retirado (R$)</label><input type="number" step="0.01" inputmode="decimal" id="s-valor" required></div>
     </div>
-    <label>Período do depósito (opcional)</label>
+    <label>Período do depósito</label>
     <div class="grid2">
-      <div><label>De</label><input type="date" id="s-periodo-inicio"></div>
-      <div><label>Até</label><input type="date" id="s-periodo-fim"></div>
+      <div><label>De</label><input type="date" id="s-periodo-inicio" required></div>
+      <div><label>Até</label><input type="date" id="s-periodo-fim" required></div>
     </div>
+    <label>Nome de quem depositou</label>
+    <input type="text" id="s-nome-depositante" placeholder="ex: João (gerente)" required>
     <label>Observação (opcional)</label>
     <input type="text" id="s-descricao" placeholder="ex: retirada na visita da tarde">
+    <label>Confirme sua senha</label>
+    <input type="password" id="s-password" required autocomplete="current-password">
     <div class="msg hidden" id="msg-sangria"></div>
     <button class="btn-primary" type="submit" id="btn-sangria">Registrar sangria/depósito</button>
   </form>
@@ -314,11 +318,13 @@
       <input type="number" step="0.01" inputmode="decimal" id="se-valor" required>
       <label>Data</label>
       <input type="date" id="se-data" required>
-      <label>Período do depósito (opcional)</label>
+      <label>Período do depósito</label>
       <div class="grid2">
-        <div><label>De</label><input type="date" id="se-periodo-inicio"></div>
-        <div><label>Até</label><input type="date" id="se-periodo-fim"></div>
+        <div><label>De</label><input type="date" id="se-periodo-inicio" required></div>
+        <div><label>Até</label><input type="date" id="se-periodo-fim" required></div>
       </div>
+      <label>Nome de quem depositou</label>
+      <input type="text" id="se-nome-depositante" required>
       <label>Observação</label>
       <input type="text" id="se-descricao">
       <div class="msg hidden" id="msg-sangria-editar"></div>
@@ -570,7 +576,7 @@ function renderSangrias(){
         <span>${escapeHtml(s.unidadeNome||s.unidade)} · ${fmtData(s.data)}</span>
         <b>${fmtMoney(s.valor)}</b>
       </div>
-      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.periodoInicio&&s.periodoFim?(' · Período: '+fmtData(s.periodoInicio)+' a '+fmtData(s.periodoFim)):''}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
+      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.periodoInicio&&s.periodoFim?(' · Período: '+fmtData(s.periodoInicio)+' a '+fmtData(s.periodoFim)):''}${s.nomeDepositante?(' · Depositado por '+escapeHtml(s.nomeDepositante)):''}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
       ${IS_MASTER ? `<button type="button" class="link-btn" style="margin-top:4px;" onclick="abrirEditarSangria('${s.id}')">✎ Editar/excluir (Master)</button>` : ''}
     </div>`).join('');
 }
@@ -586,6 +592,7 @@ function abrirEditarSangria(id){
   document.getElementById('se-data').value = s.data;
   document.getElementById('se-periodo-inicio').value = s.periodoInicio || '';
   document.getElementById('se-periodo-fim').value = s.periodoFim || '';
+  document.getElementById('se-nome-depositante').value = s.nomeDepositante || '';
   document.getElementById('se-descricao').value = s.descricao || '';
   document.getElementById('msg-sangria-editar').classList.add('hidden');
   document.getElementById('overlay-sangria-editar').classList.remove('hidden');
@@ -604,6 +611,7 @@ document.getElementById('form-sangria-editar').addEventListener('submit', async 
         descricao: document.getElementById('se-descricao').value,
         periodoInicio: document.getElementById('se-periodo-inicio').value,
         periodoFim: document.getElementById('se-periodo-fim').value,
+        nomeDepositante: document.getElementById('se-nome-depositante').value,
       }),
     });
     const data = await res.json();
@@ -650,6 +658,8 @@ document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
       descricao: document.getElementById('s-descricao').value,
       periodoInicio: document.getElementById('s-periodo-inicio').value,
       periodoFim: document.getElementById('s-periodo-fim').value,
+      nomeDepositante: document.getElementById('s-nome-depositante').value,
+      password: document.getElementById('s-password').value,
     };
     const res = await fetch('/api/sangrias', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
