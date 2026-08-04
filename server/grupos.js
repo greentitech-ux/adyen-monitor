@@ -1,11 +1,12 @@
 // grupos.js
-// Cada franquia/rede lança fechamento de um jeito diferente - o Faturamento e
-// o Total Declarado usam a mesma fórmula pra todo mundo (canais de venda /
-// formas de pagamento, ver fechamentosLive.js), mas os KPI's variam muito
-// (ex: Domino's acompanha LegTime/RunTime/OTD que não fazem sentido pra
-// quem não usa aquele sistema de entrega). Essa coleção deixa o Master
-// montar, por grupo, quais campos de KPI extras aparecem no formulário de
-// fechamento - sem precisar de código novo a cada franquia diferente.
+// Cada franquia/rede lança fechamento de um jeito diferente. Essa coleção
+// deixa o Master montar, por grupo, campos extras em três frentes do
+// fechamento - Canais de venda (somam no Faturamento), Formas de pagamento
+// (somam no Total Declarado) e KPI's (não somam em nada, só informativos) -
+// sem precisar de código novo a cada franquia diferente. Os campos fixos de
+// cada seção (Delivery/Carryout/... e Adyen/Ifood/... e TC/Cancelados)
+// continuam os mesmos pra todo mundo; os extras daqui são um acréscimo por
+// cima, nunca uma substituição (ver recomputarTotais em fechamentosLive.js).
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
 
@@ -26,7 +27,9 @@ function slugify(s) {
     .join('');
 }
 
-function sanitizarKpisExtras(lista) {
+// usado pras 3 listas de campos extras (kpisExtras, canaisVendaExtras,
+// formasPagamentoExtras) - mesmo formato, mesma validacao
+function sanitizarCamposExtras(lista) {
   if (!Array.isArray(lista)) return [];
   const usados = new Set();
   return lista
@@ -52,7 +55,7 @@ async function listUncached() {
 const gruposCache = createCache(listUncached, 20 * 1000);
 const list = gruposCache.cached;
 
-async function create({ nome, unidades, kpisExtras }) {
+async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras }) {
   const nomeLimpo = String(nome || '').trim();
   if (!nomeLimpo) throw new Error('Informe o nome do grupo.');
   const ref = COLLECTION.doc();
@@ -60,7 +63,9 @@ async function create({ nome, unidades, kpisExtras }) {
     id: ref.id,
     nome: nomeLimpo,
     unidades: Array.isArray(unidades) ? unidades.map(String) : [],
-    kpisExtras: sanitizarKpisExtras(kpisExtras),
+    kpisExtras: sanitizarCamposExtras(kpisExtras),
+    canaisVendaExtras: sanitizarCamposExtras(canaisVendaExtras),
+    formasPagamentoExtras: sanitizarCamposExtras(formasPagamentoExtras),
     criadoEm: new Date().toISOString(),
   };
   await ref.set(registro);
@@ -68,7 +73,7 @@ async function create({ nome, unidades, kpisExtras }) {
   return registro;
 }
 
-async function update(id, { nome, unidades, kpisExtras }) {
+async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Grupo não encontrado.');
@@ -79,7 +84,9 @@ async function update(id, { nome, unidades, kpisExtras }) {
     patch.nome = nomeLimpo;
   }
   if (unidades != null) patch.unidades = Array.isArray(unidades) ? unidades.map(String) : [];
-  if (kpisExtras != null) patch.kpisExtras = sanitizarKpisExtras(kpisExtras);
+  if (kpisExtras != null) patch.kpisExtras = sanitizarCamposExtras(kpisExtras);
+  if (canaisVendaExtras != null) patch.canaisVendaExtras = sanitizarCamposExtras(canaisVendaExtras);
+  if (formasPagamentoExtras != null) patch.formasPagamentoExtras = sanitizarCamposExtras(formasPagamentoExtras);
   await ref.update(patch);
   gruposCache.invalidar();
   return { ...snap.data(), ...patch };

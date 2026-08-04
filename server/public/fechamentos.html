@@ -312,6 +312,7 @@
       <div><label>Pickup</label><input type="number" step="0.01" id="ef-pickup"></div>
       <div><label>Loja (salão)</label><input type="number" step="0.01" id="ef-loja"></div>
     </div>
+    <div class="fech-grid hidden" id="ef-canais-extras"></div>
 
     <div class="secao-titulo">Formas de pagamento</div>
     <div class="fech-grid">
@@ -322,6 +323,7 @@
       <div><label>Pix CNPJ</label><input type="number" step="0.01" id="ef-pixCnpj"></div>
       <div><label>Outros</label><input type="number" step="0.01" id="ef-outros"></div>
     </div>
+    <div class="fech-grid hidden" id="ef-formas-extras"></div>
 
     <div class="secao-titulo">KPI's</div>
     <div class="fech-grid">
@@ -1213,6 +1215,19 @@ let GRUPOS_KPI = [];
 function grupoKpiDaUnidade(unidade){
   return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
 }
+// generico pras 3 frentes de campo extra do fechamento (Canais de venda,
+// Formas de pagamento, KPI's) no modal de edição direta do Master - mesmo
+// padrão usado em lancamento.html
+function renderExtrasEdicaoFechamento(grupo, chaveGrupo, mapaAtual, containerId, classe, datasetKey){
+  const campos = grupo ? (grupo[chaveGrupo]||[]) : [];
+  const container = document.getElementById(containerId);
+  if(!campos.length){ container.classList.add('hidden'); container.innerHTML = ''; return; }
+  container.classList.remove('hidden');
+  const attr = datasetKey.replace(/[A-Z]/g, c=>'-'+c.toLowerCase());
+  container.innerHTML = campos.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-${attr}="${escapeHtml(k.campo)}" class="${classe}" value="${num((mapaAtual||{})[k.campo])}"></div>`
+  ).join('');
+}
 
 async function abrirEdicaoFechamento(id){
   // busca o registro BRUTO (sem mesclar com sangria/planilha) - editar em
@@ -1234,17 +1249,9 @@ async function abrirEdicaoFechamento(id){
   document.getElementById('ef-motivo').value = '';
 
   const grupoKpi = grupoKpiDaUnidade(d.unidade);
-  const kpisDef = grupoKpi ? (grupoKpi.kpisExtras||[]) : [];
-  const kpisContainer = document.getElementById('ef-kpis-extras');
-  if(kpisDef.length){
-    kpisContainer.classList.remove('hidden');
-    kpisContainer.innerHTML = kpisDef.map(k=>
-      `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-kpi-campo="${escapeHtml(k.campo)}" class="ef-kpi-extra-input" value="${num((d.kpisExtras||{})[k.campo])}"></div>`
-    ).join('');
-  } else {
-    kpisContainer.classList.add('hidden');
-    kpisContainer.innerHTML = '';
-  }
+  renderExtrasEdicaoFechamento(grupoKpi, 'kpisExtras', d.kpisExtras, 'ef-kpis-extras', 'ef-kpi-extra-input', 'kpiCampo');
+  renderExtrasEdicaoFechamento(grupoKpi, 'canaisVendaExtras', d.canaisVendaExtras, 'ef-canais-extras', 'ef-canal-extra-input', 'canalCampo');
+  renderExtrasEdicaoFechamento(grupoKpi, 'formasPagamentoExtras', d.formasPagamentoExtras, 'ef-formas-extras', 'ef-forma-extra-input', 'formaCampo');
 
   const linhaMesclada = DATA.find(x=>x.id===id);
   const avisoSangria = document.getElementById('fech-aviso-sangria');
@@ -1272,10 +1279,14 @@ async function salvarEdicaoFechamento(){
   CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
   const mudancasKpis = {};
   document.querySelectorAll('.ef-kpi-extra-input').forEach(el=>{ mudancasKpis[el.dataset.kpiCampo] = el.value; });
+  const mudancasCanais = {};
+  document.querySelectorAll('.ef-canal-extra-input').forEach(el=>{ mudancasCanais[el.dataset.canalCampo] = el.value; });
+  const mudancasFormas = {};
+  document.querySelectorAll('.ef-forma-extra-input').forEach(el=>{ mudancasFormas[el.dataset.formaCampo] = el.value; });
   try{
     const resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, mudancasKpis, motivo: document.getElementById('ef-motivo').value }),
+      body: JSON.stringify({ mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo: document.getElementById('ef-motivo').value }),
     });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');

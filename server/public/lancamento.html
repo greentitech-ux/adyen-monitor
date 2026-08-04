@@ -204,6 +204,7 @@
         <div><label>Pickup</label><input type="number" step="0.01" inputmode="decimal" id="f-pickup"></div>
         <div><label>Loja (salão)</label><input type="number" step="0.01" inputmode="decimal" id="f-loja"></div>
       </div>
+      <div class="grid2 hidden" id="canais-extras-container" style="margin-top:6px;"></div>
     </div>
 
     <div class="secao">
@@ -218,6 +219,7 @@
       </div>
       <label>Outros</label>
       <input type="number" step="0.01" inputmode="decimal" id="f-outros">
+      <div class="grid2 hidden" id="formas-extras-container" style="margin-top:6px;"></div>
     </div>
 
     <div class="secao">
@@ -298,6 +300,8 @@
         <div><label>Gerente responsável</label><input type="text" id="m-gerente"></div>
       </div>
       <div class="grid2" id="m-campos-numericos"></div>
+      <div class="grid2" id="m-canais-extras" style="margin-top:6px;"></div>
+      <div class="grid2" id="m-formas-extras" style="margin-top:6px;"></div>
       <div class="grid2" id="m-kpis-extras" style="margin-top:6px;"></div>
       <label>Observação</label>
       <textarea id="m-observacao"></textarea>
@@ -477,8 +481,8 @@ function atualizarResumo(){
   // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
   // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
   const g = (id)=>num(document.getElementById(id).value);
-  const faturamento = +(g('f-delivery')+g('f-carryout')+g('f-pickup')+g('f-loja')).toFixed(2);
-  const totalDeclarado = +(somaMaquinas+g('f-ifood')+g('f-food99')+g('f-pix')+g('f-pixCnpj')+g('f-outros')+g('f-entradaDinheiro')).toFixed(2);
+  const faturamento = +(g('f-delivery')+g('f-carryout')+g('f-pickup')+g('f-loja')+somaExtras('canal-extra-input')).toFixed(2);
+  const totalDeclarado = +(somaMaquinas+g('f-ifood')+g('f-food99')+g('f-pix')+g('f-pixCnpj')+g('f-outros')+g('f-entradaDinheiro')+somaExtras('forma-extra-input')).toFixed(2);
   document.getElementById('resumo-faturamento').textContent = fmtMoney(faturamento);
   document.getElementById('resumo-declarado').textContent = fmtMoney(totalDeclarado);
 
@@ -500,26 +504,45 @@ let GRUPOS_KPI = [];
 function grupoKpiDaUnidade(unidade){
   return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
 }
-function renderKpisExtras(unidade){
+// generico pras 3 frentes de campo extra (Canais de venda, Formas de
+// pagamento, KPI's) - so muda a chave lida do grupo, o id do container e a
+// classe usada pra achar os inputs depois (leitura no submit e soma no
+// resumo). Ver grupos.js/fechamentosLive.js pro mesmo padrao no servidor.
+function renderExtrasGrupo(unidade, chaveGrupo, containerId, classe){
   const grupo = grupoKpiDaUnidade(unidade);
-  const campos = grupo ? (grupo.kpisExtras||[]) : [];
-  const container = document.getElementById('kpis-extras-container');
+  const campos = grupo ? (grupo[chaveGrupo]||[]) : [];
+  const container = document.getElementById(containerId);
   if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
   container.classList.remove('hidden');
   container.innerHTML = campos.map(k=>`
-    <div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>
+    <div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-extra-campo="${escapeHtml(k.campo)}" class="${classe}"></div>
   `).join('');
+  container.querySelectorAll('.'+classe).forEach(el=>el.addEventListener('input', atualizarResumo));
 }
-function lerKpisExtras(){
+function lerExtrasGrupo(classe){
   const out = {};
-  document.querySelectorAll('.kpi-extra-input').forEach(el=>{ out[el.dataset.kpiCampo] = el.value; });
+  document.querySelectorAll('.'+classe).forEach(el=>{ out[el.dataset.extraCampo] = el.value; });
   return out;
 }
+function somaExtras(classe){
+  let s = 0;
+  document.querySelectorAll('.'+classe).forEach(el=>{ s += num(el.value); });
+  return s;
+}
+function renderKpisExtras(unidade){ renderExtrasGrupo(unidade, 'kpisExtras', 'kpis-extras-container', 'kpi-extra-input'); }
+function lerKpisExtras(){ return lerExtrasGrupo('kpi-extra-input'); }
+function renderCanaisExtras(unidade){ renderExtrasGrupo(unidade, 'canaisVendaExtras', 'canais-extras-container', 'canal-extra-input'); }
+function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
+function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'forma-extra-input'); }
+function lerFormasExtras(){ return lerExtrasGrupo('forma-extra-input'); }
 
 function aplicarFranquia(unidade){
   const grupo = grupoDaUnidade(unidade);
   document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
   renderKpisExtras(unidade);
+  renderCanaisExtras(unidade);
+  renderFormasExtras(unidade);
+  atualizarResumo();
 }
 document.getElementById('f-unidade').addEventListener('change', (ev)=>{ aplicarFranquia(ev.target.value); carregarSangriaDoDia(); });
 document.getElementById('f-data').addEventListener('input', carregarSangriaDoDia);
@@ -718,6 +741,14 @@ function abrirEditarMaster(id){
   document.getElementById('m-kpis-extras').innerHTML = kpisDef.map(k=>
     `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" class="m-kpi-extra-input" value="${num((f.kpisExtras||{})[k.campo])}"></div>`
   ).join('');
+  const canaisDef = grupoKpi ? (grupoKpi.canaisVendaExtras||[]) : [];
+  document.getElementById('m-canais-extras').innerHTML = canaisDef.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-canal-campo="${escapeHtml(k.campo)}" class="m-canal-extra-input" value="${num((f.canaisVendaExtras||{})[k.campo])}"></div>`
+  ).join('');
+  const formasDef = grupoKpi ? (grupoKpi.formasPagamentoExtras||[]) : [];
+  document.getElementById('m-formas-extras').innerHTML = formasDef.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-forma-campo="${escapeHtml(k.campo)}" class="m-forma-extra-input" value="${num((f.formasPagamentoExtras||{})[k.campo])}"></div>`
+  ).join('');
   document.getElementById('msg-master').classList.add('hidden');
   document.getElementById('overlay-master').classList.remove('hidden');
 }
@@ -760,11 +791,23 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
     const v = num(el.value);
     if(v !== num((f.kpisExtras||{})[campo])) mudancasKpis[campo] = v;
   });
-  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length){ fecharMaster(); return; }
+  const mudancasCanais = {};
+  document.querySelectorAll('.m-canal-extra-input').forEach(el=>{
+    const campo = el.dataset.canalCampo;
+    const v = num(el.value);
+    if(v !== num((f.canaisVendaExtras||{})[campo])) mudancasCanais[campo] = v;
+  });
+  const mudancasFormas = {};
+  document.querySelectorAll('.m-forma-extra-input').forEach(el=>{
+    const campo = el.dataset.formaCampo;
+    const v = num(el.value);
+    if(v !== num((f.formasPagamentoExtras||{})[campo])) mudancasFormas[campo] = v;
+  });
+  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length && !Object.keys(mudancasCanais).length && !Object.keys(mudancasFormas).length){ fecharMaster(); return; }
   try{
     const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}/editar-direto`, {
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, mudancasKpis, motivo }),
+      body: JSON.stringify({ mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo }),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao salvar');
@@ -805,8 +848,8 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
     // Faturamento/Total declarado sao sempre recalculados no servidor (ver
     // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
     // completude do payload, nao por confiança nesse numero
-    campos.faturamento = num(campos.delivery) + num(campos.carryout) + num(campos.pickup) + num(campos.loja);
-    campos.totalDeclarado = num(campos.adyen) + num(campos.ifood) + num(campos.food99) + num(campos.pix) + num(campos.pixCnpj) + num(campos.outros) + num(campos.entradaDinheiro);
+    campos.faturamento = num(campos.delivery) + num(campos.carryout) + num(campos.pickup) + num(campos.loja) + somaExtras('canal-extra-input');
+    campos.totalDeclarado = num(campos.adyen) + num(campos.ifood) + num(campos.food99) + num(campos.pix) + num(campos.pixCnpj) + num(campos.outros) + num(campos.entradaDinheiro) + somaExtras('forma-extra-input');
 
     const body = {
       unidade,
@@ -816,6 +859,8 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       gerente: document.getElementById('f-gerente').value,
       campos,
       kpisExtras: lerKpisExtras(),
+      canaisVendaExtras: lerCanaisExtras(),
+      formasPagamentoExtras: lerFormasExtras(),
       observacao: document.getElementById('f-observacao').value,
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
       detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),

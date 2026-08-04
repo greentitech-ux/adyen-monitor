@@ -138,7 +138,7 @@
     <h2>Grupos cadastrados</h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Nome</th><th>Lojas</th><th>KPI's extras</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Lojas</th><th>Canais extras</th><th>Formas extras</th><th>KPI's extras</th><th></th></tr></thead>
         <tbody id="grupos-body"></tbody>
       </table>
     </div>
@@ -152,6 +152,18 @@
       <fieldset>
         <legend>Lojas desse grupo</legend>
         <div id="c-unidades"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Canais de venda extras (somam no Faturamento, além de Delivery/Carryout/Pickup/Loja)</legend>
+        <div id="c-canais"></div>
+        <button type="button" class="btn-add" onclick="adicionarKpi('c-canais')">+ Adicionar canal</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Formas de pagamento extras (somam no Total Declarado, além de Adyen/Ifood/99Food/Pix/Pix CNPJ/Outros)</legend>
+        <div id="c-formas"></div>
+        <button type="button" class="btn-add" onclick="adicionarKpi('c-formas')">+ Adicionar forma de pagamento</button>
       </fieldset>
 
       <fieldset>
@@ -175,6 +187,18 @@
     <fieldset>
       <legend>Lojas desse grupo</legend>
       <div id="e-unidades"></div>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Canais de venda extras</legend>
+      <div id="e-canais"></div>
+      <button type="button" class="btn-add" onclick="adicionarKpi('e-canais')">+ Adicionar canal</button>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Formas de pagamento extras</legend>
+      <div id="e-formas"></div>
+      <button type="button" class="btn-add" onclick="adicionarKpi('e-formas')">+ Adicionar forma de pagamento</button>
     </fieldset>
 
     <fieldset style="margin-top:10px;">
@@ -259,19 +283,24 @@ function nomeUnidade(codigo){
   return u ? u.nome : codigo;
 }
 
+function tagsExtras(lista){
+  return `<div class="tags">${(lista||[]).map(k=>`<span class="tag kpi">${escapeHtml(k.label)}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div>`;
+}
 function renderGrupos(){
   document.getElementById('grupos-body').innerHTML = GRUPOS.map(g=>`
     <tr>
       <td><b>${escapeHtml(g.nome)}</b></td>
       <td><div class="tags">${(g.unidades||[]).map(u=>`<span class="tag">${escapeHtml(nomeUnidade(u))}</span>`).join('') || '<span style="color:var(--muted);">nenhuma</span>'}</div></td>
-      <td><div class="tags">${(g.kpisExtras||[]).map(k=>`<span class="tag kpi">${escapeHtml(k.label)}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div></td>
+      <td>${tagsExtras(g.canaisVendaExtras)}</td>
+      <td>${tagsExtras(g.formasPagamentoExtras)}</td>
+      <td>${tagsExtras(g.kpisExtras)}</td>
       <td>
         <div class="rowacts">
           <button type="button" onclick="abrirEdicaoGrupo('${g.id}')">Editar</button>
           <button type="button" onclick="excluirGrupo('${g.id}','${escapeHtml(g.nome)}')">Excluir</button>
         </div>
       </td>
-    </tr>`).join('') || `<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</td></tr>`;
 }
 
 document.getElementById('create-form').addEventListener('submit', async (e)=>{
@@ -281,6 +310,8 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
   const payload = {
     nome: document.getElementById('c-nome').value,
     unidades: readChecked(document.getElementById('c-unidades')),
+    canaisVendaExtras: lerKpis('c-canais'),
+    formasPagamentoExtras: lerKpis('c-formas'),
     kpisExtras: lerKpis('c-kpis'),
   };
   try{
@@ -289,6 +320,8 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     if(!res.ok) throw new Error(data.error || 'Erro ao criar grupo.');
     document.getElementById('create-form').reset();
     document.getElementById('c-unidades').innerHTML = unidadesChecksHtml('unidades', new Set());
+    document.getElementById('c-canais').innerHTML = '';
+    document.getElementById('c-formas').innerHTML = '';
     document.getElementById('c-kpis').innerHTML = '';
     await carregarGrupos();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
@@ -302,6 +335,10 @@ function abrirEdicaoGrupo(id){
   document.getElementById('grupo-title').textContent = 'Editar ' + g.nome;
   document.getElementById('e-nome').value = g.nome;
   document.getElementById('e-unidades').innerHTML = unidadesChecksHtml('e-unidades', new Set(g.unidades||[]));
+  document.getElementById('e-canais').innerHTML = '';
+  (g.canaisVendaExtras||[]).forEach(k=>adicionarKpi('e-canais', k.label));
+  document.getElementById('e-formas').innerHTML = '';
+  (g.formasPagamentoExtras||[]).forEach(k=>adicionarKpi('e-formas', k.label));
   document.getElementById('e-kpis').innerHTML = '';
   (g.kpisExtras||[]).forEach(k=>adicionarKpi('e-kpis', k.label));
   document.getElementById('grupo-err').classList.add('hidden');
@@ -316,6 +353,8 @@ document.getElementById('grupo-form').addEventListener('submit', async (e)=>{
   const payload = {
     nome: document.getElementById('e-nome').value,
     unidades: readChecked(document.getElementById('e-unidades')),
+    canaisVendaExtras: lerKpis('e-canais'),
+    formasPagamentoExtras: lerKpis('e-formas'),
     kpisExtras: lerKpis('e-kpis'),
   };
   try{
