@@ -42,4 +42,37 @@ function createCache(fnOriginal, ttlMs = 20 * 1000) {
   return { cached, invalidar };
 }
 
-module.exports = { createCache };
+// variante com chave, pra quando o resultado depende de um argumento (ex:
+// getUserById(id) - cada usuario tem seu proprio cache, ao inves de um valor
+// unico compartilhado por todo mundo como no createCache() acima)
+function createKeyedCache(fnOriginal, ttlMs = 20 * 1000) {
+  const cache = new Map(); // key -> { valor, expiraEm, emAndamento }
+
+  function invalidar(key) {
+    if (key === undefined) { cache.clear(); return; }
+    cache.delete(key);
+  }
+
+  async function cached(key, ...restArgs) {
+    const agora = Date.now();
+    const entry = cache.get(key);
+    if (entry && entry.valor !== undefined && agora < entry.expiraEm) return entry.valor;
+    if (entry && entry.emAndamento) return entry.emAndamento;
+
+    const promessa = fnOriginal(key, ...restArgs)
+      .then((valor) => {
+        cache.set(key, { valor, expiraEm: Date.now() + ttlMs, emAndamento: null });
+        return valor;
+      })
+      .catch((err) => {
+        cache.delete(key);
+        throw err;
+      });
+    cache.set(key, { valor: undefined, expiraEm: 0, emAndamento: promessa });
+    return promessa;
+  }
+
+  return { cached, invalidar };
+}
+
+module.exports = { createCache, createKeyedCache };
