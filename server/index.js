@@ -26,6 +26,7 @@ const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
 const fechamentosReport = require('./fechamentosReport');
+const monitorReport = require('./monitorReport');
 const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
@@ -46,6 +47,15 @@ const upload = multer({
 });
 
 const app = express();
+
+// fuso horario usado em todos os timestamps "Exportado em ..." dos
+// relatorios (CSV/PDF) - sem isso, new Date().toLocaleString() usa o fuso
+// do servidor (normalmente UTC em hospedagem), saindo com 2-3h de diferenca
+// do horario real de Brasilia
+const FUSO_BR = 'America/Sao_Paulo';
+function agoraBrasiliaFmt() {
+  return new Date().toLocaleString('pt-BR', { timeZone: FUSO_BR });
+}
 
 // ---------- resiliencia contra falhas temporarias do Firestore/rede ----------
 // antes disso, qualquer erro nao tratado (ex: "RESOURCE_EXHAUSTED: Quota
@@ -519,6 +529,136 @@ app.get('/api/chargebacks', requireSection('monitor'), (req, res) => {
   res.json(auth.filterByUnidade(req, store.chargebacks()));
 });
 
+// ---------- relatorios (CSV/PDF) dos paineis do Monitor de transacoes:
+// Transacoes, Pedidos repetidos, Chargeback, Pedidos que mudaram de status e
+// Comparativo por unidade - mesma secao 'monitor' da tela (nao restrito ao
+// Master), respeitando as unidades que o usuario tem permissao de ver.
+// Filtros por query string: inicio/fim (periodo), status (lista separada por
+// virgula) e unidades (lista separada por virgula) - mesmos filtros da tela.
+function filtrarTransacoesPeriodo(req) {
+  const { inicio, fim, status, unidades } = req.query;
+  const statusSet = status ? new Set(String(status).split(',').filter(Boolean)) : null;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  const permitido = auth.filterByUnidade(req, store.allTransactions());
+  return permitido.filter((t) =>
+    (!statusSet || statusSet.has(t.status)) &&
+    (!unidadesSet || unidadesSet.has(t.unidade)) &&
+    (!inicio || (t.dataHora || '') >= inicio) &&
+    (!fim || (t.dataHora || '') <= fim + 'T23:59:59')
+  );
+}
+function filtrarPedidosPeriodo(lista, req, campoData) {
+  const { inicio, fim, status, unidades } = req.query;
+  const statusSet = status ? new Set(String(status).split(',').filter(Boolean)) : null;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  const permitido = auth.filterByUnidade(req, lista);
+  return permitido.filter((o) => {
+    const data = o[campoData] || o.ultimaAtualizacao;
+    return (!statusSet || statusSet.has(o.statusAtual)) &&
+      (!unidadesSet || unidadesSet.has(o.unidade)) &&
+      (!inicio || (data || '') >= inicio) &&
+      (!fim || (data || '') <= fim + 'T23:59:59');
+  });
+}
+function unidadesDoQuery(req) {
+  return req.query.unidades ? String(req.query.unidades).split(',').filter(Boolean) : [];
+}
+function periodoTexto(req) {
+  const { inicio, fim } = req.query;
+  return inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+}
+
+app.get('/api/monitor/relatorio-transacoes.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararTransacoes(filtrarTransacoesPeriodo(req));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('transacoes', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-transacoes.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararTransacoes(filtrarTransacoesPeriodo(req));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} transação(ões)`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Transações', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('transacoes', unidadesDoQuery(req)),
+  });
+});
+
+app.get('/api/monitor/relatorio-repetidos.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararRepetidos(filtrarTransacoesPeriodo(req));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('pedidos-repetidos', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-repetidos.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararRepetidos(filtrarTransacoesPeriodo(req));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} grupo(s) de pedidos repetidos`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Pedidos Repetidos', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('pedidos-repetidos', unidadesDoQuery(req)),
+  });
+});
+
+app.get('/api/monitor/relatorio-chargebacks.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararChargebacks(filtrarPedidosPeriodo(store.chargebacks(), req, 'dataChargeback'));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('chargebacks', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-chargebacks.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararChargebacks(filtrarPedidosPeriodo(store.chargebacks(), req, 'dataChargeback'));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} chargeback(s)`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Chargebacks', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('chargebacks', unidadesDoQuery(req)),
+  });
+});
+
+app.get('/api/monitor/relatorio-mudaram-status.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararMudaramStatus(filtrarPedidosPeriodo(store.ordersChanged(), req, 'ultimaAtualizacao'));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('pedidos-mudaram-status', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-mudaram-status.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararMudaramStatus(filtrarPedidosPeriodo(store.ordersChanged(), req, 'ultimaAtualizacao'));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} pedido(s)`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Pedidos que Mudaram de Status', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('pedidos-mudaram-status', unidadesDoQuery(req)),
+  });
+});
+
+// comparativo-unidade usa fraudMarks.listAllCached() (nao listAll()) -
+// listAll() faz leitura direta no Firestore sem cache; usar sem cache aqui
+// foi a causa provavel de estourar a cota de leitura numa versao anterior
+// desta feature (revertida em producao por esse motivo). Ver fraudMarks.js.
+app.get('/api/monitor/relatorio-comparativo-unidade.csv', requireSection('monitor'), async (req, res) => {
+  try {
+    const marcas = await fraudMarks.listAllCached();
+    const rows = monitorReport.semFraudeECapeado(filtrarTransacoesPeriodo(req), marcas);
+    const { colunas, linhas } = monitorReport.prepararComparativoUnidade(rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('comparativo-unidade', unidadesDoQuery(req))}.csv"`);
+    res.send(monitorReport.toCSV(colunas, linhas));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get('/api/monitor/relatorio-comparativo-unidade.pdf', requireSection('monitor'), async (req, res) => {
+  try {
+    const marcas = await fraudMarks.listAllCached();
+    const rows = monitorReport.semFraudeECapeado(filtrarTransacoesPeriodo(req), marcas);
+    const { colunas, linhas } = monitorReport.prepararComparativoUnidade(rows);
+    const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} unidade(s)`;
+    monitorReport.writePDF(res, {
+      titulo: 'Relatório Comparativo por Unidade', subtitulo, colunas, linhas,
+      nomeArquivo: monitorReport.nomeArquivoComUnidades('comparativo-unidade', unidadesDoQuery(req)),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------- marcacao manual de suspeita/fraude por pedido (monitoramento
 // efetivo, separado do status que vem da Adyen - esse continua intacto) ----------
 app.get('/api/fraude', requireSection('monitor'), (req, res) => {
@@ -576,7 +716,7 @@ app.get('/api/fraude/relatorio.pdf', auth.requireMaster, async (req, res) => {
   const filtrado = historico.filter((m) => (!inicio || (m.criadoEm || '') >= inicio) && (!fim || (m.criadoEm || '') <= fim + 'T23:59:59'));
   const linhas = fraudReport.agruparPorCliente(filtrado);
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
-  const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} cliente(s) monitorado(s)`;
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} cliente(s) monitorado(s)`;
   fraudReport.writePDF(res, { titulo: 'Relatório de Fraude', subtitulo, linhas });
 });
 
@@ -596,7 +736,7 @@ app.get('/api/alertas/relatorio.pdf', auth.requireMaster, (req, res) => {
   const transacoes = store.allTransactions().filter((t) => (!inicio || (t.dataHora || '') >= inicio) && (!fim || (t.dataHora || '') <= fim + 'T23:59:59'));
   const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
-  const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} cliente(s) com alerta`;
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} cliente(s) com alerta`;
   alertReport.writePDF(res, { titulo: 'Relatório de Alertas', subtitulo, linhas });
 });
 
@@ -1001,7 +1141,7 @@ app.get('/api/vault/export.csv', auth.requireMaster, async (req, res) => {
 app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
   try {
     const { titulo, rows } = await resolverEscopoExportacao(req);
-    const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')} · ${rows.length} senha(s)`;
+    const subtitulo = `Exportado em ${agoraBrasiliaFmt()} · ${rows.length} senha(s)`;
     vaultExport.writePDF(res, { titulo, subtitulo, rows });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1246,7 +1386,7 @@ app.get('/api/fechamentos/relatorio.pdf', requireSection('fechamentos'), async (
   const { inicio, fim } = req.query;
   const linhas = await montarLinhasRelatorioFechamentos(req);
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
-  const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')}${periodo} · ${linhas.length} fechamento(s)`;
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} fechamento(s)`;
   fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, linhas });
 });
 
