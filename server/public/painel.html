@@ -58,6 +58,11 @@
   .pstat.wide{grid-column:1 / -1;}
   .pstat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);}
   .pstat .val{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .pstats-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+  .pstats-row:first-child{margin-top:0;}
+  .pstats-row .pstat{flex:1 1 100px;max-width:160px;}
+  .pstats-row.center{justify-content:center;}
+  .pstats-row.center .pstat{flex:0 1 130px;text-align:center;}
   .pstat .val.ok{color:var(--ok);} .pstat .val.bad{color:var(--bad);} .pstat .val.warn{color:var(--warn);}
   .ptipos{display:flex;flex-direction:column;gap:6px;font-size:12px;}
   .ptipos .linha{display:flex;justify-content:space-between;gap:8px;}
@@ -147,6 +152,8 @@ function ontemBrasilia(){
 }
 
 const TIPOS_CENTRAL_LABEL = { estorno:'Estorno', 'ajuste-fechamento':'Correção de fechamento', compra:'Compra', manutencao:'Manutenção', 'suporte-ti':'Suporte de TI' };
+let ME_GLOBAL = null;
+let IS_MASTER_GLOBAL = false;
 
 function statRow(label, valor, classe, wide){
   return `<div class="pstat${wide?' wide':''}"><div class="lbl">${escapeHtml(label)}</div><div class="val ${classe||''}">${valor}</div></div>`;
@@ -170,15 +177,21 @@ async function cardMonitor(){
   const fraude = semChargeback.filter(t=>t.fraudeSuspeita);
   const volume = +aprovadas.reduce((s,t)=>s+(t.valor||0),0).toFixed(2);
   const taxa = semChargeback.length ? Math.round(aprovadas.length/semChargeback.length*100) : 0;
-  return pcardWrap('📈','Monitor (hoje)','/', `<div class="pstats">
-    ${statRow('Transações', semChargeback.length)}
-    ${statRow('Aprovadas', aprovadas.length,'ok')}
-    ${statRow('Recusadas', recusadas.length, recusadas.length ? 'bad' : '')}
-    ${statRow('Taxa aprov.', taxa+'%')}
-    ${statRow('Volume aprovado', fmtMoney(volume), '', true)}
-    ${statRow('Chargebacks', chargebacks.length, chargebacks.length ? 'warn' : '')}
-    ${statRow('Fraude suspeita', fraude.length, fraude.length ? 'bad' : '')}
-  </div>`);
+  return pcardWrap('📈','Monitor (hoje)','/', `
+    <div class="pstats-row">
+      ${statRow('Transações', semChargeback.length)}
+      ${statRow('Aprovadas', aprovadas.length,'ok')}
+      ${statRow('Recusadas', recusadas.length, recusadas.length ? 'bad' : '')}
+    </div>
+    <div class="pstats-row">
+      ${statRow('Taxa aprov.', taxa+'%')}
+      ${statRow('Volume aprovado', fmtMoney(volume))}
+    </div>
+    <div class="pstats-row center">
+      ${statRow('Chargebacks', chargebacks.length, chargebacks.length ? 'warn' : '')}
+      ${statRow('Fraude suspeita', fraude.length, fraude.length ? 'bad' : '')}
+    </div>
+  `);
 }
 
 async function cardFechamentos(){
@@ -192,15 +205,58 @@ async function cardFechamentos(){
   </div>`);
 }
 
+// mesmo roster hardcoded de entregas.html (dominio proprio de Entregas, com
+// codigos diferentes do cadastro geral de lojas usado por Fechamento/Monitor
+// - ex: "Bessa", nao "Dominos Bessa" ou "19855")
+const ENTREGAS_UNIDADES_NOMES = { 'Tirol Natal':'Dom Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Dom Bessa', Caruaru:'Dom Caruaru', Garanhuns:'Dom Garanhuns' };
+let ENTREGAS_DODIA_CACHE = [];
+let ENTREGAS_ROSTER_CACHE = [];
+
+function rosterEntregas(){
+  const todos = Object.keys(ENTREGAS_UNIDADES_NOMES);
+  if(IS_MASTER_GLOBAL) return todos;
+  const permitidas = new Set(ME_GLOBAL?.permissions?.unidades || []);
+  return todos.filter(c=>permitidas.has(c));
+}
+
+function corpoEntregas(doDia, roster, unidadeFiltro){
+  if(unidadeFiltro){
+    const daUnidade = doDia.filter(d=>d.unidade===unidadeFiltro);
+    const entregas = daUnidade.reduce((s,d)=>s+(d.entrega||0),0);
+    const valor = +daUnidade.reduce((s,d)=>s+(d.valor||0),0).toFixed(2);
+    return `<div class="pstats">
+      ${statRow('Entregas', entregas)}
+      ${statRow('Valor', fmtMoney(valor))}
+    </div>`;
+  }
+  const lancaram = roster.filter(c=>doDia.some(d=>d.unidade===c));
+  const entregasTotal = doDia.reduce((s,d)=>s+(d.entrega||0),0);
+  const valorTotal = +doDia.reduce((s,d)=>s+(d.valor||0),0).toFixed(2);
+  return `<div class="pstats">
+    ${statRow('Unidades lançaram', `${lancaram.length} de ${roster.length}`)}
+    ${statRow('Entregas', entregasTotal)}
+    ${statRow('Valor total', fmtMoney(valorTotal))}
+  </div>`;
+}
+
+function atualizarCardEntregas(unidadeFiltro){
+  document.getElementById('entregas-corpo').innerHTML = corpoEntregas(ENTREGAS_DODIA_CACHE, ENTREGAS_ROSTER_CACHE, unidadeFiltro);
+}
+
 async function cardEntregas(){
   const ontem = ontemBrasilia();
   const rows = await fetch('/api/entregas').then(r=>r.json());
-  const doDia = rows.filter(d=>d.data===ontem);
-  const valor = +doDia.reduce((s,d)=>s+(d.valor||0),0).toFixed(2);
-  return pcardWrap('🛵','Entregas (ontem)','/entregas.html', `<div class="pstats">
-    ${statRow('Corridas', doDia.length)}
-    ${statRow('Valor', fmtMoney(valor))}
-  </div>`);
+  ENTREGAS_DODIA_CACHE = rows.filter(d=>d.data===ontem);
+  ENTREGAS_ROSTER_CACHE = rosterEntregas().sort((a,b)=>(ENTREGAS_UNIDADES_NOMES[a]||a).localeCompare(ENTREGAS_UNIDADES_NOMES[b]||b,'pt-BR'));
+  const selectHtml = ENTREGAS_ROSTER_CACHE.length > 1 ? `
+    <select id="entregas-filtro-unidade" style="margin-bottom:2px;font-size:12px;padding:6px 8px;" onchange="atualizarCardEntregas(this.value)">
+      <option value="">Todas as unidades</option>
+      ${ENTREGAS_ROSTER_CACHE.map(c=>`<option value="${c}">${escapeHtml(ENTREGAS_UNIDADES_NOMES[c]||c)}</option>`).join('')}
+    </select>` : '';
+  return pcardWrap('🛵','Entregas (ontem)','/entregas.html', `
+    ${selectHtml}
+    <div id="entregas-corpo">${corpoEntregas(ENTREGAS_DODIA_CACHE, ENTREGAS_ROSTER_CACHE, '')}</div>
+  `);
 }
 
 async function cardCentral(){
@@ -256,6 +312,8 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const ME = await res.json();
   const isMaster = ME.role==='master';
+  ME_GLOBAL = ME;
+  IS_MASTER_GLOBAL = isMaster;
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));

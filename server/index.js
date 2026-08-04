@@ -94,9 +94,22 @@ function senhasIguais(a, b) {
   if (bufA.length !== bufB.length) return false;
   return crypto.timingSafeEqual(bufA, bufB);
 }
+// pagina/rotas do link publico de estorno (compartilhado com o CLIENTE FINAL
+// pelo WhatsApp/QR code, sem login nenhum - ver estorno-cliente.html) tem que
+// ficar de fora dessa autenticacao do dashboard. Sem essa excecao, o
+// navegador do cliente pedia usuario/senha (que ele nao tem) so pra abrir a
+// pagina, ou - se a pagina abria mas a chamada de API é que caia no muro -
+// recebia texto puro em vez de JSON, quebrando o fetch().json() com um erro
+// cru na tela ("Unexpected token 'A'...")
+const ROTAS_PUBLICAS_SEM_DASHBOARD = new Set([
+  '/webhooks/adyen',
+  '/estorno-cliente.html',
+  '/api/meta/unidades-publico',
+  '/api/refund-requests/publico',
+]);
 if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
   app.use((req, res, next) => {
-    if (req.path === '/webhooks/adyen') return next();
+    if (ROTAS_PUBLICAS_SEM_DASHBOARD.has(req.path)) return next();
     const header = req.headers.authorization || '';
     const [scheme, encoded] = header.split(' ');
     if (scheme === 'Basic' && encoded) {
