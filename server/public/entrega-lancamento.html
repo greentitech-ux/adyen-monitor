@@ -25,7 +25,17 @@
   header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
   a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
   .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
@@ -68,17 +78,35 @@
 <body>
 
 <header>
-  <div>
-    <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
-    <h1>Lançamento de entregas</h1>
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+    <div>
+      <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+      <h1>Lançamento de entregas</h1>
+    </div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
-    <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
-    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
     <button class="back" onclick="logout()">🚪 Sair</button>
   </div>
 </header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back active" id="nav-entrega-lancamento-self" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso ao lançamento de entregas. Fale com o administrador (Master).</div>
 
@@ -217,6 +245,8 @@ window.fetch = (url, opts = {}) => {
   return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
 const CAMPOS_NUMERICOS = ['entrega','retorno','extra','bonus','pos00hs','foraDeArea','ajudaCusto','valor','coopRecebe','quantTotal'];
 const NOMES_CAMPOS = { entrega:'Entregas', retorno:'Retorno', extra:'Extra', bonus:'Bônus (Gami/NEXT)', pos00hs:'Pos 00hs', foraDeArea:'Fora de área', ajudaCusto:'Ajuda de custo', valor:'Valor a pagar', coopRecebe:'COOP recebe', quantTotal:'Quantidade total' };
@@ -444,10 +474,17 @@ async function boot(){
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
   document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('entregas-lancamento')){
     document.getElementById('sem-acesso').classList.remove('hidden');
