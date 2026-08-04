@@ -143,6 +143,11 @@
       <div><label>Data</label><input type="date" id="s-data" required></div>
       <div><label>Valor retirado (R$)</label><input type="number" step="0.01" inputmode="decimal" id="s-valor" required></div>
     </div>
+    <label>Período do depósito (opcional)</label>
+    <div class="grid2">
+      <div><label>De</label><input type="date" id="s-periodo-inicio"></div>
+      <div><label>Até</label><input type="date" id="s-periodo-fim"></div>
+    </div>
     <label>Observação (opcional)</label>
     <input type="text" id="s-descricao" placeholder="ex: retirada na visita da tarde">
     <div class="msg hidden" id="msg-sangria"></div>
@@ -309,6 +314,11 @@
       <input type="number" step="0.01" inputmode="decimal" id="se-valor" required>
       <label>Data</label>
       <input type="date" id="se-data" required>
+      <label>Período do depósito (opcional)</label>
+      <div class="grid2">
+        <div><label>De</label><input type="date" id="se-periodo-inicio"></div>
+        <div><label>Até</label><input type="date" id="se-periodo-fim"></div>
+      </div>
       <label>Observação</label>
       <input type="text" id="se-descricao">
       <div class="msg hidden" id="msg-sangria-editar"></div>
@@ -560,7 +570,7 @@ function renderSangrias(){
         <span>${escapeHtml(s.unidadeNome||s.unidade)} · ${fmtData(s.data)}</span>
         <b>${fmtMoney(s.valor)}</b>
       </div>
-      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
+      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.periodoInicio&&s.periodoFim?(' · Período: '+fmtData(s.periodoInicio)+' a '+fmtData(s.periodoFim)):''}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
       ${IS_MASTER ? `<button type="button" class="link-btn" style="margin-top:4px;" onclick="abrirEditarSangria('${s.id}')">✎ Editar/excluir (Master)</button>` : ''}
     </div>`).join('');
 }
@@ -574,6 +584,8 @@ function abrirEditarSangria(id){
   document.getElementById('sangria-editar-info').textContent = `${s.unidadeNome||s.unidade} · registrada em ${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
   document.getElementById('se-valor').value = s.valor;
   document.getElementById('se-data').value = s.data;
+  document.getElementById('se-periodo-inicio').value = s.periodoInicio || '';
+  document.getElementById('se-periodo-fim').value = s.periodoFim || '';
   document.getElementById('se-descricao').value = s.descricao || '';
   document.getElementById('msg-sangria-editar').classList.add('hidden');
   document.getElementById('overlay-sangria-editar').classList.remove('hidden');
@@ -586,7 +598,13 @@ document.getElementById('form-sangria-editar').addEventListener('submit', async 
   try{
     const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, {
       method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ valor: document.getElementById('se-valor').value, data: document.getElementById('se-data').value, descricao: document.getElementById('se-descricao').value }),
+      body: JSON.stringify({
+        valor: document.getElementById('se-valor').value,
+        data: document.getElementById('se-data').value,
+        descricao: document.getElementById('se-descricao').value,
+        periodoInicio: document.getElementById('se-periodo-inicio').value,
+        periodoFim: document.getElementById('se-periodo-fim').value,
+      }),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao salvar');
@@ -613,20 +631,25 @@ async function excluirSangria(){
 
 document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  const unidade = document.getElementById('s-unidade').value;
+  const dataEscolhida = document.getElementById('s-data').value;
+  const jaLancadaHoje = (SANGRIAS||[]).some(s=>s.unidade===unidade && s.data===dataEscolhida);
+  if(jaLancadaHoje && !confirm('Já existe uma sangria/depósito lançada pra essa unidade nessa data. Tem certeza que quer lançar outra?')) return;
   const btn = document.getElementById('btn-sangria');
   const msg = document.getElementById('msg-sangria');
   msg.classList.add('hidden');
   btn.disabled = true;
   try{
-    const unidade = document.getElementById('s-unidade').value;
     const grupo = grupoDaUnidade(unidade);
     const body = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
       grupo,
-      data: document.getElementById('s-data').value,
+      data: dataEscolhida,
       valor: document.getElementById('s-valor').value,
       descricao: document.getElementById('s-descricao').value,
+      periodoInicio: document.getElementById('s-periodo-inicio').value,
+      periodoFim: document.getElementById('s-periodo-fim').value,
     };
     const res = await fetch('/api/sangrias', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();

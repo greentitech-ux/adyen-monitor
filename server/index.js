@@ -1614,12 +1614,12 @@ app.delete('/api/grupos/:id', auth.requireMaster, async (req, res) => {
 // as demais secoes do Fechamento (Faturamento, Declarado, etc) ----------
 app.post('/api/sangrias', requireSection('sangria'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, valor, descricao } = req.body;
+    const { unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await sangrias.criar({
-      unidade, unidadeNome, grupo, data, valor, descricao,
+      unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
