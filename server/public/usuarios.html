@@ -262,6 +262,14 @@
   </div>
 </div>
 
+<div class="overlay" id="sessoes-overlay">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="sessoes-titulo" style="margin:0;word-break:break-all;">Locais logados</h3>
+    <div id="sessoes-lista" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+    <button type="button" class="back" style="margin-top:14px;cursor:pointer;" onclick="fecharSessoes()">Fechar</button>
+  </div>
+</div>
+
 <div class="overlay" id="perm-overlay">
   <form class="modal" id="perm-form">
     <h3 id="perm-title">Editar permissões</h3>
@@ -608,6 +616,7 @@ function renderUsers(){
     const statusBadges = (u.locked
       ? `<span class="badge locked" title="Bloqueado após 3 tentativas de senha erradas - use \"Nova senha\" pra destravar">bloqueado</span>`
       : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`)
+      + ` <span class="badge ${u.online?'on':'off'}" style="cursor:pointer;" onclick="abrirSessoes('${u.id}')" title="${u.ultimaAtividadeEm ? 'Última atividade: '+formatarRelativo(u.ultimaAtividadeEm) : 'Nunca fez login'} - clique pra ver os locais">${u.online?'🟢':'⚪'} ${u.sessoesAtivas} ${u.sessoesAtivas===1?'local':'locais'}</span>`
       + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '')
       + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '')
       + (u.podeCatalogoEstoque ? ` <span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque (setor/tipo/custo/ativar-desativar)">📦 catálogo</span>` : '');
@@ -648,6 +657,61 @@ function abrirAcoes(id){
 }
 function fecharAcoes(){ document.getElementById('acoes-overlay').classList.remove('show'); }
 document.getElementById('acoes-overlay').addEventListener('click', (e)=>{ if(e.target.id==='acoes-overlay') fecharAcoes(); });
+
+// ---------- "quantos locais estao logados com esse usuario" - clique na
+// badge online/offline da linha abre a lista de sessoes (device/IP/ultima
+// atividade), com opcao de encerrar uma especifica sem trocar a senha ----------
+function formatarRelativo(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms/60000);
+  if(min < 1) return 'agora mesmo';
+  if(min < 60) return `há ${min} min`;
+  const h = Math.floor(min/60);
+  if(h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h/24)}d`;
+}
+function iconeDispositivo(ua){
+  ua = ua || '';
+  if(/Mobile|Android|iPhone/i.test(ua)) return '📱';
+  if(/iPad|Tablet/i.test(ua)) return '📱';
+  return '💻';
+}
+function descreverDispositivo(ua){
+  ua = ua || '';
+  const nav = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Navegador';
+  const so = /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+  return [nav, so].filter(Boolean).join(' · ') || 'Dispositivo desconhecido';
+}
+async function abrirSessoes(id){
+  const u = USERS.find(x=>x.id===id);
+  if(!u) return;
+  document.getElementById('sessoes-titulo').textContent = 'Locais logados · ' + u.email;
+  const lista = document.getElementById('sessoes-lista');
+  lista.innerHTML = '<p style="color:var(--muted);font-size:12.5px;">Carregando…</p>';
+  document.getElementById('sessoes-overlay').classList.add('show');
+  const res = await fetch('/api/users/'+id+'/sessoes');
+  const sessoesData = await res.json();
+  if(!res.ok){ lista.innerHTML = `<p class="err">${sessoesData.error||'Erro ao carregar.'}</p>`; return; }
+  if(!sessoesData.length){ lista.innerHTML = '<p style="color:var(--muted);font-size:12.5px;">Nenhum local logado agora - o último token já expirou (8h) ou nunca fez login.</p>'; return; }
+  lista.innerHTML = sessoesData.map(s => `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);">
+      <div style="min-width:0;">
+        <div style="font-size:12.5px;">${iconeDispositivo(s.userAgent)} ${escapeHtml(descreverDispositivo(s.userAgent))} ${s.online?'<span class="badge on" style="margin-left:4px;">online</span>':''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Desde ${new Date(s.criadoEm).toLocaleString('pt-BR')} · última atividade ${formatarRelativo(s.ultimaAtividadeEm)}${s.ip ? ' · IP '+escapeHtml(s.ip) : ''}</div>
+      </div>
+      <button type="button" class="danger" style="flex-shrink:0;padding:6px 10px;font-size:11.5px;" onclick="encerrarSessao('${id}','${s.id}')">Encerrar</button>
+    </div>
+  `).join('');
+}
+function fecharSessoes(){ document.getElementById('sessoes-overlay').classList.remove('show'); }
+document.getElementById('sessoes-overlay').addEventListener('click', (e)=>{ if(e.target.id==='sessoes-overlay') fecharSessoes(); });
+async function encerrarSessao(userId, sessionId){
+  if(!confirm('Encerrar esse local? Vai precisar logar de novo por lá.')) return;
+  const res = await fetch('/api/users/'+userId+'/sessoes/'+sessionId, {method:'DELETE'});
+  if(!res.ok){ const data = await res.json().catch(()=>({})); alert(data.error||'Erro ao encerrar.'); return; }
+  await abrirSessoes(userId);
+  await carregarUsuarios();
+}
 
 async function definirCargo(id, cargo){
   const res = await fetch('/api/users/'+id+'/cargo', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cargo})});
