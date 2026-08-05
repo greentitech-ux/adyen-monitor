@@ -88,4 +88,32 @@ async function listarBackups() {
     .sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
 }
 
-module.exports = { rodarBackup, listarBackups };
+// nome do arquivo vem sempre da lista de listarBackups() (nunca digitado
+// livre pelo usuario), mas valida o formato mesmo assim antes de montar o
+// caminho no bucket - evita qualquer chance de path traversal
+function validarNomeArquivo(nomeArquivo) {
+  if (!/^[\w.-]+\.json$/.test(String(nomeArquivo || ''))) throw new Error('Nome de arquivo de backup inválido.');
+}
+
+async function lerBackup(nomeArquivo) {
+  validarNomeArquivo(nomeArquivo);
+  const bucket = await resolverBucket();
+  const [conteudo] = await bucket.file(`backups/${nomeArquivo}`).download();
+  return JSON.parse(conteudo.toString('utf8'));
+}
+
+// restaura UM documento de UMA colecao, de volta pro Firestore, exatamente
+// como estava naquele backup - usado pelo Master pra desfazer uma exclusao
+// feita por engano (o app so faz exclusao de verdade, sem lixeira/undo, ver
+// comentario em fechamentosLive.js/remove)
+async function restaurarDocumento(nomeArquivo, colecao, id) {
+  if (!COLECOES.includes(colecao)) throw new Error('Coleção inválida.');
+  const dump = await lerBackup(nomeArquivo);
+  const lista = dump[colecao] || [];
+  const registro = lista.find((d) => d.id === id);
+  if (!registro) throw new Error('Documento não encontrado nesse backup.');
+  await db.collection(colecao).doc(id).set(registro);
+  return registro;
+}
+
+module.exports = { rodarBackup, listarBackups, lerBackup, restaurarDocumento };

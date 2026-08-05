@@ -84,6 +84,7 @@
   button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;align-self:flex-start;}
   .err{color:var(--bad);font-size:11.5px;}
   .ok-msg{color:var(--ok);font-size:11.5px;}
+  #restaurar-fechamento-overlay input[type=text],#restaurar-fechamento-overlay select{width:100%;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
   .overlay.show{display:flex;}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:480px;}
@@ -184,7 +185,10 @@
   <div class="panel">
     <h2>Backup do banco de dados</h2>
     <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Backup automático todo dia, guardado no Storage por 30 dias. Use "Fazer backup agora" antes de qualquer mudança grande, por segurança.</p>
-    <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
+      <button type="button" class="back" onclick="abrirRestaurarFechamento()">🔍 Recuperar fechamento excluído</button>
+    </div>
     <p class="ok-msg hidden" id="backup-msg" style="margin-top:10px;"></p>
     <div class="tablewrap" style="margin-top:14px;">
       <table style="min-width:420px;">
@@ -192,6 +196,23 @@
         <tbody id="backups-body"></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="restaurar-fechamento-overlay">
+  <div class="modal" style="max-width:560px;">
+    <h3 style="margin-top:0;">Recuperar fechamento excluído</h3>
+    <p style="font-size:11.5px;color:var(--muted);margin:-4px 0 12px;">Escolha um backup de antes da exclusão, busque pela unidade/data/gerente e restaure o registro exatamente como estava.</p>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Backup</label>
+    <div style="display:flex;gap:8px;">
+      <select id="restaurar-backup-select" style="flex:1;"></select>
+      <button type="button" class="primary" id="btn-restaurar-buscar" onclick="buscarFechamentosBackup()">Buscar</button>
+    </div>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;">Filtrar por unidade, gerente ou data (aaaa-mm-dd)</label>
+    <input type="text" id="restaurar-busca" placeholder="ex: Bessa" oninput="renderResultadosRestaurar()">
+    <p class="err hidden" id="restaurar-msg" style="margin-top:10px;"></p>
+    <div id="restaurar-resultados" style="margin-top:12px;max-height:320px;overflow-y:auto;"></div>
+    <button type="button" class="back" style="margin-top:14px;" onclick="fecharRestaurarFechamento()">Fechar</button>
   </div>
 </div>
 
@@ -366,11 +387,92 @@ function fmtBytes(n){
   return (n/1024/1024).toFixed(1)+' MB';
 }
 
+let BACKUPS = [];
 async function carregarBackups(){
-  const backups = await fetch('/api/backups').then(r=>r.json());
-  document.getElementById('backups-body').innerHTML = backups.length ? backups.map(b=>`
+  BACKUPS = await fetch('/api/backups').then(r=>r.json());
+  document.getElementById('backups-body').innerHTML = BACKUPS.length ? BACKUPS.map(b=>`
     <tr><td>${escapeHtml(b.nome)}</td><td>${new Date(b.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</td><td>${fmtBytes(b.tamanhoBytes)}</td></tr>
   `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum backup ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+// ---------- recuperar fechamento excluido a partir de um backup ----------
+function fmtDataYMD(d){ if(!d) return '—'; const [y,m,dd]=String(d).split('-'); return `${dd}/${m}/${y}`; }
+function fmtMoneyBR(v){ return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+let RESTAURAR_FECHAMENTOS = [];
+function abrirRestaurarFechamento(){
+  if(!BACKUPS.length){ alert('Nenhum backup disponível ainda.'); return; }
+  document.getElementById('restaurar-backup-select').innerHTML = BACKUPS.map(b=>
+    `<option value="${escapeHtml(b.nome)}">${new Date(b.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</option>`
+  ).join('');
+  document.getElementById('restaurar-busca').value = '';
+  RESTAURAR_FECHAMENTOS = [];
+  document.getElementById('restaurar-resultados').innerHTML = '';
+  document.getElementById('restaurar-msg').classList.add('hidden');
+  document.getElementById('restaurar-fechamento-overlay').classList.add('show');
+}
+function fecharRestaurarFechamento(){
+  document.getElementById('restaurar-fechamento-overlay').classList.remove('show');
+}
+
+async function buscarFechamentosBackup(){
+  const nome = document.getElementById('restaurar-backup-select').value;
+  if(!nome) return;
+  const msg = document.getElementById('restaurar-msg');
+  msg.classList.add('hidden');
+  const btn = document.getElementById('btn-restaurar-buscar');
+  btn.disabled = true;
+  try{
+    const res = await fetch(`/api/backups/${encodeURIComponent(nome)}/fechamentos`);
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Erro ao ler o backup.');
+    RESTAURAR_FECHAMENTOS = data;
+    renderResultadosRestaurar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function renderResultadosRestaurar(){
+  const termo = document.getElementById('restaurar-busca').value.trim().toLowerCase();
+  const el = document.getElementById('restaurar-resultados');
+  if(!RESTAURAR_FECHAMENTOS.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Clique em "Buscar" pra carregar os fechamentos desse backup.</div>';
+    return;
+  }
+  const filtrados = !termo ? RESTAURAR_FECHAMENTOS : RESTAURAR_FECHAMENTOS.filter(f=>
+    (f.unidadeNome||f.unidade||'').toLowerCase().includes(termo) ||
+    (f.gerente||'').toLowerCase().includes(termo) ||
+    (f.data||'').includes(termo)
+  );
+  const lista = filtrados.slice(0,50);
+  el.innerHTML = lista.length ? lista.map(f=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--line);">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;">
+        <span>${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtDataYMD(f.data)}</span>
+        <b>${fmtMoneyBR(f.faturamento)}</b>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escapeHtml(f.gerente||'—')}</div>
+      <button type="button" class="back" style="margin-top:6px;" onclick="restaurarFechamento('${f.id}')">↩️ Restaurar este fechamento</button>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:12px;">Nenhum resultado pra essa busca.</div>';
+}
+
+async function restaurarFechamento(id){
+  const f = RESTAURAR_FECHAMENTOS.find(x=>x.id===id);
+  const rotulo = f ? `${f.unidadeNome||f.unidade} · ${fmtDataYMD(f.data)}` : id;
+  if(!confirm(`Restaurar o fechamento de ${rotulo}? Isso recria o registro exatamente como estava nesse backup, sobrescrevendo se já existir um com esse mesmo id.`)) return;
+  const nome = document.getElementById('restaurar-backup-select').value;
+  const msg = document.getElementById('restaurar-msg');
+  try{
+    const res = await fetch(`/api/backups/${encodeURIComponent(nome)}/fechamentos/${id}/restaurar`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Erro ao restaurar.');
+    msg.textContent = `Fechamento de ${rotulo} restaurado com sucesso.`; msg.className = 'ok-msg'; msg.classList.remove('hidden');
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err'; msg.classList.remove('hidden');
+  }
 }
 
 async function rodarBackupAgora(){
