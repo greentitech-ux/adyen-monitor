@@ -357,4 +357,8 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
 }
 
 
-module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao, remove };
+function invalidarCache() {
+  fechamentosCache.invalidar();
+}
+
+module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache };

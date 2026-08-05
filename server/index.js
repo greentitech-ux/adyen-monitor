@@ -1379,6 +1379,31 @@ app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
   }
 });
 
+// recuperar um fechamento excluido por engano - le a coleção fechamentosLive
+// de dentro de um arquivo de backup especifico (a lista completa, pro Master
+// buscar/filtrar na tela) e permite restaurar um registro pontual de volta
+// pro Firestore, exatamente como estava naquele backup
+app.get('/api/backups/:nome/fechamentos', auth.requireMaster, async (req, res) => {
+  try {
+    const dump = await backup.lerBackup(req.params.nome);
+    res.json(dump.fechamentosLive || []);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/backups/:nome/fechamentos/:id/restaurar', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await backup.restaurarDocumento(req.params.nome, 'fechamentosLive', req.params.id);
+    fechamentosLive.invalidarCache();
+    broadcast('fechamento-restaurado', registro, 'lancamento');
+    broadcast('fechamento-restaurado', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- fechamentos de caixa (secao "fechamentos") ----------
 // combina os fechamentos das planilhas do Google Sheets (ARCFOOD + Grupo
 // Bravo, aba "BD") com os fechamentos lançados ao vivo pelas lojas. As
