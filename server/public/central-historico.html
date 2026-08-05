@@ -107,6 +107,8 @@
   .notif-chat .notif-titulo{font-size:12px;font-weight:700;padding-right:14px;}
   .notif-chat .notif-fechar{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;}
   .notif-chat .notif-fechar:hover{color:var(--text);border-color:var(--accent);}
+  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
   .notif-chat .notif-corpo{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   @keyframes notif-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
   .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
@@ -222,19 +224,34 @@
 </div><!-- /#root -->
 
 <div class="overlay hidden" id="overlay-edicao-fechamento">
-  <div class="sheet">
+  <div class="sheet" style="position:relative;">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharEdicaoFechamento()">✕</span>
     <h3>Pedir correção</h3>
     <div class="sub" id="edicao-fechamento-info"></div>
+    <label>O que você precisa pedir?</label>
+    <select id="ef-tipo" onchange="atualizarTipoEdicaoFechamento()">
+      <option value="campo">Corrigir um valor</option>
+      <option value="data">Corrigir a data do lançamento</option>
+      <option value="excluir">Excluir o lançamento inteiro</option>
+    </select>
     <form id="form-edicao-fechamento">
-      <label>Qual valor está errado e qual o valor correto?</label>
-      <select id="ef-campo"></select>
-      <input type="number" step="0.01" id="ef-valor" placeholder="valor correto" style="margin-top:8px;">
-      <label>Motivo da correção</label>
+      <div id="ef-campo-wrap">
+        <label>Qual valor está errado e qual o valor correto?</label>
+        <select id="ef-campo"></select>
+        <input type="number" step="0.01" id="ef-valor" placeholder="valor correto" style="margin-top:8px;">
+      </div>
+      <div id="ef-data-wrap" class="hidden">
+        <label>Qual é a data correta?</label>
+        <input type="date" id="ef-nova-data">
+      </div>
+      <div id="ef-excluir-wrap" class="hidden">
+        <div class="sub" style="color:var(--bad);">O lançamento inteiro (todos os valores, KPIs e histórico desse dia) será excluído se o Master aprovar. Depois de aprovado, não tem como desfazer pela loja.</div>
+      </div>
+      <label style="margin-top:10px;">Motivo</label>
       <textarea id="ef-motivo" placeholder="explique o que aconteceu, o Master vai revisar antes de aprovar" required></textarea>
       <div class="msg hidden" id="msg-edicao-fechamento"></div>
       <button class="btn-primary" type="submit">Enviar pedido ao Master</button>
     </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharEdicaoFechamento()">Cancelar</button>
   </div>
 </div>
 
@@ -920,23 +937,49 @@ function abrirEdicaoFechamento(id){
   document.getElementById('edicao-fechamento-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado o fechamento não pode ser mudado direto; o pedido vai para aprovação do Master.`;
   document.getElementById('ef-campo').innerHTML = CAMPOS_NUMERICOS_MASTER_FECHAMENTO.map(c=>`<option value="${c}">${NOMES_CAMPOS_FECHAMENTO[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
   document.getElementById('ef-valor').value = '';
+  document.getElementById('ef-nova-data').value = '';
   document.getElementById('ef-motivo').value = '';
+  document.getElementById('ef-tipo').value = 'campo';
+  atualizarTipoEdicaoFechamento();
   document.getElementById('msg-edicao-fechamento').classList.add('hidden');
   document.getElementById('overlay-edicao-fechamento').classList.remove('hidden');
 }
 function fecharEdicaoFechamento(){ document.getElementById('overlay-edicao-fechamento').classList.add('hidden'); EDITANDO_FECHAMENTO_ID=null; }
 
+// alterna os campos visiveis conforme o tipo de pedido escolhido - corrigir
+// um valor (fluxo original), corrigir a data, ou excluir o lançamento inteiro
+function atualizarTipoEdicaoFechamento(){
+  const tipo = document.getElementById('ef-tipo').value;
+  document.getElementById('ef-campo-wrap').classList.toggle('hidden', tipo!=='campo');
+  document.getElementById('ef-data-wrap').classList.toggle('hidden', tipo!=='data');
+  document.getElementById('ef-excluir-wrap').classList.toggle('hidden', tipo!=='excluir');
+}
+
 document.getElementById('form-edicao-fechamento').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
-  const campo = document.getElementById('ef-campo').value;
-  const valor = document.getElementById('ef-valor').value;
+  const tipo = document.getElementById('ef-tipo').value;
   const motivo = document.getElementById('ef-motivo').value;
   const msg = document.getElementById('msg-edicao-fechamento');
   msg.classList.add('hidden');
+
+  let body;
+  if(tipo==='excluir'){
+    if(!confirm('Tem certeza que quer pedir a exclusão desse lançamento inteiro? Se o Master aprovar, não tem como desfazer.')) return;
+    body = { tipoCorrecao:'excluir', motivo };
+  } else if(tipo==='data'){
+    const novaData = document.getElementById('ef-nova-data').value;
+    if(!novaData){ msg.textContent = 'Informe a data correta.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
+    body = { tipoCorrecao:'data', novaData, motivo };
+  } else {
+    const campo = document.getElementById('ef-campo').value;
+    const valor = document.getElementById('ef-valor').value;
+    body = { tipoCorrecao:'campo', mudancas: { [campo]: valor }, motivo };
+  }
+
   try{
     const res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_ID}/solicitar-edicao`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas: { [campo]: valor }, motivo }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');

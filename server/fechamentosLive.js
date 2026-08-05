@@ -197,7 +197,7 @@ async function getOne(id) {
 // que já existe, não substitui
 const TIPOS_ITEM_NOVO = ['maquininha', 'saida'];
 
-async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, motivo, anexos, solicitadoPorId, solicitadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
+async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, novaData, motivo, anexos, solicitadoPorId, solicitadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   const atual = await getOne(fechamentoId);
   if (!atual) throw new Error('Fechamento não encontrado.');
   if (!motivo || !String(motivo).trim()) throw new Error('Descreva o motivo da correção.');
@@ -208,9 +208,10 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
     unidade: atual.unidade,
     unidadeNome: atual.unidadeNome,
     data: atual.data,
-    tipoCorrecao: tipoCorrecao === 'item' ? 'item' : 'campo',
+    tipoCorrecao: ['item', 'excluir', 'data'].includes(tipoCorrecao) ? tipoCorrecao : 'campo',
     mudancas: {},
     itemNovo: null,
+    novaData: null,
     motivo: String(motivo).trim(),
     anexos: Array.isArray(anexos) ? anexos : [],
     status: 'PENDENTE',
@@ -236,6 +237,20 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
     const valor = num(itemNovo.valor);
     if (valor <= 0) throw new Error('Informe o valor do item.');
     pedido.itemNovo = { tipo: itemNovo.tipo, descricao: String(itemNovo.descricao || '').slice(0, 200), valor };
+  } else if (pedido.tipoCorrecao === 'excluir') {
+    // nada mais pra validar - so o motivo, ja exigido acima. A exclusao de
+    // fato so acontece se o Master aprovar (ver decidirEdicao); ate la o
+    // fechamento continua intacto e visivel normalmente
+  } else if (pedido.tipoCorrecao === 'data') {
+    // mudar a data efetivamente troca o ID do documento (ver docId), entao
+    // precisa validar aqui que a data e valida, diferente da atual e que o
+    // destino esta livre (checado de novo na aprovacao, que e quando de
+    // fato acontece - pode ter mudado nesse meio tempo)
+    if (!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData)) throw new Error('Informe a data correta (AAAA-MM-DD).');
+    if (novaData === atual.data) throw new Error('A data correta é igual à data atual do lançamento.');
+    const colisao = await COLLECTION.doc(docId(atual.unidade, novaData)).get();
+    if (colisao.exists) throw new Error('Já existe um fechamento lançado para essa unidade nessa data.');
+    pedido.novaData = novaData;
   } else {
     const camposValidos = {};
     Object.entries(mudancas || {}).forEach(([campo, valor]) => {
@@ -382,6 +397,14 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
   const pedido = doc.data();
   if (pedido.status !== 'PENDENTE') throw new Error('Esse pedido já foi decidido.');
 
+  // valida ANTES de marcar como decidido - mudar a data efetivamente troca o
+  // ID do documento (ver docId), entao precisa garantir que o destino ainda
+  // esta livre (pode ter mudado desde o pedido) antes de comprometer a decisao
+  if (status === 'APROVADO' && pedido.tipoCorrecao === 'data') {
+    const colisao = await COLLECTION.doc(docId(pedido.unidade, pedido.novaData)).get();
+    if (colisao.exists) throw new Error('Já existe um fechamento lançado para essa unidade nessa data.');
+  }
+
   await ref.update({
     status,
     decididoPorEmail,
@@ -395,6 +418,28 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
     const fechDoc = await fechRef.get();
     if (fechDoc.exists) {
       const atual = fechDoc.data();
+
+      if (pedido.tipoCorrecao === 'excluir') {
+        await fechRef.delete();
+        fechamentosCache.invalidar();
+        return { ...pedido, status };
+      }
+
+      if (pedido.tipoCorrecao === 'data') {
+        const novoId = docId(pedido.unidade, pedido.novaData);
+        const historico = [...(atual.historico || []), {
+          em: new Date().toISOString(),
+          por: decididoPorEmail,
+          motivo: pedido.motivo,
+          valoresAnteriores: { data: atual.data },
+          valoresNovos: { data: pedido.novaData },
+        }];
+        await COLLECTION.doc(novoId).set({ ...atual, id: novoId, data: pedido.novaData, historico, atualizadoEm: new Date().toISOString() });
+        await fechRef.delete();
+        fechamentosCache.invalidar();
+        return { ...pedido, status };
+      }
+
       let camposMudados; // pra saber o que recalcular/registrar no historico
       let novosValores;
 
