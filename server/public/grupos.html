@@ -165,6 +165,21 @@
       </fieldset>
 
       <fieldset>
+        <legend>Seções do lançamento (loja)</legend>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
+          <input type="checkbox" id="c-caixa-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Caixa (caixa inicial/final, entrada em dinheiro, depósito)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:8px;">
+          <input type="checkbox" id="c-maquininhas-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Maquininhas (cartão)
+        </label>
+        <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Nome padrão das maquininhas (ex: "Getnet" vira Getnet 1, Getnet 2...)</label>
+        <input type="text" id="c-maquininha-prefixo" placeholder="Maquininha" value="Maquininha" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
+          <input type="checkbox" id="c-saidas-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Outras saídas de caixa
+        </label>
+      </fieldset>
+
+      <fieldset>
         <legend>Canais de venda extras (somam no Faturamento, além de Delivery/Carryout/Pickup/Loja)</legend>
         <div id="c-canais"></div>
         <button type="button" class="btn-add" onclick="adicionarKpi('c-canais')">+ Adicionar canal</button>
@@ -202,6 +217,21 @@
     <fieldset>
       <legend>Lojas desse grupo</legend>
       <div id="e-unidades"></div>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Seções do lançamento (loja)</legend>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
+        <input type="checkbox" id="e-caixa-habilitado" style="width:auto;margin:0;"> Habilitar seção Caixa (caixa inicial/final, entrada em dinheiro, depósito)
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:8px;">
+        <input type="checkbox" id="e-maquininhas-habilitado" style="width:auto;margin:0;"> Habilitar seção Maquininhas (cartão)
+      </label>
+      <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Nome padrão das maquininhas (ex: "Getnet" vira Getnet 1, Getnet 2...)</label>
+      <input type="text" id="e-maquininha-prefixo" placeholder="Maquininha" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
+        <input type="checkbox" id="e-saidas-habilitado" style="width:auto;margin:0;"> Habilitar seção Outras saídas de caixa
+      </label>
     </fieldset>
 
     <fieldset style="margin-top:10px;">
@@ -414,6 +444,10 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
   const payload = {
     nome: document.getElementById('c-nome').value,
     unidades: readChecked(document.getElementById('c-unidades')),
+    caixaHabilitado: document.getElementById('c-caixa-habilitado').checked,
+    maquininhasHabilitado: document.getElementById('c-maquininhas-habilitado').checked,
+    maquininhaPrefixo: document.getElementById('c-maquininha-prefixo').value,
+    saidasHabilitado: document.getElementById('c-saidas-habilitado').checked,
     canaisVendaExtras: lerKpis('c-canais'),
     formasPagamentoExtras: lerKpis('c-formas'),
     kpisExtras: lerKpis('c-kpis'),
@@ -425,6 +459,10 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     if(!res.ok) throw new Error(data.error || 'Erro ao criar grupo.');
     document.getElementById('create-form').reset();
     document.getElementById('c-unidades').innerHTML = unidadesChecksHtml('unidades', new Set());
+    document.getElementById('c-caixa-habilitado').checked = true;
+    document.getElementById('c-maquininhas-habilitado').checked = true;
+    document.getElementById('c-maquininha-prefixo').value = 'Maquininha';
+    document.getElementById('c-saidas-habilitado').checked = true;
     document.getElementById('c-canais').innerHTML = '';
     document.getElementById('c-formas').innerHTML = '';
     document.getElementById('c-kpis').innerHTML = '';
@@ -441,6 +479,10 @@ function abrirEdicaoGrupo(id){
   document.getElementById('grupo-title').textContent = 'Editar ' + g.nome;
   document.getElementById('e-nome').value = g.nome;
   document.getElementById('e-unidades').innerHTML = unidadesChecksHtml('e-unidades', new Set(g.unidades||[]));
+  document.getElementById('e-caixa-habilitado').checked = g.caixaHabilitado !== false;
+  document.getElementById('e-maquininhas-habilitado').checked = g.maquininhasHabilitado !== false;
+  document.getElementById('e-maquininha-prefixo').value = g.maquininhaPrefixo || 'Maquininha';
+  document.getElementById('e-saidas-habilitado').checked = g.saidasHabilitado !== false;
   document.getElementById('e-canais').innerHTML = '';
   (g.canaisVendaExtras||[]).forEach(k=>adicionarKpi('e-canais', k.label));
   document.getElementById('e-formas').innerHTML = '';
@@ -460,6 +502,10 @@ document.getElementById('grupo-form').addEventListener('submit', async (e)=>{
   const payload = {
     nome: document.getElementById('e-nome').value,
     unidades: readChecked(document.getElementById('e-unidades')),
+    caixaHabilitado: document.getElementById('e-caixa-habilitado').checked,
+    maquininhasHabilitado: document.getElementById('e-maquininhas-habilitado').checked,
+    maquininhaPrefixo: document.getElementById('e-maquininha-prefixo').value,
+    saidasHabilitado: document.getElementById('e-saidas-habilitado').checked,
     canaisVendaExtras: lerKpis('e-canais'),
     formasPagamentoExtras: lerKpis('e-formas'),
     kpisExtras: lerKpis('e-kpis'),

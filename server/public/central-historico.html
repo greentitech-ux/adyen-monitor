@@ -99,10 +99,11 @@
   .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
   .kanban-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:12px;}
   .notif-chat-wrap{position:fixed;top:14px;right:14px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:min(320px,calc(100vw - 28px));}
-  .notif-chat{background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:11px 13px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;animation:notif-in .18s ease;}
+  .notif-chat{position:relative;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:11px 13px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;animation:notif-in .18s ease;}
   .notif-chat:hover{background:var(--panel2);}
-  .notif-chat .notif-titulo{font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-  .notif-chat .notif-fechar{color:var(--muted);font-size:14px;line-height:1;flex:none;}
+  .notif-chat .notif-titulo{font-size:12px;font-weight:700;padding-right:14px;}
+  .notif-chat .notif-fechar{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;}
+  .notif-chat .notif-fechar:hover{color:var(--text);border-color:var(--accent);}
   .notif-chat .notif-corpo{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   @keyframes notif-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
   .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
@@ -1057,9 +1058,11 @@ function mostrarNotificacaoChat(msg){
   el.className = 'notif-chat';
   el.id = 'notif-' + (++NOTIF_SEQ);
   el.innerHTML = `
-    <div class="notif-titulo"><span>💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</span><span class="notif-fechar">✕</span></div>
+    <span class="notif-fechar" title="Fechar">✕</span>
+    <div class="notif-titulo">💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</div>
     <div class="notif-corpo"><b>${escapeHtml(msg.autorEmail||'')}:</b> ${escapeHtml(msg.texto)}</div>
   `;
+  el.querySelector('.notif-fechar').addEventListener('click', (ev)=>{ ev.stopPropagation(); el.remove(); });
   el.onclick = ()=>{
     el.remove();
     if(card) abrirDetalhe(card.tipo, card.id);
