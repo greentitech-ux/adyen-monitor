@@ -637,12 +637,22 @@ async function excluirSangria(){
   }
 }
 
+// mesmo motivo do form de fechamento acima: campos soltos de texto/numero -
+// Enter em qualquer um deles nao pode registrar a sangria/deposito sem
+// querer, antes de terminar de preencher
+document.getElementById('form-sangria').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
 document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const unidade = document.getElementById('s-unidade').value;
   const dataEscolhida = document.getElementById('s-data').value;
   const jaLancadaHoje = (SANGRIAS||[]).some(s=>s.unidade===unidade && s.data===dataEscolhida);
   if(jaLancadaHoje && !confirm('Já existe uma sangria/depósito lançada pra essa unidade nessa data. Tem certeza que quer lançar outra?')) return;
+  if(!confirm('Tem certeza que deseja registrar essa sangria/depósito? Confira o valor e o período antes de continuar.')) return;
   const btn = document.getElementById('btn-sangria');
   const msg = document.getElementById('msg-sangria');
   msg.classList.add('hidden');

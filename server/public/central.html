@@ -437,8 +437,21 @@ function montarSelectCampo(){
   document.getElementById('a-campo').innerHTML = CAMPOS_NUMERICOS.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]}</option>`).join('');
 }
 
+// varios campos soltos de texto/numero no formulario - Enter em qualquer um
+// deles nao pode enviar a solicitação sem querer (so os textarea de
+// motivo/observação continuam livres pra quebrar linha)
+document.getElementById('form-nova').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
 document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  const msgConfirmacao = TIPO_SELECIONADO === 'ajuste-fechamento'
+    ? 'Tem certeza que deseja enviar esse pedido de correção ao Master? Confira os dados antes de continuar - quanto mais preciso o pedido, menos idas e vindas até aprovar.'
+    : `Tem certeza que deseja enviar essa solicitação de ${TIPOS_INFO[TIPO_SELECIONADO]?.label || TIPO_SELECIONADO}?`;
+  if(!confirm(msgConfirmacao)) return;
   const btn = document.getElementById('btn-nova');
   const msg = document.getElementById('msg-nova');
   msg.classList.add('hidden');

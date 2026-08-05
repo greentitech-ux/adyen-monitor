@@ -667,6 +667,8 @@ function renderRefundPanel(){
 }
 
 async function decidirEstorno(id, status){
+  const pergunta = status==='APROVADO' ? 'Tem certeza que deseja aprovar esse estorno?' : 'Tem certeza que deseja rejeitar esse estorno?';
+  if(!confirm(pergunta)) return;
   let motivoDecisao = '';
   if(status==='REJEITADO'){
     motivoDecisao = prompt('Motivo da rejeição (opcional):') || '';

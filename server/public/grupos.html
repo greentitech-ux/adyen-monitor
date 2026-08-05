@@ -238,6 +238,13 @@
   </form>
 </div>
 
+<!-- opcoes de autocomplete pros inputs de Canais/Formas/KPI's extras (ver
+     adicionarKpi/atualizarDatalistsExtras) - reaproveita nomes ja usados em
+     outros grupos, tanto no form de criar quanto no de editar -->
+<datalist id="datalist-canais"></datalist>
+<datalist id="datalist-formas"></datalist>
+<datalist id="datalist-kpis"></datalist>
+
 <script>
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
 if(!AUTH_TOKEN){ location.href = '/'; }
@@ -259,14 +266,32 @@ let GRUPOS = [];
 let EDITING_GRUPO = null;
 
 // linhas repetiveis de KPI (so um campo: o nome/label) - mesmo padrao visual
-// de "Itens da compra" na Central de Solicitações, aqui so com um input
+// de "Itens da compra" na Central de Solicitações, aqui so com um input.
+// O input usa <datalist> (ver atualizarDatalistsExtras) com os nomes ja
+// usados em OUTROS grupos pra esse mesmo tipo de campo (canal/forma/KPI) -
+// assim o Master pode reaproveitar um nome existente em vez de digitar de
+// novo (e arriscar duplicar com grafia diferente, ex "Pix CNPJ" vs "PIX
+// cnpj", virando 2 colunas diferentes na tabela de Fechamentos)
 function adicionarKpi(containerId, valorInicial){
   const container = document.getElementById(containerId);
   const div = document.createElement('div');
   div.className = 'linha-kpi';
-  div.innerHTML = `<input type="text" value="${escapeHtml(valorInicial||'')}" placeholder="ex: Taxa de entrega, LegTime, OTD...">
+  const datalistId = containerId.includes('canais') ? 'datalist-canais' : containerId.includes('formas') ? 'datalist-formas' : 'datalist-kpis';
+  div.innerHTML = `<input type="text" value="${escapeHtml(valorInicial||'')}" list="${datalistId}" placeholder="ex: Taxa de entrega, LegTime, OTD... (ou escolha um já usado)">
     <button type="button" class="btn-remover" onclick="this.closest('.linha-kpi').remove()">✕</button>`;
   container.appendChild(div);
+}
+// junta os labels ja usados em QUALQUER grupo existente, por tipo de campo,
+// pra alimentar o autocomplete (datalist) dos inputs acima
+function atualizarDatalistsExtras(){
+  const preencher = (datalistId, chave) => {
+    const labels = new Set();
+    GRUPOS.forEach(g=>(g[chave]||[]).forEach(k=>{ if(k.label) labels.add(k.label); }));
+    document.getElementById(datalistId).innerHTML = [...labels].sort((a,b)=>a.localeCompare(b,'pt-BR')).map(l=>`<option value="${escapeHtml(l)}"></option>`).join('');
+  };
+  preencher('datalist-canais', 'canaisVendaExtras');
+  preencher('datalist-formas', 'formasPagamentoExtras');
+  preencher('datalist-kpis', 'kpisExtras');
 }
 function lerKpis(containerId){
   return [...document.querySelectorAll('#'+containerId+' .linha-kpi input')]
@@ -431,6 +456,7 @@ function baixarRelatorioGrupos(formato){
 async function carregarGrupos(){
   GRUPOS = await fetch('/api/grupos').then(r=>r.json());
   renderGrupos();
+  atualizarDatalistsExtras();
 }
 
 async function boot(){

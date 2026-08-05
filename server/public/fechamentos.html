@@ -562,6 +562,8 @@ async function carregarEdicoes(){
 }
 
 async function decidirEdicaoFechamento(id, status){
+  const pergunta = status==='APROVADO' ? 'Tem certeza que deseja aprovar essa correção? O valor será aplicado no fechamento.' : 'Tem certeza que deseja rejeitar essa correção?';
+  if(!confirm(pergunta)) return;
   let motivoDecisao = '';
   if(status==='REJEITADO'){ motivoDecisao = prompt('Motivo da rejeição (opcional):') || ''; }
   await fetch(`/api/fechamentos/edicoes/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });

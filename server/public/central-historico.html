@@ -685,6 +685,8 @@ async function excluirCard(){
 async function decidir(status){
   if(!DETALHE_ATUAL) return;
   const c = DETALHE_ATUAL;
+  const pergunta = status==='APROVADO' ? 'Tem certeza que deseja aprovar essa solicitação?' : 'Tem certeza que deseja rejeitar essa solicitação?';
+  if(!confirm(pergunta)) return;
   const msg = document.getElementById('msg-detalhe');
   msg.classList.add('hidden');
   try{
