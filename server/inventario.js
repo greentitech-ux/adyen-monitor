@@ -18,6 +18,10 @@ const CATALOGO = db.collection('inventarioCatalogo');
 const RECEBIMENTOS = db.collection('inventarioRecebimentos');
 const SAIDAS = db.collection('inventarioSaidas');
 const CONTAGENS = db.collection('inventarioContagens');
+// setores/tipos extras cadastrados pelo Master (ver criarSetor/criarTipo) -
+// os fixos abaixo continuam existindo (o catálogo padrão da rede usa esses
+// códigos), mas dá pra somar novos sem precisar mexer no código
+const CONFIG = db.collection('inventarioConfig').doc('geral');
 
 const SETORES = {
   estoque_seco: 'Estoque Seco',
@@ -45,6 +49,57 @@ function validarData(data) {
 function normalizarNome(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
 }
+function slugify(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase().replace(/^_+|_+$/g, '');
+}
+
+// ---------- setores/tipos: fixos (SETORES/TIPOS_ITEM acima) + extras que o
+// Master cadastra na hora (ver criarSetor/criarTipo) - guardados num unico
+// doc de config, pra nao precisar de uma colecao inteira por 2 arrays curtos ----------
+async function getConfigUncached() {
+  const doc = await CONFIG.get();
+  return doc.exists ? doc.data() : { setoresExtras: [], tiposExtras: [] };
+}
+const configCache = createCache(getConfigUncached, 20 * 1000);
+const getConfig = configCache.cached;
+
+async function listSetores() {
+  const cfg = await getConfig();
+  const base = Object.entries(SETORES).map(([codigo, nome]) => ({ codigo, nome }));
+  const extras = (cfg.setoresExtras || []).map((s) => ({ codigo: s.codigo, nome: s.nome }));
+  return [...base, ...extras];
+}
+async function criarSetor(nome) {
+  nome = String(nome || '').trim();
+  if (!nome) throw new Error('Informe o nome do setor.');
+  const codigo = slugify(nome);
+  if (!codigo) throw new Error('Nome de setor inválido.');
+  const atuais = await listSetores();
+  if (atuais.some((s) => s.codigo === codigo)) throw new Error('Já existe um setor com esse nome.');
+  const cfg = await getConfig();
+  const setoresExtras = [...(cfg.setoresExtras || []), { codigo, nome: nome.slice(0, 60) }];
+  await CONFIG.set({ ...cfg, setoresExtras }, { merge: true });
+  configCache.invalidar();
+  return { codigo, nome: nome.slice(0, 60) };
+}
+
+async function listTipos() {
+  const cfg = await getConfig();
+  return [...TIPOS_ITEM, ...(cfg.tiposExtras || [])];
+}
+async function criarTipo(nome) {
+  nome = String(nome || '').trim().toUpperCase().slice(0, 30);
+  if (!nome) throw new Error('Informe o nome do tipo.');
+  const atuais = await listTipos();
+  if (atuais.includes(nome)) throw new Error('Já existe um tipo com esse nome.');
+  const cfg = await getConfig();
+  const tiposExtras = [...(cfg.tiposExtras || []), nome];
+  await CONFIG.set({ ...cfg, tiposExtras }, { merge: true });
+  configCache.invalidar();
+  return { nome };
+}
 
 // ---------- catálogo (Master gerencia; leitura liberada pra quem tem a
 // seção "inventario", ver index.js) ----------
@@ -58,13 +113,15 @@ const listCatalogo = catalogoCache.cached;
 async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia }) {
   nome = String(nome || '').trim();
   if (!nome) throw new Error('Nome do item é obrigatório.');
-  if (!SETORES[setor]) throw new Error('Setor inválido.');
+  const setores = await listSetores();
+  if (!setores.some((s) => s.codigo === setor)) throw new Error('Setor inválido.');
+  const tipos = await listTipos();
   const ref = CATALOGO.doc();
   const registro = {
     id: ref.id,
     nome: nome.slice(0, 120),
     setor,
-    tipo: TIPOS_ITEM.includes(tipo) ? tipo : 'COMIDA',
+    tipo: tipos.includes(tipo) ? tipo : (tipos[0] || 'COMIDA'),
     unidadeMedida: (String(unidadeMedida || 'UN').trim().slice(0, 10) || 'UN').toUpperCase(),
     custoReferencia: num(custoReferencia),
     ativo: true,
@@ -86,10 +143,14 @@ async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoRefere
     patch.nome = n.slice(0, 120);
   }
   if (setor != null) {
-    if (!SETORES[setor]) throw new Error('Setor inválido.');
+    const setores = await listSetores();
+    if (!setores.some((s) => s.codigo === setor)) throw new Error('Setor inválido.');
     patch.setor = setor;
   }
-  if (tipo != null) patch.tipo = TIPOS_ITEM.includes(tipo) ? tipo : 'COMIDA';
+  if (tipo != null) {
+    const tipos = await listTipos();
+    patch.tipo = tipos.includes(tipo) ? tipo : (tipos[0] || 'COMIDA');
+  }
   if (unidadeMedida != null) patch.unidadeMedida = (String(unidadeMedida).trim().slice(0, 10) || 'UN').toUpperCase();
   if (custoReferencia != null) patch.custoReferencia = num(custoReferencia);
   if (ativo != null) patch.ativo = !!ativo;
@@ -127,14 +188,20 @@ async function seedCatalogoPadrao() {
 }
 
 // ---------- recebimento de mercadoria (entrada) - guarda o valor unitario
-// pago pra dar nocao de CMV (ver calcularDiferencas) ----------
-async function criarRecebimento({ unidade, unidadeNome, itemId, fornecedor, quantidade, valorUnitario, data, notaFiscal, criadoPorId, criadoPorEmail }) {
+// pago pra dar nocao de CMV (ver calcularDiferencas). A nota fiscal quase
+// sempre traz os dois numeros impressos (Valor Unit. e Valor Total) - em vez
+// de obrigar a loja a fazer a conta de cabeça, aceita o que ela tiver mais a
+// mao e calcula o outro automaticamente (valorTotal informado sem
+// valorUnitario -> divide pela quantidade; valorUnitario informado -> usa
+// ele direto e recalcula o total, igual antes dessa mudanca).
+async function criarRecebimento({ unidade, unidadeNome, itemId, fornecedor, quantidade, valorUnitario, valorTotal, data, notaFiscal, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!itemId) throw new Error('Selecione o item.');
   const dataValida = validarData(data);
   const qtd = num(quantidade);
   if (qtd <= 0) throw new Error('Informe a quantidade recebida.');
-  const valorUnit = num(valorUnitario);
+  let valorUnit = num(valorUnitario);
+  if (valorUnit <= 0 && num(valorTotal) > 0) valorUnit = num(valorTotal) / qtd;
   if (valorUnit < 0) throw new Error('Valor unitário inválido.');
   const item = (await listCatalogo()).find((i) => i.id === itemId);
   if (!item) throw new Error('Item não encontrado no catálogo.');
@@ -388,6 +455,7 @@ async function calcularDiferencas(unidade, dataInicio, dataFim) {
 
 module.exports = {
   SETORES, TIPOS_ITEM, TIPOS_SAIDA,
+  listSetores, criarSetor, listTipos, criarTipo,
   listCatalogo, criarItem, atualizarItem, removerItem, seedCatalogoPadrao,
   listRecebimentos, criarRecebimento, removerRecebimento,
   listSaidas, criarSaida, removerSaida,
