@@ -265,7 +265,9 @@
 </div>
 
 <div class="overlay hidden" id="overlay-master-fechamento">
-  <div class="sheet">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharMasterFechamento()">✕</span>
+    <div class="sheet">
     <h3>Editar fechamento (Master)</h3>
     <div class="sub" id="master-fechamento-info"></div>
     <form id="form-master-fechamento">
@@ -286,12 +288,14 @@
         <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirFechamentoMaster()">🗑️ Excluir</button>
       </div>
     </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharMasterFechamento()">Cancelar</button>
+    </div>
   </div>
 </div>
 
 <div class="overlay hidden" id="overlay-detalhe">
-  <div class="sheet">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharDetalhe()">✕</span>
+    <div class="sheet">
     <h3 id="d-titulo"></h3>
     <div class="sub" id="d-sub"></div>
     <div id="d-corpo" style="font-size:13px;display:flex;flex-direction:column;gap:8px;"></div>
@@ -326,7 +330,7 @@
       </div>
     </div>
     <div class="msg hidden" id="msg-detalhe"></div>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharDetalhe()">Fechar</button>
+    </div>
   </div>
 </div>
 
