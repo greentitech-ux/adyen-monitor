@@ -235,9 +235,18 @@
       <div><label>Fornecedor</label><input type="text" id="r-fornecedor" list="datalist-fornecedores" placeholder="ex: Martin Brower" required></div>
     </div>
     <label>Item</label>
-    <select id="r-item" required></select>
-    <label>Quantidade</label>
-    <input type="number" step="0.001" id="r-quantidade" required>
+    <select id="r-item" required onchange="atualizarModoRecebimento()"></select>
+    <div id="r-modo-simples">
+      <label>Quantidade</label>
+      <input type="number" step="0.001" id="r-quantidade">
+    </div>
+    <div class="hidden" id="r-modo-embalagem">
+      <div class="grid2">
+        <div><label>Quantidade de embalagens</label><input type="number" step="1" min="0" id="r-qtd-embalagens"></div>
+        <div><label>Peso da embalagem (g)</label><input type="number" step="1" min="0" id="r-peso-embalagem"></div>
+      </div>
+      <div class="sub" id="r-peso-calculado" style="margin:-4px 0 8px;"></div>
+    </div>
     <div class="grid2">
       <div><label>Valor unitário (R$)</label><input type="number" step="0.01" id="r-valor"></div>
       <div><label>Valor total da nota (R$)</label><input type="number" step="0.01" id="r-valor-total"></div>
@@ -376,9 +385,14 @@
         </div>
       </div>
       <div class="grid2">
-        <div><label>Unidade de medida</label><input type="text" id="i-unidade" placeholder="KG, LT, UN..." required></div>
+        <div><label>Unidade de medida</label><input type="text" id="i-unidade" placeholder="KG, LT, UN..." required oninput="atualizarCampoPesoItem()"></div>
         <div><label>Custo de referência (R$)</label><input type="number" step="0.01" id="i-custo" value="0"></div>
       </div>
+      <div class="grid2">
+        <div><label>Qtd. padrão de compra (opcional)</label><input type="number" step="1" min="0" id="i-quantidade-padrao" placeholder="ex: 10 embalagens"></div>
+        <div class="hidden" id="i-peso-wrap"><label>Peso da embalagem (g, opcional)</label><input type="number" step="1" min="0" id="i-peso-embalagem" placeholder="ex: 400"></div>
+      </div>
+      <div class="sub" id="i-peso-sub" style="margin:-4px 0 8px;">Qtd. padrão pré-preenche o Recebimento. Peso da embalagem só aparece pra item medido em KG/G - com ele, o Recebimento aceita "quantas embalagens vieram" e calcula o peso/valor sozinho (útil pra item fracionado, ex: 400g, 300g).</div>
       <div class="msg hidden" id="msg-item"></div>
       <div class="modal-actions">
         <button type="button" onclick="fecharItem()">Cancelar</button>
@@ -482,6 +496,7 @@ function opcoesItensAgrupadas(){
 }
 function popularSelectsItem(){
   document.getElementById('r-item').innerHTML = opcoesItensAgrupadas();
+  atualizarModoRecebimento();
   document.getElementById('s-item').innerHTML = opcoesItensAgrupadas();
 }
 
@@ -613,6 +628,49 @@ async function excluirRecebimento(id){
 }
 async function carregarRecebimentos(){ RECEBIMENTOS = await fetch('/api/inventario/recebimentos').then(r=>r.json()); }
 
+// item medido em KG/G com peso de embalagem cadastrado (ver i-peso-embalagem
+// no Catálogo) entra no "modo embalagem": em vez de digitar a quantidade já
+// em peso (o que exigia fazer de cabeça embalagens×peso pra item fracionado
+// tipo 400g/300g), a loja digita quantas embalagens vieram e o peso de cada
+// uma (pré-preenchido, mas editável - a marca pode trazer embalagem de
+// tamanho diferente) e o sistema calcula o peso total sozinho.
+function itemSelecionadoRecebimento(){
+  return CATALOGO.find(i=>i.id===document.getElementById('r-item').value);
+}
+function atualizarModoRecebimento(){
+  const item = itemSelecionadoRecebimento();
+  const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+  document.getElementById('r-modo-simples').classList.toggle('hidden', modoEmbalagem);
+  document.getElementById('r-modo-embalagem').classList.toggle('hidden', !modoEmbalagem);
+  if(modoEmbalagem){
+    document.getElementById('r-qtd-embalagens').value = item.quantidadePadrao || '';
+    document.getElementById('r-peso-embalagem').value = item.pesoEmbalagemG || '';
+  } else {
+    document.getElementById('r-quantidade').value = item && item.quantidadePadrao ? item.quantidadePadrao : '';
+    document.getElementById('r-peso-calculado').textContent = '';
+  }
+  R_ULTIMO_EDITADO = null;
+  recalcularValoresRecebimento('quantidade');
+}
+// quantidade efetiva na unidadeMedida do item - ou direto do campo simples,
+// ou calculada a partir de embalagens×peso (convertendo g->kg quando for o caso)
+function quantidadeEfetivaRecebimento(){
+  const item = itemSelecionadoRecebimento();
+  if(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG){
+    const embalagens = num(document.getElementById('r-qtd-embalagens').value);
+    const pesoG = num(document.getElementById('r-peso-embalagem').value);
+    const totalG = embalagens*pesoG;
+    const calc = document.getElementById('r-peso-calculado');
+    if(embalagens>0 && pesoG>0){
+      calc.textContent = item.unidadeMedida==='KG' ? `= ${(totalG/1000).toLocaleString('pt-BR',{maximumFractionDigits:3})} kg no total` : `= ${totalG.toLocaleString('pt-BR')} g no total`;
+    } else {
+      calc.textContent = '';
+    }
+    return item.unidadeMedida==='KG' ? totalG/1000 : totalG;
+  }
+  return num(document.getElementById('r-quantidade').value);
+}
+
 // a nota fiscal quase sempre traz os 2 numeros impressos (Valor Unit. e
 // Valor Total) - a loja preenche o que tiver mais a mao e o outro é
 // calculado sozinho a partir da Quantidade, sem precisar fazer conta de
@@ -620,7 +678,7 @@ async function carregarRecebimentos(){ RECEBIMENTOS = await fetch('/api/inventar
 let R_ULTIMO_EDITADO = null; // 'unitario' | 'total'
 function recalcularValoresRecebimento(origem){
   if(origem!=='quantidade') R_ULTIMO_EDITADO = origem;
-  const qtd = num(document.getElementById('r-quantidade').value);
+  const qtd = quantidadeEfetivaRecebimento();
   if(!qtd) return;
   const base = origem==='quantidade' ? R_ULTIMO_EDITADO : origem;
   if(base==='total'){
@@ -632,6 +690,8 @@ function recalcularValoresRecebimento(origem){
   }
 }
 document.getElementById('r-quantidade').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
+document.getElementById('r-qtd-embalagens').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
+document.getElementById('r-peso-embalagem').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
 document.getElementById('r-valor').addEventListener('input', ()=>recalcularValoresRecebimento('unitario'));
 document.getElementById('r-valor-total').addEventListener('input', ()=>recalcularValoresRecebimento('total'));
 
@@ -645,17 +705,26 @@ document.getElementById('form-recebimento').addEventListener('submit', async (ev
     msg.textContent = 'Informe o valor unitário ou o valor total da nota.'; msg.className = 'msg err'; msg.classList.remove('hidden');
     return;
   }
+  if(quantidadeEfetivaRecebimento()<=0){
+    const msg = document.getElementById('msg-recebimento');
+    msg.textContent = 'Informe a quantidade recebida.'; msg.className = 'msg err'; msg.classList.remove('hidden');
+    return;
+  }
   if(!confirm('Tem certeza que deseja lançar esse recebimento? Confira o item, a quantidade e o valor antes de continuar.')) return;
   const msg = document.getElementById('msg-recebimento');
   msg.classList.add('hidden');
   try{
     const unidade = unidadeAtual();
     const unidadeNome = UNIDADES.find(u=>u.codigo===unidade)?.nome || unidade;
+    const item = itemSelecionadoRecebimento();
+    const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
     const body = {
       unidade, unidadeNome,
       itemId: document.getElementById('r-item').value,
       fornecedor: document.getElementById('r-fornecedor').value,
-      quantidade: document.getElementById('r-quantidade').value,
+      quantidade: modoEmbalagem ? null : document.getElementById('r-quantidade').value,
+      quantidadeEmbalagens: modoEmbalagem ? document.getElementById('r-qtd-embalagens').value : null,
+      pesoEmbalagem: modoEmbalagem ? document.getElementById('r-peso-embalagem').value : null,
       valorUnitario: document.getElementById('r-valor').value,
       valorTotal: document.getElementById('r-valor-total').value,
       data: document.getElementById('r-data').value,
@@ -666,10 +735,15 @@ document.getElementById('form-recebimento').addEventListener('submit', async (ev
     if(!res.ok) throw new Error(data.error||'erro ao lançar');
     msg.textContent = 'Recebimento lançado com sucesso.'; msg.className = 'msg ok';
     document.getElementById('r-quantidade').value = '';
+    document.getElementById('r-qtd-embalagens').value = '';
+    document.getElementById('r-peso-embalagem').value = '';
+    document.getElementById('r-peso-calculado').textContent = '';
     document.getElementById('r-valor').value = '';
     document.getElementById('r-valor-total').value = '';
     document.getElementById('r-nota').value = '';
     R_ULTIMO_EDITADO = null;
+    await carregarCatalogo(); // pesoEmbalagemG do item pode ter mudado (novo padrao)
+    atualizarModoRecebimento(); // repopula com o padrao do item, pronta pro proximo lançamento
     await carregarRecebimentos();
     renderRecebimentos();
   }catch(err){
@@ -899,12 +973,22 @@ let ITEM_EDITANDO_ID = null;
 // (ver abrirNovoItemContagem) - decide se, depois de salvar, atualiza a
 // lista de itens do setor atual na aba Contagem
 let ITEM_ORIGEM = 'catalogo';
+// peso da embalagem so faz sentido pra item medido em KG/G (peso de venc.
+// fracionado, ex: 400g) - some pra UN/LT/outras unidades, onde nao ha o que
+// converter (ver criarRecebimento em inventario.js)
+function unidadeUsaPeso(unidade){ return ['KG','G'].includes(String(unidade||'').trim().toUpperCase()); }
+function atualizarCampoPesoItem(){
+  const usa = unidadeUsaPeso(document.getElementById('i-unidade').value);
+  document.getElementById('i-peso-wrap').classList.toggle('hidden', !usa);
+  if(!usa) document.getElementById('i-peso-embalagem').value = '';
+}
 function abrirNovoItem(){
   ITEM_EDITANDO_ID = null;
   ITEM_ORIGEM = 'catalogo';
   document.getElementById('item-modal-titulo').textContent = 'Novo item';
   document.getElementById('form-item').reset();
   document.getElementById('i-custo').value = 0;
+  atualizarCampoPesoItem();
   document.getElementById('msg-item').classList.add('hidden');
   document.getElementById('overlay-item').classList.remove('hidden');
 }
@@ -919,6 +1003,9 @@ function abrirEditarItem(id){
   document.getElementById('i-tipo').value = item.tipo;
   document.getElementById('i-unidade').value = item.unidadeMedida;
   document.getElementById('i-custo').value = item.custoReferencia;
+  document.getElementById('i-quantidade-padrao').value = item.quantidadePadrao ?? '';
+  document.getElementById('i-peso-embalagem').value = item.pesoEmbalagemG ?? '';
+  atualizarCampoPesoItem();
   document.getElementById('msg-item').classList.add('hidden');
   document.getElementById('overlay-item').classList.remove('hidden');
 }
@@ -935,6 +1022,8 @@ document.getElementById('form-item').addEventListener('submit', async (ev)=>{
       tipo: document.getElementById('i-tipo').value,
       unidadeMedida: document.getElementById('i-unidade').value,
       custoReferencia: document.getElementById('i-custo').value,
+      quantidadePadrao: document.getElementById('i-quantidade-padrao').value || null,
+      pesoEmbalagemG: unidadeUsaPeso(document.getElementById('i-unidade').value) ? (document.getElementById('i-peso-embalagem').value || null) : null,
     };
     const url = ITEM_EDITANDO_ID ? `/api/inventario/catalogo/${ITEM_EDITANDO_ID}` : '/api/inventario/catalogo';
     const res = await fetch(url, { method: ITEM_EDITANDO_ID?'PUT':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
