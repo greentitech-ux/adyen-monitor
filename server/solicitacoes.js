@@ -64,6 +64,13 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     decididoEm: null,
     motivoDecisao: null,
     chamadoId: null, // preenchido se virar Chamado de TI (tipo 'suporte-ti' aprovado)
+    // status de Comprada (so tipo 'compra' aprovado) - data de entrega prevista
+    // e/ou print do comprovante da compra, ver marcarComprada
+    comprada: false,
+    dataEntregaPrevista: null,
+    comprovante: null, // { nome, path, tipo }
+    marcadoCompradoPorEmail: null,
+    marcadoCompradoEm: null,
   };
   await doc.set(registro);
   solicitacoesCache.invalidar();
@@ -111,6 +118,40 @@ async function vincularChamado(id, chamadoId) {
   solicitacoesCache.invalidar();
 }
 
+// marca um pedido de Compra ja aprovado como comprado - data de entrega
+// prevista e/ou print do comprovante, os dois opcionais (o Admin/Master
+// pode marcar so com a data, so com o comprovante, ou com os dois)
+async function marcarComprada(id, { dataEntregaPrevista, comprovante, marcadoPorEmail }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  const atual = snap.data();
+  if (atual.tipo !== 'compra') throw new Error('Só pedidos de Compra podem ser marcados como Comprada.');
+  if (atual.status !== 'APROVADO') throw new Error('Só pedidos já Aprovados podem ser marcados como Comprada.');
+  const patch = {
+    comprada: true,
+    dataEntregaPrevista: dataEntregaPrevista || atual.dataEntregaPrevista || null,
+    marcadoCompradoPorEmail: marcadoPorEmail,
+    marcadoCompradoEm: new Date().toISOString(),
+  };
+  if (comprovante) patch.comprovante = comprovante;
+  await ref.update(patch);
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+async function desmarcarComprada(id) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  await ref.update({
+    comprada: false, dataEntregaPrevista: null, comprovante: null,
+    marcadoCompradoPorEmail: null, marcadoCompradoEm: null,
+  });
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
 // edicao direta pelo Master - poder de corrigir qualquer campo do pedido
 // (titulo, valor, observacao, itens, unidade), independente do status.
 // So atualiza o que vier em `campos`, sem mexer em status/decisao/chamado.
@@ -142,4 +183,4 @@ async function remove(id) {
   solicitacoesCache.invalidar();
 }
 
-module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove, marcarNotificacaoVista };
+module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove, marcarNotificacaoVista, marcarComprada, desmarcarComprada };

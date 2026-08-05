@@ -56,6 +56,9 @@
   textarea{resize:vertical;min-height:56px;}
   .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
   @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .filtros-compactos{display:flex;flex-wrap:wrap;gap:10px;}
+  .filtros-compactos>div{flex:1 1 130px;min-width:110px;max-width:200px;}
+  .filtros-compactos label{margin:0 0 4px;font-size:12px;}
   .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
   .linha-item input{padding:9px 10px;font-size:13.5px;}
   .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
@@ -182,15 +185,15 @@
       <button type="button" class="export-btn" onclick="baixarRelatorioCentral('pdf')">📄 Relatório PDF</button>
     </span>
   </h2>
-  <div class="grid2" id="filtros-extra" style="margin-bottom:10px;">
-    <div><label style="margin:0 0 4px;">Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
-    <div><label style="margin:0 0 4px;">Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
+  <div class="filtros-compactos" id="filtros-extra" style="margin-bottom:10px;">
+    <div><label>Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
+    <div><label>Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
       <option value="">Todos</option>
       <option value="ARCFOOD">ARCFOOD</option>
       <option value="Grupo Bravo (GBE)">Grupo Bravo (GBE)</option>
     </select></div>
-    <div><label style="margin:0 0 4px;">De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
-    <div><label style="margin:0 0 4px;">Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
+    <div><label>De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
+    <div><label>Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
   </div>
   <button type="button" class="link-btn" style="margin:-4px 0 10px;" onclick="limparFiltrosExtra()">Limpar filtros de loja/grupo/data</button>
   <div class="kanban-board" id="kanban-board">
@@ -282,6 +285,10 @@
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--ok);" onclick="decidir('APROVADO')">✓ Aprovar</button>
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
       </div>
+    </div>
+    <div id="d-comprada" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">🛍️ Comprada</div>
+      <div id="d-comprada-corpo"></div>
     </div>
     <div id="d-chat" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">💬 Chat</div>
@@ -390,6 +397,7 @@ function kcardHtml(c){
       <div class="linha1">
         <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
         ${c.ehOrcamento ? '<span class="tipo-badge" style="background:#3d2f0f;color:#e0b84c;">💰 orçamento</span>' : ''}
+        ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
@@ -501,8 +509,76 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-master-crud').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
 
+  renderComprada(c);
+
   document.getElementById('overlay-detalhe').classList.remove('hidden');
   carregarChat(c.tipo, c.id);
+}
+
+// bloco de Comprada - so pra pedidos de Compra ja Aprovados, visivel pra
+// Master/Admin marcar (data de entrega prevista e/ou print do comprovante)
+// ou desmarcar; quem nao decide (loja) so ve o status ja marcado
+function renderComprada(c){
+  const wrap = document.getElementById('d-comprada');
+  const podeVer = c.tipo==='compra' && c.status==='APROVADO';
+  wrap.classList.toggle('hidden', !podeVer);
+  if(!podeVer) return;
+  const podeMarcar = IS_MASTER || IS_ADMIN;
+  const corpo = document.getElementById('d-comprada-corpo');
+  if(c.comprada){
+    corpo.innerHTML = `
+      <div style="color:var(--ok);font-weight:600;">✅ Comprada</div>
+      ${c.dataEntregaPrevista ? `<div>Entrega prevista: <b>${fmtData(c.dataEntregaPrevista)}</b></div>` : ''}
+      ${c.comprovante ? `<div class="anexo-item">📎 <a href="/api/solicitacoes/${c.id}/comprovante?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(c.comprovante.nome)}</a></div>` : ''}
+      <div class="sub" style="margin-top:2px;">marcado por ${escapeHtml(c.marcadoCompradoPorEmail||'')} · ${fmtDataHora(c.marcadoCompradoEm)}</div>
+      ${podeMarcar ? `<button type="button" class="link-btn" style="margin-top:6px;" onclick="desmarcarComprada()">Desmarcar</button>` : ''}
+    `;
+    return;
+  }
+  if(!podeMarcar){
+    corpo.innerHTML = `<div class="sub">Ainda não foi marcada como comprada.</div>`;
+    return;
+  }
+  corpo.innerHTML = `
+    <label>Data de entrega prevista (opcional)</label>
+    <input type="date" id="comprada-data">
+    <label>Print/comprovante da compra (opcional)</label>
+    <input type="file" id="comprada-arquivo" accept="image/*,.pdf">
+    <button type="button" class="btn-primary" style="margin-top:8px;" onclick="marcarComprada()">✅ Marcar como Comprada</button>
+  `;
+}
+async function marcarComprada(){
+  if(!DETALHE_ATUAL) return;
+  const data = document.getElementById('comprada-data').value;
+  const arquivo = document.getElementById('comprada-arquivo').files[0];
+  try{
+    let resp;
+    if(arquivo){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify({ dataEntregaPrevista: data || null }));
+      fd.append('comprovante', arquivo);
+      resp = await fetch(`/api/solicitacoes/${DETALHE_ATUAL.id}/comprada`, { method:'PATCH', body: fd });
+    }else{
+      resp = await fetch(`/api/solicitacoes/${DETALHE_ATUAL.id}/comprada`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dataEntregaPrevista: data || null }) });
+    }
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao marcar como comprada.');
+    DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
+    renderComprada(DETALHE_ATUAL);
+    await carregarCentral();
+  }catch(err){ alert(err.message); }
+}
+async function desmarcarComprada(){
+  if(!DETALHE_ATUAL) return;
+  if(!confirm('Desmarcar como comprada?')) return;
+  try{
+    const resp = await fetch(`/api/solicitacoes/${DETALHE_ATUAL.id}/comprada`, { method:'DELETE' });
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao desmarcar.');
+    DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
+    renderComprada(DETALHE_ATUAL);
+    await carregarCentral();
+  }catch(err){ alert(err.message); }
 }
 function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
 

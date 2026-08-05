@@ -2187,6 +2187,49 @@ app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), as
   storage.streamArquivo(anexo.path, anexo.tipo, res);
 });
 
+app.get('/api/solicitacoes/:id/comprovante', requireSection('solicitacoes'), async (req, res) => {
+  const registro = await solicitacoes.getOne(req.params.id);
+  if (!registro) return res.sendStatus(404);
+  if (!req.isMaster && !req.isAdmin && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
+  if (!registro.comprovante) return res.sendStatus(404);
+  storage.streamArquivo(registro.comprovante.path, registro.comprovante.tipo, res);
+});
+
+// marcar/desmarcar Comprada - so pedidos de Compra ja Aprovados, Master ou
+// Admin, com data de entrega prevista e/ou print do comprovante da compra
+// (os dois opcionais, ver solicitacoes.marcarComprada)
+app.patch('/api/solicitacoes/:id/comprada', auth.requireMasterOrAdmin, upload.single('comprovante'), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    let comprovante = null;
+    if (req.file) {
+      const path = await storage.salvarArquivo(atual.unidade || 'geral', req.file, 'solicitacoes');
+      comprovante = { nome: req.file.originalname, path, tipo: req.file.mimetype || 'application/octet-stream' };
+    }
+    const registro = await solicitacoes.marcarComprada(req.params.id, {
+      dataEntregaPrevista: payload.dataEntregaPrevista,
+      comprovante,
+      marcadoPorEmail: req.user.email,
+    });
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/solicitacoes/:id/comprada', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const registro = await solicitacoes.desmarcarComprada(req.params.id);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // aprovar/rejeitar - so o Master. Se for suporte-ti e for aprovado, ja cria
 // o Chamado vinculado (precisa escolher o tecnico no corpo da requisicao)
 app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
