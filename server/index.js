@@ -1761,6 +1761,29 @@ app.get('/api/inventario/unidades', requireSection('inventario'), (req, res) => 
   res.json(unidades.map((codigo) => ({ codigo, nome: INVENTARIO_UNIDADES_NOMES[codigo] })));
 });
 
+// setores/tipos do catalogo - fixos + os que o Master for cadastrando (ver
+// inventario.js). So Master cria (mesmo padrao de permissao do catalogo).
+app.get('/api/inventario/setores', requireSection('inventario'), async (req, res) => {
+  res.json(await inventario.listSetores());
+});
+app.post('/api/inventario/setores', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.criarSetor(req.body.nome));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get('/api/inventario/tipos', requireSection('inventario'), async (req, res) => {
+  res.json(await inventario.listTipos());
+});
+app.post('/api/inventario/tipos', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.criarTipo(req.body.nome));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
   res.json(await inventario.listCatalogo());
 });

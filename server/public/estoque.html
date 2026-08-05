@@ -90,6 +90,12 @@
   .item-linha .un{color:var(--muted);font-weight:400;font-size:11px;}
   .item-linha .ref{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:4px;}
   .item-linha input{padding:7px 8px;font-size:13px;}
+  .linha-contagem{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #1a1f26;flex-wrap:wrap;}
+  .linha-contagem:last-child{border-bottom:none;}
+  .linha-contagem .nome{flex:1 1 200px;min-width:0;font-size:13px;}
+  .linha-contagem .nome .un{color:var(--muted);font-weight:400;font-size:11px;margin-left:4px;}
+  .linha-contagem .ref{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;flex:none;}
+  .linha-contagem input{width:110px;flex:none;padding:7px 8px;font-size:13px;}
   .tablewrap{overflow-x:auto;}
   table{width:100%;min-width:560px;border-collapse:collapse;font-size:12.5px;}
   thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
@@ -197,13 +203,26 @@
   <div class="toolbar">
     <div class="campo">
       <label>Data da contagem</label>
-      <input type="date" id="c-data" onchange="carregarContagem()">
+      <input type="date" id="c-data" onchange="reiniciarContagem()">
     </div>
     <div class="sub" id="c-info" style="padding-bottom:9px;"></div>
   </div>
-  <div id="c-setores"></div>
-  <div class="msg hidden" id="msg-contagem"></div>
-  <button type="button" class="btn-primary" style="margin-top:14px;" onclick="salvarContagem()" id="btn-salvar-contagem">Salvar contagem</button>
+  <div id="c-inicio">
+    <button type="button" class="btn-primary" onclick="iniciarContagem()">▶️ Iniciar contagem</button>
+  </div>
+  <div id="c-corpo" class="hidden">
+    <div class="toolbar">
+      <div class="campo">
+        <label>Setor</label>
+        <select id="c-setor" onchange="renderContagemSetor()"></select>
+      </div>
+      <div class="sub" id="c-progresso" style="padding-bottom:9px;"></div>
+    </div>
+    <div id="c-itens"></div>
+    <button type="button" class="btn-add" onclick="abrirNovoItemContagem()">+ Adicionar item nesse setor</button>
+    <div class="msg hidden" id="msg-contagem"></div>
+    <button type="button" class="btn-primary" style="margin-top:14px;" onclick="salvarContagem()" id="btn-salvar-contagem">Salvar contagem</button>
+  </div>
 </div>
 
 <!-- ---------- Recebimento ---------- -->
@@ -217,10 +236,13 @@
     </div>
     <label>Item</label>
     <select id="r-item" required></select>
+    <label>Quantidade</label>
+    <input type="number" step="0.001" id="r-quantidade" required>
     <div class="grid2">
-      <div><label>Quantidade</label><input type="number" step="0.001" id="r-quantidade" required></div>
-      <div><label>Valor unitário (R$)</label><input type="number" step="0.01" id="r-valor" required></div>
+      <div><label>Valor unitário (R$)</label><input type="number" step="0.01" id="r-valor"></div>
+      <div><label>Valor total da nota (R$)</label><input type="number" step="0.01" id="r-valor-total"></div>
     </div>
+    <div class="sub" style="margin:-2px 0 8px;">Preencha um dos dois - o outro é calculado sozinho a partir da Quantidade (igual vem na nota: Valor Unit. × Quantidade = Valor Total).</div>
     <label>Nota fiscal (opcional)</label>
     <input type="text" id="r-nota" placeholder="número da nota">
     <div class="msg hidden" id="msg-recebimento"></div>
@@ -345,14 +367,12 @@
         <div>
           <label>Setor</label>
           <select id="i-setor" required></select>
+          <button type="button" class="btn-add" style="margin-top:6px;padding:5px 8px;font-size:11px;" onclick="abrirNovoSetor()">+ Novo setor</button>
         </div>
         <div>
           <label>Tipo</label>
-          <select id="i-tipo" required>
-            <option value="COMIDA">Comida</option>
-            <option value="BEBIDA">Bebida</option>
-            <option value="EMBALAGEM">Embalagem</option>
-          </select>
+          <select id="i-tipo" required></select>
+          <button type="button" class="btn-add" style="margin-top:6px;padding:5px 8px;font-size:11px;" onclick="abrirNovoTipo()">+ Novo tipo</button>
         </div>
       </div>
       <div class="grid2">
@@ -409,11 +429,11 @@ function calcularPreset(tipo, refIso){
   return {inicio:isoLocal(i),fim:isoLocal(f)};
 }
 
-const SETORES = {
-  estoque_seco: 'Estoque Seco', congelados: 'Congelados (Freezer)', camara_fria: 'Câmara Fria',
-  geladeira: 'Geladeira', makeline: 'Makeline', mesa_de_corte: 'Mesa de Corte',
-};
-const ORDEM_SETORES = ['estoque_seco','congelados','camara_fria','geladeira','makeline','mesa_de_corte'];
+// setores/tipos vem do servidor agora (fixos + os que o Master for
+// cadastrando, ver inventario.js/abrirNovoSetor) - carregado no boot()
+let SETORES = {};
+let ORDEM_SETORES = [];
+let TIPOS_ITEM = [];
 
 let ME = null;
 let IS_MASTER = false;
@@ -435,7 +455,7 @@ function mudarAba(aba){
   document.getElementById('tab-saida-lista').classList.toggle('hidden', aba!=='saida');
   document.getElementById('tab-diferencas').classList.toggle('hidden', aba!=='diferencas');
   document.getElementById('tab-catalogo').classList.toggle('hidden', aba!=='catalogo');
-  if(aba==='contagem') carregarContagem();
+  if(aba==='contagem' && !CONTAGEM_INICIADA) reiniciarContagem();
   if(aba==='recebimento') renderRecebimentos();
   if(aba==='saida') renderSaidas();
   if(aba==='diferencas') carregarDiferencas();
@@ -443,7 +463,7 @@ function mudarAba(aba){
 }
 
 function trocarUnidade(){
-  if(ABA_ATUAL==='contagem') carregarContagem();
+  if(ABA_ATUAL==='contagem') reiniciarContagem();
   else if(ABA_ATUAL==='recebimento') renderRecebimentos();
   else if(ABA_ATUAL==='saida') renderSaidas();
   else if(ABA_ATUAL==='diferencas') carregarDiferencas();
@@ -466,40 +486,79 @@ function popularSelectsItem(){
 }
 
 // ---------- Contagem ----------
-async function carregarContagem(){
+// fluxo: "Iniciar contagem" busca a contagem de hoje/ontem e mostra o
+// seletor de Setor; trocar de setor so troca o que aparece na tela, os
+// valores digitados ficam guardados em CONTAGEM_VALORES (nao no DOM) - assim
+// da pra ir e voltar entre setores sem perder o que ja foi digitado, igual
+// preencher a planilha por abas
+let CONTAGEM_VALORES = {};
+let CONTAGEM_ONTEM = {};
+let CONTAGEM_INICIADA = false;
+
+function reiniciarContagem(){
+  CONTAGEM_VALORES = {}; CONTAGEM_ONTEM = {}; CONTAGEM_INICIADA = false;
+  document.getElementById('c-corpo').classList.add('hidden');
+  document.getElementById('c-inicio').classList.remove('hidden');
+  document.getElementById('c-info').textContent = '';
+}
+
+async function iniciarContagem(){
   const unidade = unidadeAtual();
   const data = document.getElementById('c-data').value;
-  const container = document.getElementById('c-setores');
-  if(!unidade || !data){ container.innerHTML = '<div class="empty">Selecione a unidade e a data.</div>'; return; }
+  if(!unidade || !data){ alert('Selecione a unidade e a data.'); return; }
 
   const dOntem = new Date(data+'T00:00:00'); dOntem.setDate(dOntem.getDate()-1);
   const dataOntem = isoLocal(dOntem);
-
   const [hoje, ontem] = await Promise.all([
     fetch(`/api/inventario/contagens?unidade=${encodeURIComponent(unidade)}&data=${data}`).then(r=>r.json()),
     fetch(`/api/inventario/contagens?unidade=${encodeURIComponent(unidade)}&data=${dataOntem}`).then(r=>r.json()),
   ]);
+  CONTAGEM_VALORES = { ...(hoje.contagens||{}) };
+  CONTAGEM_ONTEM = ontem.contagens || {};
+  CONTAGEM_INICIADA = true;
   document.getElementById('c-info').textContent = `Contagem anterior (${fmtData(dataOntem)}) aparece como referência ao lado de cada item.`;
 
-  const ativos = CATALOGO.filter(i=>i.ativo!==false);
-  container.innerHTML = ORDEM_SETORES.map(setor=>{
-    const itens = ativos.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
-    if(!itens.length) return '';
-    return `<div class="setor-bloco">
-      <div class="setor-titulo">${escapeHtml(SETORES[setor])} <span class="n">(${itens.length})</span></div>
-      <div class="itens-grid">
-        ${itens.map(i=>{
-          const valorAtual = (hoje.contagens||{})[i.id];
-          const valorOntem = (ontem.contagens||{})[i.id];
-          return `<div class="item-linha">
-            <div class="nome">${escapeHtml(i.nome)} <span class="un">${escapeHtml(i.unidadeMedida)}</span></div>
-            <div class="ref">Ontem: ${valorOntem!=null ? valorOntem : '—'}</div>
-            <input type="number" step="0.001" data-item-id="${i.id}" class="input-contagem" value="${valorAtual!=null?valorAtual:''}" placeholder="qtd">
-          </div>`;
-        }).join('')}
-      </div>
+  const setoresComItens = ORDEM_SETORES.filter(s=>CATALOGO.some(i=>i.setor===s && i.ativo!==false));
+  document.getElementById('c-setor').innerHTML = setoresComItens.length
+    ? setoresComItens.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('')
+    : '';
+  document.getElementById('c-inicio').classList.add('hidden');
+  document.getElementById('c-corpo').classList.remove('hidden');
+  renderContagemSetor();
+}
+
+function setorAtualContagem(){ return document.getElementById('c-setor').value; }
+
+function renderContagemSetor(){
+  const setor = setorAtualContagem();
+  const container = document.getElementById('c-itens');
+  if(!setor){ container.innerHTML = '<div class="empty">Nenhum item no catálogo ainda - adicione um item abaixo.</div>'; atualizarProgressoContagem(); return; }
+  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  container.innerHTML = itens.length ? itens.map(i=>{
+    const valorAtual = CONTAGEM_VALORES[i.id];
+    const valorOntem = CONTAGEM_ONTEM[i.id];
+    return `<div class="linha-contagem">
+      <div class="nome">${escapeHtml(i.nome)} <span class="un">${escapeHtml(i.unidadeMedida)}</span></div>
+      <div class="ref">Ontem: ${valorOntem!=null ? valorOntem : '—'}</div>
+      <input type="number" step="0.001" data-item-id="${i.id}" class="input-contagem" value="${valorAtual!=null?valorAtual:''}" placeholder="qtd" oninput="CONTAGEM_VALORES[this.dataset.itemId]=this.value; atualizarProgressoContagem();">
     </div>`;
-  }).join('') || '<div class="empty">Nenhum item no catálogo ainda - cadastre na aba Catálogo.</div>';
+  }).join('') : '<div class="empty">Nenhum item nesse setor ainda - adicione um abaixo.</div>';
+  atualizarProgressoContagem();
+}
+
+function atualizarProgressoContagem(){
+  const preenchidos = Object.values(CONTAGEM_VALORES).filter(v=>v!=='' && v!=null).length;
+  document.getElementById('c-progresso').textContent = preenchidos ? `${preenchidos} item(ns) preenchido(s) no total (todos os setores)` : '';
+}
+
+// abre o modal "Novo item" (o mesmo do Catálogo) ja com o Setor atual
+// selecionado - depois de salvar, o item novo aparece direto na lista desse
+// setor aqui na Contagem, sem precisar ir na aba Catálogo
+function abrirNovoItemContagem(){
+  const setor = setorAtualContagem();
+  abrirNovoItem();
+  ITEM_ORIGEM = 'contagem';
+  if(setor) document.getElementById('i-setor').value = setor;
 }
 
 async function salvarContagem(){
@@ -507,8 +566,8 @@ async function salvarContagem(){
   const data = document.getElementById('c-data').value;
   if(!unidade || !data){ alert('Selecione unidade e data.'); return; }
   const contagens = {};
-  document.querySelectorAll('.input-contagem').forEach(el=>{
-    if(el.value !== '') contagens[el.dataset.itemId] = el.value;
+  Object.entries(CONTAGEM_VALORES).forEach(([itemId,valor])=>{
+    if(valor !== '' && valor != null) contagens[itemId] = valor;
   });
   if(!Object.keys(contagens).length){ alert('Preencha ao menos uma contagem.'); return; }
   if(!confirm('Tem certeza que deseja salvar essa contagem? Confira os valores antes de continuar.')) return;
@@ -522,7 +581,7 @@ async function salvarContagem(){
     const body = await res.json();
     if(!res.ok) throw new Error(body.error||'erro ao salvar');
     msg.textContent = 'Contagem salva com sucesso.'; msg.className = 'msg ok';
-    await carregarContagem();
+    await iniciarContagem();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
   }finally{
@@ -554,11 +613,38 @@ async function excluirRecebimento(id){
 }
 async function carregarRecebimentos(){ RECEBIMENTOS = await fetch('/api/inventario/recebimentos').then(r=>r.json()); }
 
+// a nota fiscal quase sempre traz os 2 numeros impressos (Valor Unit. e
+// Valor Total) - a loja preenche o que tiver mais a mao e o outro é
+// calculado sozinho a partir da Quantidade, sem precisar fazer conta de
+// cabeça (evita erro de digitação num valor já dividido/multiplicado errado)
+let R_ULTIMO_EDITADO = null; // 'unitario' | 'total'
+function recalcularValoresRecebimento(origem){
+  if(origem!=='quantidade') R_ULTIMO_EDITADO = origem;
+  const qtd = num(document.getElementById('r-quantidade').value);
+  if(!qtd) return;
+  const base = origem==='quantidade' ? R_ULTIMO_EDITADO : origem;
+  if(base==='total'){
+    const total = num(document.getElementById('r-valor-total').value);
+    if(total>0) document.getElementById('r-valor').value = (total/qtd).toFixed(4);
+  } else if(base==='unitario'){
+    const unit = num(document.getElementById('r-valor').value);
+    if(unit>0) document.getElementById('r-valor-total').value = (unit*qtd).toFixed(2);
+  }
+}
+document.getElementById('r-quantidade').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
+document.getElementById('r-valor').addEventListener('input', ()=>recalcularValoresRecebimento('unitario'));
+document.getElementById('r-valor-total').addEventListener('input', ()=>recalcularValoresRecebimento('total'));
+
 document.getElementById('form-recebimento').addEventListener('keydown', (ev)=>{
   if(ev.key==='Enter' && (ev.target.tagName||'').toUpperCase()!=='TEXTAREA') ev.preventDefault();
 });
 document.getElementById('form-recebimento').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  if(num(document.getElementById('r-valor').value)<=0 && num(document.getElementById('r-valor-total').value)<=0){
+    const msg = document.getElementById('msg-recebimento');
+    msg.textContent = 'Informe o valor unitário ou o valor total da nota.'; msg.className = 'msg err'; msg.classList.remove('hidden');
+    return;
+  }
   if(!confirm('Tem certeza que deseja lançar esse recebimento? Confira o item, a quantidade e o valor antes de continuar.')) return;
   const msg = document.getElementById('msg-recebimento');
   msg.classList.add('hidden');
@@ -571,6 +657,7 @@ document.getElementById('form-recebimento').addEventListener('submit', async (ev
       fornecedor: document.getElementById('r-fornecedor').value,
       quantidade: document.getElementById('r-quantidade').value,
       valorUnitario: document.getElementById('r-valor').value,
+      valorTotal: document.getElementById('r-valor-total').value,
       data: document.getElementById('r-data').value,
       notaFiscal: document.getElementById('r-nota').value,
     };
@@ -580,7 +667,9 @@ document.getElementById('form-recebimento').addEventListener('submit', async (ev
     msg.textContent = 'Recebimento lançado com sucesso.'; msg.className = 'msg ok';
     document.getElementById('r-quantidade').value = '';
     document.getElementById('r-valor').value = '';
+    document.getElementById('r-valor-total').value = '';
     document.getElementById('r-nota').value = '';
+    R_ULTIMO_EDITADO = null;
     await carregarRecebimentos();
     renderRecebimentos();
   }catch(err){
@@ -806,8 +895,13 @@ async function carregarCatalogoPadrao(){
 }
 
 let ITEM_EDITANDO_ID = null;
+// de onde o modal "Novo item" foi aberto - 'catalogo' (padrão) ou 'contagem'
+// (ver abrirNovoItemContagem) - decide se, depois de salvar, atualiza a
+// lista de itens do setor atual na aba Contagem
+let ITEM_ORIGEM = 'catalogo';
 function abrirNovoItem(){
   ITEM_EDITANDO_ID = null;
+  ITEM_ORIGEM = 'catalogo';
   document.getElementById('item-modal-titulo').textContent = 'Novo item';
   document.getElementById('form-item').reset();
   document.getElementById('i-custo').value = 0;
@@ -818,6 +912,7 @@ function abrirEditarItem(id){
   const item = CATALOGO.find(i=>i.id===id);
   if(!item) return;
   ITEM_EDITANDO_ID = id;
+  ITEM_ORIGEM = 'catalogo';
   document.getElementById('item-modal-titulo').textContent = 'Editar item';
   document.getElementById('i-nome').value = item.nome;
   document.getElementById('i-setor').value = item.setor;
@@ -849,6 +944,10 @@ document.getElementById('form-item').addEventListener('submit', async (ev)=>{
     await carregarCatalogo();
     renderCatalogo();
     popularSelectsItem();
+    if(ITEM_ORIGEM==='contagem' && CONTAGEM_INICIADA){
+      document.getElementById('c-setor').value = data.setor;
+      renderContagemSetor();
+    }
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }
@@ -865,6 +964,41 @@ async function excluirItem(id){
 }
 
 async function carregarCatalogo(){ CATALOGO = await fetch('/api/inventario/catalogo').then(r=>r.json()); }
+
+// ---------- setores/tipos (Master pode adicionar novos, ver inventario.js) ----------
+async function carregarSetoresTipos(){
+  const [setores, tipos] = await Promise.all([
+    fetch('/api/inventario/setores').then(r=>r.json()),
+    fetch('/api/inventario/tipos').then(r=>r.json()),
+  ]);
+  SETORES = {}; ORDEM_SETORES = [];
+  setores.forEach(s=>{ SETORES[s.codigo] = s.nome; ORDEM_SETORES.push(s.codigo); });
+  TIPOS_ITEM = tipos;
+}
+async function abrirNovoSetor(){
+  const nome = prompt('Nome do novo setor (ex: Área Externa, Estoque de Bebidas...):');
+  if(!nome || !nome.trim()) return;
+  try{
+    const res = await fetch('/api/inventario/setores', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao criar setor');
+    await carregarSetoresTipos();
+    document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
+    document.getElementById('i-setor').value = data.codigo;
+  }catch(err){ alert(err.message); }
+}
+async function abrirNovoTipo(){
+  const nome = prompt('Nome do novo tipo (ex: DESCARTÁVEL, LIMPEZA...):');
+  if(!nome || !nome.trim()) return;
+  try{
+    const res = await fetch('/api/inventario/tipos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao criar tipo');
+    await carregarSetoresTipos();
+    document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
+    document.getElementById('i-tipo').value = data.nome;
+  }catch(err){ alert(err.message); }
+}
 
 async function boot(){
   const res = await fetch('/api/me');
@@ -902,13 +1036,14 @@ async function boot(){
   document.getElementById('s-data').value = hoje;
   document.getElementById('s-data').max = hoje;
 
-  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
   renderPresetsDif();
 
   const [unidadesResp] = await Promise.all([
     fetch('/api/inventario/unidades').then(r=>r.json()),
-    carregarCatalogo(), carregarRecebimentos(), carregarSaidas(),
+    carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas(),
   ]);
+  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
+  document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
   UNIDADES = unidadesResp;
   document.getElementById('sel-unidade').innerHTML = UNIDADES.length
     ? UNIDADES.map(u=>`<option value="${escapeHtml(u.codigo)}">${escapeHtml(u.nome)}</option>`).join('')
