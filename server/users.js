@@ -5,6 +5,7 @@
 const bcrypt = require('bcryptjs');
 const db = require('./firestore');
 const { emptyPermissions, invalidarUsuario } = require('./auth');
+const { createCache } = require('./liveCache');
 
 const usersRef = db.collection('users');
 
@@ -31,10 +32,17 @@ function sanitizeHorarioPermitido(input) {
   return { ativo: true, inicio: h.inicio, fim: h.fim };
 }
 
-async function list() {
+// cache de 20s: a listagem passou a ser lida tambem por rotas quentes fora
+// da tela de Usuarios (ex: GET /api/grupos/responsaveis, chamada a cada
+// troca de unidade no formulario da Central) - sem cache, cada uma dessas
+// chamadas relia a colecao users inteira do Firestore. Toda mutacao abaixo
+// invalida (create/permissions/active/horario/isAdmin/cargo/senha/remove)
+async function listUncached() {
   const snap = await usersRef.orderBy('createdAt', 'asc').get();
   return snap.docs.map(toPublic);
 }
+const usersCache = createCache(listUncached, 20 * 1000);
+const list = usersCache.cached;
 
 async function create({ email, password, permissions }) {
   email = String(email || '').trim().toLowerCase();
@@ -53,6 +61,7 @@ async function create({ email, password, permissions }) {
     permissions: sanitizePermissions(permissions),
     createdAt: new Date().toISOString(),
   });
+  usersCache.invalidar();
   return toPublic(await doc.get());
 }
 
@@ -63,6 +72,7 @@ async function updatePermissions(id, permissions) {
   if (snap.data().role === 'master') throw new Error('O acesso Master não usa permissões.');
   await ref.update({ permissions: sanitizePermissions(permissions) });
   invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -73,6 +83,7 @@ async function setActive(id, active) {
   if (snap.data().role === 'master') throw new Error('O acesso Master não pode ser desativado.');
   await ref.update({ active: !!active });
   invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -83,6 +94,7 @@ async function updateHorarioPermitido(id, horarioPermitido) {
   if (snap.data().role === 'master') throw new Error('O acesso Master não usa horário restrito.');
   await ref.update({ horarioPermitido: sanitizeHorarioPermitido(horarioPermitido) });
   invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -93,6 +105,7 @@ async function updateIsAdmin(id, isAdmin) {
   if (snap.data().role === 'master') throw new Error('O acesso Master já pode tudo, não precisa da tag Admin.');
   await ref.update({ isAdmin: !!isAdmin });
   invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -108,6 +121,7 @@ async function updateCargo(id, cargo) {
   if (snap.data().role === 'master') throw new Error('O acesso Master não usa tag de cargo.');
   await ref.update({ cargo: limpo });
   invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -120,6 +134,7 @@ async function resetPassword(id, password) {
   // o Master trocando a senha tambem desbloqueia o acesso (ex: apos 3 tentativas erradas)
   await ref.update({ passwordHash, locked: false, failedAttempts: 0 });
   invalidarUsuario(id);
+  usersCache.invalidar();
   return { ok: true };
 }
 
@@ -130,6 +145,7 @@ async function remove(id) {
   if (snap.data().role === 'master') throw new Error('O acesso Master não pode ser excluído.');
   await ref.delete();
   invalidarUsuario(id);
+  usersCache.invalidar();
 }
 
 function toPublic(doc) {
