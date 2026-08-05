@@ -110,7 +110,7 @@ async function listCatalogoUncached() {
 const catalogoCache = createCache(listCatalogoUncached, 20 * 1000);
 const listCatalogo = catalogoCache.cached;
 
-async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia }) {
+async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, quantidadePadrao, pesoEmbalagemG }) {
   nome = String(nome || '').trim();
   if (!nome) throw new Error('Nome do item é obrigatório.');
   const setores = await listSetores();
@@ -124,6 +124,12 @@ async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia }) 
     tipo: tipos.includes(tipo) ? tipo : (tipos[0] || 'COMIDA'),
     unidadeMedida: (String(unidadeMedida || 'UN').trim().slice(0, 10) || 'UN').toUpperCase(),
     custoReferencia: num(custoReferencia),
+    // pra automatizar o Recebimento (ver criarRecebimento): quantidadePadrao
+    // pre-preenche "quantidade" (ou "qtd. de embalagens" pra item com peso);
+    // pesoEmbalagemG so faz sentido pra item medido em KG/G - peso de 1
+    // embalagem/pacote, usado pra converter embalagens recebidas em peso
+    quantidadePadrao: quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null,
+    pesoEmbalagemG: pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null,
     ativo: true,
     createdAt: new Date().toISOString(),
   };
@@ -132,7 +138,7 @@ async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia }) 
   return registro;
 }
 
-async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoReferencia, ativo }) {
+async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoReferencia, ativo, quantidadePadrao, pesoEmbalagemG }) {
   const ref = CATALOGO.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Item não encontrado.');
@@ -154,6 +160,8 @@ async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoRefere
   if (unidadeMedida != null) patch.unidadeMedida = (String(unidadeMedida).trim().slice(0, 10) || 'UN').toUpperCase();
   if (custoReferencia != null) patch.custoReferencia = num(custoReferencia);
   if (ativo != null) patch.ativo = !!ativo;
+  if (quantidadePadrao !== undefined) patch.quantidadePadrao = quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null;
+  if (pesoEmbalagemG !== undefined) patch.pesoEmbalagemG = pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null;
   await ref.update(patch);
   catalogoCache.invalidar();
   return (await ref.get()).data();
@@ -194,29 +202,51 @@ async function seedCatalogoPadrao() {
 // mao e calcula o outro automaticamente (valorTotal informado sem
 // valorUnitario -> divide pela quantidade; valorUnitario informado -> usa
 // ele direto e recalcula o total, igual antes dessa mudanca).
-async function criarRecebimento({ unidade, unidadeNome, itemId, fornecedor, quantidade, valorUnitario, valorTotal, data, notaFiscal, criadoPorId, criadoPorEmail }) {
+//
+// itens medidos em KG/G podem vir por EMBALAGEM em vez de quantidade direta
+// (ex: 10 pacotes de 400g) - se quantidadeEmbalagens+pesoEmbalagem vierem
+// preenchidos, a quantidade real (na unidadeMedida do item) e calculada a
+// partir deles em vez do campo `quantidade` bruto, poupando a loja de fazer
+// a conversao embalagem->peso de cabeca (o ponto que travava o lancamento
+// de itens fracionados tipo 400g/300g/210g). O peso informado tambem vira o
+// novo padrao do item no catalogo, pra pre-preencher o proximo recebimento -
+// util quando a marca muda o tamanho da embalagem (1kg -> 1,2kg -> 1,7kg).
+async function criarRecebimento({ unidade, unidadeNome, itemId, fornecedor, quantidade, quantidadeEmbalagens, pesoEmbalagem, valorUnitario, valorTotal, data, notaFiscal, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!itemId) throw new Error('Selecione o item.');
   const dataValida = validarData(data);
-  const qtd = num(quantidade);
+  const item = (await listCatalogo()).find((i) => i.id === itemId);
+  if (!item) throw new Error('Item não encontrado no catálogo.');
+
+  const porEmbalagem = ['KG', 'G'].includes(item.unidadeMedida) && num(quantidadeEmbalagens) > 0 && num(pesoEmbalagem) > 0;
+  const pesoUsadoG = porEmbalagem ? num(pesoEmbalagem) : null;
+  const qtd = porEmbalagem
+    ? (item.unidadeMedida === 'KG' ? (num(quantidadeEmbalagens) * pesoUsadoG) / 1000 : num(quantidadeEmbalagens) * pesoUsadoG)
+    : num(quantidade);
   if (qtd <= 0) throw new Error('Informe a quantidade recebida.');
   let valorUnit = num(valorUnitario);
   if (valorUnit <= 0 && num(valorTotal) > 0) valorUnit = num(valorTotal) / qtd;
   if (valorUnit < 0) throw new Error('Valor unitário inválido.');
-  const item = (await listCatalogo()).find((i) => i.id === itemId);
-  if (!item) throw new Error('Item não encontrado no catálogo.');
 
   const ref = RECEBIMENTOS.doc();
   const registro = {
     id: ref.id, unidade, unidadeNome: unidadeNome || unidade,
     itemId, itemNome: item.nome, setor: item.setor,
     fornecedor: String(fornecedor || '').trim().slice(0, 80) || 'Não informado',
-    quantidade: qtd, valorUnitario: valorUnit, valorTotal: arred(qtd * valorUnit),
+    quantidade: arred(qtd, 3), valorUnitario: valorUnit, valorTotal: arred(qtd * valorUnit),
+    // so preenchidos quando o recebimento veio por embalagem - guardados pra
+    // rastreabilidade/exibicao (a `quantidade` acima ja e o total convertido)
+    quantidadeEmbalagens: porEmbalagem ? num(quantidadeEmbalagens) : null,
+    pesoEmbalagem: pesoUsadoG,
     data: dataValida, notaFiscal: (notaFiscal || '').trim().slice(0, 60) || null,
     criadoPorId, criadoPorEmail, criadoEm: new Date().toISOString(),
   };
   await ref.set(registro);
   recebimentosCache.invalidar();
+
+  if (porEmbalagem && pesoUsadoG !== item.pesoEmbalagemG) {
+    await atualizarItem(itemId, { pesoEmbalagemG: pesoUsadoG });
+  }
   return registro;
 }
 
