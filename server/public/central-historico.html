@@ -362,6 +362,8 @@ const TIPOS_INFO = {
   'compra': { label:'Compra', secaoNecessaria:null },
   'manutencao': { label:'Manutenção', secaoNecessaria:null },
   'suporte-ti': { label:'Suporte de TI', secaoNecessaria:null },
+  'pagamento': { label:'Pagamento', secaoNecessaria:null },
+  'nota': { label:'Nota', secaoNecessaria:null },
 };
 
 let ME = null;
@@ -405,7 +407,17 @@ function limparFiltrosExtra(){
 }
 
 function iconeTipo(tipo){
-  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻', pagamento:'💸', nota:'📄' }[tipo] || '📋';
+}
+
+// badge de vencimento pra demanda de pagamento - vermelho se ja venceu e
+// ainda esta pendente (o motivo de existir o robo de cobranças: nao atrasar)
+function badgeVencimento(c){
+  if(c.tipo!=='pagamento' || !c.vencimento) return '';
+  const hoje = new Date().toLocaleDateString('sv-SE', { timeZone:'America/Sao_Paulo' });
+  const vencido = c.vencimento < hoje && c.status==='PENDENTE';
+  const [y,m,d] = c.vencimento.split('-');
+  return `<span class="tipo-badge" style="${vencido?'background:var(--bad-dim);color:var(--bad);font-weight:700;':'background:#12303a;color:var(--accent);'}">${vencido?'⚠️ venceu':'vence'} ${d}/${m}</span>`;
 }
 
 const STATUS_COLUNAS = ['PENDENTE','APROVADO','REJEITADO'];
@@ -417,6 +429,7 @@ function kcardHtml(c){
         <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
         ${c.ehOrcamento ? '<span class="tipo-badge" style="background:#3d2f0f;color:#e0b84c;">💰 orçamento</span>' : ''}
         ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
+        ${badgeVencimento(c)}
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
@@ -490,6 +503,8 @@ function abrirDetalhe(tipo, id){
 
   let corpo = c.ehOrcamento ? `<div style="color:#e0b84c;font-weight:600;">💰 É um orçamento — precisa de aprovação de um Admin ou Master.</div>` : '';
   corpo += `<div><b>${escapeHtml(c.titulo)}</b></div>`;
+  if(c.fornecedor) corpo += `<div>Fornecedor: <b>${escapeHtml(c.fornecedor)}</b></div>`;
+  if(c.vencimento) corpo += `<div>Vencimento: <b>${fmtData(c.vencimento)}</b></div>`;
   if(c.itens && c.itens.length){
     corpo += `<div><b>Itens:</b></div><ul style="margin:0;padding-left:18px;">${c.itens.map(i=>
       `<li>${escapeHtml(i.descricao)}${i.quantidade!=null && i.quantidade!=='' ? ` · qtd. ${escapeHtml(String(i.quantidade))}` : ''}</li>`
@@ -713,6 +728,11 @@ function campoEdicaoHtml(c){
         <div id="lista-itens-editar"></div>
         <button type="button" class="btn-add" onclick="adicionarItemEditar()">+ Adicionar item</button>
       </div>` : ''}
+    ${['pagamento','nota'].includes(c.tipo) ? `
+      <label>Fornecedor</label>
+      <input type="text" id="ed-fornecedor" value="${escapeHtml(c.fornecedor||'')}">
+      ${c.tipo==='pagamento' ? `<label>Vencimento</label><input type="date" id="ed-vencimento" value="${c.vencimento||''}">` : ''}
+    ` : ''}
     <label>Observação</label>
     <textarea id="ed-observacao">${escapeHtml(c.observacao||'')}</textarea>
     <label>Valor ${c.tipo==='compra'?'estimado':'(orçamento, opcional)'}</label>
@@ -804,6 +824,10 @@ async function salvarEdicaoCard(){
         ehOrcamento: document.getElementById('ed-ehOrcamento').checked,
       };
       if(c.tipo==='compra') payload.itens = ITENS_EDITAR.map(i=>({descricao:i.descricao, quantidade:i.quantidade}));
+      if(['pagamento','nota'].includes(c.tipo)){
+        payload.fornecedor = document.getElementById('ed-fornecedor').value;
+        if(c.tipo==='pagamento') payload.vencimento = document.getElementById('ed-vencimento').value || '';
+      }
       resp = await fetch(`/api/solicitacoes/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     }
     const data = await resp.json();
