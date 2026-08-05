@@ -85,8 +85,13 @@
   .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
   .linha-kpi{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;margin-top:6px;}
   .linha-kpi.com-tipo{grid-template-columns:1fr 170px auto;}
+  .linha-kpi.com-opcoes{row-gap:6px;}
   .linha-kpi input,.linha-kpi select{padding:9px 10px;font-size:13px;}
   .linha-kpi select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;}
+  .linha-kpi-opcoes{grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--muted);}
+  .linha-kpi-opcoes label{display:flex;align-items:center;gap:6px;}
+  .linha-kpi-opcoes select{font-size:11px;padding:4px 7px;}
+  .linha-kpi-opcoes input[type=checkbox]{width:auto;margin:0;}
   .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:34px;height:36px;font-size:15px;cursor:pointer;flex:none;}
   .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
 </style>
@@ -319,16 +324,29 @@ const TIPOS_KPI = [
 // Fechamentos). Só KPI's ganham o seletor de unidade de medida - Canais de
 // venda/Formas de pagamento sempre somam em R$ (Faturamento/Total
 // Declarado), não faz sentido escolher outro tipo pra eles.
-function adicionarKpi(containerId, valorInicial, tipoInicial){
+// Canais/Formas ganham, em vez disso, controle de Operação (soma/subtrai no
+// PRÓPRIO total) e "também contar em [outro total]" - pra casos como TEF:
+// é um Canal de venda, mas já é forma de pagamento validada, então precisa
+// também somar no Total Declarado (senão sobra "falta no caixa" - o valor
+// aparece no Faturamento mas nunca é creditado no Total Declarado).
+function adicionarKpi(containerId, valorInicial, tipoInicial, operacaoInicial, tambemInicial){
   const container = document.getElementById(containerId);
   const ehKpi = containerId.includes('kpis');
+  const ehCanal = containerId.includes('canais');
+  const ehForma = containerId.includes('formas');
   const div = document.createElement('div');
-  div.className = 'linha-kpi' + (ehKpi ? ' com-tipo' : '');
-  const datalistId = containerId.includes('canais') ? 'datalist-canais' : containerId.includes('formas') ? 'datalist-formas' : 'datalist-kpis';
+  div.className = 'linha-kpi' + (ehKpi ? ' com-tipo' : (ehCanal||ehForma) ? ' com-opcoes' : '');
+  const datalistId = ehCanal ? 'datalist-canais' : ehForma ? 'datalist-formas' : 'datalist-kpis';
   const seletorTipo = ehKpi ? `<select class="kpi-tipo-select">${TIPOS_KPI.map(([v,l])=>`<option value="${v}" ${(tipoInicial||'quantidade')===v?'selected':''}>${l}</option>`).join('')}</select>` : '';
+  const outroTotal = ehCanal ? 'Total Declarado' : ehForma ? 'Faturamento' : '';
+  const opcoes = (ehCanal||ehForma) ? `<div class="linha-kpi-opcoes">
+      <label>Operação <select class="extra-operacao-select"><option value="soma" ${(operacaoInicial||'soma')==='soma'?'selected':''}>Soma</option><option value="subtrai" ${operacaoInicial==='subtrai'?'selected':''}>Subtrai</option></select></label>
+      <label><input type="checkbox" class="extra-tambem-checkbox" ${tambemInicial?'checked':''}> também contar em ${outroTotal}</label>
+    </div>` : '';
   div.innerHTML = `<input type="text" value="${escapeHtml(valorInicial||'')}" list="${datalistId}" placeholder="ex: Taxa de entrega, LegTime, OTD... (ou escolha um já usado)">
     ${seletorTipo}
-    <button type="button" class="btn-remover" onclick="this.closest('.linha-kpi').remove()">✕</button>`;
+    <button type="button" class="btn-remover" onclick="this.closest('.linha-kpi').remove()">✕</button>
+    ${opcoes}`;
   container.appendChild(div);
 }
 // junta os labels ja usados em QUALQUER grupo existente, por tipo de campo,
@@ -345,6 +363,7 @@ function atualizarDatalistsExtras(){
 }
 function lerKpis(containerId){
   const ehKpi = containerId.includes('kpis');
+  const ehCanalOuForma = containerId.includes('canais') || containerId.includes('formas');
   return [...document.querySelectorAll('#'+containerId+' .linha-kpi')]
     .map(linha=>{
       const label = linha.querySelector('input').value.trim();
@@ -353,6 +372,12 @@ function lerKpis(containerId){
       if(ehKpi){
         const sel = linha.querySelector('.kpi-tipo-select');
         item.tipo = sel ? sel.value : 'quantidade';
+      }
+      if(ehCanalOuForma){
+        const selOp = linha.querySelector('.extra-operacao-select');
+        item.operacao = selOp ? selOp.value : 'soma';
+        const chkTambem = linha.querySelector('.extra-tambem-checkbox');
+        item.tambemNoOutroTotal = chkTambem ? chkTambem.checked : false;
       }
       return item;
     })
@@ -484,9 +509,9 @@ function abrirEdicaoGrupo(id){
   document.getElementById('e-maquininha-prefixo').value = g.maquininhaPrefixo || 'Maquininha';
   document.getElementById('e-saidas-habilitado').checked = g.saidasHabilitado !== false;
   document.getElementById('e-canais').innerHTML = '';
-  (g.canaisVendaExtras||[]).forEach(k=>adicionarKpi('e-canais', k.label));
+  (g.canaisVendaExtras||[]).forEach(k=>adicionarKpi('e-canais', k.label, null, k.operacao, k.tambemNoOutroTotal));
   document.getElementById('e-formas').innerHTML = '';
-  (g.formasPagamentoExtras||[]).forEach(k=>adicionarKpi('e-formas', k.label));
+  (g.formasPagamentoExtras||[]).forEach(k=>adicionarKpi('e-formas', k.label, null, k.operacao, k.tambemNoOutroTotal));
   document.getElementById('e-kpis').innerHTML = '';
   (g.kpisExtras||[]).forEach(k=>adicionarKpi('e-kpis', k.label, k.tipo));
   responsaveisChecksHtml('e-responsaveis', new Set(g.responsaveis||[]));
