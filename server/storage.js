@@ -5,17 +5,19 @@
 // streaming pelo proprio backend (index.js).
 const admin = require('firebase-admin');
 require('./firestore'); // garante que o app do firebase-admin ja foi inicializado
-const { resolverBucket } = require('./storageBucket');
+const { resolverBucket, comBucket } = require('./storageBucket');
 
 function caminhoSeguro(nome) {
   return (nome || 'arquivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
 async function salvarArquivo(pedidoId, file, pasta = 'disputes') {
-  const bucket = await resolverBucket();
   const caminho = `${pasta}/${caminhoSeguro(pedidoId)}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${caminhoSeguro(file.originalname)}`;
   try {
-    await bucket.file(caminho).save(file.buffer, { contentType: file.mimetype || 'application/octet-stream' });
+    // comBucket testa os candidatos de bucket com o upload REAL - se o
+    // primeiro nome nao existir, tenta o proximo automaticamente (ver
+    // storageBucket.js); so estoura pro usuario se nenhum funcionar
+    await comBucket((bucket) => bucket.file(caminho).save(file.buffer, { contentType: file.mimetype || 'application/octet-stream' }));
   } catch (err) {
     console.error('Erro ao salvar arquivo no Storage:', err.message);
     throw new Error('Não foi possível enviar o arquivo agora. Tente novamente em instantes ou contate o suporte.');
