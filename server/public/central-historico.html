@@ -883,9 +883,22 @@ function abrirEditarMasterFechamento(id){
   ).join('');
   const grupoKpi = grupoKpiDaUnidadeFechamento(f.unidade);
   const kpisDef = grupoKpi ? (grupoKpi.kpisExtras||[]) : [];
-  document.getElementById('mf-kpis-extras').innerHTML = kpisDef.map(k=>
-    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" class="mf-kpi-extra-input" value="${num((f.kpisExtras||{})[k.campo])}"></div>`
-  ).join('');
+  // KPI's tem unidade de medida por campo (ver grupos.html) - quantidade/
+  // moeda/kg viram number, texto vira texto livre, arquivo mostra o link do
+  // anexo atual + um input pra trocar (nao da pra editar como numero)
+  document.getElementById('mf-kpis-extras').innerHTML = kpisDef.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    const atual = (f.kpisExtras||{})[k.campo];
+    if(tipo === 'arquivo'){
+      const linkAtual = atual ? `<a href="/api/fechamentos/${f.id}/kpi-arquivo/${encodeURIComponent(k.campo)}" target="_blank" style="display:block;font-size:11px;color:var(--accent);margin-bottom:4px;">📎 ver arquivo atual</a>` : '';
+      return `<div><label>${escapeHtml(k.label)}</label>${linkAtual}<input type="file" accept="image/*,application/pdf" data-kpi-campo="${escapeHtml(k.campo)}" class="mf-kpi-arquivo-input"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="texto" class="mf-kpi-extra-input" value="${escapeHtml(atual||'')}"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    return `<div><label>${escapeHtml(k.label)}</label><input type="number" step="${step}" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="${tipo}" class="mf-kpi-extra-input" value="${num(atual)}"></div>`;
+  }).join('');
   const canaisDef = grupoKpi ? (grupoKpi.canaisVendaExtras||[]) : [];
   document.getElementById('mf-canais-extras').innerHTML = canaisDef.map(k=>
     `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-canal-campo="${escapeHtml(k.campo)}" class="mf-canal-extra-input" value="${num((f.canaisVendaExtras||{})[k.campo])}"></div>`
@@ -933,8 +946,14 @@ document.getElementById('form-master-fechamento').addEventListener('submit', asy
   const mudancasKpis = {};
   document.querySelectorAll('.mf-kpi-extra-input').forEach(el=>{
     const campo = el.dataset.kpiCampo;
-    const v = num(el.value);
-    if(v !== num((f.kpisExtras||{})[campo])) mudancasKpis[campo] = v;
+    const atual = (f.kpisExtras||{})[campo];
+    if(el.dataset.kpiTipo === 'texto'){
+      const v = el.value;
+      if(v !== String(atual||'')) mudancasKpis[campo] = v;
+    } else {
+      const v = num(el.value);
+      if(v !== num(atual)) mudancasKpis[campo] = v;
+    }
   });
   const mudancasCanais = {};
   document.querySelectorAll('.mf-canal-extra-input').forEach(el=>{
@@ -948,12 +967,22 @@ document.getElementById('form-master-fechamento').addEventListener('submit', asy
     const v = num(el.value);
     if(v !== num((f.formasPagamentoExtras||{})[campo])) mudancasFormas[campo] = v;
   });
-  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length && !Object.keys(mudancasCanais).length && !Object.keys(mudancasFormas).length){ fecharMasterFechamento(); return; }
+  const arquivosKpi = [...document.querySelectorAll('.mf-kpi-arquivo-input')].filter(el=>el.files && el.files[0]);
+  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length && !Object.keys(mudancasCanais).length && !Object.keys(mudancasFormas).length && !arquivosKpi.length){ fecharMasterFechamento(); return; }
   try{
-    const res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_MASTER_ID}/editar-direto`, {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo }),
-    });
+    const payload = { mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo };
+    let res;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.kpiCampo, el.files[0]));
+      res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_MASTER_ID}/editar-direto`, { method:'PATCH', body: fd });
+    } else {
+      res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_MASTER_ID}/editar-direto`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+    }
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao salvar');
     fecharMasterFechamento();

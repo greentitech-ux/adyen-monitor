@@ -475,8 +475,35 @@ function somaExtras(classe){
   document.querySelectorAll('.'+classe).forEach(el=>{ s += num(el.value); });
   return s;
 }
-function renderKpisExtras(unidade){ renderExtrasGrupo(unidade, 'kpisExtras', 'kpis-extras-container', 'kpis-vazio', 'kpi-extra-input'); }
+// KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
+// Canais/Formas (sempre R$), o input muda de tipo conforme "tipo":
+// quantidade/moeda/kg viram number (so muda step), texto vira texto livre, e
+// arquivo vira upload de anexo (nao entra no mapa kpisExtras da leitura
+// normal - vai junto do FormData no submit, ver arquivosKpiSelecionados)
+function renderKpisExtras(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('kpis-extras-container');
+  document.getElementById('kpis-vazio').classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    if(tipo === 'arquivo'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="file" accept="image/*,application/pdf" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-arquivo"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    const sufixo = tipo === 'kg' ? ' (Kg)' : (tipo === 'moeda' ? ' (R$)' : '');
+    return `<div><label>${escapeHtml(k.label)}${sufixo}</label><input type="number" step="${step}" inputmode="decimal" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>`;
+  }).join('');
+}
 function lerKpisExtras(){ return lerExtrasGrupo('kpi-extra-input'); }
+function arquivosKpiSelecionados(){
+  return [...document.querySelectorAll('.kpi-extra-arquivo')].filter(el=>el.files && el.files[0]);
+}
 function renderCanaisExtras(unidade){ renderExtrasGrupo(unidade, 'canaisVendaExtras', 'canais-extras-container', 'canais-vazio', 'canal-extra-input'); }
 function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
 function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'formas-vazio', 'forma-extra-input'); }
@@ -678,7 +705,16 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
       detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
-    const res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const arquivosKpi = arquivosKpiSelecionados();
+    let res;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(body));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.extraCampo, el.files[0]));
+      res = await fetch('/api/fechamentos/lancar', { method:'POST', body: fd });
+    } else {
+      res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao lançar');
     msg.textContent = 'Fechamento lançado com sucesso.'; msg.className = 'msg ok';

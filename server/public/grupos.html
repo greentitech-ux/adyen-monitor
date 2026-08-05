@@ -84,7 +84,9 @@
   .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
   .linha-kpi{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;margin-top:6px;}
-  .linha-kpi input{padding:9px 10px;font-size:13px;}
+  .linha-kpi.com-tipo{grid-template-columns:1fr 170px auto;}
+  .linha-kpi input,.linha-kpi select{padding:9px 10px;font-size:13px;}
+  .linha-kpi select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;}
   .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:34px;height:36px;font-size:15px;cursor:pointer;flex:none;}
   .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
 </style>
@@ -266,19 +268,36 @@ let UNIDADES = [];
 let GRUPOS = [];
 let EDITING_GRUPO = null;
 
-// linhas repetiveis de KPI (so um campo: o nome/label) - mesmo padrao visual
-// de "Itens da compra" na Central de Solicitações, aqui so com um input.
-// O input usa <datalist> (ver atualizarDatalistsExtras) com os nomes ja
-// usados em OUTROS grupos pra esse mesmo tipo de campo (canal/forma/KPI) -
-// assim o Master pode reaproveitar um nome existente em vez de digitar de
-// novo (e arriscar duplicar com grafia diferente, ex "Pix CNPJ" vs "PIX
-// cnpj", virando 2 colunas diferentes na tabela de Fechamentos)
-function adicionarKpi(containerId, valorInicial){
+// unidade de medida de um KPI - so faz sentido pra KPI's (Canais de venda e
+// Formas de pagamento sempre somam em R$, entao esse seletor nem aparece
+// nessas 2 secoes, ver adicionarKpi). "Arquivo/Imagem" guarda o anexo no
+// Storage (ex: nota fiscal assinada, comprovante) em vez de um numero.
+const TIPOS_KPI = [
+  ['quantidade', 'Quantidade (número)'],
+  ['moeda', 'R$ (valor em reais)'],
+  ['kg', 'Peso (Kg)'],
+  ['arquivo', 'Arquivo/Imagem (anexo)'],
+  ['texto', 'Texto livre'],
+];
+
+// linhas repetiveis de Canal/Forma/KPI - mesmo padrao visual de "Itens da
+// compra" na Central de Solicitações. O input usa <datalist> (ver
+// atualizarDatalistsExtras) com os nomes ja usados em OUTROS grupos pra esse
+// mesmo tipo de campo - assim o Master pode reaproveitar um nome existente
+// em vez de digitar de novo (e arriscar duplicar com grafia diferente, ex
+// "Pix CNPJ" vs "PIX cnpj", virando 2 colunas diferentes na tabela de
+// Fechamentos). Só KPI's ganham o seletor de unidade de medida - Canais de
+// venda/Formas de pagamento sempre somam em R$ (Faturamento/Total
+// Declarado), não faz sentido escolher outro tipo pra eles.
+function adicionarKpi(containerId, valorInicial, tipoInicial){
   const container = document.getElementById(containerId);
+  const ehKpi = containerId.includes('kpis');
   const div = document.createElement('div');
-  div.className = 'linha-kpi';
+  div.className = 'linha-kpi' + (ehKpi ? ' com-tipo' : '');
   const datalistId = containerId.includes('canais') ? 'datalist-canais' : containerId.includes('formas') ? 'datalist-formas' : 'datalist-kpis';
+  const seletorTipo = ehKpi ? `<select class="kpi-tipo-select">${TIPOS_KPI.map(([v,l])=>`<option value="${v}" ${(tipoInicial||'quantidade')===v?'selected':''}>${l}</option>`).join('')}</select>` : '';
   div.innerHTML = `<input type="text" value="${escapeHtml(valorInicial||'')}" list="${datalistId}" placeholder="ex: Taxa de entrega, LegTime, OTD... (ou escolha um já usado)">
+    ${seletorTipo}
     <button type="button" class="btn-remover" onclick="this.closest('.linha-kpi').remove()">✕</button>`;
   container.appendChild(div);
 }
@@ -295,10 +314,19 @@ function atualizarDatalistsExtras(){
   preencher('datalist-kpis', 'kpisExtras');
 }
 function lerKpis(containerId){
-  return [...document.querySelectorAll('#'+containerId+' .linha-kpi input')]
-    .map(i=>i.value.trim())
-    .filter(Boolean)
-    .map(label=>({label}));
+  const ehKpi = containerId.includes('kpis');
+  return [...document.querySelectorAll('#'+containerId+' .linha-kpi')]
+    .map(linha=>{
+      const label = linha.querySelector('input').value.trim();
+      if(!label) return null;
+      const item = { label };
+      if(ehKpi){
+        const sel = linha.querySelector('.kpi-tipo-select');
+        item.tipo = sel ? sel.value : 'quantidade';
+      }
+      return item;
+    })
+    .filter(Boolean);
 }
 // remove todos os campos de uma vez (em vez de clicar no ✕ de cada linha) -
 // util quando o Master quer recomecar a configuracao do zero pra um grupo
@@ -350,8 +378,12 @@ function nomeUnidade(codigo){
   return u ? u.nome : codigo;
 }
 
+const SUFIXO_TIPO_KPI = { quantidade:'#', moeda:'R$', kg:'Kg', arquivo:'📎', texto:'Abc' };
 function tagsExtras(lista){
-  return `<div class="tags">${(lista||[]).map(k=>`<span class="tag kpi">${escapeHtml(k.label)}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div>`;
+  return `<div class="tags">${(lista||[]).map(k=>{
+    const sufixo = k.tipo ? ` <span style="opacity:.6;">· ${SUFIXO_TIPO_KPI[k.tipo]||k.tipo}</span>` : '';
+    return `<span class="tag kpi">${escapeHtml(k.label)}${sufixo}</span>`;
+  }).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div>`;
 }
 function nomeResponsavel(id){
   const u = USUARIOS_MASTER_ADMIN.find(x=>x.id===id);
@@ -414,7 +446,7 @@ function abrirEdicaoGrupo(id){
   document.getElementById('e-formas').innerHTML = '';
   (g.formasPagamentoExtras||[]).forEach(k=>adicionarKpi('e-formas', k.label));
   document.getElementById('e-kpis').innerHTML = '';
-  (g.kpisExtras||[]).forEach(k=>adicionarKpi('e-kpis', k.label));
+  (g.kpisExtras||[]).forEach(k=>adicionarKpi('e-kpis', k.label, k.tipo));
   responsaveisChecksHtml('e-responsaveis', new Set(g.responsaveis||[]));
   document.getElementById('grupo-err').classList.add('hidden');
   grupoOverlay.classList.add('show');
