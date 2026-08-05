@@ -5,13 +5,10 @@
 // pro periodo coberto - chargeback e fraude nunca sao apagados (retidos pra
 // sempre, ver store.js), o resto (aprovado/recusado/estornado sem disputa)
 // sai do banco depois que o relatorio existe.
-const admin = require('firebase-admin');
 const db = require('./firestore'); // garante que o app do firebase-admin ja foi inicializado
 const store = require('./store');
 const { toCSV, resumoPorStatus, gerarPDFBuffer, slugify } = require('./reportExport');
-
-const bucketName = process.env.FIREBASE_STORAGE_BUCKET || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
-const bucket = admin.storage().bucket(bucketName);
+const { resolverBucket, comBucket } = require('./storageBucket');
 
 // a cada quantos dias roda (tambem define o tamanho da janela coberta) -
 // ex: 2 = gera relatorio de seg+ter na quarta, depois apaga o que nao e
@@ -41,10 +38,10 @@ async function rodarRelatorio() {
   const csv = toCSV(doPeriodo);
   const pdf = await gerarPDFBuffer({ titulo, subtitulo, resumo, transacoes: doPeriodo });
 
-  await Promise.all([
+  await comBucket((bucket) => Promise.all([
     bucket.file(`${base}.csv`).save(csv, { contentType: 'text/csv; charset=utf-8' }),
     bucket.file(`${base}.pdf`).save(pdf, { contentType: 'application/pdf' }),
-  ]);
+  ]));
 
   // so agora, com o relatorio ja salvo, apaga do banco o que nao e
   // chargeback/fraude e caiu dentro da janela coberta
@@ -56,6 +53,7 @@ async function rodarRelatorio() {
 }
 
 async function limparAntigos() {
+  const bucket = await resolverBucket();
   const [arquivos] = await bucket.getFiles({ prefix: 'relatorios/' });
   const limite = Date.now() - RETENCAO_RELATORIOS_DIAS * 24 * 60 * 60 * 1000;
   await Promise.all(
@@ -67,6 +65,7 @@ async function limparAntigos() {
 
 // junta o .pdf e o .csv do mesmo carimbo numa unica linha pra listagem
 async function listarRelatorios() {
+  const bucket = await resolverBucket();
   const [arquivos] = await bucket.getFiles({ prefix: 'relatorios/' });
   const porBase = {};
   arquivos.forEach((f) => {
@@ -85,6 +84,7 @@ async function baixarArquivo(nomeComExtensao, res) {
   const ext = nomeComExtensao.endsWith('.pdf') ? 'pdf' : 'csv';
   res.setHeader('Content-Type', ext === 'pdf' ? 'application/pdf' : 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${slugify(nomeComExtensao)}.${ext}"`);
+  const bucket = await resolverBucket();
   bucket.file(`relatorios/${nomeComExtensao}`)
     .createReadStream()
     .on('error', () => { if (!res.headersSent) res.sendStatus(404); })
