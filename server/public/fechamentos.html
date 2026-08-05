@@ -104,6 +104,9 @@
   .truncate{max-width:160px;overflow:hidden;text-overflow:ellipsis;}
   .tablewrap{max-height:360px;overflow:auto;}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
+  .fech-grupo-titulo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin:16px 2px 8px;}
+  #fechamentos-tabelas > .fech-grupo-titulo:first-child{margin-top:4px;}
+  .fech-grupo-titulo .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
 
@@ -306,12 +309,11 @@
       <div class="multiselect-panel" id="ms-fech-unidade-panel"></div>
     </div>
   </div>
-  <div class="tablewrap">
-    <table>
-      <thead><tr id="fechamentos-thead"></tr></thead>
-      <tbody id="fechamentos-body"></tbody>
-    </table>
-  </div>
+  <!-- um bloco de tabela POR GRUPO (franquia) - cada franquia lança um
+       fechamento diferente (canais/formas próprios em /grupos.html), então
+       misturar tudo numa tabela só criava colunas cheias de R$ 0,00 pra quem
+       não usa aquele campo. Ver renderTabela(). -->
+  <div id="fechamentos-tabelas"></div>
 </div>
 
 </div><!-- /#root -->
@@ -1307,33 +1309,21 @@ function colunasExtras(rows, chave){
   return [...vistas.entries()].map(([campo,label])=>({campo,label}));
 }
 
-function renderTabela(rows){
-  // "rows" ja vem filtrado pelo filtro principal (periodo/grupo/unidades de
-  // cima); aqui aplicamos, POR CIMA, o filtro exclusivo desta tabela
-  // (presets/periodo/grupo/unidades proprios) - o resultado obedece aos DOIS
-  // filtros ao mesmo tempo (intersecao)
-  const {inicio, fim} = intervaloEfetivoTabela();
-  const grupoFech = document.getElementById('fech-grupo').value;
-  const filtradas = rows.filter(d=>
-    (!inicio || (d.data||'')>=inicio) && (!fim || (d.data||'')<=fim) &&
-    (!grupoFech || d.grupo===grupoFech) &&
-    (SEL_UNIDADE_FECH.size===0 || SEL_UNIDADE_FECH.has(d.unidade))
-  );
-  const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
-  document.getElementById('fechamentos-count').textContent = ordenadas.length;
+// monta UMA tabela de fechamentos a partir de um conjunto de linhas - as
+// colunas extras (canais/formas) sao calculadas so com essas linhas, entao
+// cada tabela mostra apenas os campos que aquele conjunto de fato preenche
+function tabelaFechamentosHtml(rows){
+  const colunasCanais = colunasExtras(rows, 'canaisVendaExtras');
+  const colunasFormas = colunasExtras(rows, 'formasPagamentoExtras');
 
-  const colunasCanais = colunasExtras(ordenadas, 'canaisVendaExtras');
-  const colunasFormas = colunasExtras(ordenadas, 'formasPagamentoExtras');
-  const totalColunas = 14 + colunasCanais.length + colunasFormas.length + (IS_MASTER ? 1 : 0);
-
-  document.getElementById('fechamentos-thead').innerHTML =
+  const thead =
     '<th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th>' +
     colunasCanais.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     colunasFormas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     '<th>Observação</th>' +
-    (IS_MASTER ? '<th id="th-acoes">Ações</th>' : '');
+    (IS_MASTER ? '<th>Ações</th>' : '');
 
-  document.getElementById('fechamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>{
+  const corpo = rows.map(d=>{
     const cor = d.diferenca<0?'var(--bad)':(d.diferenca>0?'var(--warn)':'var(--ok)');
     const previsao = previsaoDiaSeguinte(d.unidade, d.data);
     return `<tr>
@@ -1358,7 +1348,55 @@ function renderTabela(rows){
         <button type="button" class="acao-btn excluir" title="Excluir" onclick="excluirFechamento('${d.id}')">🗑️</button>
       ` : '<span class="sub" style="margin:0;" title="Não lançado pelo sistema - vem de importação/planilha, não pode ser editado aqui">—</span>'}</td>` : ''}
     </tr>`;
-  }).join('') : `<tr><td colspan="${totalColunas}" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>`;
+  }).join('');
+
+  return `<div class="tablewrap"><table><thead><tr>${thead}</tr></thead><tbody>${corpo}</tbody></table></div>`;
+}
+
+function renderTabela(rows){
+  // "rows" ja vem filtrado pelo filtro principal (periodo/grupo/unidades de
+  // cima); aqui aplicamos, POR CIMA, o filtro exclusivo desta tabela
+  // (presets/periodo/grupo/unidades proprios) - o resultado obedece aos DOIS
+  // filtros ao mesmo tempo (intersecao)
+  const {inicio, fim} = intervaloEfetivoTabela();
+  const grupoFech = document.getElementById('fech-grupo').value;
+  const filtradas = rows.filter(d=>
+    (!inicio || (d.data||'')>=inicio) && (!fim || (d.data||'')<=fim) &&
+    (!grupoFech || d.grupo===grupoFech) &&
+    (SEL_UNIDADE_FECH.size===0 || SEL_UNIDADE_FECH.has(d.unidade))
+  );
+  const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  document.getElementById('fechamentos-count').textContent = ordenadas.length;
+
+  const container = document.getElementById('fechamentos-tabelas');
+  if(!ordenadas.length){
+    container.innerHTML = '<div class="empty">Nenhum fechamento no período/unidade selecionados.</div>';
+    return;
+  }
+
+  // cada grupo (franquia de /grupos.html) lança um fechamento diferente -
+  // canais de venda e formas de pagamento próprios - então cada um ganha a
+  // SUA tabela, só com as colunas dele, em vez de uma tabela única com a
+  // união das colunas de todo mundo (que enchia a tela de R$ 0,00)
+  const blocos = new Map(); // chave -> { nome, rows }
+  ordenadas.forEach(d=>{
+    const g = grupoKpiDaUnidade(d.unidade);
+    const chave = g ? g.id : '__sem_grupo__';
+    if(!blocos.has(chave)) blocos.set(chave, { nome: g ? g.nome : 'Sem grupo definido', semGrupo: !g, rows: [] });
+    blocos.get(chave).rows.push(d);
+  });
+  const lista = [...blocos.values()].sort((a,b)=>{
+    if(a.semGrupo !== b.semGrupo) return a.semGrupo ? 1 : -1; // sem grupo por último
+    return a.nome.localeCompare(b.nome, 'pt-BR');
+  });
+
+  // com um bloco só de unidades sem grupo cadastrado, não tem o que separar -
+  // renderiza a tabela direto, sem título
+  const soSemGrupo = lista.length===1 && lista[0].semGrupo;
+  container.innerHTML = lista.map(b=>
+    (soSemGrupo ? '' : `<div class="fech-grupo-titulo">🏪 ${escapeHtml(b.nome)} <span class="n">${b.rows.length}</span></div>`) +
+    tabelaFechamentosHtml(b.rows)
+  ).join('');
 }
 
 // ---------- Master: editar/excluir um fechamento lançado direto pela
