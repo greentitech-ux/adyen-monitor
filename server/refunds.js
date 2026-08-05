@@ -22,7 +22,7 @@ async function create({
   pedidoId, unidade, unidadeNome, observacao, origem,
   motivoEstorno, motivoOutro, valorVenda, formaPagamento, bandeira, ultimos4,
   dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente, anexos,
-  requestedById, requestedByEmail,
+  requestedById, requestedByEmail, direcionadoParaId, direcionadoParaEmail,
 }) {
   origem = ORIGENS.includes(origem) ? origem : 'interno';
 
@@ -65,6 +65,15 @@ async function create({
     status: 'PENDENTE',
     requestedById: requestedById || null,
     requestedByEmail: requestedByEmail || null,
+    // Master/Admin escolhido por quem lançou (opcional, ver grupos.js) - so
+    // um "pra quem e mais direto", nao restringe quem mais pode decidir
+    direcionadoParaId: direcionadoParaId || null,
+    direcionadoParaEmail: direcionadoParaEmail || null,
+    // notificacao (popup com som) fica ativa ate QUALQUER Master/Admin
+    // sinalizar que viu - ver marcarNotificacaoVista
+    notificacaoVista: false,
+    notificacaoVistaPorEmail: null,
+    notificacaoVistaEm: null,
     motivoDecisao: '',
     decidedByEmail: null,
     criadoEm: agora,
@@ -73,6 +82,15 @@ async function create({
   await doc.set(registro);
   refundsCache.invalidar();
   return registro;
+}
+
+async function marcarNotificacaoVista(id, { vistoPorEmail }) {
+  const ref = refundsRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaEm: new Date().toISOString() });
+  refundsCache.invalidar();
+  return getOne(id);
 }
 
 async function listAllUncached() {
@@ -130,4 +148,4 @@ async function remove(id) {
   refundsCache.invalidar();
 }
 
-module.exports = { STATUSES, create, listAll, getOne, updateStatus, update, remove };
+module.exports = { STATUSES, create, listAll, getOne, updateStatus, update, remove, marcarNotificacaoVista };

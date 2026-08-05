@@ -145,7 +145,7 @@
     </h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Nome</th><th>Lojas</th><th>Canais extras</th><th>Formas extras</th><th>KPI's extras</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Lojas</th><th>Canais extras</th><th>Formas extras</th><th>KPI's extras</th><th>Responsáveis</th><th></th></tr></thead>
         <tbody id="grupos-body"></tbody>
       </table>
     </div>
@@ -177,6 +177,11 @@
         <legend>KPI's extras (além de TC e Cancelados, que são fixos)</legend>
         <div id="c-kpis"></div>
         <button type="button" class="btn-add" onclick="adicionarKpi('c-kpis')">+ Adicionar KPI</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Responsáveis (Master/Admin) - quem pede solicitação pra esse grupo pode direcionar pra um deles</legend>
+        <div id="c-responsaveis"></div>
       </fieldset>
 
       <p class="err hidden" id="create-err"></p>
@@ -218,6 +223,11 @@
       <legend>KPI's extras</legend>
       <div id="e-kpis"></div>
       <button type="button" class="btn-add" onclick="adicionarKpi('e-kpis')">+ Adicionar KPI</button>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Responsáveis (Master/Admin)</legend>
+      <div id="e-responsaveis"></div>
     </fieldset>
 
     <p class="err hidden" id="grupo-err"></p>
@@ -297,6 +307,18 @@ function unidadesChecksHtml(name, checkedSet){
 function readChecked(container){
   return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
 }
+
+// checklist de usuarios Master/Admin - quem pede uma solicitação pra uma
+// loja desse grupo pode escolher direcionar pra um desses (ver central.html)
+let USUARIOS_MASTER_ADMIN = [];
+function responsaveisChecksHtml(elId, checkedSet){
+  const el = document.getElementById(elId);
+  if(!USUARIOS_MASTER_ADMIN.length){ el.innerHTML = '<span style="color:var(--muted);font-size:11.5px;">Nenhum usuário Master/Admin cadastrado ainda.</span>'; return; }
+  el.innerHTML = `<div class="checks">${USUARIOS_MASTER_ADMIN.map(u=>{
+    const checked = checkedSet.has(u.id) ? 'checked' : '';
+    return `<label><input type="checkbox" name="${elId}" value="${escapeHtml(u.id)}" ${checked}> ${escapeHtml(u.email)}${u.role==='master'?' <span style="color:var(--muted);">(Master)</span>':''}</label>`;
+  }).join('')}</div>`;
+}
 function nomeUnidade(codigo){
   const u = UNIDADES.find(x=>x.codigo===codigo);
   return u ? u.nome : codigo;
@@ -304,6 +326,10 @@ function nomeUnidade(codigo){
 
 function tagsExtras(lista){
   return `<div class="tags">${(lista||[]).map(k=>`<span class="tag kpi">${escapeHtml(k.label)}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div>`;
+}
+function nomeResponsavel(id){
+  const u = USUARIOS_MASTER_ADMIN.find(x=>x.id===id);
+  return u ? u.email : id;
 }
 function renderGrupos(){
   document.getElementById('grupos-body').innerHTML = GRUPOS.map(g=>`
@@ -313,13 +339,14 @@ function renderGrupos(){
       <td>${tagsExtras(g.canaisVendaExtras)}</td>
       <td>${tagsExtras(g.formasPagamentoExtras)}</td>
       <td>${tagsExtras(g.kpisExtras)}</td>
+      <td><div class="tags">${(g.responsaveis||[]).map(id=>`<span class="tag">${escapeHtml(nomeResponsavel(id))}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div></td>
       <td>
         <div class="rowacts">
           <button type="button" onclick="abrirEdicaoGrupo('${g.id}')">Editar</button>
           <button type="button" onclick="excluirGrupo('${g.id}','${escapeHtml(g.nome)}')">Excluir</button>
         </div>
       </td>
-    </tr>`).join('') || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</td></tr>`;
 }
 
 document.getElementById('create-form').addEventListener('submit', async (e)=>{
@@ -332,6 +359,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     canaisVendaExtras: lerKpis('c-canais'),
     formasPagamentoExtras: lerKpis('c-formas'),
     kpisExtras: lerKpis('c-kpis'),
+    responsaveis: readChecked(document.getElementById('c-responsaveis')),
   };
   try{
     const res = await fetch('/api/grupos', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
@@ -342,6 +370,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     document.getElementById('c-canais').innerHTML = '';
     document.getElementById('c-formas').innerHTML = '';
     document.getElementById('c-kpis').innerHTML = '';
+    responsaveisChecksHtml('c-responsaveis', new Set());
     await carregarGrupos();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
 });
@@ -360,6 +389,7 @@ function abrirEdicaoGrupo(id){
   (g.formasPagamentoExtras||[]).forEach(k=>adicionarKpi('e-formas', k.label));
   document.getElementById('e-kpis').innerHTML = '';
   (g.kpisExtras||[]).forEach(k=>adicionarKpi('e-kpis', k.label));
+  responsaveisChecksHtml('e-responsaveis', new Set(g.responsaveis||[]));
   document.getElementById('grupo-err').classList.add('hidden');
   grupoOverlay.classList.add('show');
 }
@@ -375,6 +405,7 @@ document.getElementById('grupo-form').addEventListener('submit', async (e)=>{
     canaisVendaExtras: lerKpis('e-canais'),
     formasPagamentoExtras: lerKpis('e-formas'),
     kpisExtras: lerKpis('e-kpis'),
+    responsaveis: readChecked(document.getElementById('e-responsaveis')),
   };
   try{
     const res = await fetch('/api/grupos/'+EDITING_GRUPO, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
@@ -411,6 +442,10 @@ async function boot(){
 
   UNIDADES = await fetch('/api/meta/unidades').then(r=>r.json());
   document.getElementById('c-unidades').innerHTML = unidadesChecksHtml('unidades', new Set());
+
+  const todosUsuarios = await fetch('/api/users').then(r=>r.json());
+  USUARIOS_MASTER_ADMIN = todosUsuarios.filter(u=>u.role==='master' || u.isAdmin);
+  responsaveisChecksHtml('c-responsaveis', new Set());
 
   await carregarGrupos();
 }

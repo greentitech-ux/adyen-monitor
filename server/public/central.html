@@ -157,6 +157,10 @@
       <div id="campos-comuns">
         <label>Unidade</label>
         <select id="f-unidade" required></select>
+        <label>Direcionar para (opcional)</label>
+        <select id="f-direcionado">
+          <option value="">Qualquer Master/Admin do grupo</option>
+        </select>
       </div>
 
       <!-- ESTORNO -->
@@ -342,6 +346,24 @@ async function copiarLinkCliente(){
   msg.classList.remove('hidden');
 }
 
+// lista de Master/Admin responsaveis pelo grupo da unidade escolhida - pra
+// quem esta lançando poder direcionar a solicitação pra alguém específico
+// do próprio grupo de lojas (ver GET /api/grupos/responsaveis em index.js)
+async function carregarResponsaveis(){
+  const unidade = document.getElementById('f-unidade').value;
+  const sel = document.getElementById('f-direcionado');
+  sel.innerHTML = '<option value="">Qualquer Master/Admin do grupo</option>';
+  if(!unidade) return;
+  try{
+    const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(unidade)).then(r=>r.json());
+    lista.forEach(u=>{
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.dataset.email = u.email; opt.textContent = u.email;
+      sel.appendChild(opt);
+    });
+  }catch(e){ /* mantem só a opção padrão */ }
+}
+
 function selecionarTipo(tipo){
   TIPO_SELECIONADO = tipo;
   document.querySelectorAll('#tipos-btns .tipo-btn').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
@@ -423,6 +445,9 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
   try{
     let resp;
     const anexosInput = document.getElementById('f-anexos');
+    const direcionadoSel = document.getElementById('f-direcionado');
+    const direcionadoParaId = direcionadoSel.value || null;
+    const direcionadoParaEmail = direcionadoParaId ? (direcionadoSel.selectedOptions[0]?.dataset.email || null) : null;
 
     if(TIPO_SELECIONADO === 'estorno'){
       resp = await fetch('/api/refund-requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
@@ -430,11 +455,12 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
         unidade: document.getElementById('f-unidade').value,
         observacao: document.getElementById('e-observacao').value,
         password: document.getElementById('e-senha').value,
+        direcionadoParaId, direcionadoParaEmail,
       })});
     } else if(TIPO_SELECIONADO === 'ajuste-fechamento'){
       const fechamentoId = document.getElementById('a-fechamento').value;
       if(!fechamentoId) throw new Error('Escolha o fechamento.');
-      const payload = { tipoCorrecao: TIPO_CORRECAO, motivo: document.getElementById('a-motivo').value };
+      const payload = { tipoCorrecao: TIPO_CORRECAO, motivo: document.getElementById('a-motivo').value, direcionadoParaId, direcionadoParaEmail };
       if(TIPO_CORRECAO==='campo'){
         payload.mudancas = { [document.getElementById('a-campo').value]: document.getElementById('a-valor').value };
       } else {
@@ -455,6 +481,7 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
         observacao: document.getElementById('g-observacao').value,
         itens: TIPO_SELECIONADO==='compra' ? ITENS_COMPRA.map(i=>({descricao:i.descricao, quantidade:i.quantidade})) : [],
         ehOrcamento: document.getElementById('g-orcamento').checked,
+        direcionadoParaId, direcionadoParaEmail,
       }));
       for(const file of anexosInput.files) fd.append('anexos', file);
       resp = await fetch('/api/solicitacoes', { method:'POST', body: fd });
@@ -503,6 +530,8 @@ async function boot(){
   document.getElementById('f-unidade').innerHTML = unidades.length
     ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+  document.getElementById('f-unidade').addEventListener('change', carregarResponsaveis);
+  carregarResponsaveis();
 
   const tiposDisponiveis = Object.entries(TIPOS_INFO).filter(([tipo,info])=>!info.secaoNecessaria || SECOES.includes(info.secaoNecessaria));
   document.getElementById('tipos-btns').innerHTML = tiposDisponiveis.map(([tipo,info])=>
