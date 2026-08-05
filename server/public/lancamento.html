@@ -448,8 +448,17 @@ function atualizarResumo(){
   // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
   // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
   const g = (id)=>num(document.getElementById(id).value);
-  const faturamento = +(somaExtras('canal-extra-input')).toFixed(2);
-  const totalDeclarado = +(somaMaquinas+g('f-entradaDinheiro')+somaExtras('forma-extra-input')).toFixed(2);
+  const canaisDefs = defsExtrasAtual('canaisVendaExtras');
+  const formasDefs = defsExtrasAtual('formasPagamentoExtras');
+  const faturamento = +(
+    somaExtrasComSinal('canal-extra-input', canaisDefs)
+    + somaExtrasComSinal('forma-extra-input', formasDefs, {soCruzado:true})
+  ).toFixed(2);
+  const totalDeclarado = +(
+    somaMaquinas + g('f-entradaDinheiro')
+    + somaExtrasComSinal('forma-extra-input', formasDefs)
+    + somaExtrasComSinal('canal-extra-input', canaisDefs, {soCruzado:true})
+  ).toFixed(2);
   document.getElementById('resumo-faturamento').textContent = fmtMoney(faturamento);
   document.getElementById('resumo-declarado').textContent = fmtMoney(totalDeclarado);
 
@@ -493,6 +502,29 @@ function lerExtrasGrupo(classe){
 function somaExtras(classe){
   let s = 0;
   document.querySelectorAll('.'+classe).forEach(el=>{ s += num(el.value); });
+  return s;
+}
+// campo:def dos Canais de venda/Formas de pagamento do grupo da unidade
+// selecionada (operacao soma/subtrai e tambemNoOutroTotal, ver grupos.html)
+function defsExtrasAtual(chaveGrupo){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return grupo ? (grupo[chaveGrupo]||[]) : [];
+}
+// soma um conjunto de inputs extras respeitando o sinal (soma/subtrai) de
+// cada campo - "soCruzado" pega so os campos marcados "tambem no outro
+// total" (ex: TEF Credito é um Canal mas também soma no Total Declarado,
+// ver recomputarTotais em fechamentosLive.js - mesma lógica aqui, so pra o
+// resumo em tela bater com o que o servidor vai gravar de verdade)
+function somaExtrasComSinal(classe, defs, { soCruzado } = {}){
+  const porCampo = new Map((defs||[]).map(d=>[d.campo, d]));
+  let s = 0;
+  document.querySelectorAll('.'+classe).forEach(el=>{
+    const def = porCampo.get(el.dataset.extraCampo);
+    if(soCruzado && !(def && def.tambemNoOutroTotal)) return;
+    const sinal = def && def.operacao === 'subtrai' ? -1 : 1;
+    s += sinal * num(el.value);
+  });
   return s;
 }
 // KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
@@ -733,8 +765,10 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
     // Faturamento/Total declarado sao sempre recalculados no servidor (ver
     // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
     // completude do payload, nao por confiança nesse numero
-    campos.faturamento = somaExtras('canal-extra-input');
-    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtras('forma-extra-input');
+    const canaisDefsSubmit = defsExtrasAtual('canaisVendaExtras');
+    const formasDefsSubmit = defsExtrasAtual('formasPagamentoExtras');
+    campos.faturamento = somaExtrasComSinal('canal-extra-input', canaisDefsSubmit) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit, {soCruzado:true});
+    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit) + somaExtrasComSinal('canal-extra-input', canaisDefsSubmit, {soCruzado:true});
 
     const body = {
       unidade,

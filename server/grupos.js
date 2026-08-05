@@ -33,10 +33,22 @@ function slugify(s) {
 // (grupo criado antes dessa feature).
 const TIPOS_KPI_VALIDOS = new Set(['quantidade', 'moeda', 'kg', 'arquivo', 'texto']);
 
+// sinal de um campo extra (soma no proprio total, ou subtrai dele) - so faz
+// sentido pra canaisVendaExtras/formasPagamentoExtras (kpisExtras nao soma
+// em nada). "tambemNoOutroTotal": alem do proprio total, o valor tambem
+// conta no total "cruzado" - um Canal com isso marcado tambem soma no Total
+// Declarado, e uma Forma de pagamento tambem soma no Faturamento. Existe
+// pra casos como TEF: e um Canal de venda, mas ja e forma de pagamento
+// validada, entao precisa contar nos dois (senao sobra "falta no caixa" -
+// o valor apareceria no Faturamento mas nunca no Total Declarado). Ver
+// recomputarTotais em fechamentosLive.js, que e quem realmente aplica isso.
+const OPERACOES_VALIDAS = new Set(['soma', 'subtrai']);
+
 // usado pras 3 listas de campos extras (kpisExtras, canaisVendaExtras,
 // formasPagamentoExtras) - mesmo formato, mesma validacao. "tipo" so e
 // gravado quando informado (canais/formas nunca mandam, entao continuam sem
-// esse campo no documento).
+// esse campo no documento); "operacao"/"tambemNoOutroTotal" so fazem
+// sentido pra canais/formas (kpis nao mandam, entao tambem ficam de fora).
 function sanitizarCamposExtras(lista) {
   if (!Array.isArray(lista)) return [];
   const usados = new Set();
@@ -52,6 +64,8 @@ function sanitizarCamposExtras(lista) {
       usados.add(campo);
       const item = { campo, label };
       if (k?.tipo != null) item.tipo = TIPOS_KPI_VALIDOS.has(k.tipo) ? k.tipo : 'quantidade';
+      if (k?.operacao != null) item.operacao = OPERACOES_VALIDAS.has(k.operacao) ? k.operacao : 'soma';
+      if (k?.tambemNoOutroTotal != null) item.tambemNoOutroTotal = !!k.tambemNoOutroTotal;
       return item;
     })
     .filter(Boolean)

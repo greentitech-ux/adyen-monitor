@@ -29,8 +29,31 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function somaMapa(mapa) {
-  return Object.values(mapa || {}).reduce((s, v) => s + num(v), 0);
+// soma um mapa de extras (campo:valor) respeitando o sinal de cada campo
+// (soma/subtrai no PROPRIO total, configurado no grupo - ver grupos.js).
+// "soDestinoCruzado": usado quando queremos so os campos marcados como
+// "tambem no outro total" (ex: TEF Credito é um Canal, mas tambem soma no
+// Total Declarado por já ser forma de pagamento validada) - ignora os que
+// não tem essa marcação. Campo sem definição no grupo (raro, ex: grupo foi
+// editado depois do lançamento) soma normal (sinal soma, sem cruzamento).
+function somaMapaComSinal(mapa, defs, { soDestinoCruzado } = {}) {
+  const porCampo = new Map((defs || []).map((d) => [d.campo, d]));
+  return Object.entries(mapa || {}).reduce((s, [campo, valor]) => {
+    const def = porCampo.get(campo);
+    if (soDestinoCruzado) {
+      if (!def || !def.tambemNoOutroTotal) return s;
+    }
+    const sinal = def && def.operacao === 'subtrai' ? -1 : 1;
+    return s + sinal * num(valor);
+  }, 0);
+}
+
+// resolve as definições de canaisVendaExtras/formasPagamentoExtras do grupo
+// da unidade (sinal soma/subtrai e cruzamento entre os 2 totais, ver
+// grupos.js) - usa o grupo REAL da unidade, nao o id que o cliente mandou
+async function defsExtrasDaUnidade(unidade) {
+  const grupo = await grupos.grupoDaUnidade(unidade);
+  return { canais: grupo?.canaisVendaExtras || [], formas: grupo?.formasPagamentoExtras || [] };
 }
 
 // Faturamento = canais de venda; Total Declarado = formas de pagamento
@@ -41,16 +64,30 @@ function somaMapa(mapa) {
 // "delivery", por exemplo, deixaria o Faturamento desatualizado). Os campos
 // fixos (Delivery/Carryout/... e Adyen/Ifood/...) sao os mesmos pra todo
 // mundo; canaisVendaExtras/formasPagamentoExtras (definidos por grupo, ver
-// grupos.js) somam POR CIMA desses, nunca substituem.
+// grupos.js) somam POR CIMA desses (respeitando sinal e cruzamento entre os
+// 2 totais - ver somaMapaComSinal), nunca substituem.
 // "explicitos" (opcional): campos que uma correcao mudou de proposito - se
 // for justamente faturamento/totalDeclarado, respeita o valor dado em vez
 // de recalcular por cima (escape hatch raro do Master, ver editarDireto)
-function recomputarTotais(r, explicitos) {
+// "defsExtras" (opcional): {canais, formas} do grupo da unidade (ver
+// defsExtrasDaUnidade) - sem isso, extras somam normal (sinal soma, sem
+// cruzamento), mesmo comportamento de antes dessa feature.
+function recomputarTotais(r, explicitos, defsExtras) {
+  const canaisDefs = defsExtras?.canais || [];
+  const formasDefs = defsExtras?.formas || [];
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'faturamento')) {
-    r.faturamento = +(num(r.delivery) + num(r.carryout) + num(r.pickup) + num(r.loja) + somaMapa(r.canaisVendaExtras)).toFixed(2);
+    r.faturamento = +(
+      num(r.delivery) + num(r.carryout) + num(r.pickup) + num(r.loja)
+      + somaMapaComSinal(r.canaisVendaExtras, canaisDefs)
+      + somaMapaComSinal(r.formasPagamentoExtras, formasDefs, { soDestinoCruzado: true })
+    ).toFixed(2);
   }
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'totalDeclarado')) {
-    r.totalDeclarado = +(num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro) + somaMapa(r.formasPagamentoExtras)).toFixed(2);
+    r.totalDeclarado = +(
+      num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro)
+      + somaMapaComSinal(r.formasPagamentoExtras, formasDefs)
+      + somaMapaComSinal(r.canaisVendaExtras, canaisDefs, { soDestinoCruzado: true })
+    ).toFixed(2);
   }
   r.diferenca = +(r.totalDeclarado - r.faturamento).toFixed(2);
   return r;
@@ -115,7 +152,7 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
   registro.kpisExtras = sanitizarMapaExtras(kpisExtras, tiposKpi);
   registro.canaisVendaExtras = sanitizarMapaExtras(canaisVendaExtras);
   registro.formasPagamentoExtras = sanitizarMapaExtras(formasPagamentoExtras);
-  recomputarTotais(registro);
+  recomputarTotais(registro, null, await defsExtrasDaUnidade(unidade));
   registro.observacao = observacao || null;
   registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
   registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
@@ -268,7 +305,7 @@ async function editarDireto({ fechamentoId, mudancas, mudancasKpis, mudancasCana
   const formasExtrasNovo = Object.keys(formasValidos).length ? { ...(atual.formasPagamentoExtras || {}), ...formasValidos } : atual.formasPagamentoExtras;
 
   const merged = { ...atual, ...camposValidos, canaisVendaExtras: canaisExtrasNovo, formasPagamentoExtras: formasExtrasNovo };
-  recomputarTotais(merged, camposValidos);
+  recomputarTotais(merged, camposValidos, await defsExtrasDaUnidade(atual.unidade));
   const novosValores = { ...camposValidos, faturamento: merged.faturamento, totalDeclarado: merged.totalDeclarado, diferenca: merged.diferenca };
   if (Object.keys(kpisValidos).length) novosValores.kpisExtras = kpisExtrasNovo;
   if (Object.keys(canaisValidos).length) novosValores.canaisVendaExtras = canaisExtrasNovo;
@@ -384,7 +421,7 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
       const valoresAnteriores = {};
       Object.keys(camposMudados).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
       const merged = { ...atual, ...novosValores };
-      recomputarTotais(merged, camposMudados);
+      recomputarTotais(merged, camposMudados, await defsExtrasDaUnidade(atual.unidade));
       novosValores.faturamento = merged.faturamento;
       novosValores.totalDeclarado = merged.totalDeclarado;
       novosValores.diferenca = merged.diferenca;
