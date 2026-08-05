@@ -108,6 +108,7 @@ const ROTAS_PUBLICAS_SEM_DASHBOARD = new Set([
   '/estorno-cliente.html',
   '/api/meta/unidades-publico',
   '/api/refund-requests/publico',
+  '/api/bot/solicitacoes',
 ]);
 if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
   app.use((req, res, next) => {
@@ -203,6 +204,34 @@ app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, 
     });
     broadcast('refund-requested', registro, 'monitor');
     res.json({ ok: true, id: registro.id });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- rota do robo de cobranças (Claude le o email central e lança
+// demandas de pagamento aqui, sem login de usuario) - protegida por um token
+// fixo em env var (BOT_API_TOKEN). Sem a env var configurada, a rota fica
+// desativada por completo. So cria solicitações (nunca decide/edita/exclui),
+// entao o dano possivel de um token vazado e baixo - e trocar a env var
+// revoga na hora. ----------
+app.post('/api/bot/solicitacoes', async (req, res) => {
+  const esperado = process.env.BOT_API_TOKEN || '';
+  const recebido = String(req.headers['x-bot-token'] || '');
+  if (!esperado) return res.status(404).json({ error: 'Rota desativada (BOT_API_TOKEN não configurado).' });
+  if (!recebido || !senhasIguais(recebido, esperado)) return res.status(401).json({ error: 'Token inválido.' });
+  try {
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, fornecedor, vencimento } = req.body;
+    const registro = await solicitacoes.create({
+      tipo: tipo || 'pagamento', unidade, unidadeNome, titulo, valorEstimado, observacao,
+      itens: [], anexos: [], ehOrcamento: false, fornecedor, vencimento,
+      criadoPorId: 'bot-cobrancas',
+      criadoPorEmail: 'robô de cobranças (email)',
+      direcionadoParaId: null,
+      direcionadoParaEmail: null,
+    });
+    broadcast('solicitacao-criada', registro, 'solicitacoes');
+    res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -2178,7 +2207,7 @@ app.delete('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) 
 app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
   try {
     const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
-    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, direcionadoParaId, direcionadoParaEmail } = payload;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, fornecedor, vencimento, direcionadoParaId, direcionadoParaEmail } = payload;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -2188,7 +2217,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
     }
     const registro = await solicitacoes.create({
-      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento,
+      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
       direcionadoParaId,

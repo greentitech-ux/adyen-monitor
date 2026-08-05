@@ -10,8 +10,13 @@ const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('solicitacoes');
 
-const TIPOS = ['compra', 'manutencao', 'suporte-ti'];
+// 'pagamento': demanda de pagamento pro financeiro (boleto/fatura/despesa da
+// unidade, com fornecedor e vencimento - aprovar = pago). 'nota': pedido de
+// nota fiscal ao financeiro. Os dois entram na mesma fila/Kanban da Central.
+const TIPOS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
 const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO'];
+
+const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // itens da lista de compra (nome do que comprar + quantidade) - so pra
 // tipo "compra", mesmo padrao repetivel de MAQUINAS/SAIDAS do lancamento.
@@ -27,10 +32,11 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao);
 }
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
+  if (vencimento && !DATA_RE.test(vencimento)) throw new Error('Vencimento inválido (use AAAA-MM-DD).');
 
   const doc = COLLECTION.doc();
   const agora = new Date().toISOString();
@@ -47,6 +53,10 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     // destaca que o pedido e um orcamento (precisa de julgamento de quem tem
     // a tag Admin antes de aprovar, nao so registro de rotina)
     ehOrcamento: !!ehOrcamento,
+    // so pra tipo 'pagamento'/'nota' - fornecedor da cobranca e data de
+    // vencimento (o Kanban destaca pagamento vencido ainda pendente)
+    fornecedor: fornecedor ? String(fornecedor).trim().slice(0, 120) : null,
+    vencimento: vencimento || null,
     status: 'PENDENTE',
     criadoPorId,
     criadoPorEmail,
@@ -173,6 +183,11 @@ async function update(id, campos) {
   if (campos.observacao != null) patch.observacao = campos.observacao;
   if (campos.itens != null) patch.itens = (atual.tipo === 'compra') ? sanitizarItens(campos.itens) : [];
   if (campos.ehOrcamento != null) patch.ehOrcamento = !!campos.ehOrcamento;
+  if (campos.fornecedor != null) patch.fornecedor = String(campos.fornecedor).trim().slice(0, 120) || null;
+  if (campos.vencimento != null) {
+    if (campos.vencimento && !DATA_RE.test(campos.vencimento)) throw new Error('Vencimento inválido (use AAAA-MM-DD).');
+    patch.vencimento = campos.vencimento || null;
+  }
   await ref.update(patch);
   solicitacoesCache.invalidar();
   return getOne(id);
