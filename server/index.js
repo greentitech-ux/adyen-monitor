@@ -19,6 +19,7 @@ const fraudIdentity = require('./fraudIdentity');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
+const sessions = require('./sessions');
 const vaultGroups = require('./vaultGroups');
 const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
@@ -153,7 +154,10 @@ const LEGACY_HMAC_KEY = process.env.ADYEN_HMAC_KEY || '';
 // ---------- login (sem token ainda) e portao de autenticacao pro resto da API ----------
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const result = await auth.login(req.body.email, req.body.password);
+    const result = await auth.login(req.body.email, req.body.password, {
+      userAgent: req.headers['user-agent'],
+      ip: req.headers['x-forwarded-for'] || req.ip,
+    });
     res.json(result);
   } catch (err) {
     res.status(401).json({ error: err.message });
@@ -1342,7 +1346,26 @@ app.delete('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
 // leitura tambem libera pro Admin, que precisa da lista de tecnicos pra
 // decidir solicitacoes de Suporte de TI; escrita continua so-Master
 app.get('/api/users', auth.requireMasterOrAdmin, async (req, res) => {
-  res.json(await users.list());
+  const [lista, resumoSessoes] = await Promise.all([users.list(), sessions.resumoPorUsuario()]);
+  res.json(lista.map((u) => {
+    const resumo = resumoSessoes[u.id];
+    return { ...u, sessoesAtivas: resumo?.locais || 0, online: !!resumo?.online, ultimaAtividadeEm: resumo?.ultimaAtividadeEm || null };
+  }));
+});
+
+// locais logados com um usuario especifico (device/IP/ultima atividade) -
+// pra alem da contagem que ja vem na listagem acima
+app.get('/api/users/:id/sessoes', auth.requireMasterOrAdmin, async (req, res) => {
+  res.json(await sessions.listarDoUsuario(req.params.id));
+});
+
+// encerra um local especifico sem precisar trocar a senha (o que derrubaria
+// TODOS os locais de uma vez) - util quando alguem esqueceu logado em
+// computador compartilhado, ou pra tirar um dispositivo que nao deveria
+// estar usando aquele login
+app.delete('/api/users/:id/sessoes/:sessionId', auth.requireMaster, async (req, res) => {
+  await sessions.encerrar(req.params.sessionId);
+  res.json({ ok: true });
 });
 
 // relatorio (CSV/PDF) da tabela "Acessos cadastrados" de usuarios.html -

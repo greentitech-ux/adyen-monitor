@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./firestore');
 const { createKeyedCache } = require('./liveCache');
+const sessions = require('./sessions');
 
 const JWT_SECRET = process.env.JWT_SECRET || '';
 if (!JWT_SECRET) {
@@ -108,7 +109,7 @@ async function ensureMaster() {
   console.log(`Usuario Master criado: ${email}`);
 }
 
-async function login(email, password) {
+async function login(email, password, contexto = {}) {
   email = String(email || '').trim().toLowerCase();
   const snap = await usersRef.where('email', '==', email).limit(1).get();
   if (snap.empty) throw new Error('Email ou senha invalidos.');
@@ -136,7 +137,11 @@ async function login(email, password) {
 
   if (user.failedAttempts) await doc.ref.update({ failedAttempts: 0 });
 
-  const token = jwt.sign({ sub: doc.id, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+  // uma sessao por login - deixa saber "quantos locais" estao logados com
+  // esse usuario e permite o Master encerrar um especifico (ver sessions.js)
+  const sessao = await sessions.criar({ userId: doc.id, userAgent: contexto.userAgent, ip: contexto.ip });
+
+  const token = jwt.sign({ sub: doc.id, role: user.role, sid: sessao.id }, JWT_SECRET, { expiresIn: '8h' });
   return { token, user: toPublicUser(doc.id, user) };
 }
 
@@ -195,12 +200,16 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Sessão expirada, faça login novamente.' });
   }
 
-  getUserById(payload.sub)
-    .then((user) => {
+  // tokens emitidos antes da sessao existir (sem "sid") continuam validos
+  // ate expirar sozinhos - so passam a exigir sessao ativa os novos logins
+  Promise.all([getUserById(payload.sub), payload.sid ? sessions.existeEValida(payload.sid) : true])
+    .then(([user, sessaoValida]) => {
       if (!user || user.active === false) return res.status(401).json({ error: 'Acesso inválido ou desativado.' });
+      if (!sessaoValida) return res.status(401).json({ error: 'Sessão encerrada, faça login novamente.' });
       if (user.role !== 'master' && !dentroDoHorarioPermitido(user.horarioPermitido)) {
         return res.status(401).json({ error: mensagemHorarioPermitido(user.horarioPermitido) });
       }
+      if (payload.sid) sessions.tocar(payload.sid);
       req.user = user;
       req.isMaster = user.role === 'master';
       req.isAdmin = !!user.isAdmin;
