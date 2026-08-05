@@ -10,8 +10,13 @@ const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('solicitacoes');
 
-const TIPOS = ['compra', 'manutencao', 'suporte-ti'];
+// 'pagamento': demanda de pagamento pro financeiro (boleto/fatura/despesa da
+// unidade, com fornecedor e vencimento - aprovar = pago). 'nota': pedido de
+// nota fiscal ao financeiro. Os dois entram na mesma fila/Kanban da Central.
+const TIPOS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
 const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO'];
+
+const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // itens da lista de compra (nome do que comprar + quantidade) - so pra
 // tipo "compra", mesmo padrao repetivel de MAQUINAS/SAIDAS do lancamento.
@@ -27,10 +32,11 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao);
 }
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
+  if (vencimento && !DATA_RE.test(vencimento)) throw new Error('Vencimento inválido (use AAAA-MM-DD).');
 
   const doc = COLLECTION.doc();
   const agora = new Date().toISOString();
@@ -47,6 +53,10 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     // destaca que o pedido e um orcamento (precisa de julgamento de quem tem
     // a tag Admin antes de aprovar, nao so registro de rotina)
     ehOrcamento: !!ehOrcamento,
+    // so pra tipo 'pagamento'/'nota' - fornecedor da cobranca e data de
+    // vencimento (o Kanban destaca pagamento vencido ainda pendente)
+    fornecedor: fornecedor ? String(fornecedor).trim().slice(0, 120) : null,
+    vencimento: vencimento || null,
     status: 'PENDENTE',
     criadoPorId,
     criadoPorEmail,
@@ -64,6 +74,13 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     decididoEm: null,
     motivoDecisao: null,
     chamadoId: null, // preenchido se virar Chamado de TI (tipo 'suporte-ti' aprovado)
+    // status de Comprada (so tipo 'compra' aprovado) - data de entrega prevista
+    // e/ou print do comprovante da compra, ver marcarComprada
+    comprada: false,
+    dataEntregaPrevista: null,
+    comprovante: null, // { nome, path, tipo }
+    marcadoCompradoPorEmail: null,
+    marcadoCompradoEm: null,
   };
   await doc.set(registro);
   solicitacoesCache.invalidar();
@@ -111,6 +128,40 @@ async function vincularChamado(id, chamadoId) {
   solicitacoesCache.invalidar();
 }
 
+// marca um pedido de Compra ja aprovado como comprado - data de entrega
+// prevista e/ou print do comprovante, os dois opcionais (o Admin/Master
+// pode marcar so com a data, so com o comprovante, ou com os dois)
+async function marcarComprada(id, { dataEntregaPrevista, comprovante, marcadoPorEmail }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  const atual = snap.data();
+  if (atual.tipo !== 'compra') throw new Error('Só pedidos de Compra podem ser marcados como Comprada.');
+  if (atual.status !== 'APROVADO') throw new Error('Só pedidos já Aprovados podem ser marcados como Comprada.');
+  const patch = {
+    comprada: true,
+    dataEntregaPrevista: dataEntregaPrevista || atual.dataEntregaPrevista || null,
+    marcadoCompradoPorEmail: marcadoPorEmail,
+    marcadoCompradoEm: new Date().toISOString(),
+  };
+  if (comprovante) patch.comprovante = comprovante;
+  await ref.update(patch);
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+async function desmarcarComprada(id) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  await ref.update({
+    comprada: false, dataEntregaPrevista: null, comprovante: null,
+    marcadoCompradoPorEmail: null, marcadoCompradoEm: null,
+  });
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
 // edicao direta pelo Master - poder de corrigir qualquer campo do pedido
 // (titulo, valor, observacao, itens, unidade), independente do status.
 // So atualiza o que vier em `campos`, sem mexer em status/decisao/chamado.
@@ -132,6 +183,11 @@ async function update(id, campos) {
   if (campos.observacao != null) patch.observacao = campos.observacao;
   if (campos.itens != null) patch.itens = (atual.tipo === 'compra') ? sanitizarItens(campos.itens) : [];
   if (campos.ehOrcamento != null) patch.ehOrcamento = !!campos.ehOrcamento;
+  if (campos.fornecedor != null) patch.fornecedor = String(campos.fornecedor).trim().slice(0, 120) || null;
+  if (campos.vencimento != null) {
+    if (campos.vencimento && !DATA_RE.test(campos.vencimento)) throw new Error('Vencimento inválido (use AAAA-MM-DD).');
+    patch.vencimento = campos.vencimento || null;
+  }
   await ref.update(patch);
   solicitacoesCache.invalidar();
   return getOne(id);
@@ -142,4 +198,4 @@ async function remove(id) {
   solicitacoesCache.invalidar();
 }
 
-module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove, marcarNotificacaoVista };
+module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove, marcarNotificacaoVista, marcarComprada, desmarcarComprada };

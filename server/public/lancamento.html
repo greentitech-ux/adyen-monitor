@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Lançamento de fechamento · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -125,9 +129,12 @@
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso ao lançamento de fechamento. Fale com o administrador (Master).</div>
@@ -182,7 +189,7 @@
       </div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-caixa">
       <div class="secao-titulo">Caixa</div>
       <div class="grid2">
         <div>
@@ -218,7 +225,7 @@
       <div class="sub hidden" id="formas-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-maquininhas">
       <div class="secao-titulo">Maquininhas (cartão) <span id="maq-total" style="color:var(--text);"></span></div>
       <div id="lista-maquinas"></div>
       <button type="button" class="btn-add" onclick="adicionarMaquina()">+ Adicionar maquininha</button>
@@ -229,7 +236,7 @@
       <div id="sangria-dia-info"><div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div></div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-saidas">
       <div class="secao-titulo">Outras saídas de caixa <span id="saida-total" style="color:var(--text);"></span></div>
       <div class="sub" style="margin:-2px 0 8px;">Saídas que não passaram pela Sangria/Depósito (ex: pequena despesa paga direto do caixa).</div>
       <div id="lista-saidas"></div>
@@ -260,54 +267,6 @@
   </form>
 </div>
 
-<div class="panel" id="painel-meus-lancamentos">
-  <h2>Meus últimos lançamentos</h2>
-  <div id="lista-lancamentos"><div class="empty">carregando...</div></div>
-</div>
-
-</div>
-
-<div class="overlay hidden" id="overlay-edicao">
-  <div class="sheet">
-    <h3>Pedir correção</h3>
-    <div class="sub" id="edicao-info"></div>
-    <form id="form-edicao">
-      <label>Qual valor está errado e qual o valor correto?</label>
-      <select id="e-campo"></select>
-      <input type="number" step="0.01" id="e-valor" placeholder="valor correto" style="margin-top:8px;">
-      <label>Motivo da correção</label>
-      <textarea id="e-motivo" placeholder="explique o que aconteceu, o Master vai revisar antes de aprovar" required></textarea>
-      <div class="msg hidden" id="msg-edicao"></div>
-      <button class="btn-primary" type="submit">Enviar pedido ao Master</button>
-    </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharEdicao()">Cancelar</button>
-  </div>
-</div>
-
-<div class="overlay hidden" id="overlay-master">
-  <div class="sheet">
-    <h3>Editar fechamento (Master)</h3>
-    <div class="sub" id="master-info"></div>
-    <form id="form-master">
-      <div class="grid2">
-        <div><label>Gerente responsável</label><input type="text" id="m-gerente"></div>
-      </div>
-      <div class="grid2" id="m-campos-numericos"></div>
-      <div class="grid2" id="m-canais-extras" style="margin-top:6px;"></div>
-      <div class="grid2" id="m-formas-extras" style="margin-top:6px;"></div>
-      <div class="grid2" id="m-kpis-extras" style="margin-top:6px;"></div>
-      <label>Observação</label>
-      <textarea id="m-observacao"></textarea>
-      <label>Motivo da alteração (opcional, fica registrado no histórico do fechamento)</label>
-      <textarea id="m-motivo" placeholder="ex: corrigido conforme conferência do caixa"></textarea>
-      <div class="msg hidden" id="msg-master"></div>
-      <div style="display:flex;gap:14px;align-items:center;margin-top:4px;">
-        <button class="btn-primary" style="margin-top:0;flex:1;" type="submit">Salvar alterações</button>
-        <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirFechamentoMaster()">🗑️ Excluir</button>
-      </div>
-    </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharMaster()">Cancelar</button>
-  </div>
 </div>
 
 <div class="overlay hidden" id="overlay-sangria-editar">
@@ -367,7 +326,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
   'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
   'Spoleto Shopping Recife': 'Spo Shop Recife',
@@ -379,14 +338,9 @@ const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'BRAVO'; }
 
 const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
-const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'Ifood', food99:'99Food', pix:'Adyen', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
 
 let ME = null;
 let IS_MASTER = false;
-let MEUS = [];
-let EDICOES = [];
-let EDITANDO_ID = null;
-let EDITANDO_MASTER_ID = null;
 let MAQUINAS = [];
 let SAIDAS = [];
 let SEQ = 0;
@@ -413,15 +367,35 @@ function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&'
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
 // ---------- linhas repetíveis: maquininhas ----------
+// o prefixo do nome (padrao "Maquininha", ex: "Maquininha 1") e configuravel
+// por grupo (ver grupos.html/grupoKpiDaUnidade) - franquia que usa uma
+// maquininha especifica (ex: Getnet) pode trocar pra "Getnet 1", "Getnet 2"...
+function maquininhaPrefixoDaUnidade(){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return (grupo && grupo.maquininhaPrefixo) || 'Maquininha';
+}
+// "autoNomeado": true enquanto a loja nao mexeu no nome (ainda e o
+// "Maquininha N"/"Getnet N" gerado automaticamente) - so essas linhas tem o
+// nome atualizado quando o prefixo muda (troca de unidade), pra nao
+// sobrescrever um nome que a loja digitou de proposito
 function adicionarMaquina(valor){
-  MAQUINAS.push({ id: ++SEQ, descricao: `Maquininha ${MAQUINAS.length+1}`, valor: valor||'' });
+  MAQUINAS.push({ id: ++SEQ, descricao: `${maquininhaPrefixoDaUnidade()} ${MAQUINAS.length+1}`, valor: valor||'', autoNomeado: true });
   renderMaquinas();
 }
 function removerMaquina(id){ MAQUINAS = MAQUINAS.filter(m=>m.id!==id); renderMaquinas(); }
+// re-numera as linhas ainda com nome automatico usando o prefixo atual da
+// unidade selecionada - chamado ao trocar de unidade (ver aplicarSecoesGrupo)
+function renomearMaquinasAutomaticas(){
+  const prefixo = maquininhaPrefixoDaUnidade();
+  let n = 0;
+  MAQUINAS.forEach(m=>{ n += 1; if(m.autoNomeado) m.descricao = `${prefixo} ${n}`; });
+  renderMaquinas();
+}
 function renderMaquinas(){
   document.getElementById('lista-maquinas').innerHTML = MAQUINAS.map(m=>`
     <div class="linha-item">
-      <input type="text" value="${escapeHtml(m.descricao)}" oninput="MAQUINAS.find(x=>x.id===${m.id}).descricao=this.value" placeholder="nome/identificação">
+      <input type="text" value="${escapeHtml(m.descricao)}" oninput="const mq=MAQUINAS.find(x=>x.id===${m.id}); mq.descricao=this.value; mq.autoNomeado=false;" placeholder="nome/identificação">
       <input type="number" step="0.01" inputmode="decimal" value="${m.valor}" oninput="MAQUINAS.find(x=>x.id===${m.id}).valor=this.value; atualizarResumo();" placeholder="R$">
       <button type="button" class="btn-remover" onclick="removerMaquina(${m.id})">✕</button>
     </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma maquininha adicionada.</div>';
@@ -481,8 +455,17 @@ function atualizarResumo(){
   // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
   // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
   const g = (id)=>num(document.getElementById(id).value);
-  const faturamento = +(somaExtras('canal-extra-input')).toFixed(2);
-  const totalDeclarado = +(somaMaquinas+g('f-entradaDinheiro')+somaExtras('forma-extra-input')).toFixed(2);
+  const canaisDefs = defsExtrasAtual('canaisVendaExtras');
+  const formasDefs = defsExtrasAtual('formasPagamentoExtras');
+  const faturamento = +(
+    somaExtrasComSinal('canal-extra-input', canaisDefs)
+    + somaExtrasComSinal('forma-extra-input', formasDefs, {soCruzado:true})
+  ).toFixed(2);
+  const totalDeclarado = +(
+    somaMaquinas + g('f-entradaDinheiro')
+    + somaExtrasComSinal('forma-extra-input', formasDefs)
+    + somaExtrasComSinal('canal-extra-input', canaisDefs, {soCruzado:true})
+  ).toFixed(2);
   document.getElementById('resumo-faturamento').textContent = fmtMoney(faturamento);
   document.getElementById('resumo-declarado').textContent = fmtMoney(totalDeclarado);
 
@@ -528,35 +511,96 @@ function somaExtras(classe){
   document.querySelectorAll('.'+classe).forEach(el=>{ s += num(el.value); });
   return s;
 }
-function renderKpisExtras(unidade){ renderExtrasGrupo(unidade, 'kpisExtras', 'kpis-extras-container', 'kpis-vazio', 'kpi-extra-input'); }
+// campo:def dos Canais de venda/Formas de pagamento do grupo da unidade
+// selecionada (operacao soma/subtrai e tambemNoOutroTotal, ver grupos.html)
+function defsExtrasAtual(chaveGrupo){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return grupo ? (grupo[chaveGrupo]||[]) : [];
+}
+// soma um conjunto de inputs extras respeitando o sinal (soma/subtrai) de
+// cada campo - "soCruzado" pega so os campos marcados "tambem no outro
+// total" (ex: TEF Credito é um Canal mas também soma no Total Declarado,
+// ver recomputarTotais em fechamentosLive.js - mesma lógica aqui, so pra o
+// resumo em tela bater com o que o servidor vai gravar de verdade)
+function somaExtrasComSinal(classe, defs, { soCruzado } = {}){
+  const porCampo = new Map((defs||[]).map(d=>[d.campo, d]));
+  let s = 0;
+  document.querySelectorAll('.'+classe).forEach(el=>{
+    const def = porCampo.get(el.dataset.extraCampo);
+    if(soCruzado && !(def && def.tambemNoOutroTotal)) return;
+    const sinal = def && def.operacao === 'subtrai' ? -1 : 1;
+    s += sinal * num(el.value);
+  });
+  return s;
+}
+// KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
+// Canais/Formas (sempre R$), o input muda de tipo conforme "tipo":
+// quantidade/moeda/kg viram number (so muda step), texto vira texto livre, e
+// arquivo vira upload de anexo (nao entra no mapa kpisExtras da leitura
+// normal - vai junto do FormData no submit, ver arquivosKpiSelecionados)
+function renderKpisExtras(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('kpis-extras-container');
+  document.getElementById('kpis-vazio').classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    if(tipo === 'arquivo'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="file" accept="image/*,application/pdf" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-arquivo"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    const sufixo = tipo === 'kg' ? ' (Kg)' : (tipo === 'moeda' ? ' (R$)' : '');
+    return `<div><label>${escapeHtml(k.label)}${sufixo}</label><input type="number" step="${step}" inputmode="decimal" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>`;
+  }).join('');
+}
 function lerKpisExtras(){ return lerExtrasGrupo('kpi-extra-input'); }
+function arquivosKpiSelecionados(){
+  return [...document.querySelectorAll('.kpi-extra-arquivo')].filter(el=>el.files && el.files[0]);
+}
 function renderCanaisExtras(unidade){ renderExtrasGrupo(unidade, 'canaisVendaExtras', 'canais-extras-container', 'canais-vazio', 'canal-extra-input'); }
 function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
 function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'formas-vazio', 'forma-extra-input'); }
 function lerFormasExtras(){ return lerExtrasGrupo('forma-extra-input'); }
 
-// CAMPOS_NUMERICOS fora dessas 3 secoes: Caixa/Maquininhas/Sangria continuam
-// como antes, so os fixos de Canais/Formas/KPI's saem de cena globalmente
-const CAMPOS_NUMERICOS_MASTER = CAMPOS_NUMERICOS.filter(c=>!['delivery','carryout','pickup','loja','ifood','food99','pix','pixCnpj','outros','tc','cancelados'].includes(c));
+// esconde/mostra as secoes fixas (Caixa/Maquininhas/Outras saidas de caixa)
+// conforme o grupo da unidade (ver grupos.html) - franquia que nao usa uma
+// dessas secoes nem precisa ver o campo. Zera o que tava preenchido junto,
+// pra nao ficar um valor escondido contribuindo pro fechamento sem a loja
+// perceber (ex: trocou de unidade e o campo antigo ficou com valor)
+function aplicarSecoesGrupo(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const caixaOk = !grupo || grupo.caixaHabilitado !== false;
+  const maquininhasOk = !grupo || grupo.maquininhasHabilitado !== false;
+  const saidasOk = !grupo || grupo.saidasHabilitado !== false;
 
+  document.getElementById('secao-caixa').classList.toggle('hidden', !caixaOk);
+  if(!caixaOk){
+    ['caixaInicial','caixaFinal','entradaDinheiro','deposito'].forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = ''; });
+  }
+
+  document.getElementById('secao-maquininhas').classList.toggle('hidden', !maquininhasOk);
+  if(!maquininhasOk && MAQUINAS.length){ MAQUINAS = []; renderMaquinas(); }
+  else if(maquininhasOk && !MAQUINAS.length){ adicionarMaquina(); }
+  else if(maquininhasOk){ renomearMaquinasAutomaticas(); }
+
+  document.getElementById('secao-saidas').classList.toggle('hidden', !saidasOk);
+  if(!saidasOk && SAIDAS.length){ SAIDAS = []; renderSaidas(); }
+}
 function aplicarFranquia(unidade){
   renderKpisExtras(unidade);
   renderCanaisExtras(unidade);
   renderFormasExtras(unidade);
+  aplicarSecoesGrupo(unidade);
   atualizarResumo();
 }
 document.getElementById('f-unidade').addEventListener('change', (ev)=>{ aplicarFranquia(ev.target.value); carregarSangriaDoDia(); });
 document.getElementById('f-data').addEventListener('input', carregarSangriaDoDia);
-
-async function carregar(){
-  const [meus, edicoes] = await Promise.all([
-    fetch('/api/fechamentos/meus').then(r=>r.json()),
-    fetch('/api/fechamentos/edicoes').then(r=>r.json()),
-  ]);
-  MEUS = meus.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,20);
-  EDICOES = edicoes;
-  renderLista();
-}
 
 // ---------- sangria (retirada de caixa) registrada em campo - separado do
 // fechamento em si, soma automatico no fechamento do dia (server junta na
@@ -687,165 +731,6 @@ document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
   }
 });
 
-function edicaoPendente(fechamentoId){
-  return EDICOES.find(e=>e.fechamentoId===fechamentoId && e.status==='PENDENTE');
-}
-function ultimaDecisao(fechamentoId){
-  return EDICOES.filter(e=>e.fechamentoId===fechamentoId && e.status!=='PENDENTE').sort((a,b)=>(b.decididoEm||'').localeCompare(a.decididoEm||''))[0];
-}
-
-function renderLista(){
-  const el = document.getElementById('lista-lancamentos');
-  if(!MEUS.length){ el.innerHTML = '<div class="empty">Nenhum fechamento lançado ainda.</div>'; return; }
-  el.innerHTML = MEUS.map(f=>{
-    const pendente = edicaoPendente(f.id);
-    const decidida = !pendente && ultimaDecisao(f.id);
-    return `
-    <div class="card">
-      <div class="linha1">
-        <span>${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
-        ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
-        ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
-      </div>
-      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
-      <div class="valores">
-        <span>Faturamento <b>${fmtMoney(f.faturamento)}</b></span>
-        <span>Declarado <b>${fmtMoney(f.totalDeclarado)}</b></span>
-        <span>Diferença <b style="color:${Math.abs(f.diferenca)<0.01?'var(--ok)':'var(--bad)'}">${fmtMoney(f.diferenca)}</b></span>
-      </div>
-      ${IS_MASTER
-        ? '<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEditarMaster(\''+f.id+'\')">✎ Editar (Master)</button>'
-        : (pendente?'':'<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEdicao(\''+f.id+'\')">Pedir correção</button>')}
-    </div>`;
-  }).join('');
-}
-
-function abrirEdicao(id){
-  EDITANDO_ID = id;
-  const f = MEUS.find(x=>x.id===id);
-  document.getElementById('edicao-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado o fechamento não pode ser mudado direto; o pedido vai para aprovação do Master.`;
-  document.getElementById('e-campo').innerHTML = CAMPOS_NUMERICOS_MASTER.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
-  document.getElementById('e-valor').value = '';
-  document.getElementById('e-motivo').value = '';
-  document.getElementById('msg-edicao').classList.add('hidden');
-  document.getElementById('overlay-edicao').classList.remove('hidden');
-}
-function fecharEdicao(){ document.getElementById('overlay-edicao').classList.add('hidden'); EDITANDO_ID=null; }
-
-document.getElementById('form-edicao').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const campo = document.getElementById('e-campo').value;
-  const valor = document.getElementById('e-valor').value;
-  const motivo = document.getElementById('e-motivo').value;
-  const msg = document.getElementById('msg-edicao');
-  msg.classList.add('hidden');
-  try{
-    const res = await fetch(`/api/fechamentos/${EDITANDO_ID}/solicitar-edicao`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas: { [campo]: valor }, motivo }),
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');
-    fecharEdicao();
-    await carregar();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err';
-  }
-});
-
-// ---------- edicao direta (so Master): aplica na hora, sem fila de aprovacao ----------
-function abrirEditarMaster(id){
-  EDITANDO_MASTER_ID = id;
-  const f = MEUS.find(x=>x.id===id);
-  document.getElementById('master-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — edição direta, aplicada na hora (fica registrada no histórico do fechamento).`;
-  document.getElementById('m-gerente').value = f.gerente || '';
-  document.getElementById('m-observacao').value = f.observacao || '';
-  document.getElementById('m-motivo').value = '';
-  document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS_MASTER.map(c=>
-    `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="0.01" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
-  ).join('');
-  const grupoKpi = grupoKpiDaUnidade(f.unidade);
-  const kpisDef = grupoKpi ? (grupoKpi.kpisExtras||[]) : [];
-  document.getElementById('m-kpis-extras').innerHTML = kpisDef.map(k=>
-    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" class="m-kpi-extra-input" value="${num((f.kpisExtras||{})[k.campo])}"></div>`
-  ).join('');
-  const canaisDef = grupoKpi ? (grupoKpi.canaisVendaExtras||[]) : [];
-  document.getElementById('m-canais-extras').innerHTML = canaisDef.map(k=>
-    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-canal-campo="${escapeHtml(k.campo)}" class="m-canal-extra-input" value="${num((f.canaisVendaExtras||{})[k.campo])}"></div>`
-  ).join('');
-  const formasDef = grupoKpi ? (grupoKpi.formasPagamentoExtras||[]) : [];
-  document.getElementById('m-formas-extras').innerHTML = formasDef.map(k=>
-    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-forma-campo="${escapeHtml(k.campo)}" class="m-forma-extra-input" value="${num((f.formasPagamentoExtras||{})[k.campo])}"></div>`
-  ).join('');
-  document.getElementById('msg-master').classList.add('hidden');
-  document.getElementById('overlay-master').classList.remove('hidden');
-}
-function fecharMaster(){ document.getElementById('overlay-master').classList.add('hidden'); EDITANDO_MASTER_ID=null; }
-async function excluirFechamentoMaster(){
-  if(!EDITANDO_MASTER_ID) return;
-  const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
-  const rotulo = f ? `${f.unidadeNome||f.unidade} · ${fmtData(f.data)}` : EDITANDO_MASTER_ID;
-  if(!confirm(`Excluir o fechamento de ${rotulo}? Essa ação não pode ser desfeita.`)) return;
-  const msg = document.getElementById('msg-master');
-  try{
-    const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}`, { method:'DELETE' });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao excluir');
-    fecharMaster();
-    await carregar();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-}
-
-document.getElementById('form-master').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const msg = document.getElementById('msg-master');
-  msg.classList.add('hidden');
-  const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
-  const mudancas = {};
-  CAMPOS_NUMERICOS_MASTER.forEach(c=>{
-    const v = num(document.getElementById('m-'+c).value);
-    if(v !== num(f[c])) mudancas[c] = v;
-  });
-  const gerente = document.getElementById('m-gerente').value;
-  if(gerente !== (f.gerente||'')) mudancas.gerente = gerente;
-  const observacao = document.getElementById('m-observacao').value;
-  if(observacao !== (f.observacao||'')) mudancas.observacao = observacao;
-  const motivo = document.getElementById('m-motivo').value;
-  const mudancasKpis = {};
-  document.querySelectorAll('.m-kpi-extra-input').forEach(el=>{
-    const campo = el.dataset.kpiCampo;
-    const v = num(el.value);
-    if(v !== num((f.kpisExtras||{})[campo])) mudancasKpis[campo] = v;
-  });
-  const mudancasCanais = {};
-  document.querySelectorAll('.m-canal-extra-input').forEach(el=>{
-    const campo = el.dataset.canalCampo;
-    const v = num(el.value);
-    if(v !== num((f.canaisVendaExtras||{})[campo])) mudancasCanais[campo] = v;
-  });
-  const mudancasFormas = {};
-  document.querySelectorAll('.m-forma-extra-input').forEach(el=>{
-    const campo = el.dataset.formaCampo;
-    const v = num(el.value);
-    if(v !== num((f.formasPagamentoExtras||{})[campo])) mudancasFormas[campo] = v;
-  });
-  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length && !Object.keys(mudancasCanais).length && !Object.keys(mudancasFormas).length){ fecharMaster(); return; }
-  try{
-    const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}/editar-direto`, {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo }),
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao salvar');
-    fecharMaster();
-    await carregar();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-});
-
 function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
@@ -887,8 +772,10 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
     // Faturamento/Total declarado sao sempre recalculados no servidor (ver
     // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
     // completude do payload, nao por confiança nesse numero
-    campos.faturamento = somaExtras('canal-extra-input');
-    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtras('forma-extra-input');
+    const canaisDefsSubmit = defsExtrasAtual('canaisVendaExtras');
+    const formasDefsSubmit = defsExtrasAtual('formasPagamentoExtras');
+    campos.faturamento = somaExtrasComSinal('canal-extra-input', canaisDefsSubmit) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit, {soCruzado:true});
+    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit) + somaExtrasComSinal('canal-extra-input', canaisDefsSubmit, {soCruzado:true});
 
     const body = {
       unidade,
@@ -904,12 +791,20 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
       detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
-    const res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const arquivosKpi = arquivosKpiSelecionados();
+    let res;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(body));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.extraCampo, el.files[0]));
+      res = await fetch('/api/fechamentos/lancar', { method:'POST', body: fd });
+    } else {
+      res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao lançar');
     msg.textContent = 'Fechamento lançado com sucesso.'; msg.className = 'msg ok';
     resetarForm();
-    await carregar();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
   }finally{
@@ -930,7 +825,7 @@ async function boot(){
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
   document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
@@ -944,6 +839,7 @@ async function boot(){
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
 
   const podeLancamento = secoes.includes('lancamento');
   const podeSangria = secoes.includes('sangria');
@@ -959,7 +855,6 @@ async function boot(){
 
   document.getElementById('painel-sangria').classList.toggle('hidden', !podeSangria);
   document.getElementById('painel-fechamento').classList.toggle('hidden', !podeLancamento);
-  document.getElementById('painel-meus-lancamentos').classList.toggle('hidden', !podeLancamento);
 
   // so o codigo canonico do Fechamento (UNIDADES_NOMES) pode aparecer aqui -
   // permissions.unidades pode ter codigos de OUTROS dominios (Entregas,
@@ -989,7 +884,6 @@ async function boot(){
   }
 
   document.getElementById('root').classList.remove('hidden');
-  if(podeLancamento) await carregar();
   if(podeSangria) await carregarSangrias();
 }
 

@@ -7,6 +7,7 @@
 // anterior sempre fica guardado no historico do proprio fechamento.
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
+const grupos = require('./grupos');
 
 const COLLECTION = db.collection('fechamentosLive');
 const EDITS = db.collection('fechamentoEdicoes');
@@ -28,8 +29,31 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function somaMapa(mapa) {
-  return Object.values(mapa || {}).reduce((s, v) => s + num(v), 0);
+// soma um mapa de extras (campo:valor) respeitando o sinal de cada campo
+// (soma/subtrai no PROPRIO total, configurado no grupo - ver grupos.js).
+// "soDestinoCruzado": usado quando queremos so os campos marcados como
+// "tambem no outro total" (ex: TEF Credito é um Canal, mas tambem soma no
+// Total Declarado por já ser forma de pagamento validada) - ignora os que
+// não tem essa marcação. Campo sem definição no grupo (raro, ex: grupo foi
+// editado depois do lançamento) soma normal (sinal soma, sem cruzamento).
+function somaMapaComSinal(mapa, defs, { soDestinoCruzado } = {}) {
+  const porCampo = new Map((defs || []).map((d) => [d.campo, d]));
+  return Object.entries(mapa || {}).reduce((s, [campo, valor]) => {
+    const def = porCampo.get(campo);
+    if (soDestinoCruzado) {
+      if (!def || !def.tambemNoOutroTotal) return s;
+    }
+    const sinal = def && def.operacao === 'subtrai' ? -1 : 1;
+    return s + sinal * num(valor);
+  }, 0);
+}
+
+// resolve as definições de canaisVendaExtras/formasPagamentoExtras do grupo
+// da unidade (sinal soma/subtrai e cruzamento entre os 2 totais, ver
+// grupos.js) - usa o grupo REAL da unidade, nao o id que o cliente mandou
+async function defsExtrasDaUnidade(unidade) {
+  const grupo = await grupos.grupoDaUnidade(unidade);
+  return { canais: grupo?.canaisVendaExtras || [], formas: grupo?.formasPagamentoExtras || [] };
 }
 
 // Faturamento = canais de venda; Total Declarado = formas de pagamento
@@ -40,16 +64,30 @@ function somaMapa(mapa) {
 // "delivery", por exemplo, deixaria o Faturamento desatualizado). Os campos
 // fixos (Delivery/Carryout/... e Adyen/Ifood/...) sao os mesmos pra todo
 // mundo; canaisVendaExtras/formasPagamentoExtras (definidos por grupo, ver
-// grupos.js) somam POR CIMA desses, nunca substituem.
+// grupos.js) somam POR CIMA desses (respeitando sinal e cruzamento entre os
+// 2 totais - ver somaMapaComSinal), nunca substituem.
 // "explicitos" (opcional): campos que uma correcao mudou de proposito - se
 // for justamente faturamento/totalDeclarado, respeita o valor dado em vez
 // de recalcular por cima (escape hatch raro do Master, ver editarDireto)
-function recomputarTotais(r, explicitos) {
+// "defsExtras" (opcional): {canais, formas} do grupo da unidade (ver
+// defsExtrasDaUnidade) - sem isso, extras somam normal (sinal soma, sem
+// cruzamento), mesmo comportamento de antes dessa feature.
+function recomputarTotais(r, explicitos, defsExtras) {
+  const canaisDefs = defsExtras?.canais || [];
+  const formasDefs = defsExtras?.formas || [];
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'faturamento')) {
-    r.faturamento = +(num(r.delivery) + num(r.carryout) + num(r.pickup) + num(r.loja) + somaMapa(r.canaisVendaExtras)).toFixed(2);
+    r.faturamento = +(
+      num(r.delivery) + num(r.carryout) + num(r.pickup) + num(r.loja)
+      + somaMapaComSinal(r.canaisVendaExtras, canaisDefs)
+      + somaMapaComSinal(r.formasPagamentoExtras, formasDefs, { soDestinoCruzado: true })
+    ).toFixed(2);
   }
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'totalDeclarado')) {
-    r.totalDeclarado = +(num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro) + somaMapa(r.formasPagamentoExtras)).toFixed(2);
+    r.totalDeclarado = +(
+      num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro)
+      + somaMapaComSinal(r.formasPagamentoExtras, formasDefs)
+      + somaMapaComSinal(r.canaisVendaExtras, canaisDefs, { soDestinoCruzado: true })
+    ).toFixed(2);
   }
   r.diferenca = +(r.totalDeclarado - r.faturamento).toFixed(2);
   return r;
@@ -71,14 +109,29 @@ function sanitizarItens(lista) {
 // quem decide QUAIS campos fazem sentido pra cada unidade e o cadastro do
 // grupo, nao esse modulo. Usado pros 3 mapas: kpisExtras, canaisVendaExtras,
 // formasPagamentoExtras.
-function sanitizarMapaExtras(obj) {
+// "tipos" (opcional, so kpisExtras usa): mapa campo->tipo vindo do cadastro
+// do grupo (ver tiposKpiDaUnidade) - decide se o valor e forçado pra numero
+// (quantidade/moeda/kg, o padrao) ou guardado como texto (texto/arquivo, esse
+// ultimo guarda o CAMINHO do arquivo no Storage, nao o numero).
+function sanitizarMapaExtras(obj, tipos) {
   if (!obj || typeof obj !== 'object') return {};
   const out = {};
   Object.entries(obj).slice(0, 40).forEach(([campo, valor]) => {
     const chave = String(campo).slice(0, 60);
     if (!chave) return;
-    out[chave] = num(valor);
+    const tipo = tipos && tipos[chave];
+    out[chave] = (tipo === 'arquivo' || tipo === 'texto') ? String(valor ?? '').slice(0, 300) : num(valor);
   });
+  return out;
+}
+
+// resolve campo->tipo dos kpisExtras configurados pro grupo da unidade (ver
+// grupos.js) - usa o grupo REAL da unidade, nao o id que o cliente mandou no
+// payload, pra nao confiar em um "grupo" desatualizado/errado vindo do form
+async function tiposKpiDaUnidade(unidade) {
+  const grupo = await grupos.grupoDaUnidade(unidade);
+  const out = {};
+  (grupo?.kpisExtras || []).forEach((k) => { out[k.campo] = k.tipo || 'quantidade'; });
   return out;
 }
 
@@ -95,10 +148,11 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
 
   const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
-  registro.kpisExtras = sanitizarMapaExtras(kpisExtras);
+  const tiposKpi = await tiposKpiDaUnidade(unidade);
+  registro.kpisExtras = sanitizarMapaExtras(kpisExtras, tiposKpi);
   registro.canaisVendaExtras = sanitizarMapaExtras(canaisVendaExtras);
   registro.formasPagamentoExtras = sanitizarMapaExtras(formasPagamentoExtras);
-  recomputarTotais(registro);
+  recomputarTotais(registro, null, await defsExtrasDaUnidade(unidade));
   registro.observacao = observacao || null;
   registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
   registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
@@ -143,7 +197,7 @@ async function getOne(id) {
 // que já existe, não substitui
 const TIPOS_ITEM_NOVO = ['maquininha', 'saida'];
 
-async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, motivo, anexos, solicitadoPorId, solicitadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
+async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, novaData, motivo, anexos, solicitadoPorId, solicitadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   const atual = await getOne(fechamentoId);
   if (!atual) throw new Error('Fechamento não encontrado.');
   if (!motivo || !String(motivo).trim()) throw new Error('Descreva o motivo da correção.');
@@ -154,9 +208,10 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
     unidade: atual.unidade,
     unidadeNome: atual.unidadeNome,
     data: atual.data,
-    tipoCorrecao: tipoCorrecao === 'item' ? 'item' : 'campo',
+    tipoCorrecao: ['item', 'excluir', 'data'].includes(tipoCorrecao) ? tipoCorrecao : 'campo',
     mudancas: {},
     itemNovo: null,
+    novaData: null,
     motivo: String(motivo).trim(),
     anexos: Array.isArray(anexos) ? anexos : [],
     status: 'PENDENTE',
@@ -182,6 +237,20 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
     const valor = num(itemNovo.valor);
     if (valor <= 0) throw new Error('Informe o valor do item.');
     pedido.itemNovo = { tipo: itemNovo.tipo, descricao: String(itemNovo.descricao || '').slice(0, 200), valor };
+  } else if (pedido.tipoCorrecao === 'excluir') {
+    // nada mais pra validar - so o motivo, ja exigido acima. A exclusao de
+    // fato so acontece se o Master aprovar (ver decidirEdicao); ate la o
+    // fechamento continua intacto e visivel normalmente
+  } else if (pedido.tipoCorrecao === 'data') {
+    // mudar a data efetivamente troca o ID do documento (ver docId), entao
+    // precisa validar aqui que a data e valida, diferente da atual e que o
+    // destino esta livre (checado de novo na aprovacao, que e quando de
+    // fato acontece - pode ter mudado nesse meio tempo)
+    if (!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData)) throw new Error('Informe a data correta (AAAA-MM-DD).');
+    if (novaData === atual.data) throw new Error('A data correta é igual à data atual do lançamento.');
+    const colisao = await COLLECTION.doc(docId(atual.unidade, novaData)).get();
+    if (colisao.exists) throw new Error('Já existe um fechamento lançado para essa unidade nessa data.');
+    pedido.novaData = novaData;
   } else {
     const camposValidos = {};
     Object.entries(mudancas || {}).forEach(([campo, valor]) => {
@@ -212,11 +281,13 @@ const CAMPOS_TEXTO = ['gerente', 'observacao'];
 // valida um patch de mapa livre (campo:valor) - usado pelos 3 "mudancasXxx"
 // de editarDireto, mesmo formato de sanitizarMapaExtras mas sem limite de
 // quantidade (e so um patch, nao o mapa inteiro)
-function sanitizarPatchMapa(obj) {
+function sanitizarPatchMapa(obj, tipos) {
   const out = {};
   Object.entries(obj || {}).forEach(([campo, valor]) => {
     const chave = String(campo).slice(0, 60);
-    if (chave) out[chave] = num(valor);
+    if (!chave) return;
+    const tipo = tipos && tipos[chave];
+    out[chave] = (tipo === 'arquivo' || tipo === 'texto') ? String(valor ?? '').slice(0, 300) : num(valor);
   });
   return out;
 }
@@ -233,7 +304,8 @@ async function editarDireto({ fechamentoId, mudancas, mudancasKpis, mudancasCana
   // (campos definidos pelo grupo, ver grupos.js) - aqui e um PATCH: so os
   // campos informados mudam, o resto do mapa permanece igual (diferente de
   // mudancas, que sobrescreve campo por campo mas nao apaga os que nao vieram)
-  const kpisValidos = sanitizarPatchMapa(mudancasKpis);
+  const tiposKpi = await tiposKpiDaUnidade(atual.unidade);
+  const kpisValidos = sanitizarPatchMapa(mudancasKpis, tiposKpi);
   const canaisValidos = sanitizarPatchMapa(mudancasCanais);
   const formasValidos = sanitizarPatchMapa(mudancasFormas);
   if (!Object.keys(camposValidos).length && !Object.keys(kpisValidos).length && !Object.keys(canaisValidos).length && !Object.keys(formasValidos).length) {
@@ -248,7 +320,7 @@ async function editarDireto({ fechamentoId, mudancas, mudancasKpis, mudancasCana
   const formasExtrasNovo = Object.keys(formasValidos).length ? { ...(atual.formasPagamentoExtras || {}), ...formasValidos } : atual.formasPagamentoExtras;
 
   const merged = { ...atual, ...camposValidos, canaisVendaExtras: canaisExtrasNovo, formasPagamentoExtras: formasExtrasNovo };
-  recomputarTotais(merged, camposValidos);
+  recomputarTotais(merged, camposValidos, await defsExtrasDaUnidade(atual.unidade));
   const novosValores = { ...camposValidos, faturamento: merged.faturamento, totalDeclarado: merged.totalDeclarado, diferenca: merged.diferenca };
   if (Object.keys(kpisValidos).length) novosValores.kpisExtras = kpisExtrasNovo;
   if (Object.keys(canaisValidos).length) novosValores.canaisVendaExtras = canaisExtrasNovo;
@@ -325,6 +397,14 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
   const pedido = doc.data();
   if (pedido.status !== 'PENDENTE') throw new Error('Esse pedido já foi decidido.');
 
+  // valida ANTES de marcar como decidido - mudar a data efetivamente troca o
+  // ID do documento (ver docId), entao precisa garantir que o destino ainda
+  // esta livre (pode ter mudado desde o pedido) antes de comprometer a decisao
+  if (status === 'APROVADO' && pedido.tipoCorrecao === 'data') {
+    const colisao = await COLLECTION.doc(docId(pedido.unidade, pedido.novaData)).get();
+    if (colisao.exists) throw new Error('Já existe um fechamento lançado para essa unidade nessa data.');
+  }
+
   await ref.update({
     status,
     decididoPorEmail,
@@ -338,6 +418,28 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
     const fechDoc = await fechRef.get();
     if (fechDoc.exists) {
       const atual = fechDoc.data();
+
+      if (pedido.tipoCorrecao === 'excluir') {
+        await fechRef.delete();
+        fechamentosCache.invalidar();
+        return { ...pedido, status };
+      }
+
+      if (pedido.tipoCorrecao === 'data') {
+        const novoId = docId(pedido.unidade, pedido.novaData);
+        const historico = [...(atual.historico || []), {
+          em: new Date().toISOString(),
+          por: decididoPorEmail,
+          motivo: pedido.motivo,
+          valoresAnteriores: { data: atual.data },
+          valoresNovos: { data: pedido.novaData },
+        }];
+        await COLLECTION.doc(novoId).set({ ...atual, id: novoId, data: pedido.novaData, historico, atualizadoEm: new Date().toISOString() });
+        await fechRef.delete();
+        fechamentosCache.invalidar();
+        return { ...pedido, status };
+      }
+
       let camposMudados; // pra saber o que recalcular/registrar no historico
       let novosValores;
 
@@ -364,7 +466,7 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
       const valoresAnteriores = {};
       Object.keys(camposMudados).forEach((campo) => { valoresAnteriores[campo] = atual[campo]; });
       const merged = { ...atual, ...novosValores };
-      recomputarTotais(merged, camposMudados);
+      recomputarTotais(merged, camposMudados, await defsExtrasDaUnidade(atual.unidade));
       novosValores.faturamento = merged.faturamento;
       novosValores.totalDeclarado = merged.totalDeclarado;
       novosValores.diferenca = merged.diferenca;

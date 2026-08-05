@@ -27,16 +27,17 @@ function candidatos() {
   return [...new Set(lista)];
 }
 
-function ehErroBucketInexistente(err) {
-  const msg = String(err?.message || '');
-  return err?.code === 404 || /bucket does not exist|notfound/i.test(msg);
-}
-
-// executa op(bucket) tentando cada candidato ate um funcionar - qualquer
-// erro que NAO seja "bucket nao existe" (ex: rede, permissao no objeto) e
-// relancado na hora, sem mascarar o problema real
+// executa op(bucket) tentando cada candidato ate um funcionar. Tenta TODOS os
+// candidatos independente do tipo de erro (404 "nao existe", 403 permissao,
+// 400 nome invalido - o GCS nao e consistente sobre qual codigo devolve pra
+// um bucket errado) - so assim um FIREBASE_STORAGE_BUCKET mal configurado no
+// ambiente nao aborta a tentativa antes de chegar nos candidatos padrao que
+// funcionariam. Se nenhum candidato funcionar, relança o ultimo erro (o mais
+// provavel de ser o "de verdade", ja que os candidatos anteriores costumam
+// ser especulativos) com a lista do que foi tentado, pra aparecer no log.
 async function comBucket(op) {
   if (bucketFixado) return op(bucketFixado);
+  const tentativas = [];
   let ultimoErro = null;
   for (const nome of candidatos()) {
     const bucket = admin.storage().bucket(nome);
@@ -46,11 +47,15 @@ async function comBucket(op) {
       return resultado;
     } catch (err) {
       ultimoErro = err;
-      if (!ehErroBucketInexistente(err)) throw err;
-      console.warn(`Storage: bucket "${nome}" não existe, tentando o próximo candidato...`);
+      tentativas.push(`${nome} (${err?.code || '?'}: ${err?.message || err})`);
+      console.warn(`Storage: bucket "${nome}" falhou, tentando o próximo candidato...`, err?.message || err);
     }
   }
-  throw ultimoErro || new Error('Nenhum bucket de Storage configurado (FIREBASE_STORAGE_BUCKET/FIREBASE_PROJECT_ID).');
+  const detalhe = tentativas.length
+    ? `Nenhum dos buckets candidatos funcionou: ${tentativas.join('; ')}`
+    : 'Nenhum bucket de Storage configurado (FIREBASE_STORAGE_BUCKET/FIREBASE_PROJECT_ID).';
+  console.error(`Storage: ${detalhe}`);
+  throw ultimoErro || new Error(detalhe);
 }
 
 // mantido pros caminhos de leitura/listagem (stream, backup) - se algum

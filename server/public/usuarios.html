@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuários · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -61,6 +65,7 @@
   .badge.locked{background:var(--bad-dim);color:var(--bad);}
   .badge.horario{background:#132029;color:var(--accent);border:1px solid var(--line);}
   .badge.admin{background:#2a1a3d;color:#c299ff;border:1px solid var(--line);}
+  .badge.catalogo{background:#132a1a;color:#5fd68a;border:1px solid var(--line);}
   .badge.loja{background:#12303a;color:var(--accent);border:1px solid var(--line);}
   .badge.gerente{background:#0f2f22;color:var(--ok);border:1px solid var(--line);}
   .btn-acoes{font-family:var(--sans);font-size:11.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;white-space:nowrap;}
@@ -106,6 +111,9 @@
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
   .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+  .legend-actions{display:inline-flex;gap:6px;margin-left:8px;text-transform:none;}
+  .legend-actions button{font-family:var(--sans);font-size:10.5px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .legend-actions button:hover{border-color:var(--accent);color:var(--text);}
 </style>
 </head>
 <body>
@@ -146,9 +154,12 @@
   <a class="back active" href="/usuarios.html">👤 Usuários</a>
   <a class="back" href="/grupos.html">🏷️ Grupos</a>
   <a class="back" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
 <div id="sem-acesso" class="empty hidden">Só o acesso Master pode gerenciar usuários.</div>
@@ -177,18 +188,18 @@
       <label>Senha temporária (mín. 8 caracteres)<input type="text" id="c-password" required minlength="8"></label>
 
       <fieldset>
-        <legend>Seções</legend>
+        <legend>Seções <span class="legend-actions"><button type="button" onclick="marcarTodos('c-sections',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-sections',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-sections"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Unidades</legend>
+        <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('c-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-unidades',false)">Desmarcar todos</button></span></legend>
         <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria/depósito e entregas. Chamados de TI não depende de unidade (marca todas automaticamente - o técnico vê os chamados atribuídos a ele em qualquer loja).</div>
         <div id="c-unidades"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Cofre (subgrupos)</legend>
+        <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('c-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-groups',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-groups"></div>
       </fieldset>
 
@@ -209,6 +220,19 @@
       <table style="min-width:420px;">
         <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
         <tbody id="backups-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Relatórios de transações</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">A cada 2 dias o sistema gera um PDF/CSV com tudo que aconteceu no período (aprovado, recusado, estornado, chargeback, fraude...) e depois apaga do banco o que não é chargeback nem fraude suspeita - esses dois ficam guardados pra sempre pra continuar gerando alerta. Use "Gerar agora" pra rodar fora do horário automático.</p>
+    <button type="button" class="primary" id="btn-relatorio-run" onclick="rodarRelatorioAgora()">Gerar relatório agora</button>
+    <p class="ok-msg hidden" id="relatorio-msg" style="margin-top:10px;"></p>
+    <div class="tablewrap" style="margin-top:14px;">
+      <table style="min-width:420px;">
+        <thead><tr><th>Período</th><th>Criado em</th><th></th></tr></thead>
+        <tbody id="relatorios-body"></tbody>
       </table>
     </div>
   </div>
@@ -243,15 +267,15 @@
   <form class="modal" id="perm-form">
     <h3 id="perm-title">Editar permissões</h3>
     <fieldset>
-      <legend>Seções</legend>
+      <legend>Seções <span class="legend-actions"><button type="button" onclick="marcarTodos('p-sections',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-sections',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-sections"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Unidades</legend>
+      <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('p-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-unidades',false)">Desmarcar todos</button></span></legend>
       <div id="p-unidades"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Cofre (subgrupos)</legend>
+      <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('p-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-groups',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-groups"></div>
     </fieldset>
     <p class="err hidden" id="perm-err"></p>
@@ -307,7 +331,7 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['inventario','Inventário (estoque/CMV)'] ];
 const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];
@@ -363,6 +387,9 @@ function unidadesChecksHtml(checkedSet){
 function readChecked(container){
   return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
 }
+function marcarTodos(containerId, marcar){
+  document.getElementById(containerId).querySelectorAll('input[type=checkbox]').forEach(cb=>{ cb.checked = marcar; });
+}
 function caminhoSubgrupo(id){
   const s = VAULT_SUBGROUPS.find(x=>x.id===id);
   if(!s) return id;
@@ -391,6 +418,7 @@ async function boot(){
 
   await carregarUsuarios();
   await carregarBackups();
+  await carregarRelatorios();
 }
 
 function baixarRelatorioUsuarios(formato){
@@ -518,6 +546,40 @@ async function rodarBackupAgora(){
   }
 }
 
+async function carregarRelatorios(){
+  const relatorios = await fetch('/api/relatorios').then(r=>r.json());
+  document.getElementById('relatorios-body').innerHTML = relatorios.length ? relatorios.map(r=>`
+    <tr>
+      <td>${escapeHtml(r.base)}</td>
+      <td>${new Date(r.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</td>
+      <td>
+        ${r.pdf?`<a class="back" href="/api/relatorios/${encodeURIComponent(r.base)}.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">PDF</a>`:''}
+        ${r.csv?`<a class="back" style="margin-left:6px;" href="/api/relatorios/${encodeURIComponent(r.base)}.csv?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">CSV</a>`:''}
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum relatório ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+async function rodarRelatorioAgora(){
+  const btn = document.getElementById('btn-relatorio-run');
+  const msg = document.getElementById('relatorio-msg');
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/relatorios/rodar', { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao gerar relatório');
+    msg.textContent = `Relatório gerado: ${data.resumo.total} eventos no período, ${data.removidos} removidos do banco.`;
+    msg.className = 'ok-msg';
+    await carregarRelatorios();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+}
+
 // lista compacta: mostra so as 2 primeiras tags + um chip "+N" clicavel que
 // expande/recolhe o resto - antes cada secao/unidade virava uma tag empilhada
 // e uma linha de usuario ocupava a tela inteira no celular
@@ -548,7 +610,8 @@ function renderUsers(){
       ? `<span class="badge locked" title="Bloqueado após 3 tentativas de senha erradas - use \"Nova senha\" pra destravar">bloqueado</span>`
       : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`)
       + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '')
-      + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '');
+      + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '')
+      + (u.podeCatalogoEstoque ? ` <span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque (setor/tipo/custo/ativar-desativar)">📦 catálogo</span>` : '');
     const cargoBadge = u.cargo ? ` <span class="badge ${u.cargo}" title="Tag de cargo (só organização, não muda permissão)">${u.cargo==='loja'?'🏬 loja':'👔 gerente'}</span>` : '';
     return `
     <tr>
@@ -575,6 +638,7 @@ function abrirAcoes(id){
     <button type="button" onclick="fecharAcoes();resetarSenha('${u.id}')">🔒 Nova senha</button>
     <div class="acoes-sep">Tags</div>
     <button type="button" onclick="fecharAcoes();alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'⭐ Remover tag Admin':'⭐ Tornar Admin'}</button>
+    <button type="button" onclick="fecharAcoes();alternarCatalogoEstoque('${u.id}', ${!u.podeCatalogoEstoque})">${u.podeCatalogoEstoque?'📦 Remover acesso ao Catálogo':'📦 Liberar Catálogo do Estoque'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
     <div class="acoes-sep">Conta</div>
@@ -704,6 +768,13 @@ async function alternarAdmin(id, isAdmin){
   const res = await fetch('/api/users/'+id+'/is-admin', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({isAdmin})});
   const data = await res.json();
   if(!res.ok){ alert(data.error||'Erro ao atualizar tag admin.'); return; }
+  await carregarUsuarios();
+}
+
+async function alternarCatalogoEstoque(id, podeCatalogoEstoque){
+  const res = await fetch('/api/users/'+id+'/catalogo-estoque', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoEstoque})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao atualizar permissão do Catálogo do Estoque.'); return; }
   await carregarUsuarios();
 }
 

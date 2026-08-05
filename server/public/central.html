@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Central de Solicitações · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -128,9 +132,12 @@
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso à Central de Solicitações. Fale com o administrador (Master).</div>
@@ -220,6 +227,14 @@
           <div id="lista-itens-compra"></div>
           <button type="button" class="btn-add" onclick="adicionarItemCompra()">+ Adicionar item</button>
         </div>
+        <div id="wrap-g-pagamento" class="hidden">
+          <label>Fornecedor / de quem é a cobrança</label>
+          <input type="text" id="g-fornecedor" placeholder="ex: Comgás, Martin Brower, contador...">
+          <div id="wrap-g-vencimento">
+            <label>Data de vencimento</label>
+            <input type="date" id="g-vencimento">
+          </div>
+        </div>
         <div id="wrap-g-observacao">
           <label>Observação</label>
           <textarea id="g-observacao" placeholder="detalhe o que precisa"></textarea>
@@ -291,7 +306,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
   'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
   'Spoleto Shopping Recife': 'Spo Shop Recife',
@@ -313,6 +328,8 @@ const TIPOS_INFO = {
   'compra': { label:'Compra', secaoNecessaria:null },
   'manutencao': { label:'Manutenção', secaoNecessaria:null },
   'suporte-ti': { label:'Suporte de TI', secaoNecessaria:null },
+  'pagamento': { label:'Pagamento (despesa)', secaoNecessaria:null },
+  'nota': { label:'Solicitação de Nota', secaoNecessaria:null },
 };
 
 let ME = null;
@@ -328,7 +345,7 @@ let SEQ_ITEM_COMPRA = 0;
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function iconeTipo(tipo){
-  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻', pagamento:'💸', nota:'📄' }[tipo] || '📋';
 }
 
 // monta o link do formulario publico de estorno (server/public/estorno-cliente.html)
@@ -371,14 +388,22 @@ function selecionarTipo(tipo){
   document.querySelectorAll('#tipos-btns .tipo-btn').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
   document.getElementById('campos-estorno').classList.toggle('hidden', tipo!=='estorno');
   document.getElementById('campos-ajuste').classList.toggle('hidden', tipo!=='ajuste-fechamento');
-  document.getElementById('campos-gerais').classList.toggle('hidden', !['compra','manutencao','suporte-ti'].includes(tipo));
+  document.getElementById('campos-gerais').classList.toggle('hidden', !['compra','manutencao','suporte-ti','pagamento','nota'].includes(tipo));
   document.getElementById('campos-comuns').classList.toggle('hidden', tipo==='ajuste-fechamento');
   document.getElementById('compra-itens').classList.toggle('hidden', tipo!=='compra');
+  // fornecedor/vencimento so pra demandas do financeiro (vencimento so em
+  // pagamento - solicitacao de nota nao tem data de vencer)
+  document.getElementById('wrap-g-pagamento').classList.toggle('hidden', !['pagamento','nota'].includes(tipo));
+  document.getElementById('wrap-g-vencimento').classList.toggle('hidden', tipo!=='pagamento');
+  // "é um orçamento" nao se aplica a pagamento/nota (a cobrança ja existe)
+  document.getElementById('g-orcamento').parentElement.classList.toggle('hidden', ['pagamento','nota'].includes(tipo));
   if(tipo==='compra') renderItensCompra();
   const labels = {
     compra:['Título','O que precisa comprar','Valor estimado (opcional)'],
     manutencao:['Solicitação','O que precisa de manutenção','Valor (opcional - orçamento de terceiro)'],
     'suporte-ti':['Solicitação','Qual o problema','Valor (opcional - orçamento de terceiro)'],
+    pagamento:['O que é a cobrança','ex: fatura de gás de julho, boleto do fornecedor...','Valor da cobrança (R$)'],
+    nota:['Referente a quê','ex: nota fiscal da compra de equipamentos','Valor (opcional)'],
   };
   if(labels[tipo]){
     document.getElementById('g-titulo-label').textContent = labels[tipo][0];
@@ -496,6 +521,8 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
         observacao: document.getElementById('g-observacao').value,
         itens: TIPO_SELECIONADO==='compra' ? ITENS_COMPRA.map(i=>({descricao:i.descricao, quantidade:i.quantidade})) : [],
         ehOrcamento: document.getElementById('g-orcamento').checked,
+        fornecedor: ['pagamento','nota'].includes(TIPO_SELECIONADO) ? document.getElementById('g-fornecedor').value : null,
+        vencimento: TIPO_SELECIONADO==='pagamento' ? (document.getElementById('g-vencimento').value || null) : null,
         direcionadoParaId, direcionadoParaEmail,
       }));
       for(const file of anexosInput.files) fd.append('anexos', file);
@@ -520,7 +547,7 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   IS_MASTER = ME.role==='master';
-  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
+  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
@@ -535,6 +562,7 @@ async function boot(){
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !SECOES.includes('inventario'));
 
   if(!SECOES.includes('solicitacoes')){
     document.getElementById('sem-acesso').classList.remove('hidden');

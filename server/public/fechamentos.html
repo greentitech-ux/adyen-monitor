@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fechamentos de caixa · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -107,6 +111,9 @@
   .fech-grupo-titulo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin:16px 2px 8px;}
   #fechamentos-tabelas > .fech-grupo-titulo:first-child{margin-top:4px;}
   .fech-grupo-titulo .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
+  .fech-subtitulo{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 2px 6px;padding-top:8px;border-top:1px dashed var(--line);}
+  .fech-subtitulo:first-of-type{border-top:none;padding-top:0;}
+  .fech-subtitulo .n{font-weight:400;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
 
@@ -200,9 +207,12 @@
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso aos Fechamentos. Fale com o administrador (Master).</div>
@@ -402,7 +412,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
   'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
   'Spoleto Shopping Recife': 'Spo Shop Recife',
@@ -1312,15 +1322,33 @@ function colunasExtras(rows, chave){
   return [...vistas.entries()].map(([campo,label])=>({campo,label}));
 }
 
+// os 5 campos "fixos" (Adyen/Ifood/99Food/Pix/Loja) sao o schema antigo, de
+// antes do grupo poder definir os proprios Canais de venda/Formas de
+// pagamento (ver grupos.html) - hoje so quem lanca fechamento importado de
+// planilha (sheetsSync.js) ainda usa esses campos; loja que lanca pelo
+// sistema usa exclusivamente as extras do proprio grupo. Mesma logica de
+// colunasExtras: so aparece se pelo menos uma linha do conjunto de fato usa
+const CAMPOS_FIXOS = [
+  {campo:'adyen', label:'Adyen'}, {campo:'ifood', label:'Ifood'}, {campo:'food99', label:'99Food'},
+  {campo:'pix', label:'Pix'}, {campo:'loja', label:'Loja'},
+];
+function colunasFixasUsadas(rows){
+  return CAMPOS_FIXOS.filter(c => rows.some(d => Math.abs(d[c.campo]||0) > 0.001));
+}
+
 // monta UMA tabela de fechamentos a partir de um conjunto de linhas - as
-// colunas extras (canais/formas) sao calculadas so com essas linhas, entao
-// cada tabela mostra apenas os campos que aquele conjunto de fato preenche
+// colunas fixas e extras (canais/formas) sao calculadas so com essas linhas,
+// entao cada tabela mostra apenas os campos que aquele conjunto de fato
+// preenche (ver renderTabela: cada bloco so recebe linhas de UMA origem -
+// sistema OU planilha - pra essas colunas nunca se misturarem)
 function tabelaFechamentosHtml(rows){
+  const colunasFixas = colunasFixasUsadas(rows);
   const colunasCanais = colunasExtras(rows, 'canaisVendaExtras');
   const colunasFormas = colunasExtras(rows, 'formasPagamentoExtras');
 
   const thead =
-    '<th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th>' +
+    '<th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th>' +
+    colunasFixas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     colunasCanais.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     colunasFormas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     '<th>Observação</th>' +
@@ -1338,11 +1366,7 @@ function tabelaFechamentosHtml(rows){
       <td class="valor">${fmtMoney(d.totalDeclarado)}</td>
       <td class="valor" style="color:${cor}">${fmtMoney(d.diferenca)}</td>
       <td class="valor">${fmtMoney(d.quebra)}</td>
-      <td class="valor">${fmtMoney(d.adyen)}</td>
-      <td class="valor">${fmtMoney(d.ifood)}</td>
-      <td class="valor">${fmtMoney(d.food99)}</td>
-      <td class="valor">${fmtMoney(d.pix)}</td>
-      <td class="valor">${fmtMoney(d.loja)}</td>
+      ${colunasFixas.map(c=>`<td class="valor">${fmtMoney(d[c.campo])}</td>`).join('')}
       ${colunasCanais.map(c=>`<td class="valor">${fmtMoney((d.canaisVendaExtras||{})[c.campo]||0)}</td>`).join('')}
       ${colunasFormas.map(c=>`<td class="valor">${fmtMoney((d.formasPagamentoExtras||{})[c.campo]||0)}</td>`).join('')}
       <td class="truncate" title="${escapeHtml(d.observacao||d.obsDif||'')}">${escapeHtml(d.observacao||d.obsDif||'—')}</td>
@@ -1396,10 +1420,33 @@ function renderTabela(rows){
   // com um bloco só de unidades sem grupo cadastrado, não tem o que separar -
   // renderiza a tabela direto, sem título
   const soSemGrupo = lista.length===1 && lista[0].semGrupo;
-  container.innerHTML = lista.map(b=>
-    (soSemGrupo ? '' : `<div class="fech-grupo-titulo">🏪 ${escapeHtml(b.nome)} <span class="n">${b.rows.length}</span></div>`) +
-    tabelaFechamentosHtml(b.rows)
-  ).join('');
+  container.innerHTML = lista.map(b=>{
+    const titulo = soSemGrupo ? '' : `<div class="fech-grupo-titulo">🏪 ${escapeHtml(b.nome)} <span class="n">${b.rows.length}</span></div>`;
+
+    // dentro do grupo, separa por ORIGEM: lançado pelo sistema (tem
+    // criadoPorId, usa exclusivamente os Canais de venda/Formas de
+    // pagamento/KPI's que o Master configurou pro grupo) x importado de
+    // planilha (sheetsSync.js, usa o schema antigo Adyen/Ifood/99Food/Pix/
+    // Loja). Sem essa separação as colunas de UMA origem vazavam pra tabela
+    // da outra (ex: unidade com fechamento antigo de planilha E fechamento
+    // novo pelo sistema no mesmo grupo mostrava as duas "Adyen" ao mesmo
+    // tempo - uma sempre zerada) - a planilha não pode se sobrepor ao
+    // sistema, que é quem organiza os fechamentos lançados hoje
+    const sistemaRows = b.rows.filter(d=>d.criadoPorId);
+    const planilhaRows = b.rows.filter(d=>!d.criadoPorId);
+    const temAsDuas = sistemaRows.length && planilhaRows.length;
+
+    let corpo = '';
+    if(sistemaRows.length){
+      corpo += (temAsDuas ? `<div class="fech-subtitulo">🧾 Lançamentos do sistema <span class="n">${sistemaRows.length}</span></div>` : '') +
+        tabelaFechamentosHtml(sistemaRows);
+    }
+    if(planilhaRows.length){
+      corpo += (temAsDuas ? `<div class="fech-subtitulo">📄 Histórico de planilha (importado) <span class="n">${planilhaRows.length}</span></div>` : '') +
+        tabelaFechamentosHtml(planilhaRows);
+    }
+    return titulo + corpo;
+  }).join('');
 }
 
 // ---------- Master: editar/excluir um fechamento lançado direto pela
@@ -1432,6 +1479,31 @@ function renderExtrasEdicaoFechamento(grupo, chaveGrupo, mapaAtual, containerId,
     `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-${attr}="${escapeHtml(k.campo)}" class="${classe}" value="${num((mapaAtual||{})[k.campo])}"></div>`
   ).join('');
 }
+// KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
+// Canais/Formas (sempre R$), entao ganha renderização própria: número
+// (quantidade/moeda/kg), texto livre, ou arquivo (mostra link pro anexo
+// atual + input pra trocar - o valor gravado E o caminho no Storage, não dá
+// pra "editar" ele como número)
+function renderKpisEdicaoFechamento(grupo, mapaAtual, fechamentoId){
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('ef-kpis-extras');
+  document.getElementById('ef-kpis-vazio').classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.classList.add('hidden'); container.innerHTML = ''; return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    const atual = (mapaAtual||{})[k.campo];
+    if(tipo === 'arquivo'){
+      const linkAtual = atual ? `<a href="/api/fechamentos/${fechamentoId}/kpi-arquivo/${encodeURIComponent(k.campo)}" target="_blank" style="display:block;font-size:11px;color:var(--accent);margin-bottom:4px;">📎 ver arquivo atual</a>` : '';
+      return `<div><label>${escapeHtml(k.label)}</label>${linkAtual}<input type="file" accept="image/*,application/pdf" data-kpi-campo="${escapeHtml(k.campo)}" class="ef-kpi-arquivo-input"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="texto" class="ef-kpi-extra-input" value="${escapeHtml(atual||'')}"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    return `<div><label>${escapeHtml(k.label)}</label><input type="number" step="${step}" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="${tipo}" class="ef-kpi-extra-input" value="${num(atual)}"></div>`;
+  }).join('');
+}
 
 async function abrirEdicaoFechamento(id){
   // busca o registro BRUTO (sem mesclar com sangria/planilha) - editar em
@@ -1453,7 +1525,7 @@ async function abrirEdicaoFechamento(id){
   document.getElementById('ef-motivo').value = '';
 
   const grupoKpi = grupoKpiDaUnidade(d.unidade);
-  renderExtrasEdicaoFechamento(grupoKpi, 'kpisExtras', d.kpisExtras, 'ef-kpis-extras', 'ef-kpis-vazio', 'ef-kpi-extra-input', 'kpiCampo');
+  renderKpisEdicaoFechamento(grupoKpi, d.kpisExtras, id);
   renderExtrasEdicaoFechamento(grupoKpi, 'canaisVendaExtras', d.canaisVendaExtras, 'ef-canais-extras', 'ef-canais-vazio', 'ef-canal-extra-input', 'canalCampo');
   renderExtrasEdicaoFechamento(grupoKpi, 'formasPagamentoExtras', d.formasPagamentoExtras, 'ef-formas-extras', 'ef-formas-vazio', 'ef-forma-extra-input', 'formaCampo');
 
@@ -1487,11 +1559,21 @@ async function salvarEdicaoFechamento(){
   document.querySelectorAll('.ef-canal-extra-input').forEach(el=>{ mudancasCanais[el.dataset.canalCampo] = el.value; });
   const mudancasFormas = {};
   document.querySelectorAll('.ef-forma-extra-input').forEach(el=>{ mudancasFormas[el.dataset.formaCampo] = el.value; });
+  const arquivosKpi = [...document.querySelectorAll('.ef-kpi-arquivo-input')].filter(el=>el.files && el.files[0]);
   try{
-    const resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo: document.getElementById('ef-motivo').value }),
-    });
+    const payload = { mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo: document.getElementById('ef-motivo').value };
+    let resp;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.kpiCampo, el.files[0]));
+      resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, { method:'PATCH', body: fd });
+    } else {
+      resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+    }
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
     fecharEdicaoFechamento();
@@ -1585,7 +1667,7 @@ async function boot(){
   const me = await res.json();
   const isMaster = me.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
   atualizarVisibilidadeGrupos();
 
@@ -1602,6 +1684,7 @@ async function boot(){
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('btn-sincronizar-planilhas').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('fechamentos')){

@@ -17,6 +17,30 @@ if (!JWT_SECRET) {
 
 const usersRef = db.collection('users');
 
+// require tardio (nao no topo) so pra deixar bem explicito que e uma
+// dependencia "de efeito colateral" do login, nao do modulo em si -
+// solicitacoes.js nao depende de auth.js, entao nao ha ciclo real.
+function criarChamadoBloqueio(email, userId, unidadesUsuario) {
+  const solicitacoes = require('./solicitacoes');
+  const unidades = Array.isArray(unidadesUsuario) ? unidadesUsuario.filter(Boolean) : [];
+  const unidade = unidades[0] || 'geral';
+  const unidadeNome = unidades.length ? unidades.join(', ') : 'Sem unidade vinculada a este login';
+  const agora = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
+  }).format(new Date());
+  solicitacoes
+    .create({
+      tipo: 'suporte-ti',
+      unidade,
+      unidadeNome,
+      titulo: `Login bloqueado: ${email}`,
+      observacao: `Acesso bloqueado automaticamente após 3 tentativas de senha erradas seguidas.\n\nLogin: ${email}\nUnidade(s) vinculada(s): ${unidadeNome}\nBloqueado em: ${agora}\n\nPara desbloquear: Usuários > Ações > "Nova senha" nesse login (o acesso volta a funcionar assim que a senha é trocada).`,
+      criadoPorId: userId,
+      criadoPorEmail: 'robô de bloqueio (login)',
+    })
+    .catch((e) => console.error('Falha ao criar chamado automático de Suporte TI (bloqueio de senha):', e.message));
+}
+
 // permissoes vazias por padrao - o Master preenche na hora de criar o acesso
 function emptyPermissions() {
   return { sections: [], unidades: [], vaultSubgroups: [] };
@@ -103,7 +127,10 @@ async function login(email, password) {
     const tentativas = (user.failedAttempts || 0) + 1;
     const bloqueou = tentativas >= MAX_TENTATIVAS && user.role !== 'master';
     await doc.ref.update({ failedAttempts: tentativas, locked: bloqueou });
-    if (bloqueou) throw new Error('Acesso bloqueado após 3 tentativas de senha erradas. Fale com o Master.');
+    if (bloqueou) {
+      criarChamadoBloqueio(email, doc.id, user.permissions?.unidades);
+      throw new Error('Acesso bloqueado após 3 tentativas de senha erradas. Fale com o Master.');
+    }
     throw new Error('Email ou senha invalidos.');
   }
 
@@ -177,6 +204,7 @@ function requireAuth(req, res, next) {
       req.user = user;
       req.isMaster = user.role === 'master';
       req.isAdmin = !!user.isAdmin;
+      req.podeCatalogoEstoque = !!user.podeCatalogoEstoque;
       req.permissions = req.isMaster ? null : user.permissions || emptyPermissions();
       next();
     })
@@ -194,6 +222,14 @@ function requireMaster(req, res, next) {
 // que Admins decidam sem precisar do acesso Master completo
 function requireMasterOrAdmin(req, res, next) {
   if (!req.isMaster && !req.isAdmin) return res.status(403).json({ error: 'Apenas Master ou Admin pode fazer isso.' });
+  next();
+}
+
+// Master ou usuario com a permissao de Catalogo do Estoque (atribuida pelo
+// Master em usuarios.html) - deixa um gerente organizar setor/tipo, ajustar
+// custo de referencia e ativar/desativar item sem precisar de acesso Master
+function requireMasterOuCatalogoEstoque(req, res, next) {
+  if (!req.isMaster && !req.podeCatalogoEstoque) return res.status(403).json({ error: 'Você não tem permissão pra gerenciar o Catálogo do Estoque.' });
   next();
 }
 
@@ -219,6 +255,7 @@ module.exports = {
   requireAuth,
   requireMaster,
   requireMasterOrAdmin,
+  requireMasterOuCatalogoEstoque,
   hasSection,
   filterByUnidade,
   emptyPermissions,

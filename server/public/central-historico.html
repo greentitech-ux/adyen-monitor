@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Histórico de Solicitações · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -56,11 +60,20 @@
   textarea{resize:vertical;min-height:56px;}
   .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
   @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .filtros-compactos{display:flex;flex-wrap:wrap;gap:10px;}
+  .filtros-compactos>div{flex:1 1 130px;min-width:110px;max-width:200px;}
+  .filtros-compactos label{margin:0 0 4px;font-size:12px;}
   .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
   .linha-item input{padding:9px 10px;font-size:13.5px;}
   .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
   .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
   .btn-add:hover{border-color:var(--accent);}
+  .card{border-top:1px solid var(--line);padding:12px 0;}
+  .card:first-child{border-top:none;padding-top:0;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .card .valores{display:flex;gap:12px;margin-top:8px;font-size:12px;flex-wrap:wrap;}
+  .card .valores b{color:var(--text);}
   .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
   .btn-primary:disabled{opacity:.5;cursor:default;}
   .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
@@ -93,10 +106,13 @@
   .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
   .kanban-empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:12px;}
   .notif-chat-wrap{position:fixed;top:14px;right:14px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:min(320px,calc(100vw - 28px));}
-  .notif-chat{background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:11px 13px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;animation:notif-in .18s ease;}
+  .notif-chat{position:relative;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:11px 13px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;animation:notif-in .18s ease;}
   .notif-chat:hover{background:var(--panel2);}
-  .notif-chat .notif-titulo{font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-  .notif-chat .notif-fechar{color:var(--muted);font-size:14px;line-height:1;flex:none;}
+  .notif-chat .notif-titulo{font-size:12px;font-weight:700;padding-right:14px;}
+  .notif-chat .notif-fechar{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;}
+  .notif-chat .notif-fechar:hover{color:var(--text);border-color:var(--accent);}
+  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
   .notif-chat .notif-corpo{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   @keyframes notif-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
   .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
@@ -158,9 +174,12 @@
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
   <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso à Central de Solicitações. Fale com o administrador (Master).</div>
@@ -175,15 +194,15 @@
       <button type="button" class="export-btn" onclick="baixarRelatorioCentral('pdf')">📄 Relatório PDF</button>
     </span>
   </h2>
-  <div class="grid2" id="filtros-extra" style="margin-bottom:10px;">
-    <div><label style="margin:0 0 4px;">Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
-    <div><label style="margin:0 0 4px;">Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
+  <div class="filtros-compactos" id="filtros-extra" style="margin-bottom:10px;">
+    <div><label>Loja</label><select id="filtro-unidade" onchange="aplicarFiltrosExtra()"><option value="">Todas</option></select></div>
+    <div><label>Grupo</label><select id="filtro-grupo" onchange="aplicarFiltrosExtra()">
       <option value="">Todos</option>
       <option value="ARCFOOD">ARCFOOD</option>
       <option value="Grupo Bravo (GBE)">Grupo Bravo (GBE)</option>
     </select></div>
-    <div><label style="margin:0 0 4px;">De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
-    <div><label style="margin:0 0 4px;">Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
+    <div><label>De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
+    <div><label>Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
   </div>
   <button type="button" class="link-btn" style="margin:-4px 0 10px;" onclick="limparFiltrosExtra()">Limpar filtros de loja/grupo/data</button>
   <div class="kanban-board" id="kanban-board">
@@ -202,7 +221,72 @@
   </div>
 </div>
 
+<!-- movido de lancamento.html - a tela de lançamento e so pra lançar,
+     acompanhar/corrigir o que ja foi lançado e papel do Histórico -->
+<div class="panel hidden" id="painel-meus-lancamentos">
+  <h2>Últimos fechamentos lançados</h2>
+  <div id="lista-lancamentos"><div class="empty">carregando...</div></div>
+</div>
+
 </div><!-- /#root -->
+
+<div class="overlay hidden" id="overlay-edicao-fechamento">
+  <div class="sheet" style="position:relative;">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharEdicaoFechamento()">✕</span>
+    <h3>Pedir correção</h3>
+    <div class="sub" id="edicao-fechamento-info"></div>
+    <label>O que você precisa pedir?</label>
+    <select id="ef-tipo" onchange="atualizarTipoEdicaoFechamento()">
+      <option value="campo">Corrigir um valor</option>
+      <option value="data">Corrigir a data do lançamento</option>
+      <option value="excluir">Excluir o lançamento inteiro</option>
+    </select>
+    <form id="form-edicao-fechamento">
+      <div id="ef-campo-wrap">
+        <label>Qual valor está errado e qual o valor correto?</label>
+        <select id="ef-campo"></select>
+        <input type="number" step="0.01" id="ef-valor" placeholder="valor correto" style="margin-top:8px;">
+      </div>
+      <div id="ef-data-wrap" class="hidden">
+        <label>Qual é a data correta?</label>
+        <input type="date" id="ef-nova-data">
+      </div>
+      <div id="ef-excluir-wrap" class="hidden">
+        <div class="sub" style="color:var(--bad);">O lançamento inteiro (todos os valores, KPIs e histórico desse dia) será excluído se o Master aprovar. Depois de aprovado, não tem como desfazer pela loja.</div>
+      </div>
+      <label style="margin-top:10px;">Motivo</label>
+      <textarea id="ef-motivo" placeholder="explique o que aconteceu, o Master vai revisar antes de aprovar" required></textarea>
+      <div class="msg hidden" id="msg-edicao-fechamento"></div>
+      <button class="btn-primary" type="submit">Enviar pedido ao Master</button>
+    </form>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay-master-fechamento">
+  <div class="sheet">
+    <h3>Editar fechamento (Master)</h3>
+    <div class="sub" id="master-fechamento-info"></div>
+    <form id="form-master-fechamento">
+      <div class="grid2">
+        <div><label>Gerente responsável</label><input type="text" id="mf-gerente"></div>
+      </div>
+      <div class="grid2" id="mf-campos-numericos"></div>
+      <div class="grid2" id="mf-canais-extras" style="margin-top:6px;"></div>
+      <div class="grid2" id="mf-formas-extras" style="margin-top:6px;"></div>
+      <div class="grid2" id="mf-kpis-extras" style="margin-top:6px;"></div>
+      <label>Observação</label>
+      <textarea id="mf-observacao"></textarea>
+      <label>Motivo da alteração (opcional, fica registrado no histórico do fechamento)</label>
+      <textarea id="mf-motivo" placeholder="ex: corrigido conforme conferência do caixa"></textarea>
+      <div class="msg hidden" id="msg-master-fechamento"></div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:4px;">
+        <button class="btn-primary" style="margin-top:0;flex:1;" type="submit">Salvar alterações</button>
+        <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirFechamentoMaster()">🗑️ Excluir</button>
+      </div>
+    </form>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharMasterFechamento()">Cancelar</button>
+  </div>
+</div>
 
 <div class="overlay hidden" id="overlay-detalhe">
   <div class="sheet">
@@ -225,6 +309,10 @@
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--ok);" onclick="decidir('APROVADO')">✓ Aprovar</button>
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
       </div>
+    </div>
+    <div id="d-comprada" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">🛍️ Comprada</div>
+      <div id="d-comprada-corpo"></div>
     </div>
     <div id="d-chat" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">💬 Chat</div>
@@ -264,7 +352,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
   'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
   'Spoleto Shopping Recife': 'Spo Shop Recife',
@@ -279,6 +367,8 @@ const TIPOS_INFO = {
   'compra': { label:'Compra', secaoNecessaria:null },
   'manutencao': { label:'Manutenção', secaoNecessaria:null },
   'suporte-ti': { label:'Suporte de TI', secaoNecessaria:null },
+  'pagamento': { label:'Pagamento', secaoNecessaria:null },
+  'nota': { label:'Nota', secaoNecessaria:null },
 };
 
 let ME = null;
@@ -322,7 +412,17 @@ function limparFiltrosExtra(){
 }
 
 function iconeTipo(tipo){
-  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻', pagamento:'💸', nota:'📄' }[tipo] || '📋';
+}
+
+// badge de vencimento pra demanda de pagamento - vermelho se ja venceu e
+// ainda esta pendente (o motivo de existir o robo de cobranças: nao atrasar)
+function badgeVencimento(c){
+  if(c.tipo!=='pagamento' || !c.vencimento) return '';
+  const hoje = new Date().toLocaleDateString('sv-SE', { timeZone:'America/Sao_Paulo' });
+  const vencido = c.vencimento < hoje && c.status==='PENDENTE';
+  const [y,m,d] = c.vencimento.split('-');
+  return `<span class="tipo-badge" style="${vencido?'background:var(--bad-dim);color:var(--bad);font-weight:700;':'background:#12303a;color:var(--accent);'}">${vencido?'⚠️ venceu':'vence'} ${d}/${m}</span>`;
 }
 
 const STATUS_COLUNAS = ['PENDENTE','APROVADO','REJEITADO'];
@@ -333,6 +433,8 @@ function kcardHtml(c){
       <div class="linha1">
         <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
         ${c.ehOrcamento ? '<span class="tipo-badge" style="background:#3d2f0f;color:#e0b84c;">💰 orçamento</span>' : ''}
+        ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
+        ${badgeVencimento(c)}
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
@@ -406,6 +508,8 @@ function abrirDetalhe(tipo, id){
 
   let corpo = c.ehOrcamento ? `<div style="color:#e0b84c;font-weight:600;">💰 É um orçamento — precisa de aprovação de um Admin ou Master.</div>` : '';
   corpo += `<div><b>${escapeHtml(c.titulo)}</b></div>`;
+  if(c.fornecedor) corpo += `<div>Fornecedor: <b>${escapeHtml(c.fornecedor)}</b></div>`;
+  if(c.vencimento) corpo += `<div>Vencimento: <b>${fmtData(c.vencimento)}</b></div>`;
   if(c.itens && c.itens.length){
     corpo += `<div><b>Itens:</b></div><ul style="margin:0;padding-left:18px;">${c.itens.map(i=>
       `<li>${escapeHtml(i.descricao)}${i.quantidade!=null && i.quantidade!=='' ? ` · qtd. ${escapeHtml(String(i.quantidade))}` : ''}</li>`
@@ -444,8 +548,76 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-master-crud').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
 
+  renderComprada(c);
+
   document.getElementById('overlay-detalhe').classList.remove('hidden');
   carregarChat(c.tipo, c.id);
+}
+
+// bloco de Comprada - so pra pedidos de Compra ja Aprovados, visivel pra
+// Master/Admin marcar (data de entrega prevista e/ou print do comprovante)
+// ou desmarcar; quem nao decide (loja) so ve o status ja marcado
+function renderComprada(c){
+  const wrap = document.getElementById('d-comprada');
+  const podeVer = c.tipo==='compra' && c.status==='APROVADO';
+  wrap.classList.toggle('hidden', !podeVer);
+  if(!podeVer) return;
+  const podeMarcar = IS_MASTER || IS_ADMIN;
+  const corpo = document.getElementById('d-comprada-corpo');
+  if(c.comprada){
+    corpo.innerHTML = `
+      <div style="color:var(--ok);font-weight:600;">✅ Comprada</div>
+      ${c.dataEntregaPrevista ? `<div>Entrega prevista: <b>${fmtData(c.dataEntregaPrevista)}</b></div>` : ''}
+      ${c.comprovante ? `<div class="anexo-item">📎 <a href="/api/solicitacoes/${c.id}/comprovante?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(c.comprovante.nome)}</a></div>` : ''}
+      <div class="sub" style="margin-top:2px;">marcado por ${escapeHtml(c.marcadoCompradoPorEmail||'')} · ${fmtDataHora(c.marcadoCompradoEm)}</div>
+      ${podeMarcar ? `<button type="button" class="link-btn" style="margin-top:6px;" onclick="desmarcarComprada()">Desmarcar</button>` : ''}
+    `;
+    return;
+  }
+  if(!podeMarcar){
+    corpo.innerHTML = `<div class="sub">Ainda não foi marcada como comprada.</div>`;
+    return;
+  }
+  corpo.innerHTML = `
+    <label>Data de entrega prevista (opcional)</label>
+    <input type="date" id="comprada-data">
+    <label>Print/comprovante da compra (opcional)</label>
+    <input type="file" id="comprada-arquivo" accept="image/*,.pdf">
+    <button type="button" class="btn-primary" style="margin-top:8px;" onclick="marcarComprada()">✅ Marcar como Comprada</button>
+  `;
+}
+async function marcarComprada(){
+  if(!DETALHE_ATUAL) return;
+  const data = document.getElementById('comprada-data').value;
+  const arquivo = document.getElementById('comprada-arquivo').files[0];
+  try{
+    let resp;
+    if(arquivo){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify({ dataEntregaPrevista: data || null }));
+      fd.append('comprovante', arquivo);
+      resp = await fetch(`/api/solicitacoes/${DETALHE_ATUAL.id}/comprada`, { method:'PATCH', body: fd });
+    }else{
+      resp = await fetch(`/api/solicitacoes/${DETALHE_ATUAL.id}/comprada`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dataEntregaPrevista: data || null }) });
+    }
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao marcar como comprada.');
+    DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
+    renderComprada(DETALHE_ATUAL);
+    await carregarCentral();
+  }catch(err){ alert(err.message); }
+}
+async function desmarcarComprada(){
+  if(!DETALHE_ATUAL) return;
+  if(!confirm('Desmarcar como comprada?')) return;
+  try{
+    const resp = await fetch(`/api/solicitacoes/${DETALHE_ATUAL.id}/comprada`, { method:'DELETE' });
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao desmarcar.');
+    DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
+    renderComprada(DETALHE_ATUAL);
+    await carregarCentral();
+  }catch(err){ alert(err.message); }
 }
 function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
 
@@ -561,6 +733,11 @@ function campoEdicaoHtml(c){
         <div id="lista-itens-editar"></div>
         <button type="button" class="btn-add" onclick="adicionarItemEditar()">+ Adicionar item</button>
       </div>` : ''}
+    ${['pagamento','nota'].includes(c.tipo) ? `
+      <label>Fornecedor</label>
+      <input type="text" id="ed-fornecedor" value="${escapeHtml(c.fornecedor||'')}">
+      ${c.tipo==='pagamento' ? `<label>Vencimento</label><input type="date" id="ed-vencimento" value="${c.vencimento||''}">` : ''}
+    ` : ''}
     <label>Observação</label>
     <textarea id="ed-observacao">${escapeHtml(c.observacao||'')}</textarea>
     <label>Valor ${c.tipo==='compra'?'estimado':'(orçamento, opcional)'}</label>
@@ -652,6 +829,10 @@ async function salvarEdicaoCard(){
         ehOrcamento: document.getElementById('ed-ehOrcamento').checked,
       };
       if(c.tipo==='compra') payload.itens = ITENS_EDITAR.map(i=>({descricao:i.descricao, quantidade:i.quantidade}));
+      if(['pagamento','nota'].includes(c.tipo)){
+        payload.fornecedor = document.getElementById('ed-fornecedor').value;
+        if(c.tipo==='pagamento') payload.vencimento = document.getElementById('ed-vencimento').value || '';
+      }
       resp = await fetch(`/api/solicitacoes/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     }
     const data = await resp.json();
@@ -716,13 +897,259 @@ async function decidir(status){
   }
 }
 
+// ---------- Últimos fechamentos lançados (movido de lancamento.html - a
+// tela de lançamento é só pra lançar, revisar/pedir correção/editar (Master)
+// do que já foi lançado é papel do Histórico) ----------
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+const CAMPOS_NUMERICOS_FECHAMENTO = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
+const NOMES_CAMPOS_FECHAMENTO = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'Ifood', food99:'99Food', pix:'Adyen', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
+// so os campos fora de Canais de venda/Formas de pagamento/KPI's (esses 3
+// já têm os próprios grids dinâmicos por grupo, ver abrirEditarMasterFechamento)
+const CAMPOS_NUMERICOS_MASTER_FECHAMENTO = CAMPOS_NUMERICOS_FECHAMENTO.filter(c=>!['delivery','carryout','pickup','loja','ifood','food99','pix','pixCnpj','outros','tc','cancelados'].includes(c));
+
+let MEUS_FECHAMENTOS = [];
+let EDICOES_FECHAMENTO = [];
+let EDITANDO_FECHAMENTO_ID = null;
+let EDITANDO_FECHAMENTO_MASTER_ID = null;
+let GRUPOS_KPI_FECHAMENTO = [];
+function grupoKpiDaUnidadeFechamento(unidade){
+  return GRUPOS_KPI_FECHAMENTO.find(g=>(g.unidades||[]).includes(unidade)) || null;
+}
+
+async function carregarFechamentos(){
+  const [meus, edicoes, grupos] = await Promise.all([
+    fetch('/api/fechamentos/meus').then(r=>r.json()),
+    fetch('/api/fechamentos/edicoes').then(r=>r.json()),
+    fetch('/api/grupos').then(r=>r.json()).catch(()=>[]),
+  ]);
+  MEUS_FECHAMENTOS = meus.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,20);
+  EDICOES_FECHAMENTO = edicoes;
+  GRUPOS_KPI_FECHAMENTO = grupos;
+  renderListaFechamentos();
+}
+
+function edicaoFechamentoPendente(fechamentoId){
+  return EDICOES_FECHAMENTO.find(e=>e.fechamentoId===fechamentoId && e.status==='PENDENTE');
+}
+function ultimaDecisaoFechamento(fechamentoId){
+  return EDICOES_FECHAMENTO.filter(e=>e.fechamentoId===fechamentoId && e.status!=='PENDENTE').sort((a,b)=>(b.decididoEm||'').localeCompare(a.decididoEm||''))[0];
+}
+
+function renderListaFechamentos(){
+  const el = document.getElementById('lista-lancamentos');
+  if(!MEUS_FECHAMENTOS.length){ el.innerHTML = '<div class="empty">Nenhum fechamento lançado ainda.</div>'; return; }
+  el.innerHTML = MEUS_FECHAMENTOS.map(f=>{
+    const pendente = edicaoFechamentoPendente(f.id);
+    const decidida = !pendente && ultimaDecisaoFechamento(f.id);
+    return `
+    <div class="card">
+      <div class="linha1">
+        <span>${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
+        ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
+        ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
+      </div>
+      <div class="sub">lançado em ${fmtDataHora(f.criadoEm)}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
+      <div class="valores">
+        <span>Faturamento <b>${fmtMoney(f.faturamento)}</b></span>
+        <span>Declarado <b>${fmtMoney(f.totalDeclarado)}</b></span>
+        <span>Diferença <b style="color:${Math.abs(f.diferenca)<0.01?'var(--ok)':'var(--bad)'}">${fmtMoney(f.diferenca)}</b></span>
+      </div>
+      ${IS_MASTER
+        ? '<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEditarMasterFechamento(\''+f.id+'\')">✎ Editar (Master)</button>'
+        : (pendente?'':'<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEdicaoFechamento(\''+f.id+'\')">Pedir correção</button>')}
+    </div>`;
+  }).join('');
+}
+
+function abrirEdicaoFechamento(id){
+  EDITANDO_FECHAMENTO_ID = id;
+  const f = MEUS_FECHAMENTOS.find(x=>x.id===id);
+  document.getElementById('edicao-fechamento-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado o fechamento não pode ser mudado direto; o pedido vai para aprovação do Master.`;
+  document.getElementById('ef-campo').innerHTML = CAMPOS_NUMERICOS_MASTER_FECHAMENTO.map(c=>`<option value="${c}">${NOMES_CAMPOS_FECHAMENTO[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
+  document.getElementById('ef-valor').value = '';
+  document.getElementById('ef-nova-data').value = '';
+  document.getElementById('ef-motivo').value = '';
+  document.getElementById('ef-tipo').value = 'campo';
+  atualizarTipoEdicaoFechamento();
+  document.getElementById('msg-edicao-fechamento').classList.add('hidden');
+  document.getElementById('overlay-edicao-fechamento').classList.remove('hidden');
+}
+function fecharEdicaoFechamento(){ document.getElementById('overlay-edicao-fechamento').classList.add('hidden'); EDITANDO_FECHAMENTO_ID=null; }
+
+// alterna os campos visiveis conforme o tipo de pedido escolhido - corrigir
+// um valor (fluxo original), corrigir a data, ou excluir o lançamento inteiro
+function atualizarTipoEdicaoFechamento(){
+  const tipo = document.getElementById('ef-tipo').value;
+  document.getElementById('ef-campo-wrap').classList.toggle('hidden', tipo!=='campo');
+  document.getElementById('ef-data-wrap').classList.toggle('hidden', tipo!=='data');
+  document.getElementById('ef-excluir-wrap').classList.toggle('hidden', tipo!=='excluir');
+}
+
+document.getElementById('form-edicao-fechamento').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const tipo = document.getElementById('ef-tipo').value;
+  const motivo = document.getElementById('ef-motivo').value;
+  const msg = document.getElementById('msg-edicao-fechamento');
+  msg.classList.add('hidden');
+
+  let body;
+  if(tipo==='excluir'){
+    if(!confirm('Tem certeza que quer pedir a exclusão desse lançamento inteiro? Se o Master aprovar, não tem como desfazer.')) return;
+    body = { tipoCorrecao:'excluir', motivo };
+  } else if(tipo==='data'){
+    const novaData = document.getElementById('ef-nova-data').value;
+    if(!novaData){ msg.textContent = 'Informe a data correta.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
+    body = { tipoCorrecao:'data', novaData, motivo };
+  } else {
+    const campo = document.getElementById('ef-campo').value;
+    const valor = document.getElementById('ef-valor').value;
+    body = { tipoCorrecao:'campo', mudancas: { [campo]: valor }, motivo };
+  }
+
+  try{
+    const res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_ID}/solicitar-edicao`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');
+    fecharEdicaoFechamento();
+    await carregarFechamentos();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }
+});
+
+// ---------- edicao direta (so Master): aplica na hora, sem fila de aprovacao ----------
+function abrirEditarMasterFechamento(id){
+  EDITANDO_FECHAMENTO_MASTER_ID = id;
+  const f = MEUS_FECHAMENTOS.find(x=>x.id===id);
+  document.getElementById('master-fechamento-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — edição direta, aplicada na hora (fica registrada no histórico do fechamento).`;
+  document.getElementById('mf-gerente').value = f.gerente || '';
+  document.getElementById('mf-observacao').value = f.observacao || '';
+  document.getElementById('mf-motivo').value = '';
+  document.getElementById('mf-campos-numericos').innerHTML = CAMPOS_NUMERICOS_MASTER_FECHAMENTO.map(c=>
+    `<div><label>${NOMES_CAMPOS_FECHAMENTO[c]}</label><input type="number" step="0.01" inputmode="decimal" id="mf-${c}" value="${num(f[c])}"></div>`
+  ).join('');
+  const grupoKpi = grupoKpiDaUnidadeFechamento(f.unidade);
+  const kpisDef = grupoKpi ? (grupoKpi.kpisExtras||[]) : [];
+  // KPI's tem unidade de medida por campo (ver grupos.html) - quantidade/
+  // moeda/kg viram number, texto vira texto livre, arquivo mostra o link do
+  // anexo atual + um input pra trocar (nao da pra editar como numero)
+  document.getElementById('mf-kpis-extras').innerHTML = kpisDef.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    const atual = (f.kpisExtras||{})[k.campo];
+    if(tipo === 'arquivo'){
+      const linkAtual = atual ? `<a href="/api/fechamentos/${f.id}/kpi-arquivo/${encodeURIComponent(k.campo)}" target="_blank" style="display:block;font-size:11px;color:var(--accent);margin-bottom:4px;">📎 ver arquivo atual</a>` : '';
+      return `<div><label>${escapeHtml(k.label)}</label>${linkAtual}<input type="file" accept="image/*,application/pdf" data-kpi-campo="${escapeHtml(k.campo)}" class="mf-kpi-arquivo-input"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="texto" class="mf-kpi-extra-input" value="${escapeHtml(atual||'')}"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    return `<div><label>${escapeHtml(k.label)}</label><input type="number" step="${step}" inputmode="decimal" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="${tipo}" class="mf-kpi-extra-input" value="${num(atual)}"></div>`;
+  }).join('');
+  const canaisDef = grupoKpi ? (grupoKpi.canaisVendaExtras||[]) : [];
+  document.getElementById('mf-canais-extras').innerHTML = canaisDef.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-canal-campo="${escapeHtml(k.campo)}" class="mf-canal-extra-input" value="${num((f.canaisVendaExtras||{})[k.campo])}"></div>`
+  ).join('');
+  const formasDef = grupoKpi ? (grupoKpi.formasPagamentoExtras||[]) : [];
+  document.getElementById('mf-formas-extras').innerHTML = formasDef.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-forma-campo="${escapeHtml(k.campo)}" class="mf-forma-extra-input" value="${num((f.formasPagamentoExtras||{})[k.campo])}"></div>`
+  ).join('');
+  document.getElementById('msg-master-fechamento').classList.add('hidden');
+  document.getElementById('overlay-master-fechamento').classList.remove('hidden');
+}
+function fecharMasterFechamento(){ document.getElementById('overlay-master-fechamento').classList.add('hidden'); EDITANDO_FECHAMENTO_MASTER_ID=null; }
+async function excluirFechamentoMaster(){
+  if(!EDITANDO_FECHAMENTO_MASTER_ID) return;
+  const f = MEUS_FECHAMENTOS.find(x=>x.id===EDITANDO_FECHAMENTO_MASTER_ID);
+  const rotulo = f ? `${f.unidadeNome||f.unidade} · ${fmtData(f.data)}` : EDITANDO_FECHAMENTO_MASTER_ID;
+  if(!confirm(`Excluir o fechamento de ${rotulo}? Essa ação não pode ser desfeita.`)) return;
+  const msg = document.getElementById('msg-master-fechamento');
+  try{
+    const res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_MASTER_ID}`, { method:'DELETE' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao excluir');
+    fecharMasterFechamento();
+    await carregarFechamentos();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
+
+document.getElementById('form-master-fechamento').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-master-fechamento');
+  msg.classList.add('hidden');
+  const f = MEUS_FECHAMENTOS.find(x=>x.id===EDITANDO_FECHAMENTO_MASTER_ID);
+  const mudancas = {};
+  CAMPOS_NUMERICOS_MASTER_FECHAMENTO.forEach(c=>{
+    const v = num(document.getElementById('mf-'+c).value);
+    if(v !== num(f[c])) mudancas[c] = v;
+  });
+  const gerente = document.getElementById('mf-gerente').value;
+  if(gerente !== (f.gerente||'')) mudancas.gerente = gerente;
+  const observacao = document.getElementById('mf-observacao').value;
+  if(observacao !== (f.observacao||'')) mudancas.observacao = observacao;
+  const motivo = document.getElementById('mf-motivo').value;
+  const mudancasKpis = {};
+  document.querySelectorAll('.mf-kpi-extra-input').forEach(el=>{
+    const campo = el.dataset.kpiCampo;
+    const atual = (f.kpisExtras||{})[campo];
+    if(el.dataset.kpiTipo === 'texto'){
+      const v = el.value;
+      if(v !== String(atual||'')) mudancasKpis[campo] = v;
+    } else {
+      const v = num(el.value);
+      if(v !== num(atual)) mudancasKpis[campo] = v;
+    }
+  });
+  const mudancasCanais = {};
+  document.querySelectorAll('.mf-canal-extra-input').forEach(el=>{
+    const campo = el.dataset.canalCampo;
+    const v = num(el.value);
+    if(v !== num((f.canaisVendaExtras||{})[campo])) mudancasCanais[campo] = v;
+  });
+  const mudancasFormas = {};
+  document.querySelectorAll('.mf-forma-extra-input').forEach(el=>{
+    const campo = el.dataset.formaCampo;
+    const v = num(el.value);
+    if(v !== num((f.formasPagamentoExtras||{})[campo])) mudancasFormas[campo] = v;
+  });
+  const arquivosKpi = [...document.querySelectorAll('.mf-kpi-arquivo-input')].filter(el=>el.files && el.files[0]);
+  if(!Object.keys(mudancas).length && !Object.keys(mudancasKpis).length && !Object.keys(mudancasCanais).length && !Object.keys(mudancasFormas).length && !arquivosKpi.length){ fecharMasterFechamento(); return; }
+  try{
+    const payload = { mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo };
+    let res;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.kpiCampo, el.files[0]));
+      res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_MASTER_ID}/editar-direto`, { method:'PATCH', body: fd });
+    } else {
+      res = await fetch(`/api/fechamentos/${EDITANDO_FECHAMENTO_MASTER_ID}/editar-direto`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+    }
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharMasterFechamento();
+    await carregarFechamentos();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+
 async function boot(){
   const res = await fetch('/api/me');
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   IS_MASTER = ME.role==='master';
   IS_ADMIN = !!ME.isAdmin;
-  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (ME.permissions?.sections||[]);
+  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
@@ -737,6 +1164,7 @@ async function boot(){
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !SECOES.includes('inventario'));
 
   if(!SECOES.includes('solicitacoes')){
     document.getElementById('sem-acesso').classList.remove('hidden');
@@ -760,6 +1188,12 @@ async function boot(){
   await carregarCentral();
   notificarPendentesNaoVistas();
   conectarStreamChat();
+
+  // painel "Últimos fechamentos lançados" - so pra quem tem a secao
+  // "lancamento" (mesma exigencia da rota /api/fechamentos/meus)
+  const podeLancamento = SECOES.includes('lancamento');
+  document.getElementById('painel-meus-lancamentos').classList.toggle('hidden', !podeLancamento);
+  if(podeLancamento) await carregarFechamentos();
 }
 
 // notificacao de mensagem nova no canto superior direito - fica ate a pessoa
@@ -775,9 +1209,11 @@ function mostrarNotificacaoChat(msg){
   el.className = 'notif-chat';
   el.id = 'notif-' + (++NOTIF_SEQ);
   el.innerHTML = `
-    <div class="notif-titulo"><span>💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</span><span class="notif-fechar">✕</span></div>
+    <span class="notif-fechar" title="Fechar">✕</span>
+    <div class="notif-titulo">💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</div>
     <div class="notif-corpo"><b>${escapeHtml(msg.autorEmail||'')}:</b> ${escapeHtml(msg.texto)}</div>
   `;
+  el.querySelector('.notif-fechar').addEventListener('click', (ev)=>{ ev.stopPropagation(); el.remove(); });
   el.onclick = ()=>{
     el.remove();
     if(card) abrirDetalhe(card.tipo, card.id);

@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estoque / Inventário · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;overflow-x:hidden;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  .sub{font-size:11.5px;color:var(--muted);}
+  header{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+  @media(max-width:640px){ .panel{padding:12px;} }
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:13.5px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:52px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:520px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .grid3{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:640px){ .grid3{grid-template-columns:1fr 1fr 1fr;} }
+  .btn-primary{background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:11px 16px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;}
+  .btn-add:hover{border-color:var(--accent);}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;}
+  .toolbar label{margin:0;}
+  .toolbar .campo{min-width:160px;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 16px;}
+  .tab-btn{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;transition:border-color .15s ease,color .15s ease;}
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:#06202b;background:var(--accent);border-color:var(--accent);}
+  .preset-btn{font-family:var(--sans);font-size:12px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .preset-btn:hover{border-color:var(--accent);}
+  .preset-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);}
+  .presets{display:flex;gap:6px;flex-wrap:wrap;}
+  .daterange{display:flex;align-items:center;gap:6px;}
+  .daterange input{width:140px;}
+  .sep{color:var(--muted);font-size:12px;}
+  .setor-bloco{border-top:1px solid var(--line);margin-top:16px;padding-top:14px;}
+  .setor-bloco:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .setor-titulo{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .setor-titulo .n{color:var(--muted);font-weight:400;}
+  .itens-grid{display:grid;grid-template-columns:1fr;gap:8px;}
+  @media(min-width:560px){ .itens-grid{grid-template-columns:1fr 1fr;} }
+  @media(min-width:960px){ .itens-grid{grid-template-columns:1fr 1fr 1fr;} }
+  .item-linha{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .item-linha .nome{font-size:12.5px;font-weight:600;margin-bottom:2px;}
+  .item-linha .un{color:var(--muted);font-weight:400;font-size:11px;}
+  .item-linha .ref{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:4px;}
+  .item-linha input{padding:7px 8px;font-size:13px;}
+  .linha-contagem{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #1a1f26;flex-wrap:wrap;}
+  .linha-contagem:last-child{border-bottom:none;}
+  .linha-contagem .nome{flex:1 1 200px;min-width:0;font-size:13px;}
+  .linha-contagem .nome .un{color:var(--muted);font-weight:400;font-size:11px;margin-left:4px;}
+  .linha-contagem .ref{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;flex:none;}
+  .linha-contagem input{width:110px;flex:none;padding:7px 8px;font-size:13px;}
+  .tablewrap{overflow-x:auto;}
+  table{width:100%;min-width:560px;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
+  tbody td{padding:8px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
+  .valor{font-variant-numeric:tabular-nums;text-align:right;}
+  .truncate{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .acao-btn{background:none;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;color:var(--text);margin-right:4px;}
+  .acao-btn:hover{border-color:var(--accent);}
+  .acao-btn.excluir:hover{border-color:var(--bad);color:var(--bad);}
+  .kpis{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px;}
+  @media(min-width:640px){ .kpis{grid-template-columns:repeat(3,1fr);} }
+  @media(min-width:960px){ .kpis{grid-template-columns:repeat(6,1fr);} }
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .kpi .rotulo{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .kpi .valor-kpi{font-size:18px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .kpi .valor-kpi.ok{color:var(--ok);} .kpi .valor-kpi.bad{color:var(--bad);}
+  .chart-wrap{position:relative;}
+  svg.viz text{font-family:var(--mono);font-size:10px;fill:var(--muted);}
+  svg.viz .grid-line{stroke:var(--line);stroke-width:1;}
+  svg.viz .bar{cursor:pointer;}
+  svg.viz .bar.dim{opacity:.35;}
+  svg.viz .hit-row{fill:transparent;}
+  .viz-tooltip{position:fixed;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;z-index:80;display:none;box-shadow:0 6px 20px rgba(0,0,0,.4);}
+  .viz-tooltip.show{display:block;}
+  .tt-date{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:4px;}
+  .tt-row{display:flex;align-items:center;gap:6px;}
+  .tt-key{display:flex;align-items:center;gap:5px;font-size:11.5px;}
+  .tt-key i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+  .tt-val{font-weight:700;margin-left:auto;}
+  .badge-tipo{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;}
+  .overlay.hidden{display:none!important;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;}
+  .modal h3{margin:0 0 12px;font-size:14px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+  .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>📦 Estoque / Inventário</h1>
+        <div class="sub" style="margin-top:4px;max-width:640px;">Contagem física por setor, recebimento de mercadoria (com custo, pra dar noção de CMV) e saídas (venda/desperdício) - a diferença entre o esperado e o real aparece na aba Diferenças.</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back active" id="nav-self" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao Estoque. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<div class="panel">
+  <div class="toolbar">
+    <div class="campo">
+      <label>Unidade</label>
+      <select id="sel-unidade" onchange="trocarUnidade()"></select>
+    </div>
+  </div>
+  <div class="tabs">
+    <button type="button" class="tab-btn active" data-tab="contagem" onclick="mudarAba('contagem')">📋 Contagem</button>
+    <button type="button" class="tab-btn" data-tab="recebimento" onclick="mudarAba('recebimento')">📥 Recebimento</button>
+    <button type="button" class="tab-btn" data-tab="saida" onclick="mudarAba('saida')">📤 Saída</button>
+    <button type="button" class="tab-btn" data-tab="diferencas" onclick="mudarAba('diferencas')">📊 Diferenças</button>
+    <button type="button" class="tab-btn hidden" id="tab-btn-catalogo" data-tab="catalogo" onclick="mudarAba('catalogo')">🗂️ Catálogo</button>
+  </div>
+</div>
+
+<!-- ---------- Contagem ---------- -->
+<div class="panel tab-content" id="tab-contagem">
+  <div class="toolbar">
+    <div class="campo">
+      <label>Data da contagem</label>
+      <input type="date" id="c-data" onchange="reiniciarContagem()">
+    </div>
+    <div class="sub" id="c-info" style="padding-bottom:9px;"></div>
+  </div>
+  <div id="c-inicio">
+    <button type="button" class="btn-primary" onclick="iniciarContagem()">▶️ Iniciar contagem</button>
+  </div>
+  <div id="c-corpo" class="hidden">
+    <div class="toolbar">
+      <div class="campo">
+        <label>Setor</label>
+        <select id="c-setor" onchange="renderContagemSetor()"></select>
+      </div>
+      <div class="sub" id="c-progresso" style="padding-bottom:9px;"></div>
+    </div>
+    <div id="c-itens"></div>
+    <button type="button" class="btn-add" onclick="abrirNovoItemContagem()">+ Adicionar item nesse setor</button>
+    <div class="msg hidden" id="msg-contagem"></div>
+    <button type="button" class="btn-primary" style="margin-top:14px;" onclick="salvarContagem()" id="btn-salvar-contagem">Salvar contagem</button>
+  </div>
+</div>
+
+<!-- ---------- Recebimento ---------- -->
+<div class="panel tab-content hidden" id="tab-recebimento">
+  <h2>Novo recebimento de mercadoria</h2>
+  <div class="sub" style="margin-bottom:10px;">Cadastre o item e o valor pago - é esse valor que dá a noção de CMV da loja (ver aba Diferenças).</div>
+  <form id="form-recebimento">
+    <div class="grid2">
+      <div><label>Data</label><input type="date" id="r-data" required></div>
+      <div><label>Fornecedor</label><input type="text" id="r-fornecedor" list="datalist-fornecedores" placeholder="ex: Martin Brower" required></div>
+    </div>
+    <label>Item</label>
+    <select id="r-item" required onchange="atualizarModoRecebimento()"></select>
+    <div id="r-modo-simples">
+      <label>Quantidade</label>
+      <input type="number" step="0.001" id="r-quantidade">
+    </div>
+    <div class="hidden" id="r-modo-embalagem">
+      <div class="grid2">
+        <div><label>Quantidade de embalagens</label><input type="number" step="1" min="0" id="r-qtd-embalagens"></div>
+        <div><label>Peso da embalagem (g)</label><input type="number" step="1" min="0" id="r-peso-embalagem"></div>
+      </div>
+      <div class="sub" id="r-peso-calculado" style="margin:-4px 0 8px;"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Valor unitário (R$)</label><input type="number" step="0.01" id="r-valor"></div>
+      <div><label>Valor total da nota (R$)</label><input type="number" step="0.01" id="r-valor-total"></div>
+    </div>
+    <div class="sub" style="margin:-2px 0 8px;">Preencha um dos dois - o outro é calculado sozinho a partir da Quantidade (igual vem na nota: Valor Unit. × Quantidade = Valor Total).</div>
+    <label>Nota fiscal (opcional)</label>
+    <input type="text" id="r-nota" placeholder="número da nota">
+    <div class="msg hidden" id="msg-recebimento"></div>
+    <button class="btn-primary" type="submit" style="margin-top:14px;">Lançar recebimento</button>
+  </form>
+</div>
+<div class="panel tab-content hidden" id="tab-recebimento-lista">
+  <h2>Últimos recebimentos</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Data</th><th>Item</th><th>Fornecedor</th><th>Qtd</th><th>Valor unit.</th><th>Total</th><th></th></tr></thead>
+      <tbody id="recebimentos-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ---------- Saída ---------- -->
+<div class="panel tab-content hidden" id="tab-saida">
+  <h2>Nova saída</h2>
+  <div class="sub" style="margin-bottom:10px;">Venda, desperdício ou outra saída de estoque - tudo que sai do inventário sem ser contagem.</div>
+  <form id="form-saida">
+    <div class="grid2">
+      <div><label>Data</label><input type="date" id="s-data" required></div>
+      <div>
+        <label>Tipo</label>
+        <select id="s-tipo" required>
+          <option value="VENDA">Venda</option>
+          <option value="DESPERDICIO">Desperdício</option>
+          <option value="OUTRA">Outra saída</option>
+        </select>
+      </div>
+    </div>
+    <label>Item</label>
+    <select id="s-item" required></select>
+    <label>Quantidade</label>
+    <input type="number" step="0.001" id="s-quantidade" required>
+    <label>Motivo (opcional)</label>
+    <textarea id="s-motivo" placeholder="ex: caiu no chão, validade vencida..."></textarea>
+    <div class="msg hidden" id="msg-saida"></div>
+    <button class="btn-primary" type="submit" style="margin-top:14px;">Lançar saída</button>
+  </form>
+</div>
+<div class="panel tab-content hidden" id="tab-saida-lista">
+  <h2>Últimas saídas</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Qtd</th><th>Motivo</th><th></th></tr></thead>
+      <tbody id="saidas-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ---------- Diferenças ---------- -->
+<div class="panel tab-content hidden" id="tab-diferencas">
+  <h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <span>Diferenças (esperado × real)</span>
+      <span style="display:flex;gap:8px;">
+        <button type="button" class="preset-btn" onclick="baixarRelatorioDiferencas('csv')">📄 CSV</button>
+        <button type="button" class="preset-btn" onclick="baixarRelatorioDiferencas('pdf')">📄 PDF</button>
+      </span>
+    </div>
+  </h2>
+  <div class="toolbar" style="margin-top:10px;">
+    <div class="presets" id="d-presets"></div>
+    <div class="daterange">
+      <input type="date" id="d-inicio" onchange="limparPresetAtivo();carregarDiferencas();">
+      <span class="sep">até</span>
+      <input type="date" id="d-fim" onchange="limparPresetAtivo();carregarDiferencas();">
+    </div>
+  </div>
+  <div class="kpis" id="d-kpis"></div>
+  <div class="setor-titulo">🏆 Top ofensores (maior diferença em R$)</div>
+  <div class="chart-wrap">
+    <svg class="viz" id="d-chart" width="100%" height="320"></svg>
+  </div>
+  <div class="tablewrap" style="margin-top:18px;">
+    <table>
+      <thead><tr><th>Setor</th><th>Item</th><th>Entradas</th><th>Vendas</th><th>Desperdício</th><th>Diferença (qtd)</th><th>Diferença (R$)</th></tr></thead>
+      <tbody id="d-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ---------- Catálogo ---------- -->
+<div class="panel tab-content hidden" id="tab-catalogo">
+  <h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <span>Catálogo de itens</span>
+      <button type="button" class="btn-add" id="btn-catalogo-seed" onclick="carregarCatalogoPadrao()">⬇️ Carregar catálogo padrão (Domino's)</button>
+    </div>
+  </h2>
+  <div class="msg hidden" id="msg-catalogo-seed"></div>
+  <button type="button" class="btn-add" onclick="abrirNovoItem()">+ Novo item</button>
+  <div class="tablewrap" style="margin-top:12px;">
+    <table>
+      <thead><tr><th>Nome</th><th>Setor</th><th>Tipo</th><th>Unid.</th><th>Custo ref.</th><th>Status</th><th></th></tr></thead>
+      <tbody id="catalogo-body"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /root -->
+
+<datalist id="datalist-fornecedores">
+  <option value="Martin Brower">
+  <option value="Coca-Cola">
+  <option value="Carne e Queijo">
+  <option value="Embalagens">
+  <option value="Hortifruti">
+</datalist>
+
+<div class="viz-tooltip" id="viz-tooltip"></div>
+
+<div class="overlay hidden" id="overlay-item">
+  <div class="modal">
+    <h3 id="item-modal-titulo">Novo item</h3>
+    <form id="form-item">
+      <label>Nome</label>
+      <input type="text" id="i-nome" required>
+      <div class="grid2">
+        <div>
+          <label>Setor</label>
+          <select id="i-setor" required></select>
+          <button type="button" class="btn-add" style="margin-top:6px;padding:5px 8px;font-size:11px;" onclick="abrirNovoSetor()">+ Novo setor</button>
+        </div>
+        <div>
+          <label>Tipo</label>
+          <select id="i-tipo" required></select>
+          <button type="button" class="btn-add" style="margin-top:6px;padding:5px 8px;font-size:11px;" onclick="abrirNovoTipo()">+ Novo tipo</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div><label>Unidade de medida</label><input type="text" id="i-unidade" placeholder="KG, LT, UN..." required oninput="atualizarCampoPesoItem()"></div>
+        <div><label>Custo de referência (R$)</label><input type="number" step="0.01" id="i-custo" value="0"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Qtd. padrão de compra (opcional)</label><input type="number" step="1" min="0" id="i-quantidade-padrao" placeholder="ex: 10 embalagens"></div>
+        <div class="hidden" id="i-peso-wrap"><label>Peso da embalagem (g, opcional)</label><input type="number" step="1" min="0" id="i-peso-embalagem" placeholder="ex: 400"></div>
+      </div>
+      <div class="sub" id="i-peso-sub" style="margin:-4px 0 8px;">Qtd. padrão pré-preenche o Recebimento. Peso da embalagem só aparece pra item medido em KG/G - com ele, o Recebimento aceita "quantas embalagens vieram" e calcula o peso/valor sozinho (útil pra item fracionado, ex: 400g, 300g).</div>
+      <div class="msg hidden" id="msg-item"></div>
+      <div class="modal-actions">
+        <button type="button" onclick="fecharItem()">Cancelar</button>
+        <button type="submit" class="primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+
+const FUSO_BR = 'America/Sao_Paulo';
+function pad2(n){ return String(n).padStart(2,'0'); }
+function isoLocal(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function hojeBrasilia(){ return isoLocal(agoraBrasilia()); }
+function calcularPreset(tipo, refIso){
+  const ref = new Date(refIso+'T00:00:00');
+  if(tipo==='ontem'){ const o=new Date(ref); o.setDate(o.getDate()-1); return {inicio:isoLocal(o),fim:isoLocal(o)}; }
+  if(tipo==='semana'){ const dow=ref.getDay(); const i=new Date(ref); i.setDate(ref.getDate()-dow); const f=new Date(i); f.setDate(i.getDate()+6); return {inicio:isoLocal(i),fim:isoLocal(f)}; }
+  if(tipo==='mes'){ const i=new Date(ref.getFullYear(),ref.getMonth(),1); const f=new Date(ref.getFullYear(),ref.getMonth()+1,0); return {inicio:isoLocal(i),fim:isoLocal(f)}; }
+  const i=new Date(ref.getFullYear(),ref.getMonth()-2,1); const f=new Date(ref.getFullYear(),ref.getMonth()+1,0);
+  return {inicio:isoLocal(i),fim:isoLocal(f)};
+}
+
+// setores/tipos vem do servidor agora (fixos + os que o Master for
+// cadastrando, ver inventario.js/abrirNovoSetor) - carregado no boot()
+let SETORES = {};
+let ORDEM_SETORES = [];
+let TIPOS_ITEM = [];
+
+let ME = null;
+let IS_MASTER = false;
+let UNIDADES = [];
+let CATALOGO = [];
+let RECEBIMENTOS = [];
+let SAIDAS = [];
+let ABA_ATUAL = 'contagem';
+
+function unidadeAtual(){ return document.getElementById('sel-unidade').value; }
+
+function mudarAba(aba){
+  ABA_ATUAL = aba;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===aba));
+  document.getElementById('tab-contagem').classList.toggle('hidden', aba!=='contagem');
+  document.getElementById('tab-recebimento').classList.toggle('hidden', aba!=='recebimento');
+  document.getElementById('tab-recebimento-lista').classList.toggle('hidden', aba!=='recebimento');
+  document.getElementById('tab-saida').classList.toggle('hidden', aba!=='saida');
+  document.getElementById('tab-saida-lista').classList.toggle('hidden', aba!=='saida');
+  document.getElementById('tab-diferencas').classList.toggle('hidden', aba!=='diferencas');
+  document.getElementById('tab-catalogo').classList.toggle('hidden', aba!=='catalogo');
+  if(aba==='contagem' && !CONTAGEM_INICIADA) reiniciarContagem();
+  if(aba==='recebimento') renderRecebimentos();
+  if(aba==='saida') renderSaidas();
+  if(aba==='diferencas') carregarDiferencas();
+  if(aba==='catalogo') renderCatalogo();
+}
+
+function trocarUnidade(){
+  if(ABA_ATUAL==='contagem') reiniciarContagem();
+  else if(ABA_ATUAL==='recebimento') renderRecebimentos();
+  else if(ABA_ATUAL==='saida') renderSaidas();
+  else if(ABA_ATUAL==='diferencas') carregarDiferencas();
+}
+
+// ---------- selects de item, agrupados por setor (usados em Recebimento/Saída) ----------
+function opcoesItensAgrupadas(){
+  const ativos = CATALOGO.filter(i=>i.ativo!==false);
+  return ORDEM_SETORES.map(setor=>{
+    const itens = ativos.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    if(!itens.length) return '';
+    return `<optgroup label="${escapeHtml(SETORES[setor])}">` +
+      itens.map(i=>`<option value="${i.id}">${escapeHtml(i.nome)} (${escapeHtml(i.unidadeMedida)})</option>`).join('') +
+      '</optgroup>';
+  }).join('');
+}
+function popularSelectsItem(){
+  document.getElementById('r-item').innerHTML = opcoesItensAgrupadas();
+  atualizarModoRecebimento();
+  document.getElementById('s-item').innerHTML = opcoesItensAgrupadas();
+}
+
+// ---------- Contagem ----------
+// fluxo: "Iniciar contagem" busca a contagem de hoje/ontem e mostra o
+// seletor de Setor; trocar de setor so troca o que aparece na tela, os
+// valores digitados ficam guardados em CONTAGEM_VALORES (nao no DOM) - assim
+// da pra ir e voltar entre setores sem perder o que ja foi digitado, igual
+// preencher a planilha por abas
+let CONTAGEM_VALORES = {};
+let CONTAGEM_ONTEM = {};
+let CONTAGEM_INICIADA = false;
+
+function reiniciarContagem(){
+  CONTAGEM_VALORES = {}; CONTAGEM_ONTEM = {}; CONTAGEM_INICIADA = false;
+  document.getElementById('c-corpo').classList.add('hidden');
+  document.getElementById('c-inicio').classList.remove('hidden');
+  document.getElementById('c-info').textContent = '';
+}
+
+async function iniciarContagem(){
+  const unidade = unidadeAtual();
+  const data = document.getElementById('c-data').value;
+  if(!unidade || !data){ alert('Selecione a unidade e a data.'); return; }
+
+  const dOntem = new Date(data+'T00:00:00'); dOntem.setDate(dOntem.getDate()-1);
+  const dataOntem = isoLocal(dOntem);
+  const [hoje, ontem] = await Promise.all([
+    fetch(`/api/inventario/contagens?unidade=${encodeURIComponent(unidade)}&data=${data}`).then(r=>r.json()),
+    fetch(`/api/inventario/contagens?unidade=${encodeURIComponent(unidade)}&data=${dataOntem}`).then(r=>r.json()),
+  ]);
+  CONTAGEM_VALORES = { ...(hoje.contagens||{}) };
+  CONTAGEM_ONTEM = ontem.contagens || {};
+  CONTAGEM_INICIADA = true;
+  document.getElementById('c-info').textContent = `Contagem anterior (${fmtData(dataOntem)}) aparece como referência ao lado de cada item.`;
+
+  const setoresComItens = ORDEM_SETORES.filter(s=>CATALOGO.some(i=>i.setor===s && i.ativo!==false));
+  document.getElementById('c-setor').innerHTML = setoresComItens.length
+    ? setoresComItens.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('')
+    : '';
+  document.getElementById('c-inicio').classList.add('hidden');
+  document.getElementById('c-corpo').classList.remove('hidden');
+  renderContagemSetor();
+}
+
+function setorAtualContagem(){ return document.getElementById('c-setor').value; }
+
+function renderContagemSetor(){
+  const setor = setorAtualContagem();
+  const container = document.getElementById('c-itens');
+  if(!setor){ container.innerHTML = '<div class="empty">Nenhum item no catálogo ainda - adicione um item abaixo.</div>'; atualizarProgressoContagem(); return; }
+  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  container.innerHTML = itens.length ? itens.map(i=>{
+    const valorAtual = CONTAGEM_VALORES[i.id];
+    const valorOntem = CONTAGEM_ONTEM[i.id];
+    return `<div class="linha-contagem">
+      <div class="nome">${escapeHtml(i.nome)} <span class="un">${escapeHtml(i.unidadeMedida)}</span></div>
+      <div class="ref">Ontem: ${valorOntem!=null ? valorOntem : '—'}</div>
+      <input type="number" step="0.001" data-item-id="${i.id}" class="input-contagem" value="${valorAtual!=null?valorAtual:''}" placeholder="qtd" oninput="CONTAGEM_VALORES[this.dataset.itemId]=this.value; atualizarProgressoContagem();">
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum item nesse setor ainda - adicione um abaixo.</div>';
+  atualizarProgressoContagem();
+}
+
+function atualizarProgressoContagem(){
+  const preenchidos = Object.values(CONTAGEM_VALORES).filter(v=>v!=='' && v!=null).length;
+  document.getElementById('c-progresso').textContent = preenchidos ? `${preenchidos} item(ns) preenchido(s) no total (todos os setores)` : '';
+}
+
+// abre o modal "Novo item" (o mesmo do Catálogo) ja com o Setor atual
+// selecionado - depois de salvar, o item novo aparece direto na lista desse
+// setor aqui na Contagem, sem precisar ir na aba Catálogo
+function abrirNovoItemContagem(){
+  const setor = setorAtualContagem();
+  abrirNovoItem();
+  ITEM_ORIGEM = 'contagem';
+  if(setor) document.getElementById('i-setor').value = setor;
+}
+
+async function salvarContagem(){
+  const unidade = unidadeAtual();
+  const data = document.getElementById('c-data').value;
+  if(!unidade || !data){ alert('Selecione unidade e data.'); return; }
+  const contagens = {};
+  Object.entries(CONTAGEM_VALORES).forEach(([itemId,valor])=>{
+    if(valor !== '' && valor != null) contagens[itemId] = valor;
+  });
+  if(!Object.keys(contagens).length){ alert('Preencha ao menos uma contagem.'); return; }
+  if(!confirm('Tem certeza que deseja salvar essa contagem? Confira os valores antes de continuar.')) return;
+  const btn = document.getElementById('btn-salvar-contagem');
+  const msg = document.getElementById('msg-contagem');
+  msg.classList.add('hidden'); btn.disabled = true;
+  try{
+    const unidadeNome = UNIDADES.find(u=>u.codigo===unidade)?.nome || unidade;
+    const res = await fetch('/api/inventario/contagens', { method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ unidade, unidadeNome, data, contagens }) });
+    const body = await res.json();
+    if(!res.ok) throw new Error(body.error||'erro ao salvar');
+    msg.textContent = 'Contagem salva com sucesso.'; msg.className = 'msg ok';
+    await iniciarContagem();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden'); btn.disabled = false;
+  }
+}
+
+// ---------- Recebimento ----------
+function renderRecebimentos(){
+  const unidade = unidadeAtual();
+  const filtrados = RECEBIMENTOS.filter(r=>r.unidade===unidade).slice(0,30);
+  document.getElementById('recebimentos-body').innerHTML = filtrados.length ? filtrados.map(r=>`
+    <tr>
+      <td>${fmtData(r.data)}</td>
+      <td>${escapeHtml(r.itemNome)}</td>
+      <td>${escapeHtml(r.fornecedor)}</td>
+      <td class="valor">${r.quantidade}</td>
+      <td class="valor">${fmtMoney(r.valorUnitario)}</td>
+      <td class="valor">${fmtMoney(r.valorTotal)}</td>
+      <td>${IS_MASTER ? `<button type="button" class="acao-btn excluir" onclick="excluirRecebimento('${r.id}')">🗑️</button>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">Nenhum recebimento lançado ainda pra essa unidade.</td></tr>';
+}
+async function excluirRecebimento(id){
+  if(!confirm('Excluir esse recebimento? Essa ação não pode ser desfeita.')) return;
+  const res = await fetch(`/api/inventario/recebimentos/${id}`, { method:'DELETE' });
+  if(!res.ok){ alert('Erro ao excluir.'); return; }
+  await carregarRecebimentos();
+  renderRecebimentos();
+}
+async function carregarRecebimentos(){ RECEBIMENTOS = await fetch('/api/inventario/recebimentos').then(r=>r.json()); }
+
+// item medido em KG/G com peso de embalagem cadastrado (ver i-peso-embalagem
+// no Catálogo) entra no "modo embalagem": em vez de digitar a quantidade já
+// em peso (o que exigia fazer de cabeça embalagens×peso pra item fracionado
+// tipo 400g/300g), a loja digita quantas embalagens vieram e o peso de cada
+// uma (pré-preenchido, mas editável - a marca pode trazer embalagem de
+// tamanho diferente) e o sistema calcula o peso total sozinho.
+function itemSelecionadoRecebimento(){
+  return CATALOGO.find(i=>i.id===document.getElementById('r-item').value);
+}
+function atualizarModoRecebimento(){
+  const item = itemSelecionadoRecebimento();
+  const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+  document.getElementById('r-modo-simples').classList.toggle('hidden', modoEmbalagem);
+  document.getElementById('r-modo-embalagem').classList.toggle('hidden', !modoEmbalagem);
+  if(modoEmbalagem){
+    document.getElementById('r-qtd-embalagens').value = item.quantidadePadrao || '';
+    document.getElementById('r-peso-embalagem').value = item.pesoEmbalagemG || '';
+  } else {
+    document.getElementById('r-quantidade').value = item && item.quantidadePadrao ? item.quantidadePadrao : '';
+    document.getElementById('r-peso-calculado').textContent = '';
+  }
+  R_ULTIMO_EDITADO = null;
+  recalcularValoresRecebimento('quantidade');
+}
+// quantidade efetiva na unidadeMedida do item - ou direto do campo simples,
+// ou calculada a partir de embalagens×peso (convertendo g->kg quando for o caso)
+function quantidadeEfetivaRecebimento(){
+  const item = itemSelecionadoRecebimento();
+  if(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG){
+    const embalagens = num(document.getElementById('r-qtd-embalagens').value);
+    const pesoG = num(document.getElementById('r-peso-embalagem').value);
+    const totalG = embalagens*pesoG;
+    const calc = document.getElementById('r-peso-calculado');
+    if(embalagens>0 && pesoG>0){
+      calc.textContent = item.unidadeMedida==='KG' ? `= ${(totalG/1000).toLocaleString('pt-BR',{maximumFractionDigits:3})} kg no total` : `= ${totalG.toLocaleString('pt-BR')} g no total`;
+    } else {
+      calc.textContent = '';
+    }
+    return item.unidadeMedida==='KG' ? totalG/1000 : totalG;
+  }
+  return num(document.getElementById('r-quantidade').value);
+}
+
+// a nota fiscal quase sempre traz os 2 numeros impressos (Valor Unit. e
+// Valor Total) - a loja preenche o que tiver mais a mao e o outro é
+// calculado sozinho a partir da Quantidade, sem precisar fazer conta de
+// cabeça (evita erro de digitação num valor já dividido/multiplicado errado)
+let R_ULTIMO_EDITADO = null; // 'unitario' | 'total'
+function recalcularValoresRecebimento(origem){
+  if(origem!=='quantidade') R_ULTIMO_EDITADO = origem;
+  const qtd = quantidadeEfetivaRecebimento();
+  if(!qtd) return;
+  const base = origem==='quantidade' ? R_ULTIMO_EDITADO : origem;
+  if(base==='total'){
+    const total = num(document.getElementById('r-valor-total').value);
+    if(total>0) document.getElementById('r-valor').value = (total/qtd).toFixed(4);
+  } else if(base==='unitario'){
+    const unit = num(document.getElementById('r-valor').value);
+    if(unit>0) document.getElementById('r-valor-total').value = (unit*qtd).toFixed(2);
+  }
+}
+document.getElementById('r-quantidade').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
+document.getElementById('r-qtd-embalagens').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
+document.getElementById('r-peso-embalagem').addEventListener('input', ()=>recalcularValoresRecebimento('quantidade'));
+document.getElementById('r-valor').addEventListener('input', ()=>recalcularValoresRecebimento('unitario'));
+document.getElementById('r-valor-total').addEventListener('input', ()=>recalcularValoresRecebimento('total'));
+
+document.getElementById('form-recebimento').addEventListener('keydown', (ev)=>{
+  if(ev.key==='Enter' && (ev.target.tagName||'').toUpperCase()!=='TEXTAREA') ev.preventDefault();
+});
+document.getElementById('form-recebimento').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  if(num(document.getElementById('r-valor').value)<=0 && num(document.getElementById('r-valor-total').value)<=0){
+    const msg = document.getElementById('msg-recebimento');
+    msg.textContent = 'Informe o valor unitário ou o valor total da nota.'; msg.className = 'msg err'; msg.classList.remove('hidden');
+    return;
+  }
+  if(quantidadeEfetivaRecebimento()<=0){
+    const msg = document.getElementById('msg-recebimento');
+    msg.textContent = 'Informe a quantidade recebida.'; msg.className = 'msg err'; msg.classList.remove('hidden');
+    return;
+  }
+  if(!confirm('Tem certeza que deseja lançar esse recebimento? Confira o item, a quantidade e o valor antes de continuar.')) return;
+  const msg = document.getElementById('msg-recebimento');
+  msg.classList.add('hidden');
+  try{
+    const unidade = unidadeAtual();
+    const unidadeNome = UNIDADES.find(u=>u.codigo===unidade)?.nome || unidade;
+    const item = itemSelecionadoRecebimento();
+    const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+    const body = {
+      unidade, unidadeNome,
+      itemId: document.getElementById('r-item').value,
+      fornecedor: document.getElementById('r-fornecedor').value,
+      quantidade: modoEmbalagem ? null : document.getElementById('r-quantidade').value,
+      quantidadeEmbalagens: modoEmbalagem ? document.getElementById('r-qtd-embalagens').value : null,
+      pesoEmbalagem: modoEmbalagem ? document.getElementById('r-peso-embalagem').value : null,
+      valorUnitario: document.getElementById('r-valor').value,
+      valorTotal: document.getElementById('r-valor-total').value,
+      data: document.getElementById('r-data').value,
+      notaFiscal: document.getElementById('r-nota').value,
+    };
+    const res = await fetch('/api/inventario/recebimentos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao lançar');
+    msg.textContent = 'Recebimento lançado com sucesso.'; msg.className = 'msg ok';
+    document.getElementById('r-quantidade').value = '';
+    document.getElementById('r-qtd-embalagens').value = '';
+    document.getElementById('r-peso-embalagem').value = '';
+    document.getElementById('r-peso-calculado').textContent = '';
+    document.getElementById('r-valor').value = '';
+    document.getElementById('r-valor-total').value = '';
+    document.getElementById('r-nota').value = '';
+    R_ULTIMO_EDITADO = null;
+    await carregarCatalogo(); // pesoEmbalagemG do item pode ter mudado (novo padrao)
+    atualizarModoRecebimento(); // repopula com o padrao do item, pronta pro proximo lançamento
+    await carregarRecebimentos();
+    renderRecebimentos();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+  }
+});
+
+// ---------- Saída ----------
+const NOMES_TIPO_SAIDA = { VENDA:'Venda', DESPERDICIO:'Desperdício', OUTRA:'Outra' };
+function renderSaidas(){
+  const unidade = unidadeAtual();
+  const filtrados = SAIDAS.filter(s=>s.unidade===unidade).slice(0,30);
+  document.getElementById('saidas-body').innerHTML = filtrados.length ? filtrados.map(s=>`
+    <tr>
+      <td>${fmtData(s.data)}</td>
+      <td>${escapeHtml(s.itemNome)}</td>
+      <td>${NOMES_TIPO_SAIDA[s.tipo]||s.tipo}</td>
+      <td class="valor">${s.quantidade}</td>
+      <td class="truncate" title="${escapeHtml(s.motivo||'')}">${escapeHtml(s.motivo||'—')}</td>
+      <td>${IS_MASTER ? `<button type="button" class="acao-btn excluir" onclick="excluirSaida('${s.id}')">🗑️</button>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhuma saída lançada ainda pra essa unidade.</td></tr>';
+}
+async function excluirSaida(id){
+  if(!confirm('Excluir essa saída? Essa ação não pode ser desfeita.')) return;
+  const res = await fetch(`/api/inventario/saidas/${id}`, { method:'DELETE' });
+  if(!res.ok){ alert('Erro ao excluir.'); return; }
+  await carregarSaidas();
+  renderSaidas();
+}
+async function carregarSaidas(){ SAIDAS = await fetch('/api/inventario/saidas').then(r=>r.json()); }
+
+document.getElementById('form-saida').addEventListener('keydown', (ev)=>{
+  if(ev.key==='Enter' && (ev.target.tagName||'').toUpperCase()!=='TEXTAREA') ev.preventDefault();
+});
+document.getElementById('form-saida').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  if(!confirm('Tem certeza que deseja lançar essa saída? Confira o item e a quantidade antes de continuar.')) return;
+  const msg = document.getElementById('msg-saida');
+  msg.classList.add('hidden');
+  try{
+    const unidade = unidadeAtual();
+    const unidadeNome = UNIDADES.find(u=>u.codigo===unidade)?.nome || unidade;
+    const body = {
+      unidade, unidadeNome,
+      itemId: document.getElementById('s-item').value,
+      tipo: document.getElementById('s-tipo').value,
+      quantidade: document.getElementById('s-quantidade').value,
+      motivo: document.getElementById('s-motivo').value,
+      data: document.getElementById('s-data').value,
+    };
+    const res = await fetch('/api/inventario/saidas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao lançar');
+    msg.textContent = 'Saída lançada com sucesso.'; msg.className = 'msg ok';
+    document.getElementById('s-quantidade').value = '';
+    document.getElementById('s-motivo').value = '';
+    await carregarSaidas();
+    renderSaidas();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+  }
+});
+
+// ---------- Diferenças ----------
+let PRESET_ATIVO = null;
+const ROTULOS_PRESET = { ontem:'Ontem', semana:'Semana', mes:'Mês', trimestre:'Trimestre' };
+function renderPresetsDif(){
+  document.getElementById('d-presets').innerHTML = Object.entries(ROTULOS_PRESET).map(([tipo,rotulo])=>
+    `<button type="button" class="preset-btn ${PRESET_ATIVO===tipo?'active':''}" onclick="aplicarPresetDif('${tipo}')">${rotulo}</button>`
+  ).join('');
+}
+function aplicarPresetDif(tipo){
+  PRESET_ATIVO = tipo;
+  const {inicio,fim} = calcularPreset(tipo, hojeBrasilia());
+  document.getElementById('d-inicio').value = inicio;
+  document.getElementById('d-fim').value = fim;
+  renderPresetsDif();
+  carregarDiferencas();
+}
+function limparPresetAtivo(){ PRESET_ATIVO = null; renderPresetsDif(); }
+
+let DIFERENCAS_ATUAL = null;
+async function carregarDiferencas(){
+  const unidade = unidadeAtual();
+  const inicio = document.getElementById('d-inicio').value;
+  const fim = document.getElementById('d-fim').value;
+  if(!unidade || !inicio || !fim) return;
+  const dados = await fetch(`/api/inventario/diferencas?unidade=${encodeURIComponent(unidade)}&inicio=${inicio}&fim=${fim}`).then(r=>r.json());
+  DIFERENCAS_ATUAL = dados;
+  renderKpisDif(dados.resumo);
+  renderOfensoresChart(dados.ofensores);
+  renderTabelaDif(dados.ofensores);
+}
+function renderKpisDif(r){
+  const kpis = [
+    { rotulo:'Total recebido (compras)', valor: fmtMoney(r.totalRecebidoValor), classe:'' },
+    { rotulo:'Custo do desperdício', valor: fmtMoney(r.custoDesperdicioValor), classe:'bad' },
+    { rotulo:'Custo estimado das vendas', valor: fmtMoney(r.custoVendaValor), classe:'' },
+    { rotulo:'Diferença total', valor: fmtMoney(r.totalDiferencaValor), classe: r.totalDiferencaValor<0?'bad':(r.totalDiferencaValor>0?'ok':'') },
+    { rotulo:'Falta acumulada', valor: fmtMoney(r.totalFaltaValor), classe:'bad' },
+    { rotulo:'Sobra acumulada', valor: fmtMoney(r.totalSobraValor), classe:'ok' },
+  ];
+  document.getElementById('d-kpis').innerHTML = kpis.map(k=>`
+    <div class="kpi"><div class="rotulo">${k.rotulo}</div><div class="valor-kpi ${k.classe}">${k.valor}</div></div>
+  `).join('');
+}
+function renderTabelaDif(ofensores){
+  document.getElementById('d-body').innerHTML = ofensores.length ? ofensores.map(o=>{
+    const cor = o.diferencaValor<0 ? 'var(--bad)' : (o.diferencaValor>0 ? 'var(--ok)' : 'inherit');
+    return `<tr>
+      <td>${escapeHtml(SETORES[o.setor]||o.setor||'—')}</td>
+      <td>${escapeHtml(o.itemNome)}</td>
+      <td class="valor">${o.entradas}</td>
+      <td class="valor">${o.vendas}</td>
+      <td class="valor">${o.desperdicios}</td>
+      <td class="valor" style="color:${cor}">${o.diferencaQtd}</td>
+      <td class="valor" style="color:${cor}">${fmtMoney(o.diferencaValor)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Sem dados suficientes no período (precisa de contagem no dia anterior e no período pra calcular diferença).</td></tr>';
+}
+
+function mostrarTooltip(x,y,html){
+  const tt = document.getElementById('viz-tooltip');
+  tt.innerHTML = html; tt.classList.add('show');
+  tt.style.left = Math.min(x+14, window.innerWidth-260)+'px';
+  tt.style.top = Math.max(y-10, 10)+'px';
+}
+function esconderTooltip(){ document.getElementById('viz-tooltip').classList.remove('show'); }
+
+// grafico de barras horizontais - top ofensores por |diferenca em R$|, na
+// mesma paleta ja usada em fechamentos.html (--ok=sobra, --bad=falta)
+function renderOfensoresChart(ofensores){
+  const svg = document.getElementById('d-chart');
+  const top = [...ofensores].sort((a,b)=>Math.abs(b.diferencaValor)-Math.abs(a.diferencaValor)).slice(0,10);
+  if(!top.length){ svg.innerHTML = ''; return; }
+
+  const W = Math.max(1, Math.round(svg.getBoundingClientRect().width)) || 700;
+  const rowH = 28, padL = 190, padR = 70, padT = 10, padB = 10;
+  const H = top.length*rowH + padT + padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+  const innerW = W - padL - padR;
+  const maxAbs = Math.max(1, ...top.map(o=>Math.abs(o.diferencaValor)));
+
+  let barras = '', rotulos = '', hits = '';
+  top.forEach((o,i)=>{
+    const y = padT + i*rowH;
+    const cy = y + rowH/2;
+    const largura = Math.max(2, Math.abs(o.diferencaValor)/maxAbs*innerW);
+    const cor = o.diferencaValor<0 ? 'var(--bad)' : 'var(--ok)';
+    rotulos += `<text x="${padL-8}" y="${(cy+3.5).toFixed(1)}" text-anchor="end">${escapeHtml(o.itemNome.length>24?o.itemNome.slice(0,23)+'…':o.itemNome)}</text>`;
+    barras += `<rect class="bar" data-i="${i}" x="${padL}" y="${(cy-8).toFixed(1)}" width="${largura.toFixed(1)}" height="16" rx="3" fill="${cor}"/>`;
+    barras += `<text x="${(padL+largura+6).toFixed(1)}" y="${(cy+3.5).toFixed(1)}" fill="${cor}" style="font-weight:600;">${fmtMoney(o.diferencaValor)}</text>`;
+    hits += `<rect class="hit-row" data-i="${i}" x="0" y="${y}" width="${W}" height="${rowH}"/>`;
+  });
+
+  svg.innerHTML = `<line class="grid-line" x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}"/>${rotulos}${barras}${hits}`;
+
+  svg.querySelectorAll('.hit-row').forEach(row=>{
+    const i = Number(row.dataset.i);
+    row.addEventListener('mousemove', (evt)=>{
+      svg.querySelectorAll('rect.bar').forEach(b=>b.classList.toggle('dim', Number(b.dataset.i)!==i));
+      const o = top[i];
+      const cor = o.diferencaValor<0 ? '#ff5c5c' : '#3ddc97';
+      const html = `<div class="tt-date">${escapeHtml(o.itemNome)} · ${escapeHtml(SETORES[o.setor]||'')}</div>
+        <div class="tt-row"><span class="tt-key"><i style="background:${cor}"></i>${o.diferencaValor<0?'Falta':'Sobra'}</span><span class="tt-val">${fmtMoney(o.diferencaValor)}</span></div>
+        <div class="tt-row"><span class="tt-key">Quantidade</span><span class="tt-val">${o.diferencaQtd}</span></div>`;
+      mostrarTooltip(evt.clientX, evt.clientY, html);
+    });
+    row.addEventListener('mouseleave', ()=>{ svg.querySelectorAll('rect.bar').forEach(b=>b.classList.remove('dim')); esconderTooltip(); });
+  });
+}
+
+function baixarRelatorioDiferencas(formato){
+  const unidade = unidadeAtual();
+  const inicio = document.getElementById('d-inicio').value;
+  const fim = document.getElementById('d-fim').value;
+  const params = new URLSearchParams({ token: AUTH_TOKEN, unidade, inicio, fim });
+  window.location.href = `/api/inventario/relatorio.${formato}?${params.toString()}`;
+}
+
+// ---------- Catálogo (Master) ----------
+function renderCatalogo(){
+  const porSetor = ORDEM_SETORES.map(setor=>({ setor, itens: CATALOGO.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')) }));
+  document.getElementById('catalogo-body').innerHTML = porSetor.flatMap(({setor,itens})=>
+    itens.map(i=>`
+      <tr>
+        <td>${escapeHtml(i.nome)}</td>
+        <td>${escapeHtml(SETORES[setor])}</td>
+        <td><span class="badge-tipo">${i.tipo}</span></td>
+        <td>${escapeHtml(i.unidadeMedida)}</td>
+        <td class="valor">${fmtMoney(i.custoReferencia)}</td>
+        <td>${i.ativo===false ? '<span style="color:var(--muted);">Inativo</span>' : '<span style="color:var(--ok);">Ativo</span>'}</td>
+        <td>
+          <button type="button" class="acao-btn" onclick="abrirEditarItem('${i.id}')">✏️</button>
+          <button type="button" class="acao-btn excluir" onclick="excluirItem('${i.id}')">🗑️</button>
+        </td>
+      </tr>`)
+  ).join('') || '<tr><td colspan="7" class="empty">Nenhum item cadastrado ainda.</td></tr>';
+}
+
+async function carregarCatalogoPadrao(){
+  if(!confirm('Carregar o catálogo padrão da rede Domino\'s? Só adiciona os itens que ainda não existem (não duplica nem apaga nada que já foi cadastrado).')) return;
+  const msg = document.getElementById('msg-catalogo-seed');
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/inventario/catalogo/seed', { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao carregar catálogo');
+    msg.textContent = `${data.adicionados} item(ns) adicionado(s) (${data.jaExistiam} já existiam).`; msg.className = 'msg ok';
+    await carregarCatalogo();
+    renderCatalogo();
+    popularSelectsItem();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+  }
+}
+
+let ITEM_EDITANDO_ID = null;
+// de onde o modal "Novo item" foi aberto - 'catalogo' (padrão) ou 'contagem'
+// (ver abrirNovoItemContagem) - decide se, depois de salvar, atualiza a
+// lista de itens do setor atual na aba Contagem
+let ITEM_ORIGEM = 'catalogo';
+// peso da embalagem so faz sentido pra item medido em KG/G (peso de venc.
+// fracionado, ex: 400g) - some pra UN/LT/outras unidades, onde nao ha o que
+// converter (ver criarRecebimento em inventario.js)
+function unidadeUsaPeso(unidade){ return ['KG','G'].includes(String(unidade||'').trim().toUpperCase()); }
+function atualizarCampoPesoItem(){
+  const usa = unidadeUsaPeso(document.getElementById('i-unidade').value);
+  document.getElementById('i-peso-wrap').classList.toggle('hidden', !usa);
+  if(!usa) document.getElementById('i-peso-embalagem').value = '';
+}
+function abrirNovoItem(){
+  ITEM_EDITANDO_ID = null;
+  ITEM_ORIGEM = 'catalogo';
+  document.getElementById('item-modal-titulo').textContent = 'Novo item';
+  document.getElementById('form-item').reset();
+  document.getElementById('i-custo').value = 0;
+  atualizarCampoPesoItem();
+  document.getElementById('msg-item').classList.add('hidden');
+  document.getElementById('overlay-item').classList.remove('hidden');
+}
+function abrirEditarItem(id){
+  const item = CATALOGO.find(i=>i.id===id);
+  if(!item) return;
+  ITEM_EDITANDO_ID = id;
+  ITEM_ORIGEM = 'catalogo';
+  document.getElementById('item-modal-titulo').textContent = 'Editar item';
+  document.getElementById('i-nome').value = item.nome;
+  document.getElementById('i-setor').value = item.setor;
+  document.getElementById('i-tipo').value = item.tipo;
+  document.getElementById('i-unidade').value = item.unidadeMedida;
+  document.getElementById('i-custo').value = item.custoReferencia;
+  document.getElementById('i-quantidade-padrao').value = item.quantidadePadrao ?? '';
+  document.getElementById('i-peso-embalagem').value = item.pesoEmbalagemG ?? '';
+  atualizarCampoPesoItem();
+  document.getElementById('msg-item').classList.add('hidden');
+  document.getElementById('overlay-item').classList.remove('hidden');
+}
+function fecharItem(){ document.getElementById('overlay-item').classList.add('hidden'); }
+
+document.getElementById('form-item').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-item');
+  msg.classList.add('hidden');
+  try{
+    const body = {
+      nome: document.getElementById('i-nome').value,
+      setor: document.getElementById('i-setor').value,
+      tipo: document.getElementById('i-tipo').value,
+      unidadeMedida: document.getElementById('i-unidade').value,
+      custoReferencia: document.getElementById('i-custo').value,
+      quantidadePadrao: document.getElementById('i-quantidade-padrao').value || null,
+      pesoEmbalagemG: unidadeUsaPeso(document.getElementById('i-unidade').value) ? (document.getElementById('i-peso-embalagem').value || null) : null,
+    };
+    const url = ITEM_EDITANDO_ID ? `/api/inventario/catalogo/${ITEM_EDITANDO_ID}` : '/api/inventario/catalogo';
+    const res = await fetch(url, { method: ITEM_EDITANDO_ID?'PUT':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar item');
+    fecharItem();
+    await carregarCatalogo();
+    renderCatalogo();
+    popularSelectsItem();
+    if(ITEM_ORIGEM==='contagem' && CONTAGEM_INICIADA){
+      document.getElementById('c-setor').value = data.setor;
+      renderContagemSetor();
+    }
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+
+async function excluirItem(id){
+  const item = CATALOGO.find(i=>i.id===id);
+  if(!confirm(`Excluir o item "${item?item.nome:id}" do catálogo? Contagens/recebimentos/saídas já lançados com ele continuam no histórico, mas ele some das listas de lançamento. Essa ação não pode ser desfeita.`)) return;
+  const res = await fetch(`/api/inventario/catalogo/${id}`, { method:'DELETE' });
+  if(!res.ok){ const d = await res.json(); alert(d.error||'Erro ao excluir.'); return; }
+  await carregarCatalogo();
+  renderCatalogo();
+  popularSelectsItem();
+}
+
+async function carregarCatalogo(){ CATALOGO = await fetch('/api/inventario/catalogo').then(r=>r.json()); }
+
+// ---------- setores/tipos (Master pode adicionar novos, ver inventario.js) ----------
+async function carregarSetoresTipos(){
+  const [setores, tipos] = await Promise.all([
+    fetch('/api/inventario/setores').then(r=>r.json()),
+    fetch('/api/inventario/tipos').then(r=>r.json()),
+  ]);
+  SETORES = {}; ORDEM_SETORES = [];
+  setores.forEach(s=>{ SETORES[s.codigo] = s.nome; ORDEM_SETORES.push(s.codigo); });
+  TIPOS_ITEM = tipos;
+}
+async function abrirNovoSetor(){
+  const nome = prompt('Nome do novo setor (ex: Área Externa, Estoque de Bebidas...):');
+  if(!nome || !nome.trim()) return;
+  try{
+    const res = await fetch('/api/inventario/setores', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao criar setor');
+    await carregarSetoresTipos();
+    document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
+    document.getElementById('i-setor').value = data.codigo;
+  }catch(err){ alert(err.message); }
+}
+async function abrirNovoTipo(){
+  const nome = prompt('Nome do novo tipo (ex: DESCARTÁVEL, LIMPEZA...):');
+  if(!nome || !nome.trim()) return;
+  try{
+    const res = await fetch('/api/inventario/tipos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome }) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao criar tipo');
+    await carregarSetoresTipos();
+    document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
+    document.getElementById('i-tipo').value = data.nome;
+  }catch(err){ alert(err.message); }
+}
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  const isMaster = ME.role==='master';
+  IS_MASTER = isMaster;
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-entregas-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+
+  if(!secoes.includes('inventario')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  const podeCatalogo = isMaster || !!ME.podeCatalogoEstoque;
+  document.getElementById('tab-btn-catalogo').classList.toggle('hidden', !podeCatalogo);
+  document.getElementById('btn-catalogo-seed').classList.toggle('hidden', !isMaster);
+
+  const hoje = hojeBrasilia();
+  document.getElementById('c-data').value = hoje;
+  document.getElementById('c-data').max = hoje;
+  document.getElementById('r-data').value = hoje;
+  document.getElementById('r-data').max = hoje;
+  document.getElementById('s-data').value = hoje;
+  document.getElementById('s-data').max = hoje;
+
+  renderPresetsDif();
+
+  const [unidadesResp] = await Promise.all([
+    fetch('/api/inventario/unidades').then(r=>r.json()),
+    carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas(),
+  ]);
+  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
+  document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
+  UNIDADES = unidadesResp;
+  document.getElementById('sel-unidade').innerHTML = UNIDADES.length
+    ? UNIDADES.map(u=>`<option value="${escapeHtml(u.codigo)}">${escapeHtml(u.nome)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+
+  popularSelectsItem();
+  aplicarPresetDif('semana');
+  document.getElementById('root').classList.remove('hidden');
+  mudarAba('contagem');
+}
+boot();
+</script>
+</body>
+</html>
