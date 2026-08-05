@@ -107,6 +107,9 @@
   .fech-grupo-titulo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin:16px 2px 8px;}
   #fechamentos-tabelas > .fech-grupo-titulo:first-child{margin-top:4px;}
   .fech-grupo-titulo .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
+  .fech-subtitulo{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 2px 6px;padding-top:8px;border-top:1px dashed var(--line);}
+  .fech-subtitulo:first-of-type{border-top:none;padding-top:0;}
+  .fech-subtitulo .n{font-weight:400;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
 
@@ -402,7 +405,7 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
   'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
   'Spoleto Shopping Recife': 'Spo Shop Recife',
@@ -1312,15 +1315,33 @@ function colunasExtras(rows, chave){
   return [...vistas.entries()].map(([campo,label])=>({campo,label}));
 }
 
+// os 5 campos "fixos" (Adyen/Ifood/99Food/Pix/Loja) sao o schema antigo, de
+// antes do grupo poder definir os proprios Canais de venda/Formas de
+// pagamento (ver grupos.html) - hoje so quem lanca fechamento importado de
+// planilha (sheetsSync.js) ainda usa esses campos; loja que lanca pelo
+// sistema usa exclusivamente as extras do proprio grupo. Mesma logica de
+// colunasExtras: so aparece se pelo menos uma linha do conjunto de fato usa
+const CAMPOS_FIXOS = [
+  {campo:'adyen', label:'Adyen'}, {campo:'ifood', label:'Ifood'}, {campo:'food99', label:'99Food'},
+  {campo:'pix', label:'Pix'}, {campo:'loja', label:'Loja'},
+];
+function colunasFixasUsadas(rows){
+  return CAMPOS_FIXOS.filter(c => rows.some(d => Math.abs(d[c.campo]||0) > 0.001));
+}
+
 // monta UMA tabela de fechamentos a partir de um conjunto de linhas - as
-// colunas extras (canais/formas) sao calculadas so com essas linhas, entao
-// cada tabela mostra apenas os campos que aquele conjunto de fato preenche
+// colunas fixas e extras (canais/formas) sao calculadas so com essas linhas,
+// entao cada tabela mostra apenas os campos que aquele conjunto de fato
+// preenche (ver renderTabela: cada bloco so recebe linhas de UMA origem -
+// sistema OU planilha - pra essas colunas nunca se misturarem)
 function tabelaFechamentosHtml(rows){
+  const colunasFixas = colunasFixasUsadas(rows);
   const colunasCanais = colunasExtras(rows, 'canaisVendaExtras');
   const colunasFormas = colunasExtras(rows, 'formasPagamentoExtras');
 
   const thead =
-    '<th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th>' +
+    '<th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th>' +
+    colunasFixas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     colunasCanais.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     colunasFormas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
     '<th>Observação</th>' +
@@ -1338,11 +1359,7 @@ function tabelaFechamentosHtml(rows){
       <td class="valor">${fmtMoney(d.totalDeclarado)}</td>
       <td class="valor" style="color:${cor}">${fmtMoney(d.diferenca)}</td>
       <td class="valor">${fmtMoney(d.quebra)}</td>
-      <td class="valor">${fmtMoney(d.adyen)}</td>
-      <td class="valor">${fmtMoney(d.ifood)}</td>
-      <td class="valor">${fmtMoney(d.food99)}</td>
-      <td class="valor">${fmtMoney(d.pix)}</td>
-      <td class="valor">${fmtMoney(d.loja)}</td>
+      ${colunasFixas.map(c=>`<td class="valor">${fmtMoney(d[c.campo])}</td>`).join('')}
       ${colunasCanais.map(c=>`<td class="valor">${fmtMoney((d.canaisVendaExtras||{})[c.campo]||0)}</td>`).join('')}
       ${colunasFormas.map(c=>`<td class="valor">${fmtMoney((d.formasPagamentoExtras||{})[c.campo]||0)}</td>`).join('')}
       <td class="truncate" title="${escapeHtml(d.observacao||d.obsDif||'')}">${escapeHtml(d.observacao||d.obsDif||'—')}</td>
@@ -1396,10 +1413,33 @@ function renderTabela(rows){
   // com um bloco só de unidades sem grupo cadastrado, não tem o que separar -
   // renderiza a tabela direto, sem título
   const soSemGrupo = lista.length===1 && lista[0].semGrupo;
-  container.innerHTML = lista.map(b=>
-    (soSemGrupo ? '' : `<div class="fech-grupo-titulo">🏪 ${escapeHtml(b.nome)} <span class="n">${b.rows.length}</span></div>`) +
-    tabelaFechamentosHtml(b.rows)
-  ).join('');
+  container.innerHTML = lista.map(b=>{
+    const titulo = soSemGrupo ? '' : `<div class="fech-grupo-titulo">🏪 ${escapeHtml(b.nome)} <span class="n">${b.rows.length}</span></div>`;
+
+    // dentro do grupo, separa por ORIGEM: lançado pelo sistema (tem
+    // criadoPorId, usa exclusivamente os Canais de venda/Formas de
+    // pagamento/KPI's que o Master configurou pro grupo) x importado de
+    // planilha (sheetsSync.js, usa o schema antigo Adyen/Ifood/99Food/Pix/
+    // Loja). Sem essa separação as colunas de UMA origem vazavam pra tabela
+    // da outra (ex: unidade com fechamento antigo de planilha E fechamento
+    // novo pelo sistema no mesmo grupo mostrava as duas "Adyen" ao mesmo
+    // tempo - uma sempre zerada) - a planilha não pode se sobrepor ao
+    // sistema, que é quem organiza os fechamentos lançados hoje
+    const sistemaRows = b.rows.filter(d=>d.criadoPorId);
+    const planilhaRows = b.rows.filter(d=>!d.criadoPorId);
+    const temAsDuas = sistemaRows.length && planilhaRows.length;
+
+    let corpo = '';
+    if(sistemaRows.length){
+      corpo += (temAsDuas ? `<div class="fech-subtitulo">🧾 Lançamentos do sistema <span class="n">${sistemaRows.length}</span></div>` : '') +
+        tabelaFechamentosHtml(sistemaRows);
+    }
+    if(planilhaRows.length){
+      corpo += (temAsDuas ? `<div class="fech-subtitulo">📄 Histórico de planilha (importado) <span class="n">${planilhaRows.length}</span></div>` : '') +
+        tabelaFechamentosHtml(planilhaRows);
+    }
+    return titulo + corpo;
+  }).join('');
 }
 
 // ---------- Master: editar/excluir um fechamento lançado direto pela

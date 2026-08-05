@@ -106,6 +106,9 @@
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
   .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+  .legend-actions{display:inline-flex;gap:6px;margin-left:8px;text-transform:none;}
+  .legend-actions button{font-family:var(--sans);font-size:10.5px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .legend-actions button:hover{border-color:var(--accent);color:var(--text);}
 </style>
 </head>
 <body>
@@ -177,18 +180,18 @@
       <label>Senha temporária (mín. 8 caracteres)<input type="text" id="c-password" required minlength="8"></label>
 
       <fieldset>
-        <legend>Seções</legend>
+        <legend>Seções <span class="legend-actions"><button type="button" onclick="marcarTodos('c-sections',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-sections',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-sections"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Unidades</legend>
+        <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('c-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-unidades',false)">Desmarcar todos</button></span></legend>
         <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria/depósito e entregas. Chamados de TI não depende de unidade (marca todas automaticamente - o técnico vê os chamados atribuídos a ele em qualquer loja).</div>
         <div id="c-unidades"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Cofre (subgrupos)</legend>
+        <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('c-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-groups',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-groups"></div>
       </fieldset>
 
@@ -243,15 +246,15 @@
   <form class="modal" id="perm-form">
     <h3 id="perm-title">Editar permissões</h3>
     <fieldset>
-      <legend>Seções</legend>
+      <legend>Seções <span class="legend-actions"><button type="button" onclick="marcarTodos('p-sections',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-sections',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-sections"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Unidades</legend>
+      <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('p-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-unidades',false)">Desmarcar todos</button></span></legend>
       <div id="p-unidades"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Cofre (subgrupos)</legend>
+      <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('p-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-groups',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-groups"></div>
     </fieldset>
     <p class="err hidden" id="perm-err"></p>
@@ -362,6 +365,9 @@ function unidadesChecksHtml(checkedSet){
 }
 function readChecked(container){
   return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+}
+function marcarTodos(containerId, marcar){
+  document.getElementById(containerId).querySelectorAll('input[type=checkbox]').forEach(cb=>{ cb.checked = marcar; });
 }
 function caminhoSubgrupo(id){
   const s = VAULT_SUBGROUPS.find(x=>x.id===id);

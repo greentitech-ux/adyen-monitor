@@ -783,7 +783,7 @@ const FECHAMENTO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
   'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
   'Spoleto Shopping Recife': 'Spo Shop Recife',
@@ -808,7 +808,7 @@ const INVENTARIO_UNIDADES_NOMES = {
   'Dominos Garanhuns': 'Dom Garanhuns',
   'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
-  'Dominos Tirol': 'Dominos Tirol',
+  'Dominos Tirol': 'Dom Tirol',
 };
 
 // unidades do app de entregas (motoboys) - nomes como aparecem nas planilhas
