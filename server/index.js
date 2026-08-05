@@ -1198,7 +1198,7 @@ app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
 // ---------- solicitacoes de estorno (usuario Leitor pede, Master aprova/rejeita) ----------
 app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => {
   try {
-    const { pedidoId, unidade, observacao, password } = req.body;
+    const { pedidoId, unidade, observacao, password, direcionadoParaId, direcionadoParaEmail } = req.body;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -1211,8 +1211,11 @@ app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => 
       observacao,
       requestedById: req.user.id,
       requestedByEmail: req.user.email,
+      direcionadoParaId,
+      direcionadoParaEmail,
     });
     broadcast('refund-requested', registro, 'monitor');
+    broadcast('refund-requested', registro, 'solicitacoes');
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1584,6 +1587,22 @@ app.get('/api/grupos', requireAnySection('lancamento', 'fechamentos', 'solicitac
   res.json(await grupos.list());
 });
 
+// so id+email dos Master/Admin responsaveis pelo grupo de uma unidade -
+// usado pra quem NAO e Master/Admin poder "direcionar" uma solicitação pra
+// alguem do proprio grupo de lojas (ver central.html), sem expor a lista
+// inteira de usuarios (essa e Master/Admin-only, ver GET /api/users)
+app.get('/api/grupos/responsaveis', requireSection('solicitacoes'), async (req, res) => {
+  const { unidade } = req.query;
+  if (!unidade) return res.status(400).json({ error: 'Informe a unidade.' });
+  const grupo = await grupos.grupoDaUnidade(unidade);
+  if (!grupo || !(grupo.responsaveis || []).length) return res.json([]);
+  const todos = await users.list();
+  const responsaveis = todos
+    .filter((u) => grupo.responsaveis.includes(u.id) && (u.role === 'master' || u.isAdmin))
+    .map((u) => ({ id: u.id, email: u.email }));
+  res.json(responsaveis);
+});
+
 // relatorio (CSV/PDF) da tabela "Grupos cadastrados" de grupos.html
 app.get('/api/grupos/relatorio.:formato(csv|pdf)', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
   const unidadesMapa = await construirUnidadesMapa();
@@ -1731,6 +1750,8 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
       anexos,
       solicitadoPorId: req.user.id,
       solicitadoPorEmail: req.user.email,
+      direcionadoParaId: payload.direcionadoParaId,
+      direcionadoParaEmail: payload.direcionadoParaEmail,
     });
     broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
     broadcast('fechamento-edicao-solicitada', pedido, 'solicitacoes');
@@ -1830,7 +1851,7 @@ app.delete('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) 
 app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
   try {
     const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
-    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento } = payload;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, direcionadoParaId, direcionadoParaEmail } = payload;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -1843,6 +1864,8 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
+      direcionadoParaId,
+      direcionadoParaEmail,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
     res.json(registro);
@@ -2037,6 +2060,24 @@ app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (r
     });
     broadcast('central-chat-nova', mensagem, 'solicitacoes');
     res.json(mensagem);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// sinaliza que um Master/Admin ja viu a notificacao (popup com som) de uma
+// solicitação nova - basta UM sinalizar pra ela parar de tocar/aparecer pros
+// outros tambem (ver mostrarNotificacaoSolicitacao em painel.html/
+// central-historico.html); nao decide a solicitação, so acusa recebimento
+app.post('/api/central/:tipo/:id/marcar-visto', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const { tipo, id } = req.params;
+    let registro;
+    if (tipo === 'estorno') registro = await refunds.marcarNotificacaoVista(id, { vistoPorEmail: req.user.email });
+    else if (tipo === 'ajuste-fechamento') registro = await fechamentosLive.marcarNotificacaoVistaEdicao(id, { vistoPorEmail: req.user.email });
+    else registro = await solicitacoes.marcarNotificacaoVista(id, { vistoPorEmail: req.user.email });
+    broadcast('central-notificacao-vista', { tipo, id, vistoPorEmail: req.user.email }, 'solicitacoes');
+    res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

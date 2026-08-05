@@ -143,7 +143,7 @@ async function getOne(id) {
 // que já existe, não substitui
 const TIPOS_ITEM_NOVO = ['maquininha', 'saida'];
 
-async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, motivo, anexos, solicitadoPorId, solicitadoPorEmail }) {
+async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, motivo, anexos, solicitadoPorId, solicitadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   const atual = await getOne(fechamentoId);
   if (!atual) throw new Error('Fechamento não encontrado.');
   if (!motivo || !String(motivo).trim()) throw new Error('Descreva o motivo da correção.');
@@ -162,6 +162,15 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
     status: 'PENDENTE',
     solicitadoPorId,
     solicitadoPorEmail,
+    // Master/Admin escolhido por quem lançou (opcional, ver grupos.js) - so
+    // um "pra quem e mais direto", nao restringe quem mais pode decidir
+    direcionadoParaId: direcionadoParaId || null,
+    direcionadoParaEmail: direcionadoParaEmail || null,
+    // notificacao (popup com som) fica ativa ate QUALQUER Master/Admin
+    // sinalizar que viu - ver marcarNotificacaoVista
+    notificacaoVista: false,
+    notificacaoVistaPorEmail: null,
+    notificacaoVistaEm: null,
     criadoEm: null,
     decididoPorEmail: null,
     decididoEm: null,
@@ -283,6 +292,14 @@ async function getEdicao(id) {
   return doc.exists ? doc.data() : null;
 }
 
+async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail }) {
+  const ref = EDITS.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Pedido não encontrado.');
+  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaEm: new Date().toISOString() });
+  return getEdicao(id);
+}
+
 // exclui so o PEDIDO de ajuste (o registro na fila de solicitacoes) - poder
 // do Master de limpar a fila. Se o pedido ja tinha sido aprovado, o
 // fechamento em si (ja alterado por decidirEdicao) nao e desfeito; pra
@@ -361,4 +378,4 @@ function invalidarCache() {
   fechamentosCache.invalidar();
 }
 
-module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache };
+module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache, marcarNotificacaoVistaEdicao };

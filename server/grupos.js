@@ -55,7 +55,7 @@ async function listUncached() {
 const gruposCache = createCache(listUncached, 20 * 1000);
 const list = gruposCache.cached;
 
-async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras }) {
+async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis }) {
   const nomeLimpo = String(nome || '').trim();
   if (!nomeLimpo) throw new Error('Informe o nome do grupo.');
   const ref = COLLECTION.doc();
@@ -66,6 +66,10 @@ async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPag
     kpisExtras: sanitizarCamposExtras(kpisExtras),
     canaisVendaExtras: sanitizarCamposExtras(canaisVendaExtras),
     formasPagamentoExtras: sanitizarCamposExtras(formasPagamentoExtras),
+    // ids dos usuarios Master/Admin responsaveis por esse grupo - usado pra
+    // deixar quem lanca uma solicitacao direcionar pra um deles (ver
+    // GET /api/grupos/responsaveis em index.js)
+    responsaveis: Array.isArray(responsaveis) ? responsaveis.map(String) : [],
     criadoEm: new Date().toISOString(),
   };
   await ref.set(registro);
@@ -73,7 +77,7 @@ async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPag
   return registro;
 }
 
-async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras }) {
+async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Grupo não encontrado.');
@@ -87,6 +91,7 @@ async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, forma
   if (kpisExtras != null) patch.kpisExtras = sanitizarCamposExtras(kpisExtras);
   if (canaisVendaExtras != null) patch.canaisVendaExtras = sanitizarCamposExtras(canaisVendaExtras);
   if (formasPagamentoExtras != null) patch.formasPagamentoExtras = sanitizarCamposExtras(formasPagamentoExtras);
+  if (responsaveis != null) patch.responsaveis = Array.isArray(responsaveis) ? responsaveis.map(String) : [];
   await ref.update(patch);
   gruposCache.invalidar();
   return { ...snap.data(), ...patch };

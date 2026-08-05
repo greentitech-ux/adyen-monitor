@@ -99,6 +99,13 @@
   .notif-chat .notif-fechar{color:var(--muted);font-size:14px;line-height:1;flex:none;}
   .notif-chat .notif-corpo{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   @keyframes notif-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
+  .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
+  .notif-solicitacao{background:var(--panel);border:2px solid var(--warn);border-radius:12px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.55);animation:notif-in .18s ease,notif-pulse 1.6s ease-in-out infinite;}
+  .notif-solicitacao .ns-titulo{font-size:13px;font-weight:700;}
+  .notif-solicitacao .ns-corpo{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4;}
+  .notif-solicitacao .ns-direcionado{font-size:11px;color:var(--accent);margin-top:6px;font-family:var(--mono);}
+  .notif-solicitacao button.ns-ok{margin-top:10px;width:100%;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  @keyframes notif-pulse{0%,100%{border-color:var(--warn);}50%{border-color:var(--accent);}}
   @media(max-width:760px){ .kanban-col{min-width:82vw;max-height:none;} }
   .tipo-filtro-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
   .tipo-filtro-btn{font-family:var(--sans);font-size:11.5px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:112px;transition:border-color .15s ease,background .15s ease;}
@@ -112,6 +119,7 @@
 <body>
 
 <div class="notif-chat-wrap" id="notif-chat-wrap"></div>
+<div class="notif-solicitacao-wrap" id="notif-solicitacao-wrap"></div>
 
 <header>
   <div class="header-top">
@@ -327,6 +335,7 @@ function kcardHtml(c){
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
+      ${c.direcionadoParaEmail ? `<div class="sub" style="color:var(--accent);">👤 direcionado a ${escapeHtml(c.direcionadoParaEmail)}</div>` : ''}
     </div>`;
 }
 
@@ -392,7 +401,7 @@ function abrirDetalhe(tipo, id){
   if(!c) return;
   DETALHE_ATUAL = c;
   document.getElementById('d-titulo').textContent = `${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}`;
-  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}`;
+  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}` + (c.direcionadoParaEmail ? ` · direcionado a ${c.direcionadoParaEmail}` : '');
 
   let corpo = c.ehOrcamento ? `<div style="color:#e0b84c;font-weight:600;">💰 É um orçamento — precisa de aprovação de um Admin ou Master.</div>` : '';
   corpo += `<div><b>${escapeHtml(c.titulo)}</b></div>`;
@@ -745,6 +754,7 @@ async function boot(){
   }
 
   await carregarCentral();
+  notificarPendentesNaoVistas();
   conectarStreamChat();
 }
 
@@ -771,6 +781,68 @@ function mostrarNotificacaoChat(msg){
   wrap.appendChild(el);
 }
 
+// ---------- notificacao de solicitacao NOVA: toca som e fica na tela ate
+// QUALQUER Master/Admin sinalizar (marcar-visto) - diferente da notificacao
+// de chat (so avisa, essa exige acao explicita, ver marcarVistoNotificacao).
+// So mostra pra quem decide (Master/Admin) - quem so acompanha o proprio
+// pedido nao precisa ser "cobrado" pela propria solicitação ----------
+let AUDIO_CTX = null;
+function tocarSomNotificacao(){
+  try{
+    AUDIO_CTX = AUDIO_CTX || new (window.AudioContext || window.webkitAudioContext)();
+    const tocarBeep = (delay, freq) => {
+      const osc = AUDIO_CTX.createOscillator();
+      const gain = AUDIO_CTX.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, AUDIO_CTX.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.25, AUDIO_CTX.currentTime + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, AUDIO_CTX.currentTime + delay + 0.35);
+      osc.connect(gain); gain.connect(AUDIO_CTX.destination);
+      osc.start(AUDIO_CTX.currentTime + delay);
+      osc.stop(AUDIO_CTX.currentTime + delay + 0.4);
+    };
+    tocarBeep(0, 880);
+    tocarBeep(0.18, 1160);
+  }catch(e){ /* navegador pode bloquear audio antes de alguma interacao - so nao toca */ }
+}
+
+function mostrarNotificacaoSolicitacao(card){
+  if(!IS_MASTER && !IS_ADMIN) return;
+  if(card.notificacaoVista) return;
+  const wrap = document.getElementById('notif-solicitacao-wrap');
+  const elId = 'notif-sol-'+card.tipo+'-'+card.id;
+  if(document.getElementById(elId)) return;
+  const el = document.createElement('div');
+  el.className = 'notif-solicitacao';
+  el.id = elId;
+  el.innerHTML = `
+    <div class="ns-titulo">🔔 Nova solicitação</div>
+    <div class="ns-corpo">${iconeTipo(card.tipo)} ${escapeHtml(TIPOS_INFO[card.tipo]?.label||card.tipo)} · ${escapeHtml(card.unidadeNome||card.unidade||'—')}<br>${escapeHtml(card.titulo||'')}</div>
+    ${card.direcionadoParaEmail ? `<div class="ns-direcionado">👤 direcionado a ${escapeHtml(card.direcionadoParaEmail)}</div>` : ''}
+    <button type="button" class="ns-ok">✓ Sinalizar (já vi)</button>
+  `;
+  el.querySelector('.ns-ok').addEventListener('click', ()=>marcarVistoNotificacao(card.tipo, card.id));
+  wrap.appendChild(el);
+  tocarSomNotificacao();
+}
+
+async function marcarVistoNotificacao(tipo, id){
+  removerNotificacaoSolicitacao(tipo, id);
+  try{ await fetch(`/api/central/${tipo}/${id}/marcar-visto`, { method:'POST' }); }catch(e){}
+}
+
+function removerNotificacaoSolicitacao(tipo, id){
+  const el = document.getElementById('notif-sol-'+tipo+'-'+id);
+  if(el) el.remove();
+}
+
+// ao entrar na tela, mostra (com som) qualquer solicitação pendente que
+// ninguém sinalizou ainda - assim a notificação sobrevive a um reload
+function notificarPendentesNaoVistas(){
+  if(!IS_MASTER && !IS_ADMIN) return;
+  CARDS.filter(c=>c.status==='PENDENTE' && !c.notificacaoVista).forEach(mostrarNotificacaoSolicitacao);
+}
+
 function conectarStreamChat(){
   const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
   es.addEventListener('central-chat-nova', (e)=>{
@@ -787,6 +859,19 @@ function conectarStreamChat(){
     if(DETALHE_ATUAL && DETALHE_ATUAL.tipo===info.tipo && DETALHE_ATUAL.id===info.cardId){
       carregarChat(info.tipo, info.cardId);
     }
+  });
+  ['refund-requested','solicitacao-criada','fechamento-edicao-solicitada'].forEach(evento=>{
+    es.addEventListener(evento, async (e)=>{
+      const registro = JSON.parse(e.data);
+      await carregarCentral(); // recarrega pra ter o card normalizado (mesmo formato de CARDS)
+      const tipo = registro.tipo || (evento==='fechamento-edicao-solicitada' ? 'ajuste-fechamento' : 'estorno');
+      const card = CARDS.find(c=>c.tipo===tipo && c.id===registro.id);
+      if(card) mostrarNotificacaoSolicitacao(card);
+    });
+  });
+  es.addEventListener('central-notificacao-vista', (e)=>{
+    const info = JSON.parse(e.data);
+    removerNotificacaoSolicitacao(info.tipo, info.id);
   });
 }
 

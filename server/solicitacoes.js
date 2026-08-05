@@ -27,7 +27,7 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao);
 }
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, criadoPorId, criadoPorEmail }) {
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
@@ -50,6 +50,15 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     status: 'PENDENTE',
     criadoPorId,
     criadoPorEmail,
+    // Master/Admin escolhido por quem lançou (opcional, ver grupos.js) - so
+    // um "pra quem e mais direto", nao restringe quem mais pode decidir
+    direcionadoParaId: direcionadoParaId || null,
+    direcionadoParaEmail: direcionadoParaEmail || null,
+    // notificacao (popup com som) fica ativa ate QUALQUER Master/Admin
+    // sinalizar que viu - ver marcarNotificacaoVista
+    notificacaoVista: false,
+    notificacaoVistaPorEmail: null,
+    notificacaoVistaEm: null,
     criadoEm: agora,
     decididoPorEmail: null,
     decididoEm: null,
@@ -59,6 +68,15 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
   await doc.set(registro);
   solicitacoesCache.invalidar();
   return registro;
+}
+
+async function marcarNotificacaoVista(id, { vistoPorEmail }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaEm: new Date().toISOString() });
+  solicitacoesCache.invalidar();
+  return getOne(id);
 }
 
 async function listAllUncached() {
@@ -124,4 +142,4 @@ async function remove(id) {
   solicitacoesCache.invalidar();
 }
 
-module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove };
+module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove, marcarNotificacaoVista };
