@@ -183,7 +183,8 @@ const TOPICOS = [
       <li>Confira o resumo no fim da página antes de enviar.</li>
       <li>Clique em <b>Lançar</b>.</li>
     </ol>
-    <div class="dica">Errou algo depois de já ter lançado? Não dá pra editar direto - abra <b>Central</b> → <b>Ajustar Fechamento</b> e peça a correção. Ela entra na fila de aprovação do Master/Admin.</div>
+    <div class="dica">A tela muda um pouco de loja pra loja: cada grupo/franquia pode ter a seção <b>Caixa</b>, <b>Maquininhas</b> (às vezes com nome diferente, tipo "Getnet 1, 2, 3...") e <b>Saídas</b> habilitadas ou não, além de campos de <b>KPI extra</b> próprios (alguns pedem só um número, outros um valor em R$, Kg, um arquivo/foto ou um texto). Se um campo que você espera não aparecer, é porque o grupo da loja não habilitou ele - fale com o Master.</div>
+    <div class="dica">Errou algo depois de já ter lançado? Não dá pra editar direto - abra <b>Central</b> → <b>Histórico</b> → <b>Pedir correção</b>. Dá pra corrigir um valor, corrigir a data do lançamento ou até pedir pra excluir o lançamento inteiro (se foi lançado errado do zero). Qualquer uma dessas opções entra na fila de aprovação do Master/Admin - nada muda antes de decidir.</div>
   `},
   { id:'fechamentos-painel', icone:'💰', secoes:['fechamentos'], titulo:'Acompanhar Fechamentos', corpo:`
     <p>Painel de conferência com o histórico de todos os fechamentos lançados, comparativo por unidade e gráfico dos últimos 30 dias.</p>
@@ -215,19 +216,22 @@ const TOPICOS = [
       <li>Escolha o tipo (Estorno, Ajuste de Fechamento, Compra, Manutenção ou Suporte de TI).</li>
       <li>Preencha os campos pedidos e anexe foto/orçamento se tiver.</li>
       <li>Em Compra, Manutenção e Suporte de TI, marque <b>"É um orçamento"</b> se o pedido precisa de uma análise mais cuidadosa antes de aprovar.</li>
+      <li>Se quiser, escolha em <b>Direcionar para</b> qual Master/Admin deve olhar esse pedido primeiro (não impede outros de decidirem também, é só um atalho).</li>
       <li>Envie - a solicitação cai na fila de aprovação.</li>
     </ol>
     <h3>Acompanhar (página Histórico)</h3>
     <ul>
       <li>Quadro Kanban com 3 colunas: Pendente, Aprovado, Rejeitado.</li>
-      <li>Os 6 botões no topo (Todas + os 5 tipos) mostram a contagem de cada status e filtram o quadro quando clicados.</li>
-      <li>Filtros extras de loja, grupo e período de data.</li>
+      <li>Os botões no topo (Todas + cada tipo) mostram a contagem de cada status e filtram o quadro quando clicados.</li>
+      <li>Filtros de loja, grupo e período de data, lado a lado no topo.</li>
       <li>Clique num cartão pra ver todos os detalhes, anexos e o chat da solicitação.</li>
     </ul>
+    <h3>🛍️ Status Comprada (pedidos de Compra)</h3>
+    <p>Depois que um pedido de <b>Compra</b> é aprovado, o Master ou Admin pode marcar ele como <b>Comprada</b> - informando a data de entrega prevista e/ou anexando o print/comprovante da compra (os dois são opcionais, dá pra marcar só com um deles). O cartão ganha um selo "✅ comprada" no quadro, e dá pra desmarcar se precisar corrigir.</p>
     <h3>💬 Chat da solicitação</h3>
     <p>Dentro do detalhe de qualquer solicitação tem um campo de chat: Master e Admin podem perguntar algo antes de decidir, e quem pediu pode responder direto ali - sem precisar de WhatsApp ou ligação.</p>
     <h3>✓ Aprovar / rejeitar</h3>
-    <p>Só Master e usuários com a <span class="tagpill admin">⭐ tag Admin</span> conseguem aprovar ou rejeitar. Editar ou excluir uma solicitação continua sendo só do <span class="tagpill master">Master</span>.</p>
+    <p>Só Master e usuários com a <span class="tagpill admin">⭐ tag Admin</span> conseguem aprovar ou rejeitar, marcar Comprada e ver todas as solicitações. Editar ou excluir uma solicitação continua sendo só do <span class="tagpill master">Master</span>.</p>
   `},
   { id:'admin-tag', icone:'⭐', secoes:'master', titulo:'Tag Admin: o que é e como usar', corpo:`
     <p>A tag Admin dá pra um usuário comum o poder de aprovar/rejeitar solicitações da Central, sem precisar virar Master (que tem acesso a tudo, incluindo gestão de usuários).</p>
@@ -266,17 +270,60 @@ const TOPICOS = [
       <li><b>Permissões</b>: muda seções/lojas/subgrupos liberados.</li>
       <li><b>Horário</b>: restringe o login a um intervalo do dia.</li>
       <li><b>Tornar admin / Remover admin</b>: dá ou tira o poder de aprovar solicitações da Central.</li>
+      <li><b>Liberar Catálogo do Estoque</b>: deixa a pessoa organizar setor/tipo, ajustar custo de referência e ativar/desativar item no Catálogo do Estoque, sem precisar virar Master nem Admin - útil pra um gerente que cuida disso no dia a dia da loja dele.</li>
       <li><b>Nova senha</b>: troca a senha (e destrava a conta, se estiver bloqueada).</li>
       <li><b>Ativar/Desativar</b>: liga ou desliga o acesso sem excluir.</li>
       <li><b>Excluir</b>: remove o acesso de vez.</li>
     </ul>
   `},
   { id:'grupos', icone:'🏷️', secoes:'master', titulo:'Grupos (Master)', corpo:`
-    <p>Organiza as lojas em franquias/grupos e permite configurar KPIs extras (canais de venda e formas de pagamento) usados no Fechamento.</p>
+    <p>Organiza as lojas em franquias/grupos e permite configurar, por grupo, tudo que muda de loja pra loja: seções do Fechamento, campos extras e quem recebe as notificações da Central.</p>
+    <h3>Criar/editar um grupo</h3>
     <ol>
       <li>Crie ou edite um grupo, associando as lojas que fazem parte dele.</li>
-      <li>Adicione canais de venda ou formas de pagamento extras específicos daquele grupo, se precisar.</li>
+      <li>Escolha os <b>Responsáveis</b> (Master/Admin) que aparecem como opção de "Direcionar para" quando alguém dessa unidade abre uma solicitação na Central.</li>
     </ol>
+    <h3>Seções do Fechamento</h3>
+    <p>Dá pra habilitar ou desabilitar, por grupo:</p>
+    <ul>
+      <li><b>Caixa</b> - caixa inicial, caixa final, entrada de dinheiro, depósito.</li>
+      <li><b>Maquininhas</b> - inclusive trocar o nome padrão delas (ex: "Maquininha 1, 2, 3..." vira "Getnet 1, 2, 3...").</li>
+      <li><b>Saídas</b> - saída de dinheiro do caixa.</li>
+    </ul>
+    <h3>Canais de venda / Formas de pagamento extras</h3>
+    <p>Além dos campos fixos, dá pra criar campos extras próprios do grupo. Pra cada campo extra, escolha:</p>
+    <ul>
+      <li><b>Soma ou subtrai</b> no total da própria seção.</li>
+      <li><b>Também soma no outro total</b> - ex: TEF Crédito é um Canal de venda, mas já é uma forma de pagamento validada, então também soma no Total Declarado (senão dava "falta no caixa" à toa, mesmo estando tudo certo).</li>
+    </ul>
+    <h3>KPI's extras</h3>
+    <p>Campos extras que aparecem no fim do Fechamento, cada um com a unidade de medida certa: <b>Quantidade</b>, <b>R$</b>, <b>Kg</b>, <b>Arquivo</b> (upload de foto/comprovante) ou <b>Texto</b>.</p>
+  `},
+  { id:'estoque', icone:'📦', secoes:['inventario'], titulo:'Estoque (Inventário/CMV)', corpo:`
+    <p>Controle de estoque físico da loja (insumos, bebidas, embalagens) por setor, com contagem diária, recebimento de mercadoria e cálculo de diferenças (CMV).</p>
+    <h3>Setores</h3>
+    <p>Estoque Seco, Congelados, Câmara Fria, Geladeira, Makeline, Mesa de Corte e Comissariado já vêm prontos. Quem tem acesso ao Catálogo pode criar setores e tipos extras direto na hora de cadastrar um item (botões <b>+ Novo setor</b> / <b>+ Novo tipo</b>).</p>
+    <h3>Contagem (diária)</h3>
+    <ol>
+      <li>Abra a aba <b>Contagem</b> e clique em <b>▶️ Iniciar contagem</b>.</li>
+      <li>Escolha o setor - só os itens daquele setor aparecem na lista.</li>
+      <li>Preencha a quantidade contada de cada item.</li>
+      <li>Item que não está na lista? Clique em <b>+ Adicionar item nesse setor</b> pra cadastrar na hora, sem sair da contagem.</li>
+      <li>Troque de setor quantas vezes precisar - o que já foi digitado fica salvo até enviar tudo.</li>
+    </ol>
+    <h3>Recebimento de mercadoria</h3>
+    <ol>
+      <li>Escolha o item, informe o fornecedor e a data.</li>
+      <li>Preencha só um dos dois: <b>Quantidade × Valor Unitário</b> ou o <b>Valor Total da nota</b> - o outro é calculado sozinho, igual a nota fiscal já traz os dois números.</li>
+      <li>Item vendido em embalagem fracionada (ex: queijo em pacotes de 400g)? Informe quantas embalagens vieram e o peso de cada uma - o sistema calcula o peso total e o valor por kg sozinho, sem precisar fazer a conta de cabeça. Se a marca mudar o tamanho da embalagem (ex: de 1kg pra 1,2kg), é só corrigir o peso ali mesmo - ele já vira o padrão pra próxima nota.</li>
+    </ol>
+    <h3>Saída</h3>
+    <p>Registra o que saiu do estoque sem ser contagem: <b>Venda</b>, <b>Desperdício</b> ou <b>Outra</b> saída.</p>
+    <h3>Diferenças (CMV)</h3>
+    <p>Compara o que a contagem deveria ter dado (contagem do dia anterior + recebimentos - saídas) com o que foi realmente contado. Diferença negativa = <b>falta</b> (sumiu mais do que o registrado); positiva = <b>sobra</b> (ex: chegou mercadoria e a nota não foi lançada no sistema).</p>
+    <h3>Catálogo</h3>
+    <p>Lista de todos os itens cadastrados, com setor, tipo, unidade de medida e custo de referência. Dá pra ativar/desativar um item (sem apagar o histórico de contagens/recebimentos já feitos com ele) e editar setor/tipo/custo.</p>
+    <div class="dica"><b>Quem pode organizar o Catálogo?</b> O <span class="tagpill master">Master</span> sempre pode. Pra liberar isso pra um gerente específico sem dar acesso Master completo, o Master ativa a permissão <span class="tagpill admin">📦 Catálogo do Estoque</span> pra quem escolher (veja o tópico Usuários). Cadastrar um item <b>novo</b> - por exemplo direto na Contagem - não precisa dessa permissão: qualquer um com acesso ao Estoque pode.</div>
   `},
   { id:'tecnico', icone:'🔧', secoes:['tecnico'], titulo:'Chamados de TI', corpo:`
     <p>Fila de atendimento técnico - nasce automaticamente quando uma solicitação de Suporte de TI é aprovada na Central, ou pode ser criada direto pelo Master.</p>
