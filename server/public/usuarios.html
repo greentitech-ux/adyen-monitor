@@ -151,6 +151,17 @@
       <tbody id="backups-body"></tbody>
     </table>
   </div>
+
+  <div class="panel">
+    <h2>Relatórios de transações</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">A cada 2 dias o sistema gera um PDF/CSV com tudo que aconteceu no período (aprovado, recusado, estornado, chargeback, fraude...) e depois apaga do banco o que não é chargeback nem fraude suspeita - esses dois ficam guardados pra sempre pra continuar gerando alerta. Use "Gerar agora" pra rodar fora do horário automático.</p>
+    <button type="button" class="primary" id="btn-relatorio-run" onclick="rodarRelatorioAgora()">Gerar relatório agora</button>
+    <p class="ok-msg hidden" id="relatorio-msg" style="margin-top:10px;"></p>
+    <table style="margin-top:14px;">
+      <thead><tr><th>Período</th><th>Criado em</th><th></th></tr></thead>
+      <tbody id="relatorios-body"></tbody>
+    </table>
+  </div>
 </div>
 
 <div class="overlay" id="perm-overlay">
@@ -248,6 +259,7 @@ async function boot(){
 
   await carregarUsuarios();
   await carregarBackups();
+  await carregarRelatorios();
 }
 
 async function carregarUsuarios(){
@@ -281,6 +293,40 @@ async function rodarBackupAgora(){
     msg.textContent = `Backup criado: ${data.registros} registros em ${data.colecoes} coleções.`;
     msg.className = 'ok-msg';
     await carregarBackups();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+}
+
+async function carregarRelatorios(){
+  const relatorios = await fetch('/api/relatorios').then(r=>r.json());
+  document.getElementById('relatorios-body').innerHTML = relatorios.length ? relatorios.map(r=>`
+    <tr>
+      <td>${escapeHtml(r.base)}</td>
+      <td>${new Date(r.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</td>
+      <td>
+        ${r.pdf?`<a class="back" href="/api/relatorios/${encodeURIComponent(r.base)}.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">PDF</a>`:''}
+        ${r.csv?`<a class="back" style="margin-left:6px;" href="/api/relatorios/${encodeURIComponent(r.base)}.csv?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">CSV</a>`:''}
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum relatório ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+async function rodarRelatorioAgora(){
+  const btn = document.getElementById('btn-relatorio-run');
+  const msg = document.getElementById('relatorio-msg');
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/relatorios/rodar', { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao gerar relatório');
+    msg.textContent = `Relatório gerado: ${data.resumo.total} eventos no período, ${data.removidos} removidos do banco.`;
+    msg.className = 'ok-msg';
+    await carregarRelatorios();
   }catch(err){
     msg.textContent = err.message; msg.className = 'err';
   }finally{

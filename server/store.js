@@ -21,22 +21,44 @@ function load() {
   return cache;
 }
 
-// retencao: mantem sempre os ultimos 3 meses de historico, descarta o resto
-const RETENTION_DAYS = 90;
-async function pruneOld() {
+// retencao padrao quando ninguem passa um corte explicito (fallback de
+// seguranca - o job normal e o relatorios.js, que passa o corte certo depois
+// de gerar o PDF/CSV do periodo)
+const RETENTION_DAYS = Number(process.env.RETENCAO_TRANSACOES_DIAS || 2);
+
+// apaga transacoes velhas, MAS nunca apaga um pedido que em algum momento
+// teve chargeback ou fraude suspeita - esses ficam retidos pra sempre, sem
+// prazo, porque alimentam a tela de chargebacks (que precisa da linha do
+// tempo inteira do pedido, nao so o evento isolado) e alertas futuros. Isso
+// e avaliado por PEDIDO (orderKey), nao por evento: se um pedido teve
+// chargeback, TODOS os eventos dele (aprovado, estornado, chargeback...)
+// ficam guardados, senao a tela de chargeback perde o contexto.
+async function pruneOld(cutoffMs) {
+  const cutoff = cutoffMs ?? (Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const pedidosProtegidos = new Set(
+    allOrders()
+      .filter((o) => o.fraudeSuspeita || o.history.some((h) => CHARGEBACK_STATUSES.includes(h.status)))
+      .map((o) => o.pedidoId)
+  );
+
   const all = load();
-  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
   const kept = [];
   const removed = [];
   for (const t of all) {
+    if (pedidosProtegidos.has(orderKey(t))) { kept.push(t); continue; }
     const ts = t.dataHora ? new Date(t.dataHora).getTime() : Date.now();
     (ts >= cutoff ? kept : removed).push(t);
   }
+
   if (removed.length) {
     cache = kept;
-    const batch = db.batch();
-    for (const t of removed) batch.delete(COLLECTION.doc(docId(t)));
-    await batch.commit();
+    // Firestore aceita no maximo 500 operacoes por batch
+    for (let i = 0; i < removed.length; i += 450) {
+      const lote = removed.slice(i, i + 450);
+      const batch = db.batch();
+      for (const t of lote) batch.delete(COLLECTION.doc(docId(t)));
+      await batch.commit();
+    }
   }
   return removed.length;
 }

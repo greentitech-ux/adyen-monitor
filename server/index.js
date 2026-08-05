@@ -24,6 +24,7 @@ const fechamentosLive = require('./fechamentosLive');
 const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
+const relatorios = require('./relatorios');
 const sheetsSync = require('./sheetsSync');
 const entregasSync = require('./entregasSync');
 
@@ -765,6 +766,31 @@ app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
   }
 });
 
+// ---------- relatorio periodico de transacoes (so o Master ve/aciona) ----------
+// PDF+CSV do periodo, gerado antes da limpeza do banco (ver relatorios.js) -
+// e o que substitui guardar toda transacao pra sempre: chargeback/fraude
+// ficam no banco (retidos), o resto vira so esse relatorio depois de
+// RELATORIO_INTERVALO_DIAS dias.
+app.get('/api/relatorios', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await relatorios.listarRelatorios());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/relatorios/rodar', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await relatorios.rodarRelatorio());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/relatorios/:nome', auth.requireMaster, async (req, res) => {
+  await relatorios.baixarArquivo(req.params.nome, res);
+});
+
 // ---------- fechamentos de caixa (secao "fechamentos") ----------
 // combina os fechamentos das planilhas do Google Sheets (ARCFOOD + Grupo
 // Bravo, aba "BD") com os fechamentos lançados ao vivo pelas lojas. As
@@ -1122,12 +1148,14 @@ app.use((err, req, res, next) => {
     if (contas.length) console.log(`HMAC configurada para: ${contas.join(', ')}`);
     else if (!LEGACY_HMAC_KEY) console.warn('AVISO: nenhuma ADYEN_HMAC_KEYS/ADYEN_HMAC_KEY configurada - assinatura nao esta sendo verificada.');
 
-    // mantem sempre os ultimos 3 meses de historico (roda no start e depois 1x/dia)
-    const removidos = await store.pruneOld();
-    if (removidos) console.log(`Retencao: removidas ${removidos} transacoes com mais de 90 dias.`);
+    // relatorio periodico de transacoes (PDF+CSV) + limpeza do banco: gera o
+    // retrato do periodo antes de apagar - so fica retido pra sempre quem
+    // teve chargeback/fraude (ver store.pruneOld). Roda no start e depois a
+    // cada RELATORIO_INTERVALO_DIAS dias (2 por padrao).
+    relatorios.rodarRelatorio().catch((err) => console.error('Erro ao gerar relatório periódico:', err.message));
     setInterval(() => {
-      store.pruneOld().catch((err) => console.error('Erro na limpeza de retencao:', err.message));
-    }, 24 * 60 * 60 * 1000);
+      relatorios.rodarRelatorio().catch((err) => console.error('Erro ao gerar relatório periódico:', err.message));
+    }, relatorios.INTERVALO_DIAS * 24 * 60 * 60 * 1000);
 
     // backup automatico do banco: roda no start e depois 1x/dia (o Master
     // tambem pode acionar na hora pela tela de Usuarios/Backup)
