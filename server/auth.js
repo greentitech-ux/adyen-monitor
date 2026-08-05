@@ -177,6 +177,7 @@ function requireAuth(req, res, next) {
       req.user = user;
       req.isMaster = user.role === 'master';
       req.isAdmin = !!user.isAdmin;
+      req.podeCatalogoEstoque = !!user.podeCatalogoEstoque;
       req.permissions = req.isMaster ? null : user.permissions || emptyPermissions();
       next();
     })
@@ -194,6 +195,14 @@ function requireMaster(req, res, next) {
 // que Admins decidam sem precisar do acesso Master completo
 function requireMasterOrAdmin(req, res, next) {
   if (!req.isMaster && !req.isAdmin) return res.status(403).json({ error: 'Apenas Master ou Admin pode fazer isso.' });
+  next();
+}
+
+// Master ou usuario com a permissao de Catalogo do Estoque (atribuida pelo
+// Master em usuarios.html) - deixa um gerente organizar setor/tipo, ajustar
+// custo de referencia e ativar/desativar item sem precisar de acesso Master
+function requireMasterOuCatalogoEstoque(req, res, next) {
+  if (!req.isMaster && !req.podeCatalogoEstoque) return res.status(403).json({ error: 'Você não tem permissão pra gerenciar o Catálogo do Estoque.' });
   next();
 }
 
@@ -219,6 +228,7 @@ module.exports = {
   requireAuth,
   requireMaster,
   requireMasterOrAdmin,
+  requireMasterOuCatalogoEstoque,
   hasSection,
   filterByUnidade,
   emptyPermissions,

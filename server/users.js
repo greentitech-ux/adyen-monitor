@@ -109,6 +109,21 @@ async function updateIsAdmin(id, isAdmin) {
   return toPublic(await ref.get());
 }
 
+// libera o Catálogo do Estoque (organizar setor/tipo, ajustar custo de
+// referência, ativar/desativar item) pra um usuário especifico, sem precisar
+// dar Master/Admin pra ele - pensado pra gerente de loja que cuida disso no
+// dia a dia (ver requireMaster/podeCatalogoEstoque em auth.js)
+async function updatePodeCatalogoEstoque(id, valor) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master já pode tudo, não precisa dessa permissão.');
+  await ref.update({ podeCatalogoEstoque: !!valor });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
 // tag de cargo/funcao (Loja, Gerente) - so um rotulo de organizacao na tela
 // de Usuarios, nao muda nenhuma permissao (diferente da tag Admin)
 const CARGOS_VALIDOS = ['loja', 'gerente'];
@@ -159,9 +174,10 @@ function toPublic(doc) {
     permissions: data.role === 'master' ? null : data.permissions || emptyPermissions(),
     horarioPermitido: data.role === 'master' ? null : data.horarioPermitido || { ativo: false, inicio: '', fim: '' },
     isAdmin: data.role === 'master' ? null : !!data.isAdmin,
+    podeCatalogoEstoque: data.role === 'master' ? null : !!data.podeCatalogoEstoque,
     cargo: data.role === 'master' ? null : data.cargo || null,
     createdAt: data.createdAt,
   };
 }
 
-module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, updateIsAdmin, updateCargo, resetPassword, remove };
+module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, updateIsAdmin, updatePodeCatalogoEstoque, updateCargo, resetPassword, remove };

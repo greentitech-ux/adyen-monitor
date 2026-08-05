@@ -213,7 +213,7 @@ app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, 
 app.use('/api', auth.requireAuth);
 
 app.get('/api/me', (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions, isAdmin: req.isAdmin });
+  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions, isAdmin: req.isAdmin, podeCatalogoEstoque: req.podeCatalogoEstoque });
 });
 
 // so a secao pedida bloqueia quem nao tem permissao - Master sempre passa
@@ -1366,6 +1366,14 @@ app.put('/api/users/:id/is-admin', auth.requireMaster, async (req, res) => {
   }
 });
 
+app.put('/api/users/:id/catalogo-estoque', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updatePodeCatalogoEstoque(req.params.id, req.body.podeCatalogoEstoque));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // tag de cargo (Loja/Gerente) - rotulo de organizacao, nao muda permissao
 app.put('/api/users/:id/cargo', auth.requireMaster, async (req, res) => {
   try {
@@ -1766,7 +1774,7 @@ app.get('/api/inventario/unidades', requireSection('inventario'), (req, res) => 
 app.get('/api/inventario/setores', requireSection('inventario'), async (req, res) => {
   res.json(await inventario.listSetores());
 });
-app.post('/api/inventario/setores', auth.requireMaster, async (req, res) => {
+app.post('/api/inventario/setores', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
     res.json(await inventario.criarSetor(req.body.nome));
   } catch (err) {
@@ -1776,7 +1784,7 @@ app.post('/api/inventario/setores', auth.requireMaster, async (req, res) => {
 app.get('/api/inventario/tipos', requireSection('inventario'), async (req, res) => {
   res.json(await inventario.listTipos());
 });
-app.post('/api/inventario/tipos', auth.requireMaster, async (req, res) => {
+app.post('/api/inventario/tipos', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
     res.json(await inventario.criarTipo(req.body.nome));
   } catch (err) {
@@ -1787,21 +1795,21 @@ app.post('/api/inventario/tipos', auth.requireMaster, async (req, res) => {
 app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
   res.json(await inventario.listCatalogo());
 });
-app.post('/api/inventario/catalogo', auth.requireMaster, async (req, res) => {
+app.post('/api/inventario/catalogo', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
     res.json(await inventario.criarItem(req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
-app.put('/api/inventario/catalogo/:id', auth.requireMaster, async (req, res) => {
+app.put('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
     res.json(await inventario.atualizarItem(req.params.id, req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
-app.delete('/api/inventario/catalogo/:id', auth.requireMaster, async (req, res) => {
+app.delete('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
     await inventario.removerItem(req.params.id);
     res.json({ ok: true });
