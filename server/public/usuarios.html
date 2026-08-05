@@ -69,7 +69,11 @@
   .unidades-grupo-titulo{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px;}
   .unidades-grupo-titulo:first-of-type{margin-top:0;}
   .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:280px;}
-  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+  .tag-mais{cursor:pointer;color:var(--accent);border-color:var(--accent);flex:none;}
+  .tag-mais:hover{background:rgba(92,200,255,.12);}
+  .tags .tag-extra{display:none;}
+  .tags.expanded .tag-extra{display:inline-block;}
   .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
   .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .rowacts button:hover{border-color:var(--accent);}
@@ -495,9 +499,22 @@ async function rodarBackupAgora(){
   }
 }
 
-function tagList(items, labelFn){
+// lista compacta: mostra so as 2 primeiras tags + um chip "+N" clicavel que
+// expande/recolhe o resto - antes cada secao/unidade virava uma tag empilhada
+// e uma linha de usuario ocupava a tela inteira no celular
+function tagList(items, labelFn, limite = 2){
   if(!items || !items.length) return '<span style="color:var(--muted);">—</span>';
-  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(labelFn?labelFn(i):i)}</span>`).join('')}</div>`;
+  const labels = items.map(i=>labelFn?labelFn(i):i);
+  const tituloCompleto = escapeHtml(labels.join(', '));
+  const tagHtml = (l, extra) => `<span class="tag${extra?' tag-extra':''}" title="${escapeHtml(l)}">${escapeHtml(l)}</span>`;
+  if(labels.length <= limite){
+    return `<div class="tags" title="${tituloCompleto}">${labels.map(l=>tagHtml(l,false)).join('')}</div>`;
+  }
+  return `<div class="tags" title="${tituloCompleto}">`
+    + labels.slice(0,limite).map(l=>tagHtml(l,false)).join('')
+    + labels.slice(limite).map(l=>tagHtml(l,true)).join('')
+    + `<span class="tag tag-mais" onclick="this.closest('.tags').classList.toggle('expanded'); this.textContent = this.closest('.tags').classList.contains('expanded') ? '− ver menos' : '+${labels.length-limite}';">+${labels.length-limite}</span>`
+    + `</div>`;
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
