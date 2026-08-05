@@ -107,6 +107,7 @@
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
@@ -159,14 +160,43 @@
 
     <div class="secao">
       <div class="secao-titulo">Valores</div>
-      <div class="grid2">
-        <div><label>Bônus (Gami/NEXT)</label><input type="number" step="0.01" inputmode="decimal" id="f-bonus" value="0"></div>
-        <div><label>Ajuda de custo</label><input type="number" step="0.01" inputmode="decimal" id="f-ajudaCusto" value="0"></div>
+
+      <!-- unidade "plataforma" (sem tabela de valor fixo, ex: paga o que a
+           GAMI/NEXT informar naquele dia) - loja digita os valores, como
+           sempre foi -->
+      <div id="campos-manual">
+        <div class="grid2">
+          <div><label>Ajuda de custo</label><input type="number" step="0.01" inputmode="decimal" id="f-ajudaCusto" value="0"></div>
+          <div><label>Valor a pagar</label><input type="number" step="0.01" inputmode="decimal" id="f-valor" value="0"></div>
+        </div>
+        <label>COOP recebe</label>
+        <input type="number" step="0.01" inputmode="decimal" id="f-coopRecebe" value="0">
       </div>
-      <div class="grid2">
-        <div><label>Valor a pagar</label><input type="number" step="0.01" inputmode="decimal" id="f-valor" value="0"></div>
-        <div><label>COOP recebe</label><input type="number" step="0.01" inputmode="decimal" id="f-coopRecebe" value="0"></div>
+
+      <!-- unidade "fixo" (tem tabela de valores configurada em Regras de
+           Entregas) - o servidor calcula tudo a partir das contagens acima;
+           aqui só mostramos a prévia e a opção de remover a Encosta -->
+      <div id="campos-calculados" class="hidden">
+        <div class="resumo">
+          <div class="linha"><span>Encosta/Ajuda de custo</span><b id="preview-ajudaCusto">R$ 0,00</b></div>
+          <div class="linha"><span>Valor a pagar (calculado)</span><b id="preview-valor">R$ 0,00</b></div>
+          <div class="linha"><span>COOP recebe (calculado)</span><b id="preview-coopRecebe">R$ 0,00</b></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--sans);font-size:12.5px;color:var(--text);">
+          <input type="checkbox" id="f-encostaRemovida" style="width:auto;">
+          Remover Encosta/Ajuda de custo desse entregador
+        </label>
+        <div id="wrap-motivo-encosta" class="hidden">
+          <label>Motivo</label>
+          <select id="f-motivoRemocaoEncosta">
+            <option value="atraso">Atraso</option>
+            <option value="saiu_antes">Saiu antes do fim do turno</option>
+            <option value="prejuizo">Gerou prejuízo</option>
+            <option value="outro">Outro (detalhar na Observação)</option>
+          </select>
+        </div>
       </div>
+
       <label>Quantidade total</label>
       <input type="number" step="1" inputmode="numeric" id="f-quantTotal" value="0">
       <div class="resumo">
@@ -269,6 +299,8 @@ let MEUS = [];
 let EDICOES = [];
 let EDITANDO_ID = null;
 let EDITANDO_MASTER_ID = null;
+let REGRAS_POR_UNIDADE = {}; // unidade -> regra (ver entregasRegras.js) - decide se o form pede contagem (calcula sozinho) ou valor digitado
+const MOTIVOS_REMOCAO_LABEL = { atraso:'Atraso', saiu_antes:'Saiu antes do fim do turno', prejuizo:'Gerou prejuízo', outro:'Outro' };
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtValorCampo(campo,v){ return CAMPOS_MONETARIOS.has(campo) ? fmtMoney(v) : (Number(v)||0).toString(); }
@@ -294,6 +326,46 @@ function atualizarSugestao(){
 }
 ['f-entrega','f-extra'].forEach(id=>{
   document.getElementById(id).addEventListener('input', atualizarSugestao);
+});
+
+// ---------- regra de pagamento da unidade (ver entregas-regras.html) ----------
+// unidade "fixo": esconde os campos de valor e mostra a prévia calculada a
+// partir das contagens; unidade "plataforma" (sem valor fixo, ex: paga o que
+// a GAMI/NEXT informar) mantém os campos de valor manuais, como sempre foi
+function regraAtual(){
+  const unidade = document.getElementById('f-unidade').value;
+  return REGRAS_POR_UNIDADE[unidade] || { modo:'plataforma' };
+}
+function atualizarModoUnidade(){
+  const fixo = regraAtual().modo === 'fixo';
+  document.getElementById('campos-manual').classList.toggle('hidden', fixo);
+  document.getElementById('campos-calculados').classList.toggle('hidden', !fixo);
+  if(fixo) atualizarPreviewCalculado();
+}
+function atualizarPreviewCalculado(){
+  const regra = regraAtual();
+  if(regra.modo !== 'fixo') return;
+  const entrega = num(document.getElementById('f-entrega').value);
+  const retorno = num(document.getElementById('f-retorno').value);
+  const extra = num(document.getElementById('f-extra').value);
+  const foraDeArea = num(document.getElementById('f-foraDeArea').value);
+  const encostaRemovida = document.getElementById('f-encostaRemovida').checked;
+  const ajudaCusto = encostaRemovida ? 0 : num(regra.valorEncosta);
+  // mesma conta de entregasRegras.js (calcular): Extra paga a mesma taxa da
+  // Entrega; COOP só recebe sobre a soma de Entregas (nao soma extra/retorno/FA)
+  const valor = (entrega+extra)*num(regra.valorEntrega) + retorno*num(regra.valorRetorno) + foraDeArea*num(regra.valorFA) + ajudaCusto;
+  const coopRecebe = entrega*num(regra.valorCooperativa);
+  document.getElementById('preview-ajudaCusto').textContent = fmtMoney(ajudaCusto);
+  document.getElementById('preview-valor').textContent = fmtMoney(valor);
+  document.getElementById('preview-coopRecebe').textContent = fmtMoney(coopRecebe);
+}
+document.getElementById('f-unidade').addEventListener('change', atualizarModoUnidade);
+['f-entrega','f-retorno','f-extra','f-foraDeArea'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', atualizarPreviewCalculado);
+});
+document.getElementById('f-encostaRemovida').addEventListener('change', (ev)=>{
+  document.getElementById('wrap-motivo-encosta').classList.toggle('hidden', !ev.target.checked);
+  atualizarPreviewCalculado();
 });
 
 async function carregar(){
@@ -325,6 +397,7 @@ function renderLista(){
         <span>${escapeHtml(f.entregador)} · ${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
         ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
         ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
+        ${f.encostaRemovida?`<span class="badge REJEITADO" title="Encosta/Ajuda de custo removida">Sem Encosta · ${escapeHtml(MOTIVOS_REMOCAO_LABEL[f.motivoRemocaoEncosta]||'—')}</span>`:''}
       </div>
       <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.etiquetaPath?' · <a href="/api/entregas/etiqueta/'+f.id+'?token='+encodeURIComponent(AUTH_TOKEN)+'" target="_blank" style="color:var(--accent);">📎 etiqueta</a>':''}</div>
       <div class="valores">
@@ -427,7 +500,9 @@ function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
   CAMPOS_NUMERICOS.forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = 0; });
+  document.getElementById('wrap-motivo-encosta').classList.add('hidden');
   atualizarSugestao();
+  atualizarModoUnidade();
 }
 
 // mesmo motivo do form de fechamento (ver lancamento.html): varios campos
@@ -453,6 +528,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       const el = document.getElementById('f-'+c);
       campos[c] = el ? el.value : 0;
     });
+    const encostaRemovida = document.getElementById('f-encostaRemovida').checked;
     const payload = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
@@ -462,6 +538,8 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       obsRetorno: document.getElementById('f-obsRetorno').value,
       obsExtra: document.getElementById('f-obsExtra').value,
       observacao: document.getElementById('f-observacao').value,
+      encostaRemovida,
+      motivoRemocaoEncosta: encostaRemovida ? document.getElementById('f-motivoRemocaoEncosta').value : null,
     };
     const form = new FormData();
     form.append('payload', JSON.stringify(payload));
@@ -501,6 +579,7 @@ async function boot(){
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('entregas-lancamento')){
     document.getElementById('sem-acesso').classList.remove('hidden');
@@ -521,6 +600,10 @@ async function boot(){
   document.getElementById('f-data').value = hojeBrasilia();
   document.getElementById('f-data').max = hojeBrasilia();
   atualizarSugestao();
+
+  const regras = await fetch('/api/entregas/regras').then(r=>r.json()).catch(()=>[]);
+  regras.forEach(r=>{ REGRAS_POR_UNIDADE[r.unidade] = r; });
+  atualizarModoUnidade();
 
   document.getElementById('root').classList.remove('hidden');
   await carregar();

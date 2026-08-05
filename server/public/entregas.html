@@ -120,6 +120,7 @@
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
@@ -224,6 +225,7 @@ function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidd
 let DATA = [];
 let EDICOES = [];
 let UNIDADES_NOMES = { 'Tirol Natal':'Dom Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Dom Bessa', Caruaru:'Dom Caruaru', Garanhuns:'Dom Garanhuns' };
+const MOTIVOS_REMOCAO_LABEL = { atraso:'Atraso', saiu_antes:'Saiu antes do fim do turno', prejuizo:'Gerou prejuízo', outro:'Outro' };
 // codigos que sao de fato do dominio Entregas - capturado ANTES do merge com
 // /api/meta/unidades em carregar() (que devolve o cadastro geral de lojas,
 // usado por Fechamento/Monitor/etc - unidades tem codigos diferentes lá, ex:
@@ -614,7 +616,7 @@ function renderTabela(rows){
       <td class="valor">${d.pos00hs}</td>
       <td class="valor">${d.foraDeArea}</td>
       <td class="valor">${fmtMoney(d.bonus)}</td>
-      <td class="valor">${fmtMoney(d.ajudaCusto)}</td>
+      <td class="valor" title="${d.encostaRemovida?('Removida - '+escapeHtml(MOTIVOS_REMOCAO_LABEL[d.motivoRemocaoEncosta]||'')):''}">${fmtMoney(d.ajudaCusto)}${d.encostaRemovida?' <span style="color:var(--bad);">✕</span>':''}</td>
       <td class="valor">${fmtMoney(d.valor)}</td>
       <td class="valor">${fmtMoney(d.coopRecebe)}</td>
       <td class="valor">${d.quantTotal}</td>
@@ -653,6 +655,7 @@ async function boot(){
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
   document.getElementById('btn-sincronizar-planilha').classList.toggle('hidden', !isMaster);
 
