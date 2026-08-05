@@ -115,6 +115,8 @@
   <a class="back active" id="nav-ajuda-self" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
 <div class="busca-wrap">
@@ -372,6 +374,11 @@ function abrirTopico(id){
 }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// rodape padrao de todo PAP - injetado automaticamente no fim de cada topico
+// (inclusive os que forem criados depois), pra ninguem ficar travado sem
+// saber a quem recorrer
+const RODAPE_SUPORTE = `<div class="dica" style="margin-top:16px;">💬 <b>Ficou com dúvida?</b> Fale com o suporte: <a href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">(81) 99514-8654</a></div>`;
+
 function renderSecoes(filtro){
   const termo = (filtro||'').trim().toLowerCase();
   const visiveis = TOPICOS.filter(topicoVisivel).filter(t => !termo || (t.titulo + ' ' + t.corpo).toLowerCase().includes(termo));
@@ -379,7 +386,7 @@ function renderSecoes(filtro){
   document.getElementById('lista-secoes').innerHTML = visiveis.map(t=>`
     <details class="secao-ajuda" id="${t.id}" ${termo?'open':''}>
       <summary><span class="icone">${t.icone}</span> ${escapeHtml(t.titulo)}</summary>
-      <div class="secao-corpo">${t.corpo}</div>
+      <div class="secao-corpo">${t.corpo}${RODAPE_SUPORTE}</div>
     </details>
   `).join('');
 }
