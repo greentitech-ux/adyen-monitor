@@ -182,7 +182,7 @@
       </div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-caixa">
       <div class="secao-titulo">Caixa</div>
       <div class="grid2">
         <div>
@@ -218,7 +218,7 @@
       <div class="sub hidden" id="formas-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-maquininhas">
       <div class="secao-titulo">Maquininhas (cartão) <span id="maq-total" style="color:var(--text);"></span></div>
       <div id="lista-maquinas"></div>
       <button type="button" class="btn-add" onclick="adicionarMaquina()">+ Adicionar maquininha</button>
@@ -229,7 +229,7 @@
       <div id="sangria-dia-info"><div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div></div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-saidas">
       <div class="secao-titulo">Outras saídas de caixa <span id="saida-total" style="color:var(--text);"></span></div>
       <div class="sub" style="margin:-2px 0 8px;">Saídas que não passaram pela Sangria/Depósito (ex: pequena despesa paga direto do caixa).</div>
       <div id="lista-saidas"></div>
@@ -360,15 +360,35 @@ function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&'
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
 // ---------- linhas repetíveis: maquininhas ----------
+// o prefixo do nome (padrao "Maquininha", ex: "Maquininha 1") e configuravel
+// por grupo (ver grupos.html/grupoKpiDaUnidade) - franquia que usa uma
+// maquininha especifica (ex: Getnet) pode trocar pra "Getnet 1", "Getnet 2"...
+function maquininhaPrefixoDaUnidade(){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return (grupo && grupo.maquininhaPrefixo) || 'Maquininha';
+}
+// "autoNomeado": true enquanto a loja nao mexeu no nome (ainda e o
+// "Maquininha N"/"Getnet N" gerado automaticamente) - so essas linhas tem o
+// nome atualizado quando o prefixo muda (troca de unidade), pra nao
+// sobrescrever um nome que a loja digitou de proposito
 function adicionarMaquina(valor){
-  MAQUINAS.push({ id: ++SEQ, descricao: `Maquininha ${MAQUINAS.length+1}`, valor: valor||'' });
+  MAQUINAS.push({ id: ++SEQ, descricao: `${maquininhaPrefixoDaUnidade()} ${MAQUINAS.length+1}`, valor: valor||'', autoNomeado: true });
   renderMaquinas();
 }
 function removerMaquina(id){ MAQUINAS = MAQUINAS.filter(m=>m.id!==id); renderMaquinas(); }
+// re-numera as linhas ainda com nome automatico usando o prefixo atual da
+// unidade selecionada - chamado ao trocar de unidade (ver aplicarSecoesGrupo)
+function renomearMaquinasAutomaticas(){
+  const prefixo = maquininhaPrefixoDaUnidade();
+  let n = 0;
+  MAQUINAS.forEach(m=>{ n += 1; if(m.autoNomeado) m.descricao = `${prefixo} ${n}`; });
+  renderMaquinas();
+}
 function renderMaquinas(){
   document.getElementById('lista-maquinas').innerHTML = MAQUINAS.map(m=>`
     <div class="linha-item">
-      <input type="text" value="${escapeHtml(m.descricao)}" oninput="MAQUINAS.find(x=>x.id===${m.id}).descricao=this.value" placeholder="nome/identificação">
+      <input type="text" value="${escapeHtml(m.descricao)}" oninput="const mq=MAQUINAS.find(x=>x.id===${m.id}); mq.descricao=this.value; mq.autoNomeado=false;" placeholder="nome/identificação">
       <input type="number" step="0.01" inputmode="decimal" value="${m.valor}" oninput="MAQUINAS.find(x=>x.id===${m.id}).valor=this.value; atualizarResumo();" placeholder="R$">
       <button type="button" class="btn-remover" onclick="removerMaquina(${m.id})">✕</button>
     </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma maquininha adicionada.</div>';
@@ -509,10 +529,35 @@ function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
 function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'formas-vazio', 'forma-extra-input'); }
 function lerFormasExtras(){ return lerExtrasGrupo('forma-extra-input'); }
 
+// esconde/mostra as secoes fixas (Caixa/Maquininhas/Outras saidas de caixa)
+// conforme o grupo da unidade (ver grupos.html) - franquia que nao usa uma
+// dessas secoes nem precisa ver o campo. Zera o que tava preenchido junto,
+// pra nao ficar um valor escondido contribuindo pro fechamento sem a loja
+// perceber (ex: trocou de unidade e o campo antigo ficou com valor)
+function aplicarSecoesGrupo(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const caixaOk = !grupo || grupo.caixaHabilitado !== false;
+  const maquininhasOk = !grupo || grupo.maquininhasHabilitado !== false;
+  const saidasOk = !grupo || grupo.saidasHabilitado !== false;
+
+  document.getElementById('secao-caixa').classList.toggle('hidden', !caixaOk);
+  if(!caixaOk){
+    ['caixaInicial','caixaFinal','entradaDinheiro','deposito'].forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = ''; });
+  }
+
+  document.getElementById('secao-maquininhas').classList.toggle('hidden', !maquininhasOk);
+  if(!maquininhasOk && MAQUINAS.length){ MAQUINAS = []; renderMaquinas(); }
+  else if(maquininhasOk && !MAQUINAS.length){ adicionarMaquina(); }
+  else if(maquininhasOk){ renomearMaquinasAutomaticas(); }
+
+  document.getElementById('secao-saidas').classList.toggle('hidden', !saidasOk);
+  if(!saidasOk && SAIDAS.length){ SAIDAS = []; renderSaidas(); }
+}
 function aplicarFranquia(unidade){
   renderKpisExtras(unidade);
   renderCanaisExtras(unidade);
   renderFormasExtras(unidade);
+  aplicarSecoesGrupo(unidade);
   atualizarResumo();
 }
 document.getElementById('f-unidade').addEventListener('change', (ev)=>{ aplicarFranquia(ev.target.value); carregarSangriaDoDia(); });

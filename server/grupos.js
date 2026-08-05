@@ -58,6 +58,14 @@ function sanitizarCamposExtras(lista) {
     .slice(0, 40);
 }
 
+// nome padrao das maquininhas (ex: "Maquininha 1", "Maquininha 2"...) -
+// franquia que usa uma maquinha especifica pode trocar o prefixo (ex:
+// "Getnet" -> "Getnet 1", "Getnet 2"...), ver lancamento.html
+function sanitizarPrefixo(s) {
+  const limpo = String(s || '').trim().slice(0, 30);
+  return limpo || 'Maquininha';
+}
+
 async function listUncached() {
   const snap = await COLLECTION.orderBy('nome', 'asc').get();
   return snap.docs.map((d) => d.data());
@@ -65,7 +73,7 @@ async function listUncached() {
 const gruposCache = createCache(listUncached, 20 * 1000);
 const list = gruposCache.cached;
 
-async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis }) {
+async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis, caixaHabilitado, maquininhasHabilitado, maquininhaPrefixo, saidasHabilitado }) {
   const nomeLimpo = String(nome || '').trim();
   if (!nomeLimpo) throw new Error('Informe o nome do grupo.');
   const ref = COLLECTION.doc();
@@ -80,6 +88,13 @@ async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPag
     // deixar quem lanca uma solicitacao direcionar pra um deles (ver
     // GET /api/grupos/responsaveis em index.js)
     responsaveis: Array.isArray(responsaveis) ? responsaveis.map(String) : [],
+    // secoes fixas do lancamento (Caixa/Maquininhas/Outras saidas) que a
+    // franquia pode nao usar - todas habilitadas por padrao (comportamento
+    // de sempre, pra grupo criado antes dessa feature nao mudar nada)
+    caixaHabilitado: caixaHabilitado !== false,
+    maquininhasHabilitado: maquininhasHabilitado !== false,
+    maquininhaPrefixo: sanitizarPrefixo(maquininhaPrefixo),
+    saidasHabilitado: saidasHabilitado !== false,
     criadoEm: new Date().toISOString(),
   };
   await ref.set(registro);
@@ -87,7 +102,7 @@ async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPag
   return registro;
 }
 
-async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis }) {
+async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis, caixaHabilitado, maquininhasHabilitado, maquininhaPrefixo, saidasHabilitado }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Grupo não encontrado.');
@@ -102,6 +117,10 @@ async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, forma
   if (canaisVendaExtras != null) patch.canaisVendaExtras = sanitizarCamposExtras(canaisVendaExtras);
   if (formasPagamentoExtras != null) patch.formasPagamentoExtras = sanitizarCamposExtras(formasPagamentoExtras);
   if (responsaveis != null) patch.responsaveis = Array.isArray(responsaveis) ? responsaveis.map(String) : [];
+  if (caixaHabilitado != null) patch.caixaHabilitado = caixaHabilitado !== false;
+  if (maquininhasHabilitado != null) patch.maquininhasHabilitado = maquininhasHabilitado !== false;
+  if (maquininhaPrefixo != null) patch.maquininhaPrefixo = sanitizarPrefixo(maquininhaPrefixo);
+  if (saidasHabilitado != null) patch.saidasHabilitado = saidasHabilitado !== false;
   await ref.update(patch);
   gruposCache.invalidar();
   return { ...snap.data(), ...patch };
