@@ -106,6 +106,7 @@ async function solicitarEdicao({ entregaId, mudancas, motivo, solicitadoPorId, s
     motivoDecisao: null,
   };
   await ref.set(pedido);
+  edicoesEntregaCache.invalidar();
   return pedido;
 }
 
@@ -142,10 +143,14 @@ async function editarDireto({ entregaId, mudancas, motivo, editadoPorEmail }) {
 }
 
 
-async function listarEdicoes() {
+// cache de 20s, mesmo racional da fila de edicoes de fechamento
+// (fechamentosLive.js): evita reler a colecao inteira a cada visita da tela
+async function listarEdicoesUncached() {
   const snap = await EDITS.orderBy('criadoEm', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const edicoesEntregaCache = createCache(listarEdicoesUncached, 20 * 1000);
+const listarEdicoes = edicoesEntregaCache.cached;
 
 async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
   if (!['APROVADO', 'REJEITADO'].includes(status)) throw new Error('Status inválido.');
@@ -161,6 +166,7 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
     motivoDecisao: motivoDecisao || null,
     decididoEm: new Date().toISOString(),
   });
+  edicoesEntregaCache.invalidar();
 
   if (status === 'APROVADO') {
     const entRef = COLLECTION.doc(pedido.entregaId);

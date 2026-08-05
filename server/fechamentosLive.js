@@ -196,6 +196,7 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
   pedido.id = ref.id;
   pedido.criadoEm = agora;
   await ref.set(pedido);
+  edicoesCache.invalidar();
   return pedido;
 }
 
@@ -282,10 +283,16 @@ async function remove(id) {
   fechamentosCache.invalidar();
 }
 
-async function listarEdicoes() {
+// cache de 20s: a fila de edicoes entra em TODA montagem da Central
+// (todosCardsCentral em index.js - painel, historico e cada notificacao SSE
+// refazem essa leitura) - sem cache era uma releitura completa da colecao
+// fechamentoEdicoes por chamada. Toda mutacao da fila invalida.
+async function listarEdicoesUncached() {
   const snap = await EDITS.orderBy('criadoEm', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const edicoesCache = createCache(listarEdicoesUncached, 20 * 1000);
+const listarEdicoes = edicoesCache.cached;
 
 async function getEdicao(id) {
   const doc = await EDITS.doc(id).get();
@@ -297,6 +304,7 @@ async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail }) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Pedido não encontrado.');
   await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaEm: new Date().toISOString() });
+  edicoesCache.invalidar();
   return getEdicao(id);
 }
 
@@ -306,6 +314,7 @@ async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail }) {
 // corrigir o fechamento depois disso o Master usa editarDireto normalmente.
 async function removerEdicao(id) {
   await EDITS.doc(id).delete();
+  edicoesCache.invalidar();
 }
 
 async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
@@ -322,6 +331,7 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
     motivoDecisao: motivoDecisao || null,
     decididoEm: new Date().toISOString(),
   });
+  edicoesCache.invalidar();
 
   if (status === 'APROVADO') {
     const fechRef = COLLECTION.doc(pedido.fechamentoId);
