@@ -332,7 +332,7 @@
   <h2>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <span>Catálogo de itens</span>
-      <button type="button" class="btn-add" onclick="carregarCatalogoPadrao()">⬇️ Carregar catálogo padrão (Domino's)</button>
+      <button type="button" class="btn-add" id="btn-catalogo-seed" onclick="carregarCatalogoPadrao()">⬇️ Carregar catálogo padrão (Domino's)</button>
     </div>
   </h2>
   <div class="msg hidden" id="msg-catalogo-seed"></div>
@@ -1026,7 +1026,9 @@ async function boot(){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
-  document.getElementById('tab-btn-catalogo').classList.toggle('hidden', !isMaster);
+  const podeCatalogo = isMaster || !!ME.podeCatalogoEstoque;
+  document.getElementById('tab-btn-catalogo').classList.toggle('hidden', !podeCatalogo);
+  document.getElementById('btn-catalogo-seed').classList.toggle('hidden', !isMaster);
 
   const hoje = hojeBrasilia();
   document.getElementById('c-data').value = hoje;
