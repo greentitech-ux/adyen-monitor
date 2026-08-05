@@ -1472,6 +1472,31 @@ function renderExtrasEdicaoFechamento(grupo, chaveGrupo, mapaAtual, containerId,
     `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-${attr}="${escapeHtml(k.campo)}" class="${classe}" value="${num((mapaAtual||{})[k.campo])}"></div>`
   ).join('');
 }
+// KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
+// Canais/Formas (sempre R$), entao ganha renderização própria: número
+// (quantidade/moeda/kg), texto livre, ou arquivo (mostra link pro anexo
+// atual + input pra trocar - o valor gravado E o caminho no Storage, não dá
+// pra "editar" ele como número)
+function renderKpisEdicaoFechamento(grupo, mapaAtual, fechamentoId){
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('ef-kpis-extras');
+  document.getElementById('ef-kpis-vazio').classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.classList.add('hidden'); container.innerHTML = ''; return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    const atual = (mapaAtual||{})[k.campo];
+    if(tipo === 'arquivo'){
+      const linkAtual = atual ? `<a href="/api/fechamentos/${fechamentoId}/kpi-arquivo/${encodeURIComponent(k.campo)}" target="_blank" style="display:block;font-size:11px;color:var(--accent);margin-bottom:4px;">📎 ver arquivo atual</a>` : '';
+      return `<div><label>${escapeHtml(k.label)}</label>${linkAtual}<input type="file" accept="image/*,application/pdf" data-kpi-campo="${escapeHtml(k.campo)}" class="ef-kpi-arquivo-input"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="texto" class="ef-kpi-extra-input" value="${escapeHtml(atual||'')}"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    return `<div><label>${escapeHtml(k.label)}</label><input type="number" step="${step}" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="${tipo}" class="ef-kpi-extra-input" value="${num(atual)}"></div>`;
+  }).join('');
+}
 
 async function abrirEdicaoFechamento(id){
   // busca o registro BRUTO (sem mesclar com sangria/planilha) - editar em
@@ -1493,7 +1518,7 @@ async function abrirEdicaoFechamento(id){
   document.getElementById('ef-motivo').value = '';
 
   const grupoKpi = grupoKpiDaUnidade(d.unidade);
-  renderExtrasEdicaoFechamento(grupoKpi, 'kpisExtras', d.kpisExtras, 'ef-kpis-extras', 'ef-kpis-vazio', 'ef-kpi-extra-input', 'kpiCampo');
+  renderKpisEdicaoFechamento(grupoKpi, d.kpisExtras, id);
   renderExtrasEdicaoFechamento(grupoKpi, 'canaisVendaExtras', d.canaisVendaExtras, 'ef-canais-extras', 'ef-canais-vazio', 'ef-canal-extra-input', 'canalCampo');
   renderExtrasEdicaoFechamento(grupoKpi, 'formasPagamentoExtras', d.formasPagamentoExtras, 'ef-formas-extras', 'ef-formas-vazio', 'ef-forma-extra-input', 'formaCampo');
 
@@ -1527,11 +1552,21 @@ async function salvarEdicaoFechamento(){
   document.querySelectorAll('.ef-canal-extra-input').forEach(el=>{ mudancasCanais[el.dataset.canalCampo] = el.value; });
   const mudancasFormas = {};
   document.querySelectorAll('.ef-forma-extra-input').forEach(el=>{ mudancasFormas[el.dataset.formaCampo] = el.value; });
+  const arquivosKpi = [...document.querySelectorAll('.ef-kpi-arquivo-input')].filter(el=>el.files && el.files[0]);
   try{
-    const resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo: document.getElementById('ef-motivo').value }),
-    });
+    const payload = { mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo: document.getElementById('ef-motivo').value };
+    let resp;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.kpiCampo, el.files[0]));
+      resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, { method:'PATCH', body: fd });
+    } else {
+      resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+    }
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
     fecharEdicaoFechamento();

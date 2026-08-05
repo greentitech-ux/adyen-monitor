@@ -27,8 +27,16 @@ function slugify(s) {
     .join('');
 }
 
+// unidades de medida de um KPI extra - so faz sentido pra kpisExtras (Canais
+// de venda/Formas de pagamento sempre somam em R$, entao nem mostram esse
+// seletor em grupos.html). "quantidade" e o padrao pra KPI sem tipo definido
+// (grupo criado antes dessa feature).
+const TIPOS_KPI_VALIDOS = new Set(['quantidade', 'moeda', 'kg', 'arquivo', 'texto']);
+
 // usado pras 3 listas de campos extras (kpisExtras, canaisVendaExtras,
-// formasPagamentoExtras) - mesmo formato, mesma validacao
+// formasPagamentoExtras) - mesmo formato, mesma validacao. "tipo" so e
+// gravado quando informado (canais/formas nunca mandam, entao continuam sem
+// esse campo no documento).
 function sanitizarCamposExtras(lista) {
   if (!Array.isArray(lista)) return [];
   const usados = new Set();
@@ -42,7 +50,9 @@ function sanitizarCamposExtras(lista) {
       let n = 2;
       while (usados.has(campo)) { campo = base + n; n += 1; }
       usados.add(campo);
-      return { campo, label };
+      const item = { campo, label };
+      if (k?.tipo != null) item.tipo = TIPOS_KPI_VALIDOS.has(k.tipo) ? k.tipo : 'quantidade';
+      return item;
     })
     .filter(Boolean)
     .slice(0, 40);

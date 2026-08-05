@@ -1577,17 +1577,37 @@ app.post('/api/fechamentos/sincronizar-planilhas', auth.requireMaster, async (re
   res.json(status);
 });
 
+// KPI's extras tipo "arquivo" (ver grupos.js) mandam o arquivo com fieldname
+// "kpiArquivo:<campo>" - sobe cada um pro Storage e devolve {campo: caminho}
+// pra mesclar no mapa de kpisExtras antes de mandar pro fechamentosLive (que
+// grava o caminho como o "valor" desse campo, ver sanitizarMapaExtras)
+async function uploadArquivosKpi(files, ownerId) {
+  const out = {};
+  for (const file of files || []) {
+    const m = /^kpiArquivo:(.+)$/.exec(file.fieldname);
+    if (!m) continue;
+    out[m[1]] = await storage.salvarArquivo(ownerId, file, 'fechamento-kpis');
+  }
+  return out;
+}
+
 // ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
 // substitui o AppSheet: a loja loga com um usuario proprio (papel "Fechamento",
 // limitado a sua(s) unidade(s)) e lanca o fechamento do dia direto no banco.
 // Depois de lancado o registro e imutavel - qualquer correcao vira um pedido
 // que so o Master pode aprovar (fechamentosLive.js guarda o historico).
-app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, res) => {
+// upload.any(): so entra em acao se o body vier multipart (quando algum KPI
+// extra tipo "arquivo" tem foto/anexo escolhido, ver lancamento.html) -
+// requisicao JSON normal (sem arquivo nenhum) passa direto, sem afetar nada.
+app.post('/api/fechamentos/lancar', requireSection('lancamento'), upload.any(), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas } = req.body;
+    const body = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const { unidade, unidadeNome, grupo, data, gerente, campos, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas } = body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    const arquivosKpi = await uploadArquivosKpi(req.files, unidade || 'geral');
+    const kpisExtras = { ...(body.kpisExtras || {}), ...arquivosKpi };
     const registro = await fechamentosLive.create({
       unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas,
       criadoPorId: req.user.id,
@@ -1976,16 +1996,22 @@ app.get('/api/fechamentos/edicoes/anexo/:edicaoId/:index', requireSection('lanca
 
 // edicao direta de um lancamento - so o Master, sem passar pela fila de
 // aprovacao (ele mesmo e quem aprovaria, entao pedir pra si mesmo so
-// atrasaria); ainda assim fica registrado no historico do fechamento
-app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, res) => {
+// atrasaria); ainda assim fica registrado no historico do fechamento.
+// upload.any(): so entra em acao quando o Master troca o arquivo de um KPI
+// extra tipo "arquivo" (ver fechamentos.html/central-historico.html) -
+// requisicao JSON normal passa direto.
+app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, upload.any(), async (req, res) => {
   try {
+    const body = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const arquivosKpi = await uploadArquivosKpi(req.files, req.params.id);
+    const mudancasKpis = { ...(body.mudancasKpis || {}), ...arquivosKpi };
     const registro = await fechamentosLive.editarDireto({
       fechamentoId: req.params.id,
-      mudancas: req.body.mudancas,
-      mudancasKpis: req.body.mudancasKpis,
-      mudancasCanais: req.body.mudancasCanais,
-      mudancasFormas: req.body.mudancasFormas,
-      motivo: req.body.motivo,
+      mudancas: body.mudancas,
+      mudancasKpis,
+      mudancasCanais: body.mudancasCanais,
+      mudancasFormas: body.mudancasFormas,
+      motivo: body.motivo,
       editadoPorEmail: req.user.email,
     });
     broadcast('fechamento-editado-direto', registro, 'lancamento');
@@ -1994,6 +2020,23 @@ app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, 
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// serve o arquivo de um KPI extra tipo "arquivo" (ver grupos.js/lancamento.html)
+// - o valor gravado em kpisExtras[campo] E o caminho no Storage (nao um
+// numero), ver sanitizarMapaExtras em fechamentosLive.js
+function mimeGuess(caminho) {
+  const ext = String(caminho).split('.').pop().toLowerCase();
+  const mapa = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf' };
+  return mapa[ext] || 'application/octet-stream';
+}
+app.get('/api/fechamentos/:id/kpi-arquivo/:campo', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
+  const fechamento = await fechamentosLive.getOne(req.params.id);
+  if (!fechamento) return res.sendStatus(404);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(fechamento.unidade)) return res.sendStatus(404);
+  const caminho = (fechamento.kpisExtras || {})[req.params.campo];
+  if (!caminho || typeof caminho !== 'string') return res.sendStatus(404);
+  storage.streamArquivo(caminho, mimeGuess(caminho), res);
 });
 
 // exclui um fechamento lançado de vez - so o Master. Vale so pra fechamentos

@@ -7,6 +7,7 @@
 // anterior sempre fica guardado no historico do proprio fechamento.
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
+const grupos = require('./grupos');
 
 const COLLECTION = db.collection('fechamentosLive');
 const EDITS = db.collection('fechamentoEdicoes');
@@ -71,14 +72,29 @@ function sanitizarItens(lista) {
 // quem decide QUAIS campos fazem sentido pra cada unidade e o cadastro do
 // grupo, nao esse modulo. Usado pros 3 mapas: kpisExtras, canaisVendaExtras,
 // formasPagamentoExtras.
-function sanitizarMapaExtras(obj) {
+// "tipos" (opcional, so kpisExtras usa): mapa campo->tipo vindo do cadastro
+// do grupo (ver tiposKpiDaUnidade) - decide se o valor e forçado pra numero
+// (quantidade/moeda/kg, o padrao) ou guardado como texto (texto/arquivo, esse
+// ultimo guarda o CAMINHO do arquivo no Storage, nao o numero).
+function sanitizarMapaExtras(obj, tipos) {
   if (!obj || typeof obj !== 'object') return {};
   const out = {};
   Object.entries(obj).slice(0, 40).forEach(([campo, valor]) => {
     const chave = String(campo).slice(0, 60);
     if (!chave) return;
-    out[chave] = num(valor);
+    const tipo = tipos && tipos[chave];
+    out[chave] = (tipo === 'arquivo' || tipo === 'texto') ? String(valor ?? '').slice(0, 300) : num(valor);
   });
+  return out;
+}
+
+// resolve campo->tipo dos kpisExtras configurados pro grupo da unidade (ver
+// grupos.js) - usa o grupo REAL da unidade, nao o id que o cliente mandou no
+// payload, pra nao confiar em um "grupo" desatualizado/errado vindo do form
+async function tiposKpiDaUnidade(unidade) {
+  const grupo = await grupos.grupoDaUnidade(unidade);
+  const out = {};
+  (grupo?.kpisExtras || []).forEach((k) => { out[k.campo] = k.tipo || 'quantidade'; });
   return out;
 }
 
@@ -95,7 +111,8 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
 
   const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
-  registro.kpisExtras = sanitizarMapaExtras(kpisExtras);
+  const tiposKpi = await tiposKpiDaUnidade(unidade);
+  registro.kpisExtras = sanitizarMapaExtras(kpisExtras, tiposKpi);
   registro.canaisVendaExtras = sanitizarMapaExtras(canaisVendaExtras);
   registro.formasPagamentoExtras = sanitizarMapaExtras(formasPagamentoExtras);
   recomputarTotais(registro);
@@ -212,11 +229,13 @@ const CAMPOS_TEXTO = ['gerente', 'observacao'];
 // valida um patch de mapa livre (campo:valor) - usado pelos 3 "mudancasXxx"
 // de editarDireto, mesmo formato de sanitizarMapaExtras mas sem limite de
 // quantidade (e so um patch, nao o mapa inteiro)
-function sanitizarPatchMapa(obj) {
+function sanitizarPatchMapa(obj, tipos) {
   const out = {};
   Object.entries(obj || {}).forEach(([campo, valor]) => {
     const chave = String(campo).slice(0, 60);
-    if (chave) out[chave] = num(valor);
+    if (!chave) return;
+    const tipo = tipos && tipos[chave];
+    out[chave] = (tipo === 'arquivo' || tipo === 'texto') ? String(valor ?? '').slice(0, 300) : num(valor);
   });
   return out;
 }
@@ -233,7 +252,8 @@ async function editarDireto({ fechamentoId, mudancas, mudancasKpis, mudancasCana
   // (campos definidos pelo grupo, ver grupos.js) - aqui e um PATCH: so os
   // campos informados mudam, o resto do mapa permanece igual (diferente de
   // mudancas, que sobrescreve campo por campo mas nao apaga os que nao vieram)
-  const kpisValidos = sanitizarPatchMapa(mudancasKpis);
+  const tiposKpi = await tiposKpiDaUnidade(atual.unidade);
+  const kpisValidos = sanitizarPatchMapa(mudancasKpis, tiposKpi);
   const canaisValidos = sanitizarPatchMapa(mudancasCanais);
   const formasValidos = sanitizarPatchMapa(mudancasFormas);
   if (!Object.keys(camposValidos).length && !Object.keys(kpisValidos).length && !Object.keys(canaisValidos).length && !Object.keys(formasValidos).length) {
