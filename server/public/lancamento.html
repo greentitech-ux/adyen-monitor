@@ -34,6 +34,15 @@
   .btn-sair{color:var(--bad);}
   .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
   .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
@@ -43,6 +52,7 @@
   label:first-child{margin-top:0;}
   input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  input[readonly]{opacity:.7;cursor:default;}
   textarea{resize:vertical;min-height:56px;}
   .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
   @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
@@ -82,27 +92,50 @@
 
 <header>
   <div class="header-top">
-    <div>
-      <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-      <h1>Lançamento de fechamento</h1>
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1 id="titulo-pagina">Lançamento de fechamento</h1>
+      </div>
     </div>
   </div>
   <div class="header-nav">
-    <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-    <a class="back active" href="/lancamento.html">🧾 Fechamento</a>
-    <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Entregas</a>
     <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
     <div class="nav-divider"></div>
     <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
   </div>
 </header>
 
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back active" id="nav-self" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entregas-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
 <div id="sem-acesso" class="empty hidden">Você não tem acesso ao lançamento de fechamento. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
 
 <div class="panel" id="painel-sangria">
-  <h2>💰 Registrar sangria</h2>
+  <h2>💰 Registrar sangria/depósito</h2>
   <div class="sub" style="margin:-2px 0 10px;">Pra retiradas de caixa feitas durante o dia, na visita à loja - sem precisar esperar o fechamento sair. Some automático no fechamento do dia.</div>
   <form id="form-sangria">
     <label>Unidade</label>
@@ -111,15 +144,24 @@
       <div><label>Data</label><input type="date" id="s-data" required></div>
       <div><label>Valor retirado (R$)</label><input type="number" step="0.01" inputmode="decimal" id="s-valor" required></div>
     </div>
+    <label>Período do depósito</label>
+    <div class="grid2">
+      <div><label>De</label><input type="date" id="s-periodo-inicio" required></div>
+      <div><label>Até</label><input type="date" id="s-periodo-fim" required></div>
+    </div>
+    <label>Nome de quem depositou</label>
+    <input type="text" id="s-nome-depositante" placeholder="ex: João (gerente)" required>
     <label>Observação (opcional)</label>
     <input type="text" id="s-descricao" placeholder="ex: retirada na visita da tarde">
+    <label>Confirme sua senha</label>
+    <input type="password" id="s-password" required autocomplete="current-password">
     <div class="msg hidden" id="msg-sangria"></div>
-    <button class="btn-primary" type="submit" id="btn-sangria">Registrar sangria</button>
+    <button class="btn-primary" type="submit" id="btn-sangria">Registrar sangria/depósito</button>
   </form>
   <div id="lista-sangrias" style="margin-top:4px;"></div>
 </div>
 
-<div class="panel">
+<div class="panel" id="painel-fechamento">
   <h2>Novo fechamento</h2>
   <form id="form-lancar">
 
@@ -140,7 +182,7 @@
       </div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-caixa">
       <div class="secao-titulo">Caixa</div>
       <div class="grid2">
         <div>
@@ -166,55 +208,44 @@
 
     <div class="secao">
       <div class="secao-titulo">Canais de venda</div>
-      <div class="grid2">
-        <div><label>Delivery</label><input type="number" step="0.01" inputmode="decimal" id="f-delivery"></div>
-        <div><label>Carryout</label><input type="number" step="0.01" inputmode="decimal" id="f-carryout"></div>
-      </div>
-      <div class="grid2">
-        <div><label>Pickup</label><input type="number" step="0.01" inputmode="decimal" id="f-pickup"></div>
-        <div><label>Loja (salão)</label><input type="number" step="0.01" inputmode="decimal" id="f-loja"></div>
-      </div>
+      <div class="grid2 hidden" id="canais-extras-container" style="margin-top:6px;"></div>
+      <div class="sub hidden" id="canais-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
     </div>
 
     <div class="secao">
       <div class="secao-titulo">Formas de pagamento</div>
-      <div class="grid2">
-        <div><label>iFood</label><input type="number" step="0.01" inputmode="decimal" id="f-ifood"></div>
-        <div id="wrap-food99"><label>99Food</label><input type="number" step="0.01" inputmode="decimal" id="f-food99"></div>
-      </div>
-      <div class="grid2">
-        <div><label>Pix</label><input type="number" step="0.01" inputmode="decimal" id="f-pix"></div>
-        <div><label>Pix CNPJ</label><input type="number" step="0.01" inputmode="decimal" id="f-pixCnpj"></div>
-      </div>
-      <label>Outros</label>
-      <input type="number" step="0.01" inputmode="decimal" id="f-outros">
+      <div class="grid2 hidden" id="formas-extras-container" style="margin-top:6px;"></div>
+      <div class="sub hidden" id="formas-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
     </div>
 
-    <div class="secao">
+    <div class="secao" id="secao-maquininhas">
       <div class="secao-titulo">Maquininhas (cartão) <span id="maq-total" style="color:var(--text);"></span></div>
       <div id="lista-maquinas"></div>
       <button type="button" class="btn-add" onclick="adicionarMaquina()">+ Adicionar maquininha</button>
     </div>
 
     <div class="secao">
-      <div class="secao-titulo">Saídas de caixa (sangrias) <span id="saida-total" style="color:var(--text);"></span></div>
+      <div class="secao-titulo">Saída de dinheiro (sangria/depósito) <span id="sangria-dia-total" style="color:var(--text);"></span></div>
+      <div id="sangria-dia-info"><div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div></div>
+    </div>
+
+    <div class="secao" id="secao-saidas">
+      <div class="secao-titulo">Outras saídas de caixa <span id="saida-total" style="color:var(--text);"></span></div>
+      <div class="sub" style="margin:-2px 0 8px;">Saídas que não passaram pela Sangria/Depósito (ex: pequena despesa paga direto do caixa).</div>
       <div id="lista-saidas"></div>
       <button type="button" class="btn-add" onclick="adicionarSaida()">+ Adicionar saída</button>
     </div>
 
     <div class="secao">
-      <div class="secao-titulo">Fechamento</div>
-      <div class="grid2">
-        <div><label>Faturamento total</label><input type="number" step="0.01" inputmode="decimal" id="f-faturamento"></div>
-        <div><label>Total declarado</label><input type="number" step="0.01" inputmode="decimal" id="f-totalDeclarado"></div>
-      </div>
-      <div class="grid2">
-        <div><label>TC (tíquete médio)</label><input type="number" step="0.01" inputmode="decimal" id="f-tc"></div>
-        <div><label>Cancelados</label><input type="number" step="0.01" inputmode="decimal" id="f-cancelados"></div>
-      </div>
+      <div class="secao-titulo">KPI's</div>
+      <div class="grid2 hidden" id="kpis-extras-container" style="margin-top:6px;"></div>
+      <div class="sub hidden" id="kpis-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
-        <div class="linha"><span>Soma saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
+        <div class="linha"><span>Sangria/Depósito do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
+        <div class="linha"><span>Soma outras saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
+        <div class="linha"><span>Faturamento total</span><b id="resumo-faturamento">R$ 0,00</b></div>
+        <div class="linha"><span>Total declarado</span><b id="resumo-declarado">R$ 0,00</b></div>
         <div class="linha"><span>Diferença (declarado − faturamento)</span><b id="resumo-diferenca" class="dif">R$ 0,00</b></div>
       </div>
     </div>
@@ -229,47 +260,33 @@
   </form>
 </div>
 
-<div class="panel">
-  <h2>Meus últimos lançamentos</h2>
-  <div id="lista-lancamentos"><div class="empty">carregando...</div></div>
 </div>
 
-</div>
-
-<div class="overlay hidden" id="overlay-edicao">
+<div class="overlay hidden" id="overlay-sangria-editar">
   <div class="sheet">
-    <h3>Pedir correção</h3>
-    <div class="sub" id="edicao-info"></div>
-    <form id="form-edicao">
-      <label>Qual valor está errado e qual o valor correto?</label>
-      <select id="e-campo"></select>
-      <input type="number" step="0.01" id="e-valor" placeholder="valor correto" style="margin-top:8px;">
-      <label>Motivo da correção</label>
-      <textarea id="e-motivo" placeholder="explique o que aconteceu, o Master vai revisar antes de aprovar" required></textarea>
-      <div class="msg hidden" id="msg-edicao"></div>
-      <button class="btn-primary" type="submit">Enviar pedido ao Master</button>
-    </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharEdicao()">Cancelar</button>
-  </div>
-</div>
-
-<div class="overlay hidden" id="overlay-master">
-  <div class="sheet">
-    <h3>Editar fechamento (Master)</h3>
-    <div class="sub" id="master-info"></div>
-    <form id="form-master">
+    <h3>Editar sangria/depósito (Master)</h3>
+    <div class="sub" id="sangria-editar-info"></div>
+    <form id="form-sangria-editar">
+      <label>Valor retirado (R$)</label>
+      <input type="number" step="0.01" inputmode="decimal" id="se-valor" required>
+      <label>Data</label>
+      <input type="date" id="se-data" required>
+      <label>Período do depósito</label>
       <div class="grid2">
-        <div><label>Gerente responsável</label><input type="text" id="m-gerente"></div>
+        <div><label>De</label><input type="date" id="se-periodo-inicio" required></div>
+        <div><label>Até</label><input type="date" id="se-periodo-fim" required></div>
       </div>
-      <div class="grid2" id="m-campos-numericos"></div>
+      <label>Nome de quem depositou</label>
+      <input type="text" id="se-nome-depositante" required>
       <label>Observação</label>
-      <textarea id="m-observacao"></textarea>
-      <label>Motivo da alteração (opcional, fica registrado no histórico do fechamento)</label>
-      <textarea id="m-motivo" placeholder="ex: corrigido conforme conferência do caixa"></textarea>
-      <div class="msg hidden" id="msg-master"></div>
-      <button class="btn-primary" type="submit">Salvar alterações</button>
+      <input type="text" id="se-descricao">
+      <div class="msg hidden" id="msg-sangria-editar"></div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:4px;">
+        <button class="btn-primary" style="margin-top:0;flex:1;" type="submit">Salvar</button>
+        <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirSangria()">🗑️ Excluir</button>
+      </div>
     </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharMaster()">Cancelar</button>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharEditarSangria()">Cancelar</button>
   </div>
 </div>
 
@@ -285,30 +302,42 @@ window.fetch = (url, opts = {}) => {
   return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
 // mesma lista de unidades/marcas usada em fechamentos.html - ARCFOOD usa
 // 99Food como canal de pagamento, o Grupo Bravo (Domino's/Spoleto/Milky Moo)
 // não usa. Fora essa diferença, a estrutura financeira é a mesma; o que muda
 // loja a loja é a quantidade de maquininhas e de sangrias no dia, por isso
 // essas duas seções são listas que a própria loja adiciona/remove.
-const ARCFOOD_UNIDADES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
-const BRAVO_UNIDADES = ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"];
-const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES };
-BRAVO_UNIDADES.forEach(u=>{ UNIDADES_NOMES[u] = u; });
+const ARCFOOD_UNIDADES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
+const BRAVO_UNIDADES_NOMES = {
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dom Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+};
+const BRAVO_UNIDADES = Object.keys(BRAVO_UNIDADES_NOMES);
+const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'BRAVO'; }
 
 const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
-const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', delivery:'Delivery', carryout:'Carryout', pickup:'Pickup', loja:'Loja (salão)', adyen:'Maquininhas (total)', ifood:'iFood', food99:'99Food', pix:'Pix', pixCnpj:'Pix CNPJ', outros:'Outros', totalSaida:'Total de saída', faturamento:'Faturamento total', totalDeclarado:'Total declarado', quebra:'Quebra de caixa', tc:'TC', cancelados:'Cancelados', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
 
 let ME = null;
 let IS_MASTER = false;
-let MEUS = [];
-let EDICOES = [];
-let EDITANDO_ID = null;
-let EDITANDO_MASTER_ID = null;
 let MAQUINAS = [];
 let SAIDAS = [];
 let SEQ = 0;
+let SANGRIA_DO_DIA = [];
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
@@ -330,21 +359,43 @@ function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
-// ---------- linhas repetíveis: maquininhas e saídas de caixa ----------
+// ---------- linhas repetíveis: maquininhas ----------
+// o prefixo do nome (padrao "Maquininha", ex: "Maquininha 1") e configuravel
+// por grupo (ver grupos.html/grupoKpiDaUnidade) - franquia que usa uma
+// maquininha especifica (ex: Getnet) pode trocar pra "Getnet 1", "Getnet 2"...
+function maquininhaPrefixoDaUnidade(){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return (grupo && grupo.maquininhaPrefixo) || 'Maquininha';
+}
+// "autoNomeado": true enquanto a loja nao mexeu no nome (ainda e o
+// "Maquininha N"/"Getnet N" gerado automaticamente) - so essas linhas tem o
+// nome atualizado quando o prefixo muda (troca de unidade), pra nao
+// sobrescrever um nome que a loja digitou de proposito
 function adicionarMaquina(valor){
-  MAQUINAS.push({ id: ++SEQ, descricao: `Maquininha ${MAQUINAS.length+1}`, valor: valor||'' });
+  MAQUINAS.push({ id: ++SEQ, descricao: `${maquininhaPrefixoDaUnidade()} ${MAQUINAS.length+1}`, valor: valor||'', autoNomeado: true });
   renderMaquinas();
 }
 function removerMaquina(id){ MAQUINAS = MAQUINAS.filter(m=>m.id!==id); renderMaquinas(); }
+// re-numera as linhas ainda com nome automatico usando o prefixo atual da
+// unidade selecionada - chamado ao trocar de unidade (ver aplicarSecoesGrupo)
+function renomearMaquinasAutomaticas(){
+  const prefixo = maquininhaPrefixoDaUnidade();
+  let n = 0;
+  MAQUINAS.forEach(m=>{ n += 1; if(m.autoNomeado) m.descricao = `${prefixo} ${n}`; });
+  renderMaquinas();
+}
 function renderMaquinas(){
   document.getElementById('lista-maquinas').innerHTML = MAQUINAS.map(m=>`
     <div class="linha-item">
-      <input type="text" value="${escapeHtml(m.descricao)}" oninput="MAQUINAS.find(x=>x.id===${m.id}).descricao=this.value" placeholder="nome/identificação">
+      <input type="text" value="${escapeHtml(m.descricao)}" oninput="const mq=MAQUINAS.find(x=>x.id===${m.id}); mq.descricao=this.value; mq.autoNomeado=false;" placeholder="nome/identificação">
       <input type="number" step="0.01" inputmode="decimal" value="${m.valor}" oninput="MAQUINAS.find(x=>x.id===${m.id}).valor=this.value; atualizarResumo();" placeholder="R$">
       <button type="button" class="btn-remover" onclick="removerMaquina(${m.id})">✕</button>
     </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma maquininha adicionada.</div>';
   atualizarResumo();
 }
+
+// ---------- linhas repetíveis: outras saídas de caixa (nao vem da Sangria) ----------
 function adicionarSaida(valor, descricao){
   SAIDAS.push({ id: ++SEQ, descricao: descricao||'', valor: valor||'' });
   renderSaidas();
@@ -356,43 +407,193 @@ function renderSaidas(){
       <input type="text" value="${escapeHtml(s.descricao)}" oninput="SAIDAS.find(x=>x.id===${s.id}).descricao=this.value" placeholder="motivo da saída">
       <input type="number" step="0.01" inputmode="decimal" value="${s.valor}" oninput="SAIDAS.find(x=>x.id===${s.id}).valor=this.value; atualizarResumo();" placeholder="R$">
       <button type="button" class="btn-remover" onclick="removerSaida(${s.id})">✕</button>
-    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma saída registrada.</div>';
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma saída adicionada.</div>';
+  atualizarResumo();
+}
+
+// ---------- sangria do dia (leitura automática, ver carregarSangriaDoDia) ----------
+async function carregarSangriaDoDia(){
+  const unidade = document.getElementById('f-unidade').value;
+  const data = document.getElementById('f-data').value;
+  const el = document.getElementById('sangria-dia-info');
+  if(!unidade || !data){ SANGRIA_DO_DIA = []; el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div>'; atualizarResumo(); return; }
+  try{
+    SANGRIA_DO_DIA = await fetch(`/api/sangrias/do-dia?unidade=${encodeURIComponent(unidade)}&data=${encodeURIComponent(data)}`).then(r=>r.json());
+  }catch(e){ SANGRIA_DO_DIA = []; }
+  if(!SANGRIA_DO_DIA.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Nenhuma sangria/depósito registrada pra esse dia.</div>';
+  }else{
+    el.innerHTML = SANGRIA_DO_DIA.map(s=>`
+      <div class="card" style="padding:6px 0;">
+        <div class="linha1" style="font-size:12.5px;"><span>${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</span><b>${fmtMoney(s.valor)}</b></div>
+        ${s.descricao?`<div class="sub">${escapeHtml(s.descricao)}</div>`:''}
+      </div>`).join('');
+  }
   atualizarResumo();
 }
 
 function atualizarResumo(){
   const somaMaquinas = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
-  const somaSaidas = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
+  const somaSangria = SANGRIA_DO_DIA.reduce((s,x)=>s+num(x.valor),0);
+  const somaOutrasSaidas = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
   document.getElementById('maq-total').textContent = somaMaquinas ? fmtMoney(somaMaquinas) : '';
-  document.getElementById('saida-total').textContent = somaSaidas ? fmtMoney(somaSaidas) : '';
+  document.getElementById('sangria-dia-total').textContent = somaSangria ? fmtMoney(somaSangria) : '';
+  document.getElementById('saida-total').textContent = somaOutrasSaidas ? fmtMoney(somaOutrasSaidas) : '';
   document.getElementById('resumo-maquinas').textContent = fmtMoney(somaMaquinas);
-  document.getElementById('resumo-saidas').textContent = fmtMoney(somaSaidas);
-  const faturamento = num(document.getElementById('f-faturamento').value);
-  const declarado = num(document.getElementById('f-totalDeclarado').value);
-  const dif = +(declarado - faturamento).toFixed(2);
+  document.getElementById('resumo-sangria').textContent = fmtMoney(somaSangria);
+  document.getElementById('resumo-saidas').textContent = fmtMoney(somaOutrasSaidas);
+
+  // Faturamento = soma dos canais de venda; Total declarado = soma das
+  // formas de pagamento (maquininhas + iFood + 99Food + Pix + Pix CNPJ +
+  // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
+  // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
+  const g = (id)=>num(document.getElementById(id).value);
+  const canaisDefs = defsExtrasAtual('canaisVendaExtras');
+  const formasDefs = defsExtrasAtual('formasPagamentoExtras');
+  const faturamento = +(
+    somaExtrasComSinal('canal-extra-input', canaisDefs)
+    + somaExtrasComSinal('forma-extra-input', formasDefs, {soCruzado:true})
+  ).toFixed(2);
+  const totalDeclarado = +(
+    somaMaquinas + g('f-entradaDinheiro')
+    + somaExtrasComSinal('forma-extra-input', formasDefs)
+    + somaExtrasComSinal('canal-extra-input', canaisDefs, {soCruzado:true})
+  ).toFixed(2);
+  document.getElementById('resumo-faturamento').textContent = fmtMoney(faturamento);
+  document.getElementById('resumo-declarado').textContent = fmtMoney(totalDeclarado);
+
+  const dif = +(totalDeclarado - faturamento).toFixed(2);
   const elDif = document.getElementById('resumo-diferenca');
   elDif.textContent = fmtMoney(dif);
   elDif.className = 'dif ' + (Math.abs(dif) < 0.01 ? 'ok' : 'bad');
 }
-['f-faturamento','f-totalDeclarado'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', atualizarResumo);
-});
+document.getElementById('f-entradaDinheiro').addEventListener('input', atualizarResumo);
 
+// grupos (franquias) cadastrados em /grupos.html - cada loja so mostra os
+// campos de Canais de venda/Formas de pagamento/KPI's que o Master cadastrou
+// pro grupo dela em /grupos.html - nao existe mais campo fixo/padrao pra
+// ninguem (nem ARCFOOD): loja sem grupo configurado nao tem nenhuma opcao
+// nessas 3 secoes ate o Master cadastrar (ver "vazio" abaixo).
+let GRUPOS_KPI = [];
+function grupoKpiDaUnidade(unidade){
+  return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
+}
+// generico pras 3 frentes de campo (Canais de venda, Formas de pagamento,
+// KPI's) - so muda a chave lida do grupo, o id do container/mensagem-vazia e
+// a classe usada pra achar os inputs depois (leitura no submit e soma no
+// resumo). Ver grupos.js/fechamentosLive.js pro mesmo padrao no servidor.
+function renderExtrasGrupo(unidade, chaveGrupo, containerId, vazioId, classe){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const campos = grupo ? (grupo[chaveGrupo]||[]) : [];
+  const container = document.getElementById(containerId);
+  document.getElementById(vazioId).classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>`
+    <div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" inputmode="decimal" data-extra-campo="${escapeHtml(k.campo)}" class="${classe}"></div>
+  `).join('');
+  container.querySelectorAll('.'+classe).forEach(el=>el.addEventListener('input', atualizarResumo));
+}
+function lerExtrasGrupo(classe){
+  const out = {};
+  document.querySelectorAll('.'+classe).forEach(el=>{ out[el.dataset.extraCampo] = el.value; });
+  return out;
+}
+function somaExtras(classe){
+  let s = 0;
+  document.querySelectorAll('.'+classe).forEach(el=>{ s += num(el.value); });
+  return s;
+}
+// campo:def dos Canais de venda/Formas de pagamento do grupo da unidade
+// selecionada (operacao soma/subtrai e tambemNoOutroTotal, ver grupos.html)
+function defsExtrasAtual(chaveGrupo){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return grupo ? (grupo[chaveGrupo]||[]) : [];
+}
+// soma um conjunto de inputs extras respeitando o sinal (soma/subtrai) de
+// cada campo - "soCruzado" pega so os campos marcados "tambem no outro
+// total" (ex: TEF Credito é um Canal mas também soma no Total Declarado,
+// ver recomputarTotais em fechamentosLive.js - mesma lógica aqui, so pra o
+// resumo em tela bater com o que o servidor vai gravar de verdade)
+function somaExtrasComSinal(classe, defs, { soCruzado } = {}){
+  const porCampo = new Map((defs||[]).map(d=>[d.campo, d]));
+  let s = 0;
+  document.querySelectorAll('.'+classe).forEach(el=>{
+    const def = porCampo.get(el.dataset.extraCampo);
+    if(soCruzado && !(def && def.tambemNoOutroTotal)) return;
+    const sinal = def && def.operacao === 'subtrai' ? -1 : 1;
+    s += sinal * num(el.value);
+  });
+  return s;
+}
+// KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
+// Canais/Formas (sempre R$), o input muda de tipo conforme "tipo":
+// quantidade/moeda/kg viram number (so muda step), texto vira texto livre, e
+// arquivo vira upload de anexo (nao entra no mapa kpisExtras da leitura
+// normal - vai junto do FormData no submit, ver arquivosKpiSelecionados)
+function renderKpisExtras(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('kpis-extras-container');
+  document.getElementById('kpis-vazio').classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.innerHTML = ''; container.classList.add('hidden'); return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    if(tipo === 'arquivo'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="file" accept="image/*,application/pdf" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-arquivo"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    const sufixo = tipo === 'kg' ? ' (Kg)' : (tipo === 'moeda' ? ' (R$)' : '');
+    return `<div><label>${escapeHtml(k.label)}${sufixo}</label><input type="number" step="${step}" inputmode="decimal" data-extra-campo="${escapeHtml(k.campo)}" class="kpi-extra-input"></div>`;
+  }).join('');
+}
+function lerKpisExtras(){ return lerExtrasGrupo('kpi-extra-input'); }
+function arquivosKpiSelecionados(){
+  return [...document.querySelectorAll('.kpi-extra-arquivo')].filter(el=>el.files && el.files[0]);
+}
+function renderCanaisExtras(unidade){ renderExtrasGrupo(unidade, 'canaisVendaExtras', 'canais-extras-container', 'canais-vazio', 'canal-extra-input'); }
+function lerCanaisExtras(){ return lerExtrasGrupo('canal-extra-input'); }
+function renderFormasExtras(unidade){ renderExtrasGrupo(unidade, 'formasPagamentoExtras', 'formas-extras-container', 'formas-vazio', 'forma-extra-input'); }
+function lerFormasExtras(){ return lerExtrasGrupo('forma-extra-input'); }
+
+// esconde/mostra as secoes fixas (Caixa/Maquininhas/Outras saidas de caixa)
+// conforme o grupo da unidade (ver grupos.html) - franquia que nao usa uma
+// dessas secoes nem precisa ver o campo. Zera o que tava preenchido junto,
+// pra nao ficar um valor escondido contribuindo pro fechamento sem a loja
+// perceber (ex: trocou de unidade e o campo antigo ficou com valor)
+function aplicarSecoesGrupo(unidade){
+  const grupo = grupoKpiDaUnidade(unidade);
+  const caixaOk = !grupo || grupo.caixaHabilitado !== false;
+  const maquininhasOk = !grupo || grupo.maquininhasHabilitado !== false;
+  const saidasOk = !grupo || grupo.saidasHabilitado !== false;
+
+  document.getElementById('secao-caixa').classList.toggle('hidden', !caixaOk);
+  if(!caixaOk){
+    ['caixaInicial','caixaFinal','entradaDinheiro','deposito'].forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = ''; });
+  }
+
+  document.getElementById('secao-maquininhas').classList.toggle('hidden', !maquininhasOk);
+  if(!maquininhasOk && MAQUINAS.length){ MAQUINAS = []; renderMaquinas(); }
+  else if(maquininhasOk && !MAQUINAS.length){ adicionarMaquina(); }
+  else if(maquininhasOk){ renomearMaquinasAutomaticas(); }
+
+  document.getElementById('secao-saidas').classList.toggle('hidden', !saidasOk);
+  if(!saidasOk && SAIDAS.length){ SAIDAS = []; renderSaidas(); }
+}
 function aplicarFranquia(unidade){
-  const grupo = grupoDaUnidade(unidade);
-  document.getElementById('wrap-food99').classList.toggle('hidden', grupo!=='ARCFOOD');
+  renderKpisExtras(unidade);
+  renderCanaisExtras(unidade);
+  renderFormasExtras(unidade);
+  aplicarSecoesGrupo(unidade);
+  atualizarResumo();
 }
-document.getElementById('f-unidade').addEventListener('change', (ev)=>aplicarFranquia(ev.target.value));
-
-async function carregar(){
-  const [meus, edicoes] = await Promise.all([
-    fetch('/api/fechamentos/meus').then(r=>r.json()),
-    fetch('/api/fechamentos/edicoes').then(r=>r.json()),
-  ]);
-  MEUS = meus.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,20);
-  EDICOES = edicoes;
-  renderLista();
-}
+document.getElementById('f-unidade').addEventListener('change', (ev)=>{ aplicarFranquia(ev.target.value); carregarSangriaDoDia(); });
+document.getElementById('f-data').addEventListener('input', carregarSangriaDoDia);
 
 // ---------- sangria (retirada de caixa) registrada em campo - separado do
 // fechamento em si, soma automatico no fechamento do dia (server junta na
@@ -407,37 +608,111 @@ function renderSangrias(){
   const el = document.getElementById('lista-sangrias');
   const recentes = SANGRIAS.slice(0,8);
   if(!recentes.length){ el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="sub" style="margin-bottom:6px;">Últimas sangrias registradas</div>` + recentes.map(s=>`
+  el.innerHTML = `<div class="sub" style="margin-bottom:6px;">Últimas sangrias/depósitos registrados</div>` + recentes.map(s=>`
     <div class="card" style="padding:8px 0;">
       <div class="linha1" style="font-size:12.5px;">
         <span>${escapeHtml(s.unidadeNome||s.unidade)} · ${fmtData(s.data)}</span>
         <b>${fmtMoney(s.valor)}</b>
       </div>
-      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
+      <div class="sub">${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${s.periodoInicio&&s.periodoFim?(' · Período: '+fmtData(s.periodoInicio)+' a '+fmtData(s.periodoFim)):''}${s.nomeDepositante?(' · Depositado por '+escapeHtml(s.nomeDepositante)):''}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</div>
+      ${IS_MASTER ? `<button type="button" class="link-btn" style="margin-top:4px;" onclick="abrirEditarSangria('${s.id}')">✎ Editar/excluir (Master)</button>` : ''}
     </div>`).join('');
 }
 
+// ---------- sangria: edicao/exclusao direta (so Master) ----------
+let EDITANDO_SANGRIA_ID = null;
+function abrirEditarSangria(id){
+  const s = SANGRIAS.find(x=>x.id===id);
+  if(!s) return;
+  EDITANDO_SANGRIA_ID = id;
+  document.getElementById('sangria-editar-info').textContent = `${s.unidadeNome||s.unidade} · registrada em ${new Date(s.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
+  document.getElementById('se-valor').value = s.valor;
+  document.getElementById('se-data').value = s.data;
+  document.getElementById('se-periodo-inicio').value = s.periodoInicio || '';
+  document.getElementById('se-periodo-fim').value = s.periodoFim || '';
+  document.getElementById('se-nome-depositante').value = s.nomeDepositante || '';
+  document.getElementById('se-descricao').value = s.descricao || '';
+  document.getElementById('msg-sangria-editar').classList.add('hidden');
+  document.getElementById('overlay-sangria-editar').classList.remove('hidden');
+}
+function fecharEditarSangria(){ document.getElementById('overlay-sangria-editar').classList.add('hidden'); EDITANDO_SANGRIA_ID=null; }
+document.getElementById('form-sangria-editar').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-sangria-editar');
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        valor: document.getElementById('se-valor').value,
+        data: document.getElementById('se-data').value,
+        descricao: document.getElementById('se-descricao').value,
+        periodoInicio: document.getElementById('se-periodo-inicio').value,
+        periodoFim: document.getElementById('se-periodo-fim').value,
+        nomeDepositante: document.getElementById('se-nome-depositante').value,
+      }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharEditarSangria();
+    await carregarSangrias();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+async function excluirSangria(){
+  if(!EDITANDO_SANGRIA_ID) return;
+  if(!confirm('Excluir essa sangria/depósito? Ela vai parar de somar no fechamento do dia. Essa ação não pode ser desfeita.')) return;
+  const msg = document.getElementById('msg-sangria-editar');
+  try{
+    const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, { method:'DELETE' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao excluir');
+    fecharEditarSangria();
+    await carregarSangrias();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
+
+// mesmo motivo do form de fechamento acima: campos soltos de texto/numero -
+// Enter em qualquer um deles nao pode registrar a sangria/deposito sem
+// querer, antes de terminar de preencher
+document.getElementById('form-sangria').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
 document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  const unidade = document.getElementById('s-unidade').value;
+  const dataEscolhida = document.getElementById('s-data').value;
+  const jaLancadaHoje = (SANGRIAS||[]).some(s=>s.unidade===unidade && s.data===dataEscolhida);
+  if(jaLancadaHoje && !confirm('Já existe uma sangria/depósito lançada pra essa unidade nessa data. Tem certeza que quer lançar outra?')) return;
+  if(!confirm('Tem certeza que deseja registrar essa sangria/depósito? Confira o valor e o período antes de continuar.')) return;
   const btn = document.getElementById('btn-sangria');
   const msg = document.getElementById('msg-sangria');
   msg.classList.add('hidden');
   btn.disabled = true;
   try{
-    const unidade = document.getElementById('s-unidade').value;
     const grupo = grupoDaUnidade(unidade);
     const body = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
       grupo,
-      data: document.getElementById('s-data').value,
+      data: dataEscolhida,
       valor: document.getElementById('s-valor').value,
       descricao: document.getElementById('s-descricao').value,
+      periodoInicio: document.getElementById('s-periodo-inicio').value,
+      periodoFim: document.getElementById('s-periodo-fim').value,
+      nomeDepositante: document.getElementById('s-nome-depositante').value,
+      password: document.getElementById('s-password').value,
     };
     const res = await fetch('/api/sangrias', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao registrar sangria');
-    msg.textContent = 'Sangria registrada com sucesso.'; msg.className = 'msg ok';
+    if(!res.ok) throw new Error(data.error||'erro ao registrar sangria/depósito');
+    msg.textContent = 'Sangria/depósito registrada com sucesso.'; msg.className = 'msg ok';
     document.getElementById('form-sangria').reset();
     document.getElementById('s-data').value = hojeBrasilia();
     await carregarSangrias();
@@ -449,118 +724,6 @@ document.getElementById('form-sangria').addEventListener('submit', async (ev)=>{
   }
 });
 
-function edicaoPendente(fechamentoId){
-  return EDICOES.find(e=>e.fechamentoId===fechamentoId && e.status==='PENDENTE');
-}
-function ultimaDecisao(fechamentoId){
-  return EDICOES.filter(e=>e.fechamentoId===fechamentoId && e.status!=='PENDENTE').sort((a,b)=>(b.decididoEm||'').localeCompare(a.decididoEm||''))[0];
-}
-
-function renderLista(){
-  const el = document.getElementById('lista-lancamentos');
-  if(!MEUS.length){ el.innerHTML = '<div class="empty">Nenhum fechamento lançado ainda.</div>'; return; }
-  el.innerHTML = MEUS.map(f=>{
-    const pendente = edicaoPendente(f.id);
-    const decidida = !pendente && ultimaDecisao(f.id);
-    return `
-    <div class="card">
-      <div class="linha1">
-        <span>${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
-        ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
-        ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
-      </div>
-      <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.gerente?(' · '+escapeHtml(f.gerente)):''}</div>
-      <div class="valores">
-        <span>Faturamento <b>${fmtMoney(f.faturamento)}</b></span>
-        <span>Declarado <b>${fmtMoney(f.totalDeclarado)}</b></span>
-        <span>Diferença <b style="color:${Math.abs(f.diferenca)<0.01?'var(--ok)':'var(--bad)'}">${fmtMoney(f.diferenca)}</b></span>
-      </div>
-      ${IS_MASTER
-        ? '<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEditarMaster(\''+f.id+'\')">✎ Editar (Master)</button>'
-        : (pendente?'':'<button type="button" class="link-btn" style="margin-top:8px;" onclick="abrirEdicao(\''+f.id+'\')">Pedir correção</button>')}
-    </div>`;
-  }).join('');
-}
-
-function abrirEdicao(id){
-  EDITANDO_ID = id;
-  const f = MEUS.find(x=>x.id===id);
-  document.getElementById('edicao-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — depois de lançado o fechamento não pode ser mudado direto; o pedido vai para aprovação do Master.`;
-  document.getElementById('e-campo').innerHTML = CAMPOS_NUMERICOS.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]} (atual: ${fmtMoney(f[c])})</option>`).join('');
-  document.getElementById('e-valor').value = '';
-  document.getElementById('e-motivo').value = '';
-  document.getElementById('msg-edicao').classList.add('hidden');
-  document.getElementById('overlay-edicao').classList.remove('hidden');
-}
-function fecharEdicao(){ document.getElementById('overlay-edicao').classList.add('hidden'); EDITANDO_ID=null; }
-
-document.getElementById('form-edicao').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const campo = document.getElementById('e-campo').value;
-  const valor = document.getElementById('e-valor').value;
-  const motivo = document.getElementById('e-motivo').value;
-  const msg = document.getElementById('msg-edicao');
-  msg.classList.add('hidden');
-  try{
-    const res = await fetch(`/api/fechamentos/${EDITANDO_ID}/solicitar-edicao`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas: { [campo]: valor }, motivo }),
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');
-    fecharEdicao();
-    await carregar();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err';
-  }
-});
-
-// ---------- edicao direta (so Master): aplica na hora, sem fila de aprovacao ----------
-function abrirEditarMaster(id){
-  EDITANDO_MASTER_ID = id;
-  const f = MEUS.find(x=>x.id===id);
-  document.getElementById('master-info').textContent = `${f.unidadeNome||f.unidade} · ${fmtData(f.data)} — edição direta, aplicada na hora (fica registrada no histórico do fechamento).`;
-  document.getElementById('m-gerente').value = f.gerente || '';
-  document.getElementById('m-observacao').value = f.observacao || '';
-  document.getElementById('m-motivo').value = '';
-  document.getElementById('m-campos-numericos').innerHTML = CAMPOS_NUMERICOS.map(c=>
-    `<div><label>${NOMES_CAMPOS[c]}</label><input type="number" step="0.01" inputmode="decimal" id="m-${c}" value="${num(f[c])}"></div>`
-  ).join('');
-  document.getElementById('msg-master').classList.add('hidden');
-  document.getElementById('overlay-master').classList.remove('hidden');
-}
-function fecharMaster(){ document.getElementById('overlay-master').classList.add('hidden'); EDITANDO_MASTER_ID=null; }
-
-document.getElementById('form-master').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const msg = document.getElementById('msg-master');
-  msg.classList.add('hidden');
-  const f = MEUS.find(x=>x.id===EDITANDO_MASTER_ID);
-  const mudancas = {};
-  CAMPOS_NUMERICOS.forEach(c=>{
-    const v = num(document.getElementById('m-'+c).value);
-    if(v !== num(f[c])) mudancas[c] = v;
-  });
-  const gerente = document.getElementById('m-gerente').value;
-  if(gerente !== (f.gerente||'')) mudancas.gerente = gerente;
-  const observacao = document.getElementById('m-observacao').value;
-  if(observacao !== (f.observacao||'')) mudancas.observacao = observacao;
-  const motivo = document.getElementById('m-motivo').value;
-  if(!Object.keys(mudancas).length){ fecharMaster(); return; }
-  try{
-    const res = await fetch(`/api/fechamentos/${EDITANDO_MASTER_ID}/editar-direto`, {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mudancas, motivo }),
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao salvar');
-    fecharMaster();
-    await carregar();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-});
-
 function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
@@ -568,10 +731,23 @@ function resetarForm(){
   adicionarMaquina();
   renderSaidas();
   aplicarFranquia(document.getElementById('f-unidade').value);
+  carregarSangriaDoDia();
 }
+
+// o formulario tem varios campos de texto/numero soltos (maquininhas,
+// saidas, canais/formas extras) - sem isso, apertar Enter em QUALQUER um
+// deles disparava o submit do form e lancava o fechamento sem querer, antes
+// da loja terminar de preencher. So a Observação (textarea) pode quebrar
+// linha com Enter normalmente.
+document.getElementById('form-lancar').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
 
 document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  if(!confirm('Tem certeza que deseja finalizar esse fechamento? Confira os valores antes de continuar - depois de lançado, qualquer correção precisa passar por aprovação do Master.')) return;
   const btn = document.getElementById('btn-enviar');
   const msg = document.getElementById('msg');
   msg.classList.add('hidden');
@@ -586,7 +762,13 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
     });
     campos.adyen = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
     campos.totalSaida = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
-    if(grupo!=='ARCFOOD') campos.food99 = 0;
+    // Faturamento/Total declarado sao sempre recalculados no servidor (ver
+    // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
+    // completude do payload, nao por confiança nesse numero
+    const canaisDefsSubmit = defsExtrasAtual('canaisVendaExtras');
+    const formasDefsSubmit = defsExtrasAtual('formasPagamentoExtras');
+    campos.faturamento = somaExtrasComSinal('canal-extra-input', canaisDefsSubmit) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit, {soCruzado:true});
+    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit) + somaExtrasComSinal('canal-extra-input', canaisDefsSubmit, {soCruzado:true});
 
     const body = {
       unidade,
@@ -595,16 +777,27 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       data: document.getElementById('f-data').value,
       gerente: document.getElementById('f-gerente').value,
       campos,
+      kpisExtras: lerKpisExtras(),
+      canaisVendaExtras: lerCanaisExtras(),
+      formasPagamentoExtras: lerFormasExtras(),
       observacao: document.getElementById('f-observacao').value,
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
       detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
-    const res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const arquivosKpi = arquivosKpiSelecionados();
+    let res;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(body));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.extraCampo, el.files[0]));
+      res = await fetch('/api/fechamentos/lancar', { method:'POST', body: fd });
+    } else {
+      res = await fetch('/api/fechamentos/lancar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao lançar');
     msg.textContent = 'Fechamento lançado com sucesso.'; msg.className = 'msg ok';
     resetarForm();
-    await carregar();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
   }finally{
@@ -613,39 +806,77 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   }
 });
 
+function opcoesUnidades(unidades){
+  return unidades.length
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+}
+
 async function boot(){
   const res = await fetch('/api/me');
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
   document.getElementById('nav-entregas-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
 
-  if(!secoes.includes('lancamento')){
+  const podeLancamento = secoes.includes('lancamento');
+  const podeSangria = secoes.includes('sangria');
+
+  if(!podeLancamento && !podeSangria){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
 
-  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]);
-  const selUnidade = document.getElementById('f-unidade');
-  selUnidade.innerHTML = unidades.length
-    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
-    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
-  document.getElementById('f-data').value = hojeBrasilia();
-  document.getElementById('f-data').max = hojeBrasilia();
-  adicionarMaquina();
-  renderSaidas();
-  aplicarFranquia(selUnidade.value);
+  const tituloPagina = podeLancamento ? 'Lançamento de fechamento' : 'Registrar sangria/depósito';
+  document.getElementById('titulo-pagina').textContent = tituloPagina;
+  document.getElementById('nav-self').textContent = podeLancamento ? '🧾 Fechamento' : '💰 Sangria/Depósito';
 
-  document.getElementById('s-unidade').innerHTML = selUnidade.innerHTML;
-  document.getElementById('s-data').value = hojeBrasilia();
-  document.getElementById('s-data').max = hojeBrasilia();
+  document.getElementById('painel-sangria').classList.toggle('hidden', !podeSangria);
+  document.getElementById('painel-fechamento').classList.toggle('hidden', !podeLancamento);
+
+  // so o codigo canonico do Fechamento (UNIDADES_NOMES) pode aparecer aqui -
+  // permissions.unidades pode ter codigos de OUTROS dominios (Entregas,
+  // cadastro geral etc, cada um com seu proprio espaco de codigos) que por
+  // coincidencia tambem foram liberados pro usuario; sem esse filtro, a loja
+  // via 2-3 "nomes" parecidos pra escolher (ex: "Dom Garanhuns"/"Garanhuns"/
+  // "DOM19911") e podia lançar o mesmo fechamento sob um codigo errado,
+  // fragmentando os dados da loja entre nomes diferentes
+  const unidades = isMaster ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>UNIDADES_NOMES[u]);
+
+  if(podeLancamento){
+    try{ GRUPOS_KPI = await fetch('/api/grupos').then(r=>r.json()); }catch(e){ GRUPOS_KPI = []; }
+    const selUnidade = document.getElementById('f-unidade');
+    selUnidade.innerHTML = opcoesUnidades(unidades);
+    document.getElementById('f-data').value = hojeBrasilia();
+    document.getElementById('f-data').max = hojeBrasilia();
+    adicionarMaquina();
+    renderSaidas();
+    aplicarFranquia(selUnidade.value);
+    await carregarSangriaDoDia();
+  }
+
+  if(podeSangria){
+    document.getElementById('s-unidade').innerHTML = opcoesUnidades(unidades);
+    document.getElementById('s-data').value = hojeBrasilia();
+    document.getElementById('s-data').max = hojeBrasilia();
+  }
 
   document.getElementById('root').classList.remove('hidden');
-  await carregar();
-  await carregarSangrias();
+  if(podeSangria) await carregarSangrias();
 }
 
 boot();

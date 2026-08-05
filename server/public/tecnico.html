@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Chamados de TI · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:640px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:64px;}
+  .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .card{border-top:1px solid var(--line);padding:12px 0;cursor:pointer;}
+  .card:first-child{border-top:none;padding-top:0;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.ABERTO{background:var(--warn-dim);color:var(--warn);}
+  .badge.INICIADO{background:rgba(92,200,255,.15);color:var(--accent);}
+  .badge.CONCLUIDO{background:var(--ok-dim);color:var(--ok);}
+  .badge.CANCELADO{background:var(--bad-dim);color:var(--bad);}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+  .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;}
+  .fotos-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Chamados de TI</h1>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back active" id="nav-tecnico-self" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso aos Chamados de TI. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+<div class="panel">
+  <h2>Meus chamados <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
+  <div id="lista-cards"><div class="empty">carregando...</div></div>
+</div>
+</div>
+
+<div class="overlay hidden" id="overlay-detalhe">
+  <div class="sheet">
+    <h3 id="d-titulo"></h3>
+    <div class="sub" id="d-sub"></div>
+    <div id="d-descricao" style="font-size:13px;white-space:pre-wrap;margin-bottom:10px;"></div>
+
+    <!-- ABERTO: fazer check-in -->
+    <div id="bloco-iniciar" class="hidden">
+      <label>Foto de como está antes de mexer</label>
+      <input type="file" id="i-fotos" multiple accept="image/*" capture="environment">
+      <button type="button" class="btn-primary" id="btn-iniciar" onclick="iniciarChamado()">📍 Fazer check-in / Iniciar chamado</button>
+    </div>
+
+    <!-- INICIADO: concluir -->
+    <div id="bloco-concluir" class="hidden">
+      <div class="sub" id="c-iniciado-em"></div>
+      <label>Peças compradas (se precisou)</label>
+      <div id="lista-pecas"></div>
+      <button type="button" class="btn-add" onclick="adicionarPeca()">+ Adicionar peça</button>
+      <label>Observação (o que foi feito)</label>
+      <textarea id="c-observacao" placeholder="descreva o serviço realizado"></textarea>
+      <label>Foto de como ficou depois</label>
+      <input type="file" id="c-fotos" multiple accept="image/*" capture="environment">
+      <button type="button" class="btn-primary" id="btn-concluir" onclick="concluirChamado()">✓ Concluir chamado</button>
+    </div>
+
+    <!-- CONCLUIDO: so leitura -->
+    <div id="bloco-concluido" class="hidden">
+      <div><b>Observação:</b> <span id="v-observacao"></span></div>
+      <div id="v-pecas" style="margin-top:8px;"></div>
+      <div class="sub" style="margin-top:10px;">Fotos antes</div>
+      <div class="fotos-grid" id="v-fotos-antes"></div>
+      <div class="sub" style="margin-top:10px;">Fotos depois</div>
+      <div class="fotos-grid" id="v-fotos-depois"></div>
+    </div>
+
+    <div class="msg hidden" id="msg-detalhe"></div>
+    <button class="link-btn" style="margin-top:12px;" onclick="fecharDetalhe()">Fechar</button>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+let ME = null;
+let IS_MASTER = false;
+let CHAMADOS = [];
+let DETALHE_ATUAL = null;
+let PECAS = [];
+let SEQ = 0;
+
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+const FUSO_BR = 'America/Sao_Paulo';
+function fmtDataHora(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('pt-BR',{timeZone:FUSO_BR}); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
+function renderLista(){
+  document.getElementById('lista-count').textContent = CHAMADOS.length;
+  document.getElementById('lista-cards').innerHTML = CHAMADOS.length ? CHAMADOS.map(c=>`
+    <div class="card" onclick="abrirDetalhe('${c.id}')">
+      <div class="linha1">
+        <span>${escapeHtml(c.titulo)}</span>
+        <span class="badge ${c.status}">${c.status}</span>
+      </div>
+      <div class="sub">${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtDataHora(c.criadoEm)}</div>
+    </div>`).join('') : '<div class="empty">Nenhum chamado atribuído a você ainda.</div>';
+}
+
+async function carregarChamados(){
+  CHAMADOS = await fetch('/api/chamados').then(r=>r.json());
+  CHAMADOS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
+  renderLista();
+}
+
+function adicionarPeca(valor, descricao){
+  PECAS.push({ id: ++SEQ, descricao: descricao||'', valor: valor||'', observacao:'' });
+  renderPecas();
+}
+function removerPeca(id){ PECAS = PECAS.filter(p=>p.id!==id); renderPecas(); }
+function renderPecas(){
+  document.getElementById('lista-pecas').innerHTML = PECAS.map(p=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(p.descricao)}" oninput="PECAS.find(x=>x.id===${p.id}).descricao=this.value" placeholder="descrição da peça">
+      <input type="number" step="0.01" inputmode="decimal" value="${p.valor}" oninput="PECAS.find(x=>x.id===${p.id}).valor=this.value" placeholder="R$">
+      <button type="button" class="btn-remover" onclick="removerPeca(${p.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma peça adicionada.</div>';
+}
+
+function abrirDetalhe(id){
+  const c = CHAMADOS.find(x=>x.id===id);
+  if(!c) return;
+  DETALHE_ATUAL = c;
+  document.getElementById('d-titulo').textContent = c.titulo;
+  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade} · ${fmtDataHora(c.criadoEm)}`;
+  document.getElementById('d-descricao').textContent = c.descricao || '';
+
+  document.getElementById('bloco-iniciar').classList.toggle('hidden', c.status!=='ABERTO');
+  document.getElementById('bloco-concluir').classList.toggle('hidden', c.status!=='INICIADO');
+  document.getElementById('bloco-concluido').classList.toggle('hidden', c.status!=='CONCLUIDO');
+
+  if(c.status==='INICIADO'){
+    document.getElementById('c-iniciado-em').textContent = `Check-in feito em ${fmtDataHora(c.iniciadoEm)}`;
+    PECAS = []; renderPecas();
+    document.getElementById('c-observacao').value = '';
+  }
+  if(c.status==='CONCLUIDO'){
+    document.getElementById('v-observacao').textContent = c.observacaoTecnico || '—';
+    document.getElementById('v-pecas').innerHTML = (c.pecas||[]).length
+      ? '<b>Peças:</b>' + c.pecas.map(p=>`<div>${escapeHtml(p.descricao)} - ${fmtMoney(p.valor)}${p.observacao?(' · '+escapeHtml(p.observacao)):''}</div>`).join('')
+      : '';
+    document.getElementById('v-fotos-antes').innerHTML = (c.fotosAntes||[]).map((f,i)=>`<a href="/api/chamados/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
+    document.getElementById('v-fotos-depois').innerHTML = (c.fotosDepois||[]).map((f,i)=>`<a href="/api/chamados/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
+  }
+
+  document.getElementById('msg-detalhe').classList.add('hidden');
+  document.getElementById('overlay-detalhe').classList.remove('hidden');
+}
+function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
+
+async function iniciarChamado(){
+  if(!DETALHE_ATUAL) return;
+  const msg = document.getElementById('msg-detalhe');
+  const btn = document.getElementById('btn-iniciar');
+  msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const fd = new FormData();
+    for(const file of document.getElementById('i-fotos').files) fd.append('fotosAntes', file);
+    const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/iniciar`, { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao iniciar chamado.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = '📍 Fazer check-in / Iniciar chamado';
+  }
+}
+
+async function concluirChamado(){
+  if(!DETALHE_ATUAL) return;
+  if(!confirm('Tem certeza que deseja concluir esse chamado? Confira as fotos/observações antes de continuar.')) return;
+  const msg = document.getElementById('msg-detalhe');
+  const btn = document.getElementById('btn-concluir');
+  msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify({
+      observacaoTecnico: document.getElementById('c-observacao').value,
+      pecas: PECAS.map(p=>({ descricao:p.descricao, valor:p.valor, observacao:p.observacao })),
+    }));
+    for(const file of document.getElementById('c-fotos').files) fd.append('fotosDepois', file);
+    const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/concluir`, { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao concluir chamado.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = '✓ Concluir chamado';
+  }
+}
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  IS_MASTER = ME.role==='master';
+  const secoes = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
+
+  if(!secoes.includes('tecnico')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+  await carregarChamados();
+}
+
+boot();
+</script>
+</body>
+</html>

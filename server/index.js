@@ -10,8 +10,12 @@ const { normalize } = require('./normalize');
 const { lookupBank } = require('./binLookup');
 const push = require('./push');
 const cardTesting = require('./cardTesting');
+const cardHopping = require('./cardHopping');
 const disputes = require('./disputes');
 const fraudMarks = require('./fraudMarks');
+const fraudReport = require('./fraudReport');
+const alertReport = require('./alertReport');
+const fraudIdentity = require('./fraudIdentity');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
@@ -21,12 +25,23 @@ const vaultEntries = require('./vaultEntries');
 const vaultExport = require('./vaultExport');
 const refunds = require('./refunds');
 const fechamentosLive = require('./fechamentosLive');
+const fechamentosReport = require('./fechamentosReport');
+const monitorReport = require('./monitorReport');
+const reportUtil = require('./reportUtil');
 const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
 const backup = require('./backup');
 const relatorios = require('./relatorios');
 const sheetsSync = require('./sheetsSync');
 const entregasSync = require('./entregasSync');
+const ifoodClient = require('./ifoodClient');
+const ifoodStore = require('./ifoodStore');
+const ifoodSync = require('./ifoodSync');
+const solicitacoes = require('./solicitacoes');
+const chamadosTI = require('./chamadosTI');
+const centralChat = require('./centralChat');
+const grupos = require('./grupos');
+const inventario = require('./inventario');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -37,7 +52,35 @@ const upload = multer({
 
 const app = express();
 
+// fuso horario usado em todos os timestamps "Exportado em ..." dos
+// relatorios (CSV/PDF) - sem isso, new Date().toLocaleString() usa o fuso
+// do servidor (normalmente UTC em hospedagem), saindo com 2-3h de diferenca
+// do horario real de Brasilia
+const FUSO_BR = 'America/Sao_Paulo';
+function agoraBrasiliaFmt() {
+  return new Date().toLocaleString('pt-BR', { timeZone: FUSO_BR });
+}
+
+// ---------- resiliencia contra falhas temporarias do Firestore/rede ----------
+// antes disso, qualquer erro nao tratado (ex: "RESOURCE_EXHAUSTED: Quota
+// exceeded" do Firestore, ou uma falha de rede momentanea) derrubava o
+// processo inteiro (Node encerra sozinho em uncaughtException/
+// unhandledRejection sem handler). No Render isso reinicia a instancia, o
+// boot roda de novo (store.init() releem tudo), e se a causa for cota
+// estourada, o restart nao resolve nada - so entra num ciclo de crash-loop
+// que ainda piora a propria cota (mais leituras a cada restart). Logamos o
+// erro e mantemos o processo de pe; requisicoes que dependiam daquela
+// chamada especifica falham com erro 500 (tratado nas rotas via try/catch),
+// mas o servidor inteiro continua no ar pros outros usuarios/telas.
+process.on('unhandledRejection', (err) => {
+  console.error('Erro nao tratado (unhandledRejection) - processo continua rodando:', err && err.message ? err.message : err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Excecao nao tratada (uncaughtException) - processo continua rodando:', err && err.message ? err.message : err);
+});
+
 // ---------- autenticacao basica pro dashboard/API ----------
+
 // protege tudo (dashboard, APIs, imagens/videos anexados) atras de usuario e
 // senha - o webhook da Adyen fica de fora (ja e verificado por assinatura
 // HMAC, e a Adyen nao manda esse header). Sem DASHBOARD_USER/PASSWORD
@@ -53,9 +96,22 @@ function senhasIguais(a, b) {
   if (bufA.length !== bufB.length) return false;
   return crypto.timingSafeEqual(bufA, bufB);
 }
+// pagina/rotas do link publico de estorno (compartilhado com o CLIENTE FINAL
+// pelo WhatsApp/QR code, sem login nenhum - ver estorno-cliente.html) tem que
+// ficar de fora dessa autenticacao do dashboard. Sem essa excecao, o
+// navegador do cliente pedia usuario/senha (que ele nao tem) so pra abrir a
+// pagina, ou - se a pagina abria mas a chamada de API é que caia no muro -
+// recebia texto puro em vez de JSON, quebrando o fetch().json() com um erro
+// cru na tela ("Unexpected token 'A'...")
+const ROTAS_PUBLICAS_SEM_DASHBOARD = new Set([
+  '/webhooks/adyen',
+  '/estorno-cliente.html',
+  '/api/meta/unidades-publico',
+  '/api/refund-requests/publico',
+]);
 if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
   app.use((req, res, next) => {
-    if (req.path === '/webhooks/adyen') return next();
+    if (ROTAS_PUBLICAS_SEM_DASHBOARD.has(req.path)) return next();
     const header = req.headers.authorization || '';
     const [scheme, encoded] = header.split(' ');
     if (scheme === 'Basic' && encoded) {
@@ -103,18 +159,77 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ---------- pedido de estorno feito pelo CLIENTE FINAL (sem login, ver
+// estorno-cliente.html) - unicas rotas publicas alem do login e do webhook
+// da Adyen, por isso registradas antes do portao de autenticacao abaixo.
+// O pedido cai na mesma fila que a loja ja usa (refunds.js), com origem
+// "cliente" - o Master avalia em Central de Solicitações ou no Monitor. ----------
+app.get('/api/meta/unidades-publico', async (req, res) => {
+  const mapa = await construirUnidadesMapa();
+  const porNome = new Map();
+  Object.entries(mapa).forEach(([codigo, nome]) => {
+    const secao = classificarUnidade(codigo).secao;
+    const atual = porNome.get(nome);
+    if (!atual || (secao === 'Fechamento' && atual.secao !== 'Fechamento')) {
+      porNome.set(nome, { codigo, nome, secao });
+    }
+  });
+  const lista = [...porNome.values()]
+    .map(({ codigo, nome }) => ({ codigo, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  res.json(lista);
+});
+
+app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const {
+      unidade, motivoEstorno, motivoOutro, valorVenda, formaPagamento, bandeira, ultimos4,
+      dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente,
+    } = payload;
+
+    const mapa = await construirUnidadesMapa();
+    const unidadeNome = mapa[unidade] || unidade;
+
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(unidade || 'geral', file, 'estornos-cliente');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+
+    const registro = await refunds.create({
+      origem: 'cliente', unidade, unidadeNome, motivoEstorno, motivoOutro, valorVenda, formaPagamento,
+      bandeira, ultimos4, dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente, anexos,
+    });
+    broadcast('refund-requested', registro, 'monitor');
+    res.json({ ok: true, id: registro.id });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // tudo abaixo daqui exige um usuario logado (token JWT, via header ou
 // ?token= - o EventSource do SSE usa a query porque nao manda headers custom)
 app.use('/api', auth.requireAuth);
 
 app.get('/api/me', (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions });
+  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions, isAdmin: req.isAdmin });
 });
 
 // so a secao pedida bloqueia quem nao tem permissao - Master sempre passa
 function requireSection(section) {
   return (req, res, next) => {
     if (!auth.hasSection(req, section)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    next();
+  };
+}
+
+// passa se o usuario tiver QUALQUER uma das secoes pedidas - usado pra rotas
+// de leitura compartilhadas entre dois papeis diferentes (ex: ver a sangria
+// do dia dentro do Fechamento, sem ter a secao "sangria" pra criar/editar)
+function requireAnySection(...sections) {
+  return (req, res, next) => {
+    if (!sections.some((s) => auth.hasSection(req, s))) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
     next();
   };
 }
@@ -177,6 +292,32 @@ function hmacValid(item) {
   return hmac === sign;
 }
 
+// quando um cluster de identidade (fraudIdentity) e confirmado como fraude
+// (padrao de troca de cartao intensificou, ou ja existe outra marca FRAUDE
+// no mesmo cluster), qualquer marca SUSPEITO ainda ativa nesse cluster
+// tambem vira FRAUDE - "intensificou, muda a tag toda do grupo junto"
+async function escalarClusterParaFraude(nomes, motivo) {
+  if (!nomes || !nomes.length) return;
+  const nomesNorm = new Set(nomes.map(fraudMarks.normalizarNome));
+  const marcas = await fraudMarks.listAllCached();
+
+  const suspeitosDoCluster = marcas.filter((m) => m.nivel === 'SUSPEITO' && nomesNorm.has(fraudMarks.normalizarNome(m.clienteNome)));
+  for (const m of suspeitosDoCluster) {
+    const registro = await fraudMarks.marcar({
+      pedidoId: m.pedidoId,
+      unidade: m.unidade,
+      nivel: 'FRAUDE',
+      motivo,
+      clienteChave: m.clienteChave,
+      clienteNome: m.clienteNome,
+      statusPedido: m.statusPedido,
+      valor: m.valor,
+      marcadoPorEmail: 'deteccao-automatica@sistema',
+    });
+    broadcast('fraude-marcada', registro, 'monitor');
+  }
+}
+
 // ---------- endpoint de webhook ----------
 app.post('/webhooks/adyen', async (req, res) => {
   const items = req.body?.notificationItems || [];
@@ -212,6 +353,134 @@ app.post('/webhooks/adyen', async (req, res) => {
           `card-testing-${tx.unidade}-${tx.last4}`,
           tx.unidade
         );
+      }
+    }
+
+    // identificador de pedido usado em todo o bloco de deteccao de fraude
+    // abaixo (mesmo calculo usado no resto do arquivo)
+    const pedidoIdAtual = tx.merchantReference || tx.originalReference || tx.pspReference;
+
+    // cruza o nome do cliente (shopper) com o nome impresso no cartao pra
+    // ligar pedidos de nomes "diferentes" que na verdade sao o mesmo anel
+    // de fraude (ex real: um pedido tem nomeCliente "Thais Mendes" e
+    // cardHolder "Luciano Jose"; outro tem nomeCliente "Luciano Silva" e
+    // cardHolder "Thais M Mendes" - os nomes se cruzam entre os campos).
+    // Todo o resto do bloco usa esse cluster como identidade, em vez de so
+    // o nome exato - ver fraudIdentity.js
+    const clusterInfo = fraudIdentity.registrarPedido(pedidoIdAtual, tx.nomeCliente, tx.cardHolder);
+
+    // a propria Adyen ja marca o pedido como suspeito de fraude
+    // (fraudResultType/totalFraudScore) - nesse caso NAO colocamos nossa
+    // TAG de FRAUDE por cima: duplicaria a mesma informacao nos relatorios.
+    // O objetivo da nossa deteccao e pegar o que a Adyen NAO pegou sozinha.
+    const jaFraudeNativaAdyen = !!tx.fraudeSuspeita;
+
+    // mesmo cliente (mesmo nome) testando varios finais de cartao
+    // DIFERENTES num intervalo curto -> padrao classico de cartao
+    // clonado/roubado, com ou sem nenhuma aprovacao acontecer (um ataque
+    // 100% recusado e igualmente suspeito). Quando detecta, marca o
+    // pedido que cruzou o limiar como FRAUDE automaticamente, na mesma
+    // fila do botao manual "Marcar fraude" - aparece no painel/monitor
+    // sem precisar de ninguem clicar. So dispara uma vez por ataque (ver
+    // cardHopping.js); as tentativas seguintes da mesma pessoa (podem ser
+    // muitas, em massa) entram sozinhas pela propagacao por identidade
+    // logo abaixo, sem precisar de um motivo detalhado pra cada uma -
+    // e qualquer SUSPEITO ja existente no mesmo cluster de nomes escala
+    // pra FRAUDE junto (o padrao "intensificou" pro grupo inteiro)
+    if ((tx.status === 'RECUSADO' || tx.status === 'APROVADO') && !jaFraudeNativaAdyen) {
+      // conta cartoes distintos pelo CLUSTER (nomes cruzados), nao so pelo
+      // nome exato desse pedido - assim um ataque que troca de nome a cada
+      // tentativa (alem do cartao) tambem cruza o limiar
+      const chaveCardHopping = clusterInfo ? `${tx.unidade}:cluster:${clusterInfo.clusterId}` : undefined;
+      const padraoTroca = cardHopping.registrarTentativa(tx, chaveCardHopping);
+      if (padraoTroca) {
+        try {
+          const clienteNome = tx.nomeCliente || tx.cardHolder || null;
+          const registro = await fraudMarks.marcar({
+            pedidoId: pedidoIdAtual,
+            unidade: tx.unidade,
+            nivel: 'FRAUDE',
+            motivo: `Detecção automática: ${padraoTroca.cartoesDistintos} finais de cartão diferentes testados pelo mesmo cliente em ${padraoTroca.janelaMinutos} min.`,
+            clienteChave: clienteNome ? `nome:${clienteNome}` : null,
+            clienteNome,
+            statusPedido: tx.status,
+            valor: tx.valor,
+            marcadoPorEmail: 'deteccao-automatica@sistema',
+          });
+          broadcast('fraude-marcada', registro, 'monitor');
+          push.notifyRaw(
+            `🚫 Fraude detectada automaticamente — ${tx.unidade || ''}`,
+            `${clienteNome || 'Cliente'} testou ${padraoTroca.cartoesDistintos} cartões diferentes em pouco tempo`,
+            `fraude-auto-${pedidoIdAtual}`,
+            tx.unidade
+          );
+          if (clusterInfo) {
+            await escalarClusterParaFraude(clusterInfo.nomes, 'Escalado: padrão de troca de cartão confirmado no mesmo grupo de pedidos.');
+          }
+        } catch (err) {
+          console.error('Erro ao marcar fraude automática (troca de cartão):', err.message);
+        }
+      }
+    }
+
+    // identidade cruzada (cluster de nomes/cartoes ligados, ver acima): a
+    // partir do 2º pedido conectado no mesmo cluster ja marca SUSPEITO,
+    // mesmo sem repetir cartao - nao precisa esperar acumular varias
+    // tentativas iguais, o simples cruzamento de nome ja e o sinal. Se o
+    // cluster ja tem FRAUDE confirmada (por essa via ou pela troca de
+    // cartao acima, ou por marcacao manual), propaga pro pedido novo e
+    // escala qualquer SUSPEITO residual do mesmo grupo junto. Preferimos
+    // alertar demais a deixar passar batido - o Master sempre pode
+    // remover a marcacao de um pedido especifico se for engano.
+    if (clusterInfo) {
+      try {
+        const marcasExistentes = await fraudMarks.listAllCached();
+        const jaMarcadoNesse = marcasExistentes.some((m) => m.pedidoId === pedidoIdAtual);
+
+        const nomesClusterNorm = new Set(clusterInfo.nomes.map(fraudMarks.normalizarNome));
+        const marcaFraudeCluster = marcasExistentes.find(
+          (m) => m.nivel === 'FRAUDE' && nomesClusterNorm.has(fraudMarks.normalizarNome(m.clienteNome))
+        );
+        const clienteNome = tx.nomeCliente || tx.cardHolder || null;
+
+        if (marcaFraudeCluster) {
+          if (!jaMarcadoNesse && !jaFraudeNativaAdyen) {
+            const registro = await fraudMarks.marcar({
+              pedidoId: pedidoIdAtual,
+              unidade: tx.unidade,
+              nivel: 'FRAUDE',
+              motivo: 'Cliente já identificado como fraude (nome ou cartão relacionado a pedido(s) anterior(es)).',
+              clienteChave: clienteNome ? `nome:${clienteNome}` : null,
+              clienteNome,
+              statusPedido: tx.status,
+              valor: tx.valor,
+              marcadoPorEmail: 'deteccao-automatica@sistema',
+            });
+            broadcast('fraude-marcada', registro, 'monitor');
+            push.notifyRaw(
+              `🚫 Fraude (cliente já conhecido) — ${tx.unidade || ''}`,
+              `${clienteNome || 'Cliente'} está ligado a pedido(s) já confirmado(s) como fraude`,
+              `fraude-auto-${pedidoIdAtual}`,
+              tx.unidade
+            );
+          }
+          await escalarClusterParaFraude(clusterInfo.nomes, 'Escalado: outro pedido do mesmo grupo já confirmado como fraude.');
+        } else if (!jaMarcadoNesse && clusterInfo.totalPedidos >= 2) {
+          const registro = await fraudMarks.marcar({
+            pedidoId: pedidoIdAtual,
+            unidade: tx.unidade,
+            nivel: 'SUSPEITO',
+            motivo: `Nome ou cartão relacionado a outro pedido recente (grupo: ${clusterInfo.nomeRepresentativo || 'sem nome'}).`,
+            clienteChave: clienteNome ? `nome:${clienteNome}` : null,
+            clienteNome,
+            statusPedido: tx.status,
+            valor: tx.valor,
+            marcadoPorEmail: 'deteccao-automatica@sistema',
+          });
+          broadcast('fraude-marcada', registro, 'monitor');
+        }
+      } catch (err) {
+        console.error('Erro ao processar identidade cruzada de fraude:', err.message);
       }
     }
 
@@ -277,20 +546,151 @@ app.get('/api/chargebacks', requireSection('monitor'), (req, res) => {
   res.json(auth.filterByUnidade(req, store.chargebacks()));
 });
 
+// ---------- relatorios (CSV/PDF) dos paineis do Monitor de transacoes:
+// Transacoes, Pedidos repetidos, Chargeback, Pedidos que mudaram de status e
+// Comparativo por unidade - mesma secao 'monitor' da tela (nao restrito ao
+// Master), respeitando as unidades que o usuario tem permissao de ver.
+// Filtros por query string: inicio/fim (periodo), status (lista separada por
+// virgula) e unidades (lista separada por virgula) - mesmos filtros da tela.
+function filtrarTransacoesPeriodo(req) {
+  const { inicio, fim, status, unidades } = req.query;
+  const statusSet = status ? new Set(String(status).split(',').filter(Boolean)) : null;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  const permitido = auth.filterByUnidade(req, store.allTransactions());
+  return permitido.filter((t) =>
+    (!statusSet || statusSet.has(t.status)) &&
+    (!unidadesSet || unidadesSet.has(t.unidade)) &&
+    (!inicio || (t.dataHora || '') >= inicio) &&
+    (!fim || (t.dataHora || '') <= fim + 'T23:59:59')
+  );
+}
+function filtrarPedidosPeriodo(lista, req, campoData) {
+  const { inicio, fim, status, unidades } = req.query;
+  const statusSet = status ? new Set(String(status).split(',').filter(Boolean)) : null;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  const permitido = auth.filterByUnidade(req, lista);
+  return permitido.filter((o) => {
+    const data = o[campoData] || o.ultimaAtualizacao;
+    return (!statusSet || statusSet.has(o.statusAtual)) &&
+      (!unidadesSet || unidadesSet.has(o.unidade)) &&
+      (!inicio || (data || '') >= inicio) &&
+      (!fim || (data || '') <= fim + 'T23:59:59');
+  });
+}
+function unidadesDoQuery(req) {
+  return req.query.unidades ? String(req.query.unidades).split(',').filter(Boolean) : [];
+}
+function periodoTexto(req) {
+  const { inicio, fim } = req.query;
+  return inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+}
+
+app.get('/api/monitor/relatorio-transacoes.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararTransacoes(filtrarTransacoesPeriodo(req));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('transacoes', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-transacoes.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararTransacoes(filtrarTransacoesPeriodo(req));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} transação(ões)`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Transações', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('transacoes', unidadesDoQuery(req)),
+  });
+});
+
+app.get('/api/monitor/relatorio-repetidos.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararRepetidos(filtrarTransacoesPeriodo(req));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('pedidos-repetidos', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-repetidos.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararRepetidos(filtrarTransacoesPeriodo(req));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} grupo(s) de pedidos repetidos`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Pedidos Repetidos', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('pedidos-repetidos', unidadesDoQuery(req)),
+  });
+});
+
+app.get('/api/monitor/relatorio-chargebacks.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararChargebacks(filtrarPedidosPeriodo(store.chargebacks(), req, 'dataChargeback'));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('chargebacks', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-chargebacks.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararChargebacks(filtrarPedidosPeriodo(store.chargebacks(), req, 'dataChargeback'));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} chargeback(s)`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Chargebacks', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('chargebacks', unidadesDoQuery(req)),
+  });
+});
+
+app.get('/api/monitor/relatorio-mudaram-status.csv', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararMudaramStatus(filtrarPedidosPeriodo(store.ordersChanged(), req, 'ultimaAtualizacao'));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('pedidos-mudaram-status', unidadesDoQuery(req))}.csv"`);
+  res.send(monitorReport.toCSV(colunas, linhas));
+});
+app.get('/api/monitor/relatorio-mudaram-status.pdf', requireSection('monitor'), (req, res) => {
+  const { colunas, linhas } = monitorReport.prepararMudaramStatus(filtrarPedidosPeriodo(store.ordersChanged(), req, 'ultimaAtualizacao'));
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} pedido(s)`;
+  monitorReport.writePDF(res, {
+    titulo: 'Relatório de Pedidos que Mudaram de Status', subtitulo, colunas, linhas,
+    nomeArquivo: monitorReport.nomeArquivoComUnidades('pedidos-mudaram-status', unidadesDoQuery(req)),
+  });
+});
+
+// comparativo-unidade usa fraudMarks.listAllCached() (nao listAll()) -
+// listAll() faz leitura direta no Firestore sem cache; usar sem cache aqui
+// foi a causa provavel de estourar a cota de leitura numa versao anterior
+// desta feature (revertida em producao por esse motivo). Ver fraudMarks.js.
+app.get('/api/monitor/relatorio-comparativo-unidade.csv', requireSection('monitor'), async (req, res) => {
+  try {
+    const marcas = await fraudMarks.listAllCached();
+    const rows = monitorReport.semFraudeECapeado(filtrarTransacoesPeriodo(req), marcas);
+    const { colunas, linhas } = monitorReport.prepararComparativoUnidade(rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${monitorReport.nomeArquivoComUnidades('comparativo-unidade', unidadesDoQuery(req))}.csv"`);
+    res.send(monitorReport.toCSV(colunas, linhas));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get('/api/monitor/relatorio-comparativo-unidade.pdf', requireSection('monitor'), async (req, res) => {
+  try {
+    const marcas = await fraudMarks.listAllCached();
+    const rows = monitorReport.semFraudeECapeado(filtrarTransacoesPeriodo(req), marcas);
+    const { colunas, linhas } = monitorReport.prepararComparativoUnidade(rows);
+    const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodoTexto(req)} · ${linhas.length} unidade(s)`;
+    monitorReport.writePDF(res, {
+      titulo: 'Relatório Comparativo por Unidade', subtitulo, colunas, linhas,
+      nomeArquivo: monitorReport.nomeArquivoComUnidades('comparativo-unidade', unidadesDoQuery(req)),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------- marcacao manual de suspeita/fraude por pedido (monitoramento
 // efetivo, separado do status que vem da Adyen - esse continua intacto) ----------
 app.get('/api/fraude', requireSection('monitor'), (req, res) => {
-  fraudMarks.listAll().then((lista) => res.json(auth.filterByUnidade(req, lista)));
+  fraudMarks.listAllCached().then((lista) => res.json(auth.filterByUnidade(req, lista)));
 });
+
 
 app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
   try {
-    const { pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor } = req.body;
+    const { pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, statusPedido, valor } = req.body;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await fraudMarks.marcar({
-      pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, valor,
+      pedidoId, unidade, nivel, motivo, clienteChave, clienteNome, statusPedido, valor,
       marcadoPorEmail: req.user.email,
     });
     broadcast('fraude-marcada', registro, 'monitor');
@@ -309,9 +709,52 @@ app.post('/api/fraude/marcar', requireSection('monitor'), async (req, res) => {
 });
 
 app.delete('/api/fraude/:pedidoId', requireSection('monitor'), async (req, res) => {
-  await fraudMarks.remover(decodeURIComponent(req.params.pedidoId));
+  await fraudMarks.remover(decodeURIComponent(req.params.pedidoId), req.user.email);
   broadcast('fraude-removida', { pedidoId: req.params.pedidoId }, 'monitor');
   res.json({ ok: true });
+});
+
+// ---------- relatorio de fraude (Master) - resumo por cliente pra
+// apresentar incidentes (quantidade, se algum pedido passou, acao tomada) -
+// usa o historico completo (inclui marcacoes ja removidas) ----------
+app.get('/api/fraude/relatorio.csv', auth.requireMaster, async (req, res) => {
+  const { inicio, fim } = req.query;
+  const historico = await fraudMarks.listHistorico();
+  const filtrado = historico.filter((m) => (!inicio || (m.criadoEm || '') >= inicio) && (!fim || (m.criadoEm || '') <= fim + 'T23:59:59'));
+  const linhas = fraudReport.agruparPorCliente(filtrado);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fraudReport.slugify('relatorio-fraude')}.csv"`);
+  res.send(fraudReport.toCSV(linhas));
+});
+
+app.get('/api/fraude/relatorio.pdf', auth.requireMaster, async (req, res) => {
+  const { inicio, fim } = req.query;
+  const historico = await fraudMarks.listHistorico();
+  const filtrado = historico.filter((m) => (!inicio || (m.criadoEm || '') >= inicio) && (!fim || (m.criadoEm || '') <= fim + 'T23:59:59'));
+  const linhas = fraudReport.agruparPorCliente(filtrado);
+  const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} cliente(s) monitorado(s)`;
+  fraudReport.writePDF(res, { titulo: 'Relatório de Fraude', subtitulo, linhas });
+});
+
+// ---------- relatorio do painel "Alertas de falha/fraude" (Master) - mesma
+// deteccao/agrupamento por cliente do renderAlerts() em index.html ----------
+app.get('/api/alertas/relatorio.csv', auth.requireMaster, (req, res) => {
+  const { inicio, fim } = req.query;
+  const transacoes = store.allTransactions().filter((t) => (!inicio || (t.dataHora || '') >= inicio) && (!fim || (t.dataHora || '') <= fim + 'T23:59:59'));
+  const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${alertReport.slugify('relatorio-alertas')}.csv"`);
+  res.send(alertReport.toCSV(linhas));
+});
+
+app.get('/api/alertas/relatorio.pdf', auth.requireMaster, (req, res) => {
+  const { inicio, fim } = req.query;
+  const transacoes = store.allTransactions().filter((t) => (!inicio || (t.dataHora || '') >= inicio) && (!fim || (t.dataHora || '') <= fim + 'T23:59:59'));
+  const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
+  const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} cliente(s) com alerta`;
+  alertReport.writePDF(res, { titulo: 'Relatório de Alertas', subtitulo, linhas });
 });
 
 app.get('/api/summary', requireSection('monitor'), (req, res) => {
@@ -333,19 +776,40 @@ app.get('/api/summary', requireSection('monitor'), (req, res) => {
 // Adyen. Ficam fixos aqui porque uma unidade pode precisar de permissao
 // mesmo antes de ter qualquer transacao Adyen ou fechamento lancado.
 const FECHAMENTO_UNIDADES_NOMES = {
-  '19821': 'São Miguel (Fechamento)', '19855': 'Carrão (Fechamento)', '19888': 'Mooca (Fechamento)', '19889': 'Tatuapé (Fechamento)',
-  "Domino's Carrinho Aeroporto Recife": "Domino's Carrinho Aeroporto Recife",
-  'Dominos Bessa': 'Dominos Bessa',
-  'Dominos Campina Grande': 'Dominos Campina Grande',
-  'Dominos Caruaru': 'Dominos Caruaru',
-  'Dominos Garanhuns': 'Dominos Garanhuns',
-  'Dominos Praça Aeroporto Recife': 'Dominos Praça Aeroporto Recife',
-  'Dominos Tirol': 'Dominos Tirol',
-  'Milky Moo Tirol': 'Milky Moo Tirol',
-  'Spoleto Praça Aeroporto Recife': 'Spoleto Praça Aeroporto Recife',
-  'Spoleto Shopping Recife': 'Spoleto Shopping Recife',
-  'Spoleto Shopping Tacaruna': 'Spoleto Shopping Tacaruna',
-  'São Braz IL': 'São Braz IL',
+  '19821': 'Dom Sao Miguel', '19855': 'Dom Carrão', '19888': 'Dom Mooca', '19889': 'Dom Tatuape',
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dom Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+  // lojas novas, sem conta Adyen prevista - ficam fixas aqui so pra ja
+  // aparecerem no checklist de permissoes do Master antes do 1o lançamento
+  'Spo Shop Midway': 'Spo Shop Midway',
+  'Saltiverso Patteo': 'Saltiverso Patteo',
+};
+
+// unidades do Inventario - por enquanto so as lojas Domino's (mesmos codigos
+// do Fechamento, ver FECHAMENTO_UNIDADES_NOMES acima); as demais redes
+// (Milky Moo, Spoleto etc) tem planilha/dinamica propria de estoque, ainda
+// nao mapeada - entram quando o usuario mandar o modelo de cada uma
+const INVENTARIO_UNIDADES_NOMES = {
+  '19821': 'Dom Sao Miguel', '19855': 'Dom Carrão', '19888': 'Dom Mooca', '19889': 'Dom Tatuape',
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dom Tirol',
 };
 
 // unidades do app de entregas (motoboys) - nomes como aparecem nas planilhas
@@ -354,30 +818,87 @@ const FECHAMENTO_UNIDADES_NOMES = {
 // lançamento. O Master pode liberar mais conforme novas unidades entrarem
 // (o app de entregas ainda esta sendo migrado loja a loja do AppSheet).
 const ENTREGAS_UNIDADES_NOMES = {
-  'Tirol Natal': 'Tirol Natal (Entregas)',
+  'Tirol Natal': 'Dom Natal',
   'MMTirol Natal': 'Milky Moo Tirol Natal (Entregas)',
-  Bessa: 'Bessa (Entregas)',
-  Caruaru: 'Caruaru (Entregas)',
-  Garanhuns: 'Garanhuns (Entregas)',
+  Bessa: 'Dom Bessa',
+  Caruaru: 'Dom Caruaru',
+  Garanhuns: 'Dom Garanhuns',
 };
+
+// apelidos - a mesma loja fisica as vezes aparece com codigos diferentes em
+// espacos de dados diferentes (ex: "19888" no Fechamento, "DOM___19888" e
+// "Mooca" como merchantAccountCode direto na Adyen - reflexo de como cada
+// conta foi configurada la, fora do nosso controle). Nao dá pra unificar os
+// CODIGOS sem risco de desalinhar permissao/dado ja gravado, mas o NOME
+// exibido pode e deve ser sempre o mesmo - aplicado por ultimo, sempre
+// sobrescrevendo, pra nao depender da ordem dos merges acima
+const UNIDADES_APELIDOS = {
+  '19888': 'Dom Mooca', 'DOM___19888': 'Dom Mooca', Mooca: 'Dom Mooca',
+  '19889': 'Dom Tatuape', 'DOM_19889': 'Dom Tatuape', Tatuape: 'Dom Tatuape',
+  '19821': 'Dom Sao Miguel', 'DOM__19821': 'Dom Sao Miguel', 'Sao Miguel': 'Dom Sao Miguel',
+  '19855': 'Dom Carrão', 'DOM__19855': 'Dom Carrão', Carrao: 'Dom Carrão',
+  DOM19940: 'Dom Natal', 'Tirol Natal': 'Dom Natal',
+  DOM_19798: 'Dom Caruaru', Caruaru: 'Dom Caruaru', 'Dominos Caruaru': 'Dom Caruaru',
+  DOM19911: 'Dom Garanhuns', Garanhuns: 'Dom Garanhuns', 'Dominos Garanhuns': 'Dom Garanhuns',
+  DOM_19706: 'Dom Bessa', Bessa: 'Dom Bessa', 'Dominos Bessa': 'Dom Bessa',
+  DOM_19633: 'Dom Campina Grande', 'Dominos Campina Grande': 'Dom Campina Grande',
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+};
+
+// classificacao de cada codigo por secao (de qual sistema ele vem - isso que
+// explica a mesma loja ter mais de um codigo) e grupo (franquia/rede a que
+// pertence) - so pra organizar o checklist de permissoes na tela de
+// Usuarios; nao afeta em nada o filtro de permissao em si
+const ARCFOOD_FECHAMENTO = new Set(['19821', '19855', '19888', '19889']);
+const ARCFOOD_MONITOR = new Set(['Mooca', 'Tatuape', 'Carrao', 'Sao Miguel', 'DOM___19888', 'DOM_19889', 'DOM__19821', 'DOM__19855']);
+const GBE_MONITOR = new Set(['DOM19940', 'DOM_19798', 'DOM19911', 'DOM_19706', 'DOM_19633']);
+function classificarUnidade(codigo) {
+  if (ARCFOOD_FECHAMENTO.has(codigo)) return { secao: 'Fechamento', grupo: 'ARCFOOD' };
+  if (ARCFOOD_MONITOR.has(codigo)) return { secao: 'Monitor / Disputas (Adyen)', grupo: 'ARCFOOD' };
+  if (GBE_MONITOR.has(codigo)) return { secao: 'Monitor / Disputas (Adyen)', grupo: 'Grupo Bravo (GBE)' };
+  if (codigo in ENTREGAS_UNIDADES_NOMES) return { secao: 'Entregas', grupo: 'Grupo Bravo (GBE)' };
+  if (codigo in FECHAMENTO_UNIDADES_NOMES) return { secao: 'Fechamento', grupo: 'Grupo Bravo (GBE)' };
+  if (codigo in ifoodClient.IFOOD_UNIDADES_NOMES) return { secao: 'iFood', grupo: null };
+  return { secao: 'Monitor / Disputas (Adyen)', grupo: 'Outras' };
+}
 
 // lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
 // junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
 // com as unidades fixas de Fechamento/Lançamento/Entregas (espacos de codigo
 // diferentes, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
 // dados importados/lançados, pra nunca faltar opcao no checklist do Master
-app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
+async function construirUnidadesMapa() {
   const mapa = {};
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
   Object.entries(FECHAMENTO_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
-  Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
+  Object.entries(ENTREGAS_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = nome; });
+  Object.entries(ifoodClient.IFOOD_UNIDADES_NOMES).forEach(([codigo, nome]) => { mapa[codigo] = mapa[codigo] || nome; });
   require('./fechamentos-snapshot.json').forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   (await entregasLive.listAll()).forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
+  // por ultimo, sempre - garante o nome unificado mesmo que algum dado
+  // importado (planilha, fechamento antigo) tenha trazido um nome diferente
+  Object.entries(UNIDADES_APELIDOS).forEach(([codigo, nome]) => { if (mapa[codigo]) mapa[codigo] = nome; });
+  return mapa;
+}
+
+app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
+  const mapa = await construirUnidadesMapa();
+  const SECAO_ORDEM = ['Fechamento', 'Entregas', 'Monitor / Disputas (Adyen)', 'iFood'];
   const lista = Object.entries(mapa)
-    .map(([codigo, nome]) => ({ codigo, nome }))
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    .map(([codigo, nome]) => ({ codigo, nome, ...classificarUnidade(codigo) }))
+    .sort((a, b) =>
+      (SECAO_ORDEM.indexOf(a.secao) - SECAO_ORDEM.indexOf(b.secao)) ||
+      String(a.grupo).localeCompare(String(b.grupo), 'pt-BR') ||
+      a.nome.localeCompare(b.nome, 'pt-BR')
+    );
   res.json(lista);
 });
 
@@ -413,6 +934,38 @@ app.post('/api/disputes', requireSection('disputas'), upload.array('anexos', 8),
 
 app.get('/api/disputes', requireSection('disputas'), async (req, res) => {
   res.json(auth.filterByUnidade(req, (await disputes.listAll()).filter((d) => req.isMaster || !d.unidade || (req.permissions.unidades || []).includes(d.unidade))));
+});
+
+// relatorio (CSV/PDF) da tela de Relatórios de disputa (relatorios.html) -
+// agrupado por pedido igual a tela, cruzando com o pedido (cliente/valor/
+// unidade) - mesmo filtro de status (aba ativa) da tela
+app.get('/api/disputes/relatorio.:formato(csv|pdf)', requireSection('disputas'), async (req, res) => {
+  const { status } = req.query;
+  const permitidas = (await disputes.listAll()).filter((d) => req.isMaster || !d.unidade || (req.permissions.unidades || []).includes(d.unidade));
+  const filtradas = auth.filterByUnidade(req, permitidas).filter((d) => !status || status === 'TODOS' || d.status === status);
+  const ordersById = {};
+  store.allOrders().forEach((o) => { ordersById[o.pedidoId] = o; });
+
+  const colunas = [
+    { key: 'pedidoId', label: 'Pedido' }, { key: 'cliente', label: 'Cliente' }, { key: 'unidade', label: 'Unidade' },
+    { key: 'valor', label: 'Valor' }, { key: 'status', label: 'Status' }, { key: 'contato', label: 'Contato' },
+    { key: 'notas', label: 'Notas' }, { key: 'criadoEm', label: 'Registrado em' },
+  ];
+  const linhas = [...filtradas].sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || '')).map((d) => {
+    const o = ordersById[d.pedidoId] || {};
+    return {
+      pedidoId: d.pedidoId, cliente: o.cliente || 'cliente desconhecido', unidade: o.unidade || d.unidade || '—',
+      valor: reportUtil.fmtMoneyBR(o.valor), status: d.status,
+      contato: [d.nomeContato, d.telefoneContato].filter(Boolean).join(' · ') || '—',
+      notas: d.notas || '—', criadoEm: reportUtil.fmtDataHoraBR(d.criadoEm),
+    };
+  });
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('relatorio-disputas')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Relatório de Disputas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} registro(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('relatorio-disputas') });
 });
 
 app.get('/api/disputes/:pedidoId', requireSection('disputas'), async (req, res) => {
@@ -653,7 +1206,7 @@ app.get('/api/vault/export.csv', auth.requireMaster, async (req, res) => {
 app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
   try {
     const { titulo, rows } = await resolverEscopoExportacao(req);
-    const subtitulo = `Exportado em ${new Date().toLocaleString('pt-BR')} · ${rows.length} senha(s)`;
+    const subtitulo = `Exportado em ${agoraBrasiliaFmt()} · ${rows.length} senha(s)`;
     vaultExport.writePDF(res, { titulo, subtitulo, rows });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -663,7 +1216,7 @@ app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
 // ---------- solicitacoes de estorno (usuario Leitor pede, Master aprova/rejeita) ----------
 app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => {
   try {
-    const { pedidoId, unidade, observacao, password } = req.body;
+    const { pedidoId, unidade, observacao, password, direcionadoParaId, direcionadoParaEmail } = req.body;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -676,8 +1229,11 @@ app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => 
       observacao,
       requestedById: req.user.id,
       requestedByEmail: req.user.email,
+      direcionadoParaId,
+      direcionadoParaEmail,
     });
     broadcast('refund-requested', registro, 'monitor');
+    broadcast('refund-requested', registro, 'solicitacoes');
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -690,7 +1246,7 @@ app.get('/api/refund-requests', requireSection('monitor'), async (req, res) => {
   res.json(todas.filter((r) => r.requestedById === req.user.id));
 });
 
-app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res) => {
+app.patch('/api/refund-requests/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const registro = await refunds.updateStatus(req.params.id, req.body.status, {
       motivoDecisao: req.body.motivoDecisao,
@@ -703,9 +1259,71 @@ app.patch('/api/refund-requests/:id/status', auth.requireMaster, async (req, res
   }
 });
 
+// comprovante anexado pelo cliente final no pedido de estorno publico - so
+// o Master ve (dado sensivel do cliente: nome, telefone, foto do comprovante)
+app.get('/api/refund-requests/anexo/:id/:index', auth.requireMasterOrAdmin, async (req, res) => {
+  const registro = await refunds.getOne(req.params.id);
+  if (!registro) return res.sendStatus(404);
+  const anexo = (registro.anexos || [])[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
+});
+
+// edicao/exclusao direta pelo Master - corrigir um dado errado no pedido de
+// estorno (loja errada, valor digitado errado pelo cliente, etc.) ou
+// remove-lo de vez da fila, independente do status
+app.patch('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await refunds.update(req.params.id, req.body);
+    broadcast('refund-request-changed', registro, 'monitor');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await refunds.remove(req.params.id);
+    broadcast('refund-request-changed', { id: req.params.id, excluido: true }, 'monitor');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- gestao de usuarios (so o Master) ----------
-app.get('/api/users', auth.requireMaster, async (req, res) => {
+// leitura tambem libera pro Admin, que precisa da lista de tecnicos pra
+// decidir solicitacoes de Suporte de TI; escrita continua so-Master
+app.get('/api/users', auth.requireMasterOrAdmin, async (req, res) => {
   res.json(await users.list());
+});
+
+// relatorio (CSV/PDF) da tabela "Acessos cadastrados" de usuarios.html -
+// mesma tela, sem filtro (a lista inteira, ja que so o Master ve isso)
+app.get('/api/users/relatorio.:formato(csv|pdf)', auth.requireMaster, async (req, res) => {
+  const unidadesMapa = await construirUnidadesMapa();
+  const colunas = [
+    { key: 'email', label: 'Email' }, { key: 'papel', label: 'Papel' }, { key: 'status', label: 'Status' },
+    { key: 'secoes', label: 'Seções' }, { key: 'unidades', label: 'Unidades' }, { key: 'subgrupos', label: 'Cofre (subgrupos)' },
+  ];
+  const linhas = (await users.list()).map((u) => {
+    const perms = u.permissions || { sections: [], unidades: [], vaultSubgroups: [] };
+    const isMaster = u.role === 'master';
+    return {
+      email: u.email, papel: u.role,
+      status: u.locked ? 'bloqueado' : (u.active ? 'ativo' : 'desativado'),
+      secoes: isMaster ? 'tudo' : (perms.sections || []).join(', ') || '—',
+      unidades: isMaster ? 'tudo' : (perms.unidades || []).map((c) => unidadesMapa[c] || c).join(', ') || '—',
+      subgrupos: isMaster ? 'tudo' : (perms.vaultSubgroups || []).join(', ') || '—',
+    };
+  });
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('usuarios-acessos')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Usuários · Acessos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} acesso(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('usuarios-acessos') });
 });
 
 app.post('/api/users', auth.requireMaster, async (req, res) => {
@@ -727,6 +1345,31 @@ app.put('/api/users/:id/permissions', auth.requireMaster, async (req, res) => {
 app.put('/api/users/:id/active', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.setActive(req.params.id, req.body.active));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/horario-permitido', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateHorarioPermitido(req.params.id, req.body.horarioPermitido));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/is-admin', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateIsAdmin(req.params.id, req.body.isAdmin));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// tag de cargo (Loja/Gerente) - rotulo de organizacao, nao muda permissao
+app.put('/api/users/:id/cargo', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateCargo(req.params.id, req.body.cargo));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -760,9 +1403,34 @@ app.get('/api/backups', auth.requireMaster, async (req, res) => {
 
 app.post('/api/backups/run', auth.requireMaster, async (req, res) => {
   try {
-    res.json(await backup.rodarBackup());
+    res.json(await backup.rodarBackup({ forcar: true }));
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// recuperar um fechamento excluido por engano - le a coleção fechamentosLive
+// de dentro de um arquivo de backup especifico (a lista completa, pro Master
+// buscar/filtrar na tela) e permite restaurar um registro pontual de volta
+// pro Firestore, exatamente como estava naquele backup
+app.get('/api/backups/:nome/fechamentos', auth.requireMaster, async (req, res) => {
+  try {
+    const dump = await backup.lerBackup(req.params.nome);
+    res.json(dump.fechamentosLive || []);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/backups/:nome/fechamentos/:id/restaurar', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await backup.restaurarDocumento(req.params.nome, 'fechamentosLive', req.params.id);
+    fechamentosLive.invalidarCache();
+    broadcast('fechamento-restaurado', registro, 'lancamento');
+    broadcast('fechamento-restaurado', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -839,6 +1507,90 @@ app.get('/api/fechamentos', requireSection('fechamentos'), async (req, res) => {
   res.json(auth.filterByUnidade(req, combinado));
 });
 
+// registro CRU (sem mesclar com sangria/planilha) de um fechamento - usado
+// pela edicao direta do Master, pra nunca editar em cima de um valor que ja
+// vem somado com a sangria do dia (ver sangrias.js/comoFechamento)
+app.get('/api/fechamentos/:id/bruto', auth.requireMaster, async (req, res) => {
+  const registro = await fechamentosLive.getOne(req.params.id);
+  if (!registro) return res.status(404).json({ error: 'Fechamento não encontrado.' });
+  res.json(registro);
+});
+
+// aplica os mesmos filtros do front (periodo ja efetivo - o proprio front
+// resolve qualquer corte extra da tabela antes de mandar inicio/fim - mais
+// grupo e unidades) - usado pelos relatorios de Fechamentos e de Comparativo
+// por unidade abaixo
+async function fechamentosFiltrados(req) {
+  const { inicio, fim, grupo, unidades } = req.query;
+  const lancados = await fechamentosLive.listAll();
+  const sangriasLancadas = (await sangrias.listAll()).map(sangrias.comoFechamento);
+  const combinado = sheetsSync.mesclarLancamentosDoMesmoDia([...fechamentosData, ...lancados, ...sangriasLancadas]);
+  const permitido = auth.filterByUnidade(req, combinado);
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  return permitido.filter((f) =>
+    (!grupo || f.grupo === grupo) &&
+    (!unidadesSet || unidadesSet.has(f.unidade)) &&
+    (!inicio || (f.data || '') >= inicio) &&
+    (!fim || (f.data || '') <= fim)
+  );
+}
+
+// monta as mesmas linhas mostradas no painel "Fechamentos" da tela - usado
+// pelos dois formatos de relatorio abaixo
+async function montarLinhasRelatorioFechamentos(req) {
+  return fechamentosReport.prepararLinhas(await fechamentosFiltrados(req));
+}
+
+// mesma agregacao por unidade do painel "Comparativo por unidade" da tela
+// (renderUnidadesTable em fechamentos.html) - a coluna "Previsao (mes)" fica
+// de fora do relatorio de proposito: e uma projecao calculada em cima do
+// historico completo (nao so do periodo filtrado) e nao faz sentido como
+// valor estatico exportado
+function prepararFechamentosPorUnidade(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unid.' }, { key: 'qtd', label: 'Fechamentos' }, { key: 'faturamento', label: 'Faturamento' },
+    { key: 'diferenca', label: 'Diferença' }, { key: 'tc', label: 'TC total' }, { key: 'cancelados', label: 'Cancelados' },
+  ];
+  const porUnidade = {};
+  rows.forEach((r) => {
+    const c = (porUnidade[r.unidade] ||= { nome: r.unidadeNome || r.unidade, qtd: 0, faturamento: 0, diferenca: 0, tc: 0, cancelados: 0 });
+    c.qtd++; c.faturamento += r.faturamento || 0; c.diferenca += r.diferenca || 0; c.tc += r.tc || 0; c.cancelados += r.cancelados || 0;
+  });
+  const linhas = Object.values(porUnidade).sort((a, b) => b.faturamento - a.faturamento).map((c) => ({
+    unidade: c.nome, qtd: c.qtd, faturamento: reportUtil.fmtMoneyBR(c.faturamento), diferenca: reportUtil.fmtMoneyBR(c.diferenca),
+    tc: c.tc.toFixed(0), cancelados: c.cancelados.toFixed(0),
+  }));
+  return { colunas, linhas };
+}
+
+app.get('/api/fechamentos/relatorio-unidades.:formato(csv|pdf)', requireSection('fechamentos'), async (req, res) => {
+  const { colunas, linhas } = prepararFechamentosPorUnidade(await fechamentosFiltrados(req));
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('fechamentos-por-unidade')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Fechamentos · Comparativo por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('fechamentos-por-unidade') });
+});
+
+// ---------- relatorio de Fechamentos (CSV/PDF) do periodo filtrado na tela -
+// mesma secao 'fechamentos' da tela (nao restrito ao Master), respeitando as
+// unidades que o usuario tem permissao de ver ----------
+app.get('/api/fechamentos/relatorio.csv', requireSection('fechamentos'), async (req, res) => {
+  const linhas = await montarLinhasRelatorioFechamentos(req);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fechamentosReport.slugify('relatorio-fechamentos')}.csv"`);
+  res.send(fechamentosReport.toCSV(linhas));
+});
+
+app.get('/api/fechamentos/relatorio.pdf', requireSection('fechamentos'), async (req, res) => {
+  const { inicio, fim } = req.query;
+  const linhas = await montarLinhasRelatorioFechamentos(req);
+  const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
+  const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} fechamento(s)`;
+  fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, linhas });
+});
+
 app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
   res.json(statusSincronizacaoPlanilhas);
 });
@@ -851,19 +1603,39 @@ app.post('/api/fechamentos/sincronizar-planilhas', auth.requireMaster, async (re
   res.json(status);
 });
 
+// KPI's extras tipo "arquivo" (ver grupos.js) mandam o arquivo com fieldname
+// "kpiArquivo:<campo>" - sobe cada um pro Storage e devolve {campo: caminho}
+// pra mesclar no mapa de kpisExtras antes de mandar pro fechamentosLive (que
+// grava o caminho como o "valor" desse campo, ver sanitizarMapaExtras)
+async function uploadArquivosKpi(files, ownerId) {
+  const out = {};
+  for (const file of files || []) {
+    const m = /^kpiArquivo:(.+)$/.exec(file.fieldname);
+    if (!m) continue;
+    out[m[1]] = await storage.salvarArquivo(ownerId, file, 'fechamento-kpis');
+  }
+  return out;
+}
+
 // ---------- lancamento de fechamento pela propria loja (secao "lancamento") ----------
 // substitui o AppSheet: a loja loga com um usuario proprio (papel "Fechamento",
 // limitado a sua(s) unidade(s)) e lanca o fechamento do dia direto no banco.
 // Depois de lancado o registro e imutavel - qualquer correcao vira um pedido
 // que so o Master pode aprovar (fechamentosLive.js guarda o historico).
-app.post('/api/fechamentos/lancar', requireSection('lancamento'), async (req, res) => {
+// upload.any(): so entra em acao se o body vier multipart (quando algum KPI
+// extra tipo "arquivo" tem foto/anexo escolhido, ver lancamento.html) -
+// requisicao JSON normal (sem arquivo nenhum) passa direto, sem afetar nada.
+app.post('/api/fechamentos/lancar', requireSection('lancamento'), upload.any(), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas } = req.body;
+    const body = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const { unidade, unidadeNome, grupo, data, gerente, campos, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas } = body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    const arquivosKpi = await uploadArquivosKpi(req.files, unidade || 'geral');
+    const kpisExtras = { ...(body.kpisExtras || {}), ...arquivosKpi };
     const registro = await fechamentosLive.create({
-      unidade, unidadeNome, grupo, data, gerente, campos, observacao, detalhesMaquinas, detalhesSaidas,
+      unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
@@ -879,21 +1651,278 @@ app.get('/api/fechamentos/meus', requireSection('lancamento'), async (req, res) 
   res.json(await fechamentosLive.listByUnidades(req.permissions.unidades || []));
 });
 
+// ---------- grupos (franquias) - cada uma pode ter seus proprios KPI's
+// extras no fechamento (ver grupos.js). Leitura liberada pra quem lanca
+// fechamento (precisa saber quais campos extras preencher) ou corrige
+// (central.html); so o Master cria/edita/apaga grupo ----------
+app.get('/api/grupos', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
+  res.json(await grupos.list());
+});
+
+// so id+email dos Master/Admin que podem receber uma solicitação direcionada
+// da unidade - usado pra quem NAO e Master/Admin poder "direcionar" uma
+// solicitação pra alguem do proprio grupo de lojas (ver central.html), sem
+// expor a lista inteira de usuarios (essa e Master/Admin-only, GET /api/users).
+// Quem entra na lista:
+//   - todo Master ativo (sempre, sem precisar configurar nada);
+//   - Admins configurados como responsaveis do grupo em /grupos.html;
+//   - Admins que ja se ENGAJARAM com solicitações dessas lojas (aprovaram/
+//     rejeitaram alguma, ou mandaram mensagem no chat) - assim o admin que
+//     comeca a atuar num grupo passa a aparecer/ser notificavel sozinho,
+//     sem depender do Master lembrar de cadastra-lo como responsavel
+app.get('/api/grupos/responsaveis', requireSection('solicitacoes'), async (req, res) => {
+  const { unidade } = req.query;
+  if (!unidade) return res.status(400).json({ error: 'Informe a unidade.' });
+  const grupo = await grupos.grupoDaUnidade(unidade);
+  const unidadesDoGrupo = new Set(grupo ? grupo.unidades || [] : [unidade]);
+  const idsConfigurados = new Set(grupo ? grupo.responsaveis || [] : []);
+
+  const [todos, estornos, ajustes, gerais, chats] = await Promise.all([
+    users.list(), refunds.listAll(), fechamentosLive.listarEdicoes(), solicitacoes.listAll(), centralChat.listAllCached(),
+  ]);
+
+  const cardsDoGrupo = [
+    ...estornos.filter((r) => unidadesDoGrupo.has(r.unidade)).map((r) => ({ key: `estorno:${r.id}`, decisor: r.decidedByEmail })),
+    ...ajustes.filter((p) => unidadesDoGrupo.has(p.unidade)).map((p) => ({ key: `ajuste-fechamento:${p.id}`, decisor: p.decididoPorEmail })),
+    ...gerais.filter((s) => unidadesDoGrupo.has(s.unidade)).map((s) => ({ key: `${s.tipo}:${s.id}`, decisor: s.decididoPorEmail })),
+  ];
+  const chavesDoGrupo = new Set(cardsDoGrupo.map((c) => c.key));
+  const emailsEngajados = new Set(cardsDoGrupo.map((c) => c.decisor).filter(Boolean));
+  chats.forEach((m) => { if (chavesDoGrupo.has(m.cardKey) && m.autorEmail) emailsEngajados.add(m.autorEmail); });
+
+  const responsaveis = todos
+    .filter((u) => u.active !== false && (
+      u.role === 'master' ||
+      (u.isAdmin && (idsConfigurados.has(u.id) || emailsEngajados.has(u.email)))
+    ))
+    .map((u) => ({ id: u.id, email: u.email, papel: u.role === 'master' ? 'master' : 'admin' }));
+  res.json(responsaveis);
+});
+
+// relatorio (CSV/PDF) da tabela "Grupos cadastrados" de grupos.html
+app.get('/api/grupos/relatorio.:formato(csv|pdf)', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
+  const unidadesMapa = await construirUnidadesMapa();
+  const colunas = [
+    { key: 'nome', label: 'Nome' }, { key: 'unidades', label: 'Unidades' },
+    { key: 'canais', label: 'Canais de venda extras' }, { key: 'formas', label: 'Formas de pagamento extras' }, { key: 'kpis', label: 'KPIs extras' },
+  ];
+  const listaExtras = (lista) => (lista || []).map((k) => k.label).join(', ') || '—';
+  const linhas = (await grupos.list()).map((g) => ({
+    nome: g.nome,
+    unidades: (g.unidades || []).map((u) => unidadesMapa[u] || u).join(', ') || '—',
+    canais: listaExtras(g.canaisVendaExtras), formas: listaExtras(g.formasPagamentoExtras), kpis: listaExtras(g.kpisExtras),
+  }));
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('grupos')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Grupos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} grupo(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('grupos') });
+});
+
+app.post('/api/grupos', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await grupos.create(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/grupos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await grupos.update(req.params.id, req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/grupos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await grupos.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- Inventario (contagem fisica, recebimento de mercadoria e CMV -
+// por enquanto so as lojas Domino's, ver INVENTARIO_UNIDADES_NOMES acima).
+// Secao propria "inventario"; qualquer um com a secao pode lançar contagem/
+// recebimento/saida das unidades liberadas pra ele; editar catalogo e
+// excluir lançamento e Master-only, mesmo padrao do resto do app ----------
+function podeUnidadeInventario(req, unidade) {
+  return req.isMaster || (req.permissions.unidades || []).includes(unidade);
+}
+
+app.get('/api/inventario/unidades', requireSection('inventario'), (req, res) => {
+  const unidades = req.isMaster
+    ? Object.keys(INVENTARIO_UNIDADES_NOMES)
+    : (req.permissions.unidades || []).filter((u) => INVENTARIO_UNIDADES_NOMES[u]);
+  res.json(unidades.map((codigo) => ({ codigo, nome: INVENTARIO_UNIDADES_NOMES[codigo] })));
+});
+
+app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
+  res.json(await inventario.listCatalogo());
+});
+app.post('/api/inventario/catalogo', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.criarItem(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.put('/api/inventario/catalogo/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.atualizarItem(req.params.id, req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete('/api/inventario/catalogo/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await inventario.removerItem(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+// carrega o catalogo padrao extraido das planilhas do Domino's - idempotente
+// (so adiciona o que ainda nao existe pelo nome), pode ser chamado de novo
+// sem duplicar
+app.post('/api/inventario/catalogo/seed', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.seedCatalogoPadrao());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/recebimentos', requireSection('inventario'), async (req, res) => {
+  const todos = await inventario.listRecebimentos();
+  res.json(req.isMaster ? todos : todos.filter((r) => podeUnidadeInventario(req, r.unidade)));
+});
+app.post('/api/inventario/recebimentos', requireSection('inventario'), async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const registro = await inventario.criarRecebimento({ ...req.body, criadoPorId: req.user.id, criadoPorEmail: req.user.email });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete('/api/inventario/recebimentos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await inventario.removerRecebimento(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/saidas', requireSection('inventario'), async (req, res) => {
+  const todos = await inventario.listSaidas();
+  res.json(req.isMaster ? todos : todos.filter((s) => podeUnidadeInventario(req, s.unidade)));
+});
+app.post('/api/inventario/saidas', requireSection('inventario'), async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const registro = await inventario.criarSaida({ ...req.body, criadoPorId: req.user.id, criadoPorEmail: req.user.email });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete('/api/inventario/saidas/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await inventario.removerSaida(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/contagens', requireSection('inventario'), async (req, res) => {
+  const { unidade, data } = req.query;
+  if (!unidade || !data) return res.status(400).json({ error: 'Informe unidade e data.' });
+  if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  const registro = await inventario.getContagem(unidade, data);
+  res.json(registro || { unidade, data, contagens: {} });
+});
+app.put('/api/inventario/contagens', requireSection('inventario'), async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const registro = await inventario.upsertContagem({ ...req.body, criadoPorId: req.user.id, criadoPorEmail: req.user.email });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// motor de diferenca (esperado x real) + ranking de ofensores + CMV - ver
+// inventario.js/calcularDiferencas
+app.get('/api/inventario/diferencas', requireSection('inventario'), async (req, res) => {
+  try {
+    const { unidade, inicio, fim } = req.query;
+    if (!unidade || !inicio || !fim) return res.status(400).json({ error: 'Informe unidade, início e fim.' });
+    if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    res.json(await inventario.calcularDiferencas(unidade, inicio, fim));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/relatorio.:formato(csv|pdf)', requireSection('inventario'), async (req, res) => {
+  try {
+    const { unidade, inicio, fim } = req.query;
+    if (!unidade || !inicio || !fim) return res.status(400).json({ error: 'Informe unidade, início e fim.' });
+    if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const { ofensores } = await inventario.calcularDiferencas(unidade, inicio, fim);
+    const colunas = [
+      { key: 'itemNome', label: 'Item' }, { key: 'setor', label: 'Setor' },
+      { key: 'entradas', label: 'Entradas' }, { key: 'vendas', label: 'Vendas' }, { key: 'desperdicios', label: 'Desperdício' },
+      { key: 'diferencaQtd', label: 'Diferença (qtd)' }, { key: 'diferencaValor', label: 'Diferença (R$)' },
+    ];
+    const linhas = ofensores.map((o) => ({ ...o, setor: inventario.SETORES[o.setor] || o.setor, diferencaValor: reportUtil.fmtMoneyBR(o.diferencaValor) }));
+    const nomeArquivo = reportUtil.slugify(`inventario-diferencas-${unidade}`);
+    if (req.params.formato === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
+      return res.send(reportUtil.toCSV(colunas, linhas));
+    }
+    reportUtil.writePDF(res, {
+      titulo: 'Inventário - Diferenças (ofensores)',
+      subtitulo: `${INVENTARIO_UNIDADES_NOMES[unidade] || unidade} · ${reportUtil.fmtDataBR(inicio)} a ${reportUtil.fmtDataBR(fim)}`,
+      colunas, linhas, nomeArquivo,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ---------- sangria (retirada de caixa) registrada em campo, ao longo do
 // dia - pensado pra quem visita varias lojas (ex: supervisor) e nao ta
 // esperando o fechamento do dia sair pra lancar a retirada. Fica separado do
-// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos) ----------
-app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
+// fechamento e so e mesclado com ele na leitura (GET /api/fechamentos).
+// Secao propria "sangria" (independente de "lancamento") - permite liberar
+// alguem so pra registrar sangria, em unidades especificas, sem dar acesso
+// as demais secoes do Fechamento (Faturamento, Declarado, etc) ----------
+app.post('/api/sangrias', requireSection('sangria'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, grupo, data, valor, descricao } = req.body;
+    const { unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim, nomeDepositante, password } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    // 400, nao 401 - o wrapper global de fetch das paginas desloga em
+    // qualquer 401 (token invalido), e uma senha de confirmacao errada
+    // aqui nao significa que a sessao do usuario esta invalida
+    const senhaOk = await auth.verifyPassword(req.user.id, password);
+    if (!senhaOk) return res.status(400).json({ error: 'Senha incorreta.' });
     const registro = await sangrias.criar({
-      unidade, unidadeNome, grupo, data, valor, descricao,
+      unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim, nomeDepositante,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
+    broadcast('sangria-lancada', registro, 'sangria');
     broadcast('sangria-lancada', registro, 'lancamento');
     broadcast('sangria-lancada', registro, 'fechamentos');
     res.json(registro);
@@ -902,41 +1931,113 @@ app.post('/api/sangrias', requireSection('lancamento'), async (req, res) => {
   }
 });
 
-app.get('/api/sangrias/minhas', requireSection('lancamento'), async (req, res) => {
+app.get('/api/sangrias/minhas', requireSection('sangria'), async (req, res) => {
   if (req.isMaster) return res.json(await sangrias.listAll());
   res.json(await sangrias.listByUnidades(req.permissions.unidades || []));
 });
 
-app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), async (req, res) => {
+// edicao/exclusao direta - so o Master. A sangria so existe nessa colecao
+// (o fechamento so a enxerga mesclada na leitura), entao editar/excluir
+// aqui ja reflete automaticamente em qualquer lugar que mostra o
+// fechamento mesclado (fechamentos.html, "Faturamento" do dia, etc)
+app.patch('/api/sangrias/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await sangrias.atualizar(req.params.id, req.body);
+    broadcast('sangria-atualizada', registro, 'sangria');
+    broadcast('sangria-atualizada', registro, 'lancamento');
+    broadcast('sangria-atualizada', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/sangrias/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await sangrias.remover(req.params.id);
+    broadcast('sangria-excluida', { id: req.params.id }, 'sangria');
+    broadcast('sangria-excluida', { id: req.params.id }, 'lancamento');
+    broadcast('sangria-excluida', { id: req.params.id }, 'fechamentos');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// leitura somente-informativa da sangria de um dia/unidade especifico -
+// usada pelo formulario de Fechamento (secao "lancamento") pra mostrar a
+// saida de caixa ja registrada, sem dar acesso de criar/editar sangria (que
+// exige a secao "sangria" separada, ver rotas acima)
+app.get('/api/sangrias/do-dia', requireAnySection('lancamento', 'sangria'), async (req, res) => {
+  const { unidade, data } = req.query;
+  if (!unidade || !data) return res.status(400).json({ error: 'unidade e data são obrigatórios.' });
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+    return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  }
+  const todas = await sangrias.listByUnidades([unidade]);
+  res.json(todas.filter((s) => s.data === data));
+});
+
+app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), upload.array('anexos', 4), async (req, res) => {
   try {
     const atual = await fechamentosLive.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Fechamento não encontrado.' });
     if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'fechamento-edicoes');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
     const pedido = await fechamentosLive.solicitarEdicao({
       fechamentoId: req.params.id,
-      mudancas: req.body.mudancas,
-      motivo: req.body.motivo,
+      tipoCorrecao: payload.tipoCorrecao,
+      mudancas: payload.mudancas,
+      itemNovo: payload.itemNovo,
+      motivo: payload.motivo,
+      anexos,
       solicitadoPorId: req.user.id,
       solicitadoPorEmail: req.user.email,
+      direcionadoParaId: payload.direcionadoParaId,
+      direcionadoParaEmail: payload.direcionadoParaEmail,
     });
     broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
+    broadcast('fechamento-edicao-solicitada', pedido, 'solicitacoes');
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
+app.get('/api/fechamentos/edicoes/anexo/:edicaoId/:index', requireSection('lancamento'), async (req, res) => {
+  const pedido = await fechamentosLive.getEdicao(req.params.edicaoId);
+  if (!pedido) return res.sendStatus(404);
+  if (!req.isMaster && pedido.solicitadoPorId !== req.user.id) return res.sendStatus(404);
+  const anexo = pedido.anexos && pedido.anexos[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
+});
+
 // edicao direta de um lancamento - so o Master, sem passar pela fila de
 // aprovacao (ele mesmo e quem aprovaria, entao pedir pra si mesmo so
-// atrasaria); ainda assim fica registrado no historico do fechamento
-app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, res) => {
+// atrasaria); ainda assim fica registrado no historico do fechamento.
+// upload.any(): so entra em acao quando o Master troca o arquivo de um KPI
+// extra tipo "arquivo" (ver fechamentos.html/central-historico.html) -
+// requisicao JSON normal passa direto.
+app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, upload.any(), async (req, res) => {
   try {
+    const body = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const arquivosKpi = await uploadArquivosKpi(req.files, req.params.id);
+    const mudancasKpis = { ...(body.mudancasKpis || {}), ...arquivosKpi };
     const registro = await fechamentosLive.editarDireto({
       fechamentoId: req.params.id,
-      mudancas: req.body.mudancas,
-      motivo: req.body.motivo,
+      mudancas: body.mudancas,
+      mudancasKpis,
+      mudancasCanais: body.mudancasCanais,
+      mudancasFormas: body.mudancasFormas,
+      motivo: body.motivo,
       editadoPorEmail: req.user.email,
     });
     broadcast('fechamento-editado-direto', registro, 'lancamento');
@@ -947,15 +2048,47 @@ app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, async (req, 
   }
 });
 
+// serve o arquivo de um KPI extra tipo "arquivo" (ver grupos.js/lancamento.html)
+// - o valor gravado em kpisExtras[campo] E o caminho no Storage (nao um
+// numero), ver sanitizarMapaExtras em fechamentosLive.js
+function mimeGuess(caminho) {
+  const ext = String(caminho).split('.').pop().toLowerCase();
+  const mapa = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf' };
+  return mapa[ext] || 'application/octet-stream';
+}
+app.get('/api/fechamentos/:id/kpi-arquivo/:campo', requireAnySection('lancamento', 'fechamentos', 'solicitacoes'), async (req, res) => {
+  const fechamento = await fechamentosLive.getOne(req.params.id);
+  if (!fechamento) return res.sendStatus(404);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(fechamento.unidade)) return res.sendStatus(404);
+  const caminho = (fechamento.kpisExtras || {})[req.params.campo];
+  if (!caminho || typeof caminho !== 'string') return res.sendStatus(404);
+  storage.streamArquivo(caminho, mimeGuess(caminho), res);
+});
+
+// exclui um fechamento lançado de vez - so o Master. Vale so pra fechamentos
+// de verdade (lancados pelo app, tem criadoPorId) - linha vinda da planilha
+// importada ou de sangria mapeada nao existe como documento aqui, entao
+// simplesmente da erro "nao encontrado" se tentarem
+app.delete('/api/fechamentos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await fechamentosLive.remove(req.params.id);
+    broadcast('fechamento-excluido', { id: req.params.id }, 'lancamento');
+    broadcast('fechamento-excluido', { id: req.params.id }, 'fechamentos');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // fila de pedidos de correcao - so o Master decide (aprova/rejeita), mas quem
 // pediu pode acompanhar o status do proprio pedido
 app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, res) => {
   const todas = await fechamentosLive.listarEdicoes();
-  if (req.isMaster) return res.json(todas);
+  if (req.isMaster || req.isAdmin) return res.json(todas);
   res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
 });
 
-app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) => {
+app.patch('/api/fechamentos/edicoes/:id', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const pedido = await fechamentosLive.decidirEdicao(req.params.id, req.body.status, {
       decididoPorEmail: req.user.email,
@@ -963,10 +2096,386 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) =
     });
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    broadcast('fechamento-edicao-decidida', pedido, 'solicitacoes');
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// exclui so o PEDIDO de ajuste da fila - poder do Master de limpar a fila.
+// Se ja tinha sido aprovado, o fechamento em si nao e desfeito (ele ja foi
+// alterado quando decidirEdicao rodou); pra corrigir o fechamento depois
+// disso o Master usa /editar-direto normalmente.
+app.delete('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await fechamentosLive.removerEdicao(req.params.id);
+    broadcast('fechamento-edicao-decidida', { id: req.params.id, excluido: true }, 'solicitacoes');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- Compra / Manutenção / Suporte de TI (secao "solicitacoes") -
+// mesmo fluxo de fila-com-aprovacao do Estorno e do Ajuste de Fechamento,
+// so que pra pedidos que nao tem uma secao propria ja existente. Aprovar um
+// pedido de Suporte de TI ja cria o Chamado (ver chamadosTI.js) ----------
+app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, direcionadoParaId, direcionadoParaEmail } = payload;
+    if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(unidade || 'geral', file, 'solicitacoes');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const registro = await solicitacoes.create({
+      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+      direcionadoParaId,
+      direcionadoParaEmail,
+    });
+    broadcast('solicitacao-criada', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), async (req, res) => {
+  const registro = await solicitacoes.getOne(req.params.id);
+  if (!registro) return res.sendStatus(404);
+  if (!req.isMaster && !req.isAdmin && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
+  const anexo = registro.anexos && registro.anexos[Number(req.params.index)];
+  if (!anexo) return res.sendStatus(404);
+  storage.streamArquivo(anexo.path, anexo.tipo, res);
+});
+
+// aprovar/rejeitar - so o Master. Se for suporte-ti e for aprovado, ja cria
+// o Chamado vinculado (precisa escolher o tecnico no corpo da requisicao)
+app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const { status, motivoDecisao, tecnicoId, tecnicoEmail } = req.body;
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (status === 'APROVADO' && atual.tipo === 'suporte-ti' && !tecnicoId) {
+      return res.status(400).json({ error: 'Escolha o técnico responsável pelo chamado.' });
+    }
+    const registro = await solicitacoes.updateStatus(req.params.id, status, { motivoDecisao, decidedByEmail: req.user.email });
+
+    let chamado = null;
+    if (status === 'APROVADO' && atual.tipo === 'suporte-ti') {
+      chamado = await chamadosTI.create({
+        unidade: atual.unidade,
+        unidadeNome: atual.unidadeNome,
+        titulo: atual.titulo,
+        descricao: atual.observacao,
+        tecnicoId,
+        tecnicoEmail,
+        solicitacaoId: atual.id,
+        criadoPorEmail: req.user.email,
+      });
+      await solicitacoes.vincularChamado(atual.id, chamado.id);
+      broadcast('chamado-criado', chamado, 'tecnico');
+    }
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json({ ...registro, chamado });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// edicao/exclusao direta pelo Master - corrigir um dado errado no pedido
+// (titulo, valor, observacao, itens, unidade) ou remove-lo de vez da fila,
+// independente do status
+app.patch('/api/solicitacoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await solicitacoes.update(req.params.id, req.body);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/solicitacoes/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await solicitacoes.remove(req.params.id);
+    broadcast('solicitacao-decidida', { id: req.params.id, excluido: true }, 'solicitacoes');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// leitura unificada pra Central: junta Estorno (refunds.js) + Ajuste de
+// Fechamento (fechamentosLive.js) + Compra/Manutenção/Suporte de TI
+// (solicitacoes.js) num feed so, cada card ja normalizado no mesmo formato -
+// cada usuario ve exatamente o que veria nas rotas individuais de cada tipo
+// (Master ve tudo, loja ve so o que ela mesma pediu)
+function normalizarCard(tipo, r) {
+  if (tipo === 'estorno') {
+    const ehCliente = r.origem === 'cliente';
+    const titulo = ehCliente
+      ? `Estorno (cliente) · ${r.nomeCliente || 'sem nome informado'}`
+      : `Estorno · pedido ${r.pedidoId}`;
+    let observacao = r.observacao || '';
+    if (ehCliente) {
+      const linhas = [
+        `Motivo: ${r.motivoEstorno}${r.motivoOutro ? ' - ' + r.motivoOutro : ''}`,
+        `Valor da venda: ${fmtMoneyServer(r.valorVenda)} · Valor a estornar: ${fmtMoneyServer(r.valorEstornar)}`,
+        `Forma de pagamento: ${r.formaPagamento}${r.bandeira ? ' · ' + r.bandeira : ''}${r.ultimos4 ? ' final ' + r.ultimos4 : ''}`,
+        `Venda em ${r.dataVenda}${r.horaVenda ? ' às ' + r.horaVenda : ''}`,
+        r.telefoneCliente ? `Telefone do cliente: ${r.telefoneCliente}` : null,
+      ].filter(Boolean);
+      observacao = linhas.join('\n');
+    }
+    return {
+      ...r,
+      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome || r.unidade, status: r.status, criadoEm: r.criadoEm,
+      titulo, observacao, anexos: r.anexos || [], valorEstimado: null,
+      criadoPorId: r.requestedById, criadoPorEmail: r.requestedByEmail || (ehCliente ? 'pedido do cliente final' : ''),
+      motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decidedByEmail, decididoEm: r.decidedEm,
+      chamadoId: null,
+    };
+  }
+  if (tipo === 'ajuste-fechamento') {
+    const desc = r.tipoCorrecao === 'item'
+      ? `adicionar ${r.itemNovo?.tipo === 'maquininha' ? 'maquininha' : 'saída'} "${r.itemNovo?.descricao || ''}" (${fmtMoneyServer(r.itemNovo?.valor)})`
+      : `corrigir ${Object.keys(r.mudancas || {}).join(', ')}`;
+    return {
+      ...r,
+      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
+      titulo: `Ajuste de fechamento (${r.data}) - ${desc}`, observacao: r.motivo, anexos: r.anexos || [], valorEstimado: null,
+      criadoPorId: r.solicitadoPorId, criadoPorEmail: r.solicitadoPorEmail,
+      motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
+      chamadoId: null, fechamentoId: r.fechamentoId,
+    };
+  }
+  return {
+    ...r,
+    tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
+    titulo: r.titulo, observacao: r.observacao, anexos: r.anexos || [], valorEstimado: r.valorEstimado, itens: r.itens || [],
+    criadoPorId: r.criadoPorId, criadoPorEmail: r.criadoPorEmail,
+    motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
+    chamadoId: r.chamadoId,
+  };
+}
+function fmtMoneyServer(v) {
+  return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function todosCardsCentral(req) {
+  const [estornos, ajustes, gerais] = await Promise.all([
+    refunds.listAll(),
+    fechamentosLive.listarEdicoes(),
+    solicitacoes.listAll(),
+  ]);
+  let cards = [
+    ...estornos.map((r) => normalizarCard('estorno', r)),
+    ...ajustes.map((r) => normalizarCard('ajuste-fechamento', r)),
+    ...gerais.map((r) => normalizarCard(r.tipo, r)),
+  ];
+  if (!req.isMaster && !req.isAdmin) cards = cards.filter((c) => c.criadoPorId === req.user.id);
+  cards.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
+  return cards;
+}
+
+app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
+  res.json(await todosCardsCentral(req));
+});
+
+// busca o card cru (de qualquer um dos 3 modulos) so pra achar quem criou -
+// usado no gate de acesso do chat (dono do pedido, Master ou Admin)
+async function buscarCriadorCard(tipo, id) {
+  if (tipo === 'estorno') {
+    const r = await refunds.getOne(id);
+    return r && r.requestedById;
+  }
+  if (tipo === 'ajuste-fechamento') {
+    const r = await fechamentosLive.getEdicao(id);
+    return r && r.solicitadoPorId;
+  }
+  const r = await solicitacoes.getOne(id);
+  return r && r.criadoPorId;
+}
+
+// chat de uma solicitacao da Central - quem criou o pedido, Master ou Admin
+// podem ver/participar (pra Master/Admin questionar antes de aprovar, e pra
+// quem pediu poder responder)
+app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
+  try {
+    const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
+    if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (!req.isMaster && !req.isAdmin && criadoPorId !== req.user.id) return res.sendStatus(404);
+    res.json(await centralChat.listByCard(req.params.tipo, req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
+  try {
+    const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
+    if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (!req.isMaster && !req.isAdmin && criadoPorId !== req.user.id) return res.sendStatus(404);
+    const mensagem = await centralChat.addMessage({
+      tipo: req.params.tipo,
+      cardId: req.params.id,
+      autorId: req.user.id,
+      autorEmail: req.user.email,
+      texto: req.body.texto,
+    });
+    broadcast('central-chat-nova', mensagem, 'solicitacoes');
+    res.json(mensagem);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// sinaliza que um Master/Admin ja viu a notificacao (popup com som) de uma
+// solicitação nova - basta UM sinalizar pra ela parar de tocar/aparecer pros
+// outros tambem (ver mostrarNotificacaoSolicitacao em painel.html/
+// central-historico.html); nao decide a solicitação, so acusa recebimento
+app.post('/api/central/:tipo/:id/marcar-visto', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const { tipo, id } = req.params;
+    let registro;
+    if (tipo === 'estorno') registro = await refunds.marcarNotificacaoVista(id, { vistoPorEmail: req.user.email });
+    else if (tipo === 'ajuste-fechamento') registro = await fechamentosLive.marcarNotificacaoVistaEdicao(id, { vistoPorEmail: req.user.email });
+    else registro = await solicitacoes.marcarNotificacaoVista(id, { vistoPorEmail: req.user.email });
+    broadcast('central-notificacao-vista', { tipo, id, vistoPorEmail: req.user.email }, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// apagar mensagem - so o Master (nao o Admin, que so participa da conversa)
+app.delete('/api/central/:tipo/:id/chat/:messageId', auth.requireMaster, async (req, res) => {
+  try {
+    await centralChat.removeMessage(req.params.messageId);
+    broadcast('central-chat-removida', { tipo: req.params.tipo, cardId: req.params.id, messageId: req.params.messageId }, 'solicitacoes');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- relatorio (CSV/PDF) do quadro Kanban de central-historico.html -
+// mesmos filtros de loja/grupo/data ativos na tela ----------
+const ARCFOOD_UNIDADES_CODIGOS = new Set(['19821', '19855', '19888', '19889']);
+function grupoDaUnidadeServer(u) { return ARCFOOD_UNIDADES_CODIGOS.has(u) ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
+const TIPOS_CENTRAL_LABEL = { estorno: 'Estorno', 'ajuste-fechamento': 'Ajuste de fechamento', compra: 'Compra', manutencao: 'Manutenção', 'suporte-ti': 'Suporte de TI' };
+
+function filtrarCardsCentral(cards, req) {
+  const { unidade, grupo, dataDe, dataAte } = req.query;
+  return cards.filter((c) => {
+    const dataBrasilia = (c.criadoEm || '').slice(0, 10);
+    return (!unidade || c.unidade === unidade) &&
+      (!grupo || grupoDaUnidadeServer(c.unidade) === grupo) &&
+      (!dataDe || dataBrasilia >= dataDe) &&
+      (!dataAte || dataBrasilia <= dataAte);
+  });
+}
+
+function prepararRelatorioCentral(cards) {
+  const colunas = [
+    { key: 'tipo', label: 'Tipo' }, { key: 'unidade', label: 'Unidade' }, { key: 'titulo', label: 'Título' },
+    { key: 'status', label: 'Status' }, { key: 'criadoPor', label: 'Criado por' }, { key: 'criadoEm', label: 'Criado em' },
+    { key: 'decididoPor', label: 'Decidido por' }, { key: 'decididoEm', label: 'Decidido em' }, { key: 'motivoDecisao', label: 'Motivo da decisão' },
+  ];
+  const linhas = cards.map((c) => ({
+    tipo: TIPOS_CENTRAL_LABEL[c.tipo] || c.tipo, unidade: c.unidadeNome || c.unidade || '—', titulo: c.titulo || '—',
+    status: c.status, criadoPor: c.criadoPorEmail || '—', criadoEm: reportUtil.fmtDataHoraBR(c.criadoEm),
+    decididoPor: c.decididoPorEmail || '—', decididoEm: reportUtil.fmtDataHoraBR(c.decididoEm), motivoDecisao: c.motivoDecisao || '—',
+  }));
+  return { colunas, linhas };
+}
+
+app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes'), async (req, res) => {
+  const cards = filtrarCardsCentral(await todosCardsCentral(req), req);
+  const { colunas, linhas } = prepararRelatorioCentral(cards);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('central-solicitacoes')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, nomeArquivo: reportUtil.slugify('central-solicitacoes') });
+});
+
+// ---------- Chamados de TI (secao "tecnico") - o tecnico so ve os chamados
+// atribuidos a ele; Master ve/cria todos. Nasce vinculado a uma solicitacao
+// de Suporte de TI aprovada (rota acima) ou criado direto pelo Master ----------
+app.get('/api/chamados', requireSection('tecnico'), async (req, res) => {
+  const todos = await chamadosTI.listAll();
+  if (req.isMaster) return res.json(todos);
+  res.json(todos.filter((c) => c.tecnicoId === req.user.id));
+});
+
+app.post('/api/chamados', auth.requireMaster, async (req, res) => {
+  try {
+    const { unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail } = req.body;
+    const chamado = await chamadosTI.create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, criadoPorEmail: req.user.email });
+    broadcast('chamado-criado', chamado, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// check-in: tecnico chegou na loja, registra as fotos de "como esta antes"
+app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('fotosAntes', 6), async (req, res) => {
+  try {
+    const fotosAntes = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-antes');
+      fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosTI.iniciar(req.params.id, { fotosAntes, tecnicoId: req.user.id });
+    broadcast('chamado-atualizado', chamado, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// finalizar: fotos do "depois", observacao do que foi feito e pecas compradas (se precisou)
+app.post('/api/chamados/:id/concluir', requireSection('tecnico'), upload.array('fotosDepois', 6), async (req, res) => {
+  try {
+    const payload = JSON.parse(req.body.payload || '{}');
+    const fotosDepois = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-depois');
+      fotosDepois.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosTI.concluir(req.params.id, {
+      fotosDepois,
+      observacaoTecnico: payload.observacaoTecnico,
+      pecas: payload.pecas,
+      tecnicoId: req.user.id,
+    });
+    broadcast('chamado-atualizado', chamado, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/chamados/foto/:chamadoId/:campo/:index', requireSection('tecnico'), async (req, res) => {
+  const chamado = await chamadosTI.getOne(req.params.chamadoId);
+  if (!chamado) return res.sendStatus(404);
+  if (!req.isMaster && chamado.tecnicoId !== req.user.id) return res.sendStatus(404);
+  const campo = ['fotosAntes', 'fotosDepois'].includes(req.params.campo) ? req.params.campo : null;
+  if (!campo) return res.status(400).end();
+  const foto = chamado[campo] && chamado[campo][Number(req.params.index)];
+  if (!foto) return res.sendStatus(404);
+  storage.streamArquivo(foto.path, foto.tipo, res);
 });
 
 // ---------- entregas (motoboys) - substitui o app de entregas do AppSheet ----------
@@ -1051,6 +2560,122 @@ app.get('/api/entregas', requireSection('entregas'), async (req, res) => {
   res.json(auth.filterByUnidade(req, [...entregasHistoricoData, ...(await entregasLive.listAll())]));
 });
 
+// ---------- relatorios (CSV/PDF) do dashboard de Entregas: Por entregador,
+// Por unidade, Lançamentos - mesmos 3 paineis de entregas.html, com os
+// mesmos filtros de periodo/unidades ativos na tela ----------
+function filtrarEntregasPeriodo(lista, req) {
+  const { inicio, fim, unidades } = req.query;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  return lista.filter((d) =>
+    (!unidadesSet || unidadesSet.has(d.unidade)) &&
+    (!inicio || (d.data || '') >= inicio) &&
+    (!fim || (d.data || '') <= fim)
+  );
+}
+function unidadeNomeEntrega(d) { return d.unidadeNome || d.unidade || '—'; }
+
+function prepararEntregasPorEntregador(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unidade' }, { key: 'entregador', label: 'Nome' }, { key: 'quant', label: 'Quant.' },
+    { key: 'valor', label: 'Valor' }, { key: 'ajudaCusto', label: 'Ajuda de Custo' }, { key: 'entrega', label: 'Entrega' },
+    { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' }, { key: 'bonus', label: 'Valor Gami' },
+    { key: 'foraDeArea', label: 'Fora de Área' }, { key: 'coopRecebe', label: 'COOP recebe' }, { key: 'tm', label: 'TM' },
+  ];
+  const porEntregador = {};
+  rows.forEach((r) => {
+    const chave = r.entregador + '::' + r.unidade;
+    const c = (porEntregador[chave] ||= { entregador: r.entregador, unidade: unidadeNomeEntrega(r), entrega: 0, retorno: 0, extra: 0, foraDeArea: 0, ajudaCusto: 0, bonus: 0, valor: 0, coopRecebe: 0 });
+    c.entrega += r.entrega || 0; c.retorno += r.retorno || 0; c.extra += r.extra || 0; c.foraDeArea += r.foraDeArea || 0;
+    c.ajudaCusto += r.ajudaCusto || 0; c.bonus += r.bonus || 0; c.valor += r.valor || 0; c.coopRecebe += r.coopRecebe || 0;
+  });
+  const linhas = Object.values(porEntregador).sort((a, b) => b.valor - a.valor).map((c) => ({
+    unidade: c.unidade, entregador: c.entregador, quant: c.entrega + c.extra + c.retorno,
+    valor: reportUtil.fmtMoneyBR(c.valor), ajudaCusto: reportUtil.fmtMoneyBR(c.ajudaCusto),
+    entrega: c.entrega, retorno: c.retorno, extra: c.extra, bonus: reportUtil.fmtMoneyBR(c.bonus),
+    foraDeArea: c.foraDeArea, coopRecebe: reportUtil.fmtMoneyBR(c.coopRecebe),
+    tm: reportUtil.fmtMoneyBR(c.entrega ? c.valor / c.entrega : 0),
+  }));
+  return { colunas, linhas };
+}
+
+function prepararEntregasPorUnidade(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unid.' }, { key: 'corridas', label: 'Corridas' }, { key: 'entrega', label: 'Entregas' },
+    { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' }, { key: 'foraDeArea', label: 'Fora área' },
+    { key: 'bonus', label: 'Bônus' }, { key: 'ajudaCusto', label: 'Ajuda custo' },
+    { key: 'valor', label: 'Valor pago' }, { key: 'coopRecebe', label: 'COOP recebe' }, { key: 'tm', label: 'TM' },
+  ];
+  const porUnidade = {};
+  rows.forEach((r) => {
+    const c = (porUnidade[r.unidade] ||= { nome: unidadeNomeEntrega(r), corridas: 0, entrega: 0, retorno: 0, extra: 0, foraDeArea: 0, bonus: 0, ajudaCusto: 0, valor: 0, coopRecebe: 0 });
+    c.corridas++; c.entrega += r.entrega || 0; c.retorno += r.retorno || 0; c.extra += r.extra || 0;
+    c.foraDeArea += r.foraDeArea || 0; c.bonus += r.bonus || 0; c.ajudaCusto += r.ajudaCusto || 0;
+    c.valor += r.valor || 0; c.coopRecebe += r.coopRecebe || 0;
+  });
+  const linhas = Object.values(porUnidade).sort((a, b) => b.valor - a.valor).map((c) => ({
+    unidade: c.nome, corridas: c.corridas, entrega: c.entrega, retorno: c.retorno, extra: c.extra, foraDeArea: c.foraDeArea,
+    bonus: reportUtil.fmtMoneyBR(c.bonus), ajudaCusto: reportUtil.fmtMoneyBR(c.ajudaCusto),
+    valor: reportUtil.fmtMoneyBR(c.valor), coopRecebe: reportUtil.fmtMoneyBR(c.coopRecebe),
+    tm: reportUtil.fmtMoneyBR(c.entrega ? c.valor / c.entrega : 0),
+  }));
+  return { colunas, linhas };
+}
+
+function prepararEntregasLancamentos(rows) {
+  const colunas = [
+    { key: 'data', label: 'Data' }, { key: 'unidade', label: 'Unid.' }, { key: 'entregador', label: 'Entregador' },
+    { key: 'entrega', label: 'Entregas' }, { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' },
+    { key: 'pos00hs', label: 'Pos 00hs' }, { key: 'foraDeArea', label: 'Fora área' }, { key: 'bonus', label: 'Bônus' },
+    { key: 'ajudaCusto', label: 'Ajuda custo' }, { key: 'valor', label: 'Valor' }, { key: 'coopRecebe', label: 'COOP' },
+    { key: 'quantTotal', label: 'Qtd. total' }, { key: 'observacao', label: 'Observação' },
+  ];
+  const linhas = [...rows].sort((a, b) => (b.data || '').localeCompare(a.data || '')).map((d) => ({
+    data: reportUtil.fmtDataBR(d.data), unidade: unidadeNomeEntrega(d), entregador: d.entregador || '—',
+    entrega: d.entrega || 0, retorno: d.retorno || 0, extra: d.extra || 0, pos00hs: d.pos00hs || 0, foraDeArea: d.foraDeArea || 0,
+    bonus: reportUtil.fmtMoneyBR(d.bonus), ajudaCusto: reportUtil.fmtMoneyBR(d.ajudaCusto),
+    valor: reportUtil.fmtMoneyBR(d.valor), coopRecebe: reportUtil.fmtMoneyBR(d.coopRecebe),
+    quantTotal: d.quantTotal || 0, observacao: d.observacao || '—',
+  }));
+  return { colunas, linhas };
+}
+
+async function todasEntregasPermitidas(req) {
+  return auth.filterByUnidade(req, [...entregasHistoricoData, ...(await entregasLive.listAll())]);
+}
+
+app.get('/api/entregas/relatorio-entregadores.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
+  const rows = filtrarEntregasPeriodo(await todasEntregasPermitidas(req), req);
+  const { colunas, linhas } = prepararEntregasPorEntregador(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-por-entregador')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Entregas · Por Entregador', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} entregador(es)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-por-entregador') });
+});
+
+app.get('/api/entregas/relatorio-unidades.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
+  const rows = filtrarEntregasPeriodo(await todasEntregasPermitidas(req), req);
+  const { colunas, linhas } = prepararEntregasPorUnidade(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-por-unidade')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Entregas · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-por-unidade') });
+});
+
+app.get('/api/entregas/relatorio-lancamentos.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
+  const rows = filtrarEntregasPeriodo(await todasEntregasPermitidas(req), req);
+  const { colunas, linhas } = prepararEntregasLancamentos(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-lancamentos')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Entregas · Lançamentos', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} lançamento(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-lancamentos') });
+});
+
 app.get('/api/entregas/etiqueta/:id', (req, res, next) => {
   if (!req.isMaster && !auth.hasSection(req, 'entregas') && !auth.hasSection(req, 'entregas-lancamento')) {
     return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
@@ -1121,6 +2746,94 @@ app.patch('/api/entregas/edicoes/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
+// ---------- vendas do iFood (secao "ifood") ----------
+// so leitura - dados financeiros da Sales API do iFood (nao tem lançamento
+// manual nem edição, diferente de Fechamentos/Entregas), sincronizados
+// periodicamente por ifoodSync (ver boot mais abaixo). Mesmo espaco de
+// "unidade" das outras seções (o merchantId do iFood vira o código
+// filtrado por permissao, igual FECHAMENTO_UNIDADES_NOMES/ENTREGAS_UNIDADES_NOMES).
+app.get('/api/ifood/vendas', requireSection('ifood'), async (req, res) => {
+  res.json(auth.filterByUnidade(req, await ifoodStore.listAllCached()));
+});
+
+// ---------- relatorios (CSV/PDF) do dashboard de iFood: Por unidade, Vendas -
+// mesmos 2 paineis de ifood.html, com os mesmos filtros de periodo/unidades
+// ativos na tela ----------
+function filtrarVendasIfoodPeriodo(lista, req) {
+  const { inicio, fim, unidades } = req.query;
+  const unidadesSet = unidades ? new Set(String(unidades).split(',').filter(Boolean)) : null;
+  return lista.filter((d) => {
+    const dataVenda = (d.dataHora || '').slice(0, 10);
+    return (!unidadesSet || unidadesSet.has(d.unidade)) &&
+      (!inicio || dataVenda >= inicio) &&
+      (!fim || dataVenda <= fim);
+  });
+}
+
+function prepararIfoodPorUnidade(rows) {
+  const colunas = [
+    { key: 'unidade', label: 'Unid.' }, { key: 'vendas', label: 'Vendas' }, { key: 'bruto', label: 'Valor bruto' },
+    { key: 'comissao', label: 'Comissão' }, { key: 'liquido', label: 'Valor líquido' }, { key: 'tm', label: 'Ticket médio' },
+  ];
+  const porUnidade = {};
+  rows.forEach((r) => {
+    const c = (porUnidade[r.unidade] ||= { vendas: 0, bruto: 0, comissao: 0, liquido: 0 });
+    c.vendas++; c.bruto += r.valorBruto || 0; c.comissao += r.taxaComissao || 0; c.liquido += r.valorLiquido || 0;
+  });
+  const linhas = Object.entries(porUnidade).sort((a, b) => b[1].bruto - a[1].bruto).map(([u, c]) => ({
+    unidade: ifoodClient.IFOOD_UNIDADES_NOMES[u] || u, vendas: c.vendas, bruto: reportUtil.fmtMoneyBR(c.bruto),
+    comissao: reportUtil.fmtMoneyBR(c.comissao), liquido: reportUtil.fmtMoneyBR(c.liquido),
+    tm: reportUtil.fmtMoneyBR(c.vendas ? c.bruto / c.vendas : 0),
+  }));
+  return { colunas, linhas };
+}
+
+function prepararIfoodVendas(rows) {
+  const colunas = [
+    { key: 'data', label: 'Data' }, { key: 'unidade', label: 'Unid.' }, { key: 'numeroPedido', label: 'Nº pedido' },
+    { key: 'bruto', label: 'Valor bruto' }, { key: 'comissao', label: 'Comissão' }, { key: 'liquido', label: 'Valor líquido' },
+    { key: 'formaPagamento', label: 'Forma pagto' }, { key: 'status', label: 'Status' },
+  ];
+  const linhas = [...rows].sort((a, b) => (b.dataHora || '').localeCompare(a.dataHora || '')).map((d) => ({
+    data: reportUtil.fmtDataHoraBR(d.dataHora), unidade: ifoodClient.IFOOD_UNIDADES_NOMES[d.unidade] || d.unidade || '—',
+    numeroPedido: d.numeroPedido || '—', bruto: reportUtil.fmtMoneyBR(d.valorBruto), comissao: reportUtil.fmtMoneyBR(d.taxaComissao),
+    liquido: reportUtil.fmtMoneyBR(d.valorLiquido), formaPagamento: d.formaPagamento || '—', status: d.status || '—',
+  }));
+  return { colunas, linhas };
+}
+
+app.get('/api/ifood/relatorio-unidades.:formato(csv|pdf)', requireSection('ifood'), async (req, res) => {
+  const rows = filtrarVendasIfoodPeriodo(auth.filterByUnidade(req, await ifoodStore.listAllCached()), req);
+  const { colunas, linhas } = prepararIfoodPorUnidade(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('ifood-por-unidade')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'iFood · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('ifood-por-unidade') });
+});
+
+app.get('/api/ifood/relatorio-vendas.:formato(csv|pdf)', requireSection('ifood'), async (req, res) => {
+  const rows = filtrarVendasIfoodPeriodo(auth.filterByUnidade(req, await ifoodStore.listAllCached()), req);
+  const { colunas, linhas } = prepararIfoodVendas(rows);
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('ifood-vendas')}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'iFood · Vendas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} venda(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('ifood-vendas') });
+});
+
+app.get('/api/ifood/sincronizacao', requireSection('ifood'), (req, res) => {
+  res.json(ifoodSync.getStatus());
+});
+
+// forca uma sincronizacao imediata - so o Master (evita chamadas extras na API do iFood sem necessidade)
+app.post('/api/ifood/sincronizar', auth.requireMaster, async (req, res) => {
+  const status = await ifoodSync.sincronizarVendasIfood();
+  res.json(status);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // mensagens amigaveis pros erros mais comuns de upload (arquivo grande demais,
@@ -1138,12 +2851,26 @@ app.use((err, req, res, next) => {
 });
 
 (async () => {
-  await store.init(); // carrega o historico do Firestore antes de aceitar trafego
-  await auth.ensureMaster(); // garante que existe um acesso Master pra logar
+  try {
+    await store.init(); // carrega o historico do Firestore antes de aceitar trafego
+  } catch (err) {
+    // se o Firestore estiver temporariamente indisponivel (ex: cota
+    // estourada, RESOURCE_EXHAUSTED) o app ainda sobe com o cache vazio
+    // (em vez de nao subir de jeito nenhum) - assim que o Firestore
+    // normalizar, as proximas leituras/gravacoes voltam a funcionar
+    // sozinhas, sem precisar de um redeploy manual.
+    console.error('Falha ao carregar historico do Firestore no boot (app sobe mesmo assim, com cache vazio):', err.message);
+  }
+  try {
+    await auth.ensureMaster(); // garante que existe um acesso Master pra logar
+  } catch (err) {
+    console.error('Falha ao garantir usuario Master no boot:', err.message);
+  }
 
   app.listen(PORT, async () => {
     console.log(`Zenith Ops rodando em http://localhost:${PORT}`);
     console.log(`Webhook: POST http://localhost:${PORT}/webhooks/adyen`);
+
     const contas = Object.keys(HMAC_KEYS);
     if (contas.length) console.log(`HMAC configurada para: ${contas.join(', ')}`);
     else if (!LEGACY_HMAC_KEY) console.warn('AVISO: nenhuma ADYEN_HMAC_KEYS/ADYEN_HMAC_KEY configurada - assinatura nao esta sendo verificada.');
@@ -1174,5 +2901,16 @@ app.use((err, req, res, next) => {
     // mesma logica pro historico de entregas (planilha "MOTOS BRAVO" do AppSheet)
     sincronizarPlanilhaEntregas();
     setInterval(sincronizarPlanilhaEntregas, intervaloSync);
+
+    // sincroniza as vendas do iFood (Sales API - so leitura, ver
+    // server/ifoodClient.js): roda no start e depois periodicamente. Padrao
+    // bem mais espaçado que o Sheets Sync (1h) porque a Sales API e um
+    // relatorio financeiro que so fecha de vez em D+1/D+2 - nao ha ganho em
+    // consultar com mais frequencia que isso.
+    ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
+    const intervaloIfood = Number(process.env.IFOOD_SYNC_INTERVAL_MS) || 60 * 60 * 1000;
+    setInterval(() => {
+      ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
+    }, intervaloIfood);
   });
 })();

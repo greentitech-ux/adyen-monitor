@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Central de Solicitações · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;overflow-x:hidden;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .form-wrap{max-width:640px;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-add:hover{border-color:var(--accent);}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+  .tipos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .tipo-btn{font-family:var(--sans);font-size:12px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .tipo-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .link-cliente-box{background:var(--panel2);border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+  .link-cliente-titulo{font-size:12.5px;font-weight:600;margin-bottom:4px;}
+  .link-cliente-sub{font-size:11.5px;color:var(--muted);line-height:1.4;margin-bottom:8px;}
+  .btn-link-cliente{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 12px;border-radius:8px;border:none;background:var(--accent);color:#06202b;cursor:pointer;width:100%;}
+  #link-cliente-msg{margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--ok);word-break:break-all;}
+  .hero{max-width:640px;text-align:center;padding:36px 20px;}
+  .hero .icone{font-size:34px;margin-bottom:10px;}
+  .hero p{color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 18px;}
+  .hero-acoes{display:flex;flex-direction:column;gap:10px;max-width:340px;margin:0 auto;}
+  .sucesso-box{text-align:center;padding:20px 6px;}
+  .sucesso-box .icone{font-size:32px;margin-bottom:8px;}
+  .sucesso-acoes{display:flex;gap:8px;margin-top:14px;}
+  .sucesso-acoes .btn-primary{margin-top:0;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Central de Solicitações</h1>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back active" id="nav-solicitacoes-self" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso à Central de Solicitações. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<div class="panel hero">
+  <div class="icone">📋</div>
+  <h2 style="font-size:16px;">Lançar uma solicitação</h2>
+  <p>Estorno, compra, manutenção, suporte de TI ou ajuste de fechamento — escolha o tipo, preencha os dados e envie. Acompanhamento e aprovação ficam no Histórico.</p>
+  <div class="hero-acoes">
+    <button type="button" class="btn-primary" style="margin-top:0;" onclick="abrirModalNova()">+ Nova solicitação</button>
+    <a class="back" href="/central-historico.html">📜 Ver histórico de solicitações</a>
+  </div>
+</div>
+
+</div><!-- /#root -->
+
+<div class="overlay hidden" id="overlay-nova">
+  <div class="sheet">
+    <h3>Nova solicitação</h3>
+    <div class="tipos" id="tipos-btns"></div>
+
+    <form id="form-nova">
+      <div id="campos-comuns">
+        <label>Unidade</label>
+        <select id="f-unidade" required></select>
+        <label>Direcionar para (opcional)</label>
+        <select id="f-direcionado">
+          <option value="">Qualquer Master/Admin do grupo</option>
+        </select>
+      </div>
+
+      <!-- ESTORNO -->
+      <div id="campos-estorno" class="hidden">
+        <div class="link-cliente-box">
+          <div class="link-cliente-titulo">📱 Prefere que o cliente mesmo preencha?</div>
+          <div class="link-cliente-sub">Gera um link (com a loja selecionada acima já pré-preenchida) pra mandar pelo WhatsApp - o cliente preenche os dados e anexa o comprovante sozinho, sem precisar de acesso ao sistema.</div>
+          <button type="button" class="btn-link-cliente" onclick="copiarLinkCliente()">🔗 Copiar link pro cliente</button>
+          <div id="link-cliente-msg" class="hidden"></div>
+        </div>
+        <label>Nº do pedido (pspReference/merchantReference)</label>
+        <input type="text" id="e-pedidoId">
+        <label>Observação (motivo do estorno)</label>
+        <textarea id="e-observacao"></textarea>
+        <label>Sua senha (confirmação)</label>
+        <input type="password" id="e-senha" autocomplete="current-password">
+      </div>
+
+      <!-- AJUSTE DE FECHAMENTO -->
+      <div id="campos-ajuste" class="hidden">
+        <label>Qual fechamento?</label>
+        <select id="a-fechamento"></select>
+        <label>Tipo de correção</label>
+        <div class="tipos">
+          <button type="button" class="tipo-btn active" data-tipocorrecao="campo" onclick="selecionarTipoCorrecao('campo')">Corrigir um campo</button>
+          <button type="button" class="tipo-btn" data-tipocorrecao="item" onclick="selecionarTipoCorrecao('item')">Adicionar item esquecido</button>
+        </div>
+        <div id="ajuste-campo">
+          <label>Qual campo</label>
+          <select id="a-campo"></select>
+          <label>Valor correto</label>
+          <input type="number" step="0.01" id="a-valor">
+        </div>
+        <div id="ajuste-item" class="hidden">
+          <label>O que foi esquecido</label>
+          <div class="tipos">
+            <button type="button" class="tipo-btn active" data-itemtipo="maquininha" onclick="selecionarItemTipo('maquininha')">Maquininha</button>
+            <button type="button" class="tipo-btn" data-itemtipo="saida" onclick="selecionarItemTipo('saida')">Saída de dinheiro</button>
+          </div>
+          <label>Descrição</label>
+          <input type="text" id="a-item-descricao" placeholder="ex: Maquininha Cielo extra">
+          <label>Valor</label>
+          <input type="number" step="0.01" id="a-item-valor">
+        </div>
+        <label>Motivo da correção</label>
+        <textarea id="a-motivo" placeholder="explique o que aconteceu"></textarea>
+      </div>
+
+      <!-- COMPRA / MANUTENCAO / SUPORTE TI -->
+      <div id="campos-gerais" class="hidden">
+        <label id="g-titulo-label">Título</label>
+        <input type="text" id="g-titulo" placeholder="ex: comprar papel térmico">
+        <div id="compra-itens" class="secao hidden" style="border-top:none;margin-top:10px;padding-top:0;">
+          <div class="secao-titulo">Itens da compra</div>
+          <div class="sub" style="margin:-2px 0 8px;">O que precisa comprar, item por item, com a quantidade de cada um.</div>
+          <div id="lista-itens-compra"></div>
+          <button type="button" class="btn-add" onclick="adicionarItemCompra()">+ Adicionar item</button>
+        </div>
+        <div id="wrap-g-observacao">
+          <label>Observação</label>
+          <textarea id="g-observacao" placeholder="detalhe o que precisa"></textarea>
+        </div>
+        <div id="wrap-g-valor">
+          <label id="g-valor-label">Valor estimado (opcional)</label>
+          <input type="number" step="0.01" id="g-valor">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+          <input type="checkbox" id="g-orcamento" style="width:auto;">
+          <label for="g-orcamento" style="margin:0;font-weight:normal;">É um orçamento (precisa de aprovação de um Admin antes de seguir)</label>
+        </div>
+      </div>
+
+      <div id="campos-anexo">
+        <label>Anexar foto/arquivo (opcional)</label>
+        <input type="file" id="f-anexos" multiple accept="image/*,application/pdf">
+      </div>
+
+      <div class="msg hidden" id="msg-nova"></div>
+      <button class="btn-primary" type="submit" id="btn-nova">Enviar solicitação</button>
+      <button class="link-btn" type="button" style="margin-top:12px;" onclick="fecharModalNova()">Cancelar</button>
+    </form>
+
+    <div id="sucesso-nova" class="sucesso-box hidden">
+      <div class="icone">✅</div>
+      <h3>Solicitação enviada!</h3>
+      <p class="sub" style="font-family:var(--sans);color:var(--muted);">Ela já está na fila de aprovação, disponível no Histórico.</p>
+      <div class="sucesso-acoes">
+        <button type="button" class="btn-primary" onclick="lancarOutra()">+ Lançar outra</button>
+        <a class="back" href="/central-historico.html">📜 Ver histórico</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+function abrirModalNova(){
+  document.getElementById('form-nova').classList.remove('hidden');
+  document.getElementById('sucesso-nova').classList.add('hidden');
+  document.getElementById('overlay-nova').classList.remove('hidden');
+}
+function fecharModalNova(){ document.getElementById('overlay-nova').classList.add('hidden'); }
+function lancarOutra(){
+  document.getElementById('sucesso-nova').classList.add('hidden');
+  document.getElementById('form-nova').classList.remove('hidden');
+}
+
+const ARCFOOD_UNIDADES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
+const BRAVO_UNIDADES_NOMES = {
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dom Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+};
+const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
+
+// Delivery/Carryout/.../Outros, TC e Cancelados nao sao mais campos fixos -
+// cada loja so tem os campos que o grupo dela define em /grupos.html (ver
+// lancamento.html), entao nao fazem mais sentido aqui como opcao fixa de
+// correcao pra qualquer loja
+const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','adyen','totalSaida','quebra','entradaDinheiro','deposito'];
+const NOMES_CAMPOS = { caixaInicial:'Caixa inicial', caixaFinal:'Caixa final', adyen:'Maquininhas (total)', totalSaida:'Total de saída', quebra:'Quebra de caixa', entradaDinheiro:'Entrada em dinheiro', deposito:'Depósito' };
+
+const TIPOS_INFO = {
+  'estorno': { label:'Estorno', secaoNecessaria:'monitor' },
+  'ajuste-fechamento': { label:'Ajuste de fechamento', secaoNecessaria:'lancamento' },
+  'compra': { label:'Compra', secaoNecessaria:null },
+  'manutencao': { label:'Manutenção', secaoNecessaria:null },
+  'suporte-ti': { label:'Suporte de TI', secaoNecessaria:null },
+};
+
+let ME = null;
+let IS_MASTER = false;
+let SECOES = [];
+let MEUS_FECHAMENTOS = [];
+let TIPO_SELECIONADO = 'compra';
+let TIPO_CORRECAO = 'campo';
+let ITEM_TIPO = 'maquininha';
+let ITENS_COMPRA = [];
+let SEQ_ITEM_COMPRA = 0;
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function iconeTipo(tipo){
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻' }[tipo] || '📋';
+}
+
+// monta o link do formulario publico de estorno (server/public/estorno-cliente.html)
+// com a loja ja selecionada no formulario interno, pra mandar pro cliente
+// preencher sozinho (WhatsApp etc) - ver tambem o ?unidade= lido la
+async function copiarLinkCliente(){
+  const unidade = document.getElementById('f-unidade').value;
+  const url = location.origin + '/estorno-cliente.html' + (unidade ? ('?unidade=' + encodeURIComponent(unidade)) : '');
+  const msg = document.getElementById('link-cliente-msg');
+  try{
+    await navigator.clipboard.writeText(url);
+    msg.textContent = (unidade ? '✅ Link copiado (loja já vem selecionada): ' : '✅ Link copiado (cliente escolhe a loja): ') + url;
+  }catch(e){
+    msg.textContent = 'Não deu pra copiar automático, mas aqui está o link: ' + url;
+  }
+  msg.classList.remove('hidden');
+}
+
+// lista de Master/Admin responsaveis pelo grupo da unidade escolhida - pra
+// quem esta lançando poder direcionar a solicitação pra alguém específico
+// do próprio grupo de lojas (ver GET /api/grupos/responsaveis em index.js)
+async function carregarResponsaveis(){
+  const unidade = document.getElementById('f-unidade').value;
+  const sel = document.getElementById('f-direcionado');
+  sel.innerHTML = '<option value="">Qualquer Master/Admin do grupo</option>';
+  if(!unidade) return;
+  try{
+    const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(unidade)).then(r=>r.json());
+    lista.forEach(u=>{
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.dataset.email = u.email;
+      opt.textContent = u.email + (u.papel==='master' ? ' (Master)' : ' (Admin)');
+      sel.appendChild(opt);
+    });
+  }catch(e){ /* mantem só a opção padrão */ }
+}
+
+function selecionarTipo(tipo){
+  TIPO_SELECIONADO = tipo;
+  document.querySelectorAll('#tipos-btns .tipo-btn').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
+  document.getElementById('campos-estorno').classList.toggle('hidden', tipo!=='estorno');
+  document.getElementById('campos-ajuste').classList.toggle('hidden', tipo!=='ajuste-fechamento');
+  document.getElementById('campos-gerais').classList.toggle('hidden', !['compra','manutencao','suporte-ti'].includes(tipo));
+  document.getElementById('campos-comuns').classList.toggle('hidden', tipo==='ajuste-fechamento');
+  document.getElementById('compra-itens').classList.toggle('hidden', tipo!=='compra');
+  if(tipo==='compra') renderItensCompra();
+  const labels = {
+    compra:['Título','O que precisa comprar','Valor estimado (opcional)'],
+    manutencao:['Solicitação','O que precisa de manutenção','Valor (opcional - orçamento de terceiro)'],
+    'suporte-ti':['Solicitação','Qual o problema','Valor (opcional - orçamento de terceiro)'],
+  };
+  if(labels[tipo]){
+    document.getElementById('g-titulo-label').textContent = labels[tipo][0];
+    document.getElementById('g-titulo').placeholder = labels[tipo][1];
+    document.getElementById('g-valor-label').textContent = labels[tipo][2];
+  }
+  // compra: Itens > Valor > Observação (valor logo depois dos itens).
+  // manutencao/suporte-ti: sem itens, Solicitação > Observação > Valor
+  // (valor no fim, so pra quando vira orcamento de terceiro).
+  const wrapValor = document.getElementById('wrap-g-valor');
+  const wrapObs = document.getElementById('wrap-g-observacao');
+  if(tipo==='compra') wrapValor.parentNode.insertBefore(wrapValor, wrapObs);
+  else wrapObs.parentNode.insertBefore(wrapObs, wrapValor);
+  if(tipo==='ajuste-fechamento') montarSelectFechamento();
+}
+
+// ---------- linhas repetíveis: itens da compra (nome + quantidade, mesmo
+// padrão de Maquininhas/Saídas do lançamento - so que quantidade no lugar
+// do valor, ja que aqui e uma lista do que precisa comprar) ----------
+function adicionarItemCompra(){
+  ITENS_COMPRA.push({ id: ++SEQ_ITEM_COMPRA, descricao:'', quantidade:'' });
+  renderItensCompra();
+}
+function removerItemCompra(id){ ITENS_COMPRA = ITENS_COMPRA.filter(i=>i.id!==id); renderItensCompra(); }
+function renderItensCompra(){
+  document.getElementById('lista-itens-compra').innerHTML = ITENS_COMPRA.map(i=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(i.descricao)}" oninput="ITENS_COMPRA.find(x=>x.id===${i.id}).descricao=this.value" placeholder="nome do item">
+      <input type="number" step="1" min="0" value="${i.quantidade}" oninput="ITENS_COMPRA.find(x=>x.id===${i.id}).quantidade=this.value" placeholder="qtd.">
+      <button type="button" class="btn-remover" onclick="removerItemCompra(${i.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum item adicionado.</div>';
+}
+
+function selecionarTipoCorrecao(tipo){
+  TIPO_CORRECAO = tipo;
+  document.querySelectorAll('#campos-ajuste [data-tipocorrecao]').forEach(b=>b.classList.toggle('active', b.dataset.tipocorrecao===tipo));
+  document.getElementById('ajuste-campo').classList.toggle('hidden', tipo!=='campo');
+  document.getElementById('ajuste-item').classList.toggle('hidden', tipo!=='item');
+}
+function selecionarItemTipo(tipo){
+  ITEM_TIPO = tipo;
+  document.querySelectorAll('#ajuste-item [data-itemtipo]').forEach(b=>b.classList.toggle('active', b.dataset.itemtipo===tipo));
+}
+
+async function montarSelectFechamento(){
+  if(!MEUS_FECHAMENTOS.length){
+    try{ MEUS_FECHAMENTOS = await fetch('/api/fechamentos/meus').then(r=>r.json()); }catch(e){ MEUS_FECHAMENTOS = []; }
+  }
+  const ordenados = [...MEUS_FECHAMENTOS].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const sel = document.getElementById('a-fechamento');
+  sel.innerHTML = ordenados.length
+    ? ordenados.map(f=>`<option value="${f.id}">${escapeHtml(f.unidadeNome||f.unidade)} · ${f.data}</option>`).join('')
+    : '<option value="" disabled selected>nenhum fechamento lançado ainda</option>';
+}
+
+function montarSelectCampo(){
+  document.getElementById('a-campo').innerHTML = CAMPOS_NUMERICOS.map(c=>`<option value="${c}">${NOMES_CAMPOS[c]}</option>`).join('');
+}
+
+// varios campos soltos de texto/numero no formulario - Enter em qualquer um
+// deles nao pode enviar a solicitação sem querer (so os textarea de
+// motivo/observação continuam livres pra quebrar linha)
+document.getElementById('form-nova').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
+document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msgConfirmacao = TIPO_SELECIONADO === 'ajuste-fechamento'
+    ? 'Tem certeza que deseja enviar esse pedido de correção ao Master? Confira os dados antes de continuar - quanto mais preciso o pedido, menos idas e vindas até aprovar.'
+    : `Tem certeza que deseja enviar essa solicitação de ${TIPOS_INFO[TIPO_SELECIONADO]?.label || TIPO_SELECIONADO}?`;
+  if(!confirm(msgConfirmacao)) return;
+  const btn = document.getElementById('btn-nova');
+  const msg = document.getElementById('msg-nova');
+  msg.classList.add('hidden');
+  btn.disabled = true;
+  try{
+    let resp;
+    const anexosInput = document.getElementById('f-anexos');
+    const direcionadoSel = document.getElementById('f-direcionado');
+    const direcionadoParaId = direcionadoSel.value || null;
+    const direcionadoParaEmail = direcionadoParaId ? (direcionadoSel.selectedOptions[0]?.dataset.email || null) : null;
+
+    if(TIPO_SELECIONADO === 'estorno'){
+      resp = await fetch('/api/refund-requests', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+        pedidoId: document.getElementById('e-pedidoId').value,
+        unidade: document.getElementById('f-unidade').value,
+        observacao: document.getElementById('e-observacao').value,
+        password: document.getElementById('e-senha').value,
+        direcionadoParaId, direcionadoParaEmail,
+      })});
+    } else if(TIPO_SELECIONADO === 'ajuste-fechamento'){
+      const fechamentoId = document.getElementById('a-fechamento').value;
+      if(!fechamentoId) throw new Error('Escolha o fechamento.');
+      const payload = { tipoCorrecao: TIPO_CORRECAO, motivo: document.getElementById('a-motivo').value, direcionadoParaId, direcionadoParaEmail };
+      if(TIPO_CORRECAO==='campo'){
+        payload.mudancas = { [document.getElementById('a-campo').value]: document.getElementById('a-valor').value };
+      } else {
+        payload.itemNovo = { tipo: ITEM_TIPO, descricao: document.getElementById('a-item-descricao').value, valor: document.getElementById('a-item-valor').value };
+      }
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      for(const file of anexosInput.files) fd.append('anexos', file);
+      resp = await fetch(`/api/fechamentos/${fechamentoId}/solicitar-edicao`, { method:'POST', body: fd });
+    } else {
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify({
+        tipo: TIPO_SELECIONADO,
+        unidade: document.getElementById('f-unidade').value,
+        unidadeNome: UNIDADES_NOMES[document.getElementById('f-unidade').value] || document.getElementById('f-unidade').value,
+        titulo: document.getElementById('g-titulo').value,
+        valorEstimado: document.getElementById('g-valor').value,
+        observacao: document.getElementById('g-observacao').value,
+        itens: TIPO_SELECIONADO==='compra' ? ITENS_COMPRA.map(i=>({descricao:i.descricao, quantidade:i.quantidade})) : [],
+        ehOrcamento: document.getElementById('g-orcamento').checked,
+        direcionadoParaId, direcionadoParaEmail,
+      }));
+      for(const file of anexosInput.files) fd.append('anexos', file);
+      resp = await fetch('/api/solicitacoes', { method:'POST', body: fd });
+    }
+
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar solicitação.');
+    document.getElementById('form-nova').reset();
+    ITENS_COMPRA = []; renderItensCompra();
+    document.getElementById('form-nova').classList.add('hidden');
+    document.getElementById('sucesso-nova').classList.remove('hidden');
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  IS_MASTER = ME.role==='master';
+  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+
+  document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !SECOES.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !SECOES.includes('entregas'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !SECOES.includes('entregas-lancamento'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !SECOES.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !SECOES.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !SECOES.includes('ifood'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !SECOES.includes('inventario'));
+
+  if(!SECOES.includes('solicitacoes')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+
+  const unidades = IS_MASTER ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>UNIDADES_NOMES[u]);
+  document.getElementById('f-unidade').innerHTML = unidades.length
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+  document.getElementById('f-unidade').addEventListener('change', carregarResponsaveis);
+  carregarResponsaveis();
+
+  const tiposDisponiveis = Object.entries(TIPOS_INFO).filter(([tipo,info])=>!info.secaoNecessaria || SECOES.includes(info.secaoNecessaria));
+  document.getElementById('tipos-btns').innerHTML = tiposDisponiveis.map(([tipo,info])=>
+    `<button type="button" class="tipo-btn" data-tipo="${tipo}" onclick="selecionarTipo('${tipo}')">${iconeTipo(tipo)} ${info.label}</button>`
+  ).join('');
+  montarSelectCampo();
+  if(tiposDisponiveis.length) selecionarTipo(tiposDisponiveis[0][0]);
+}
+
+boot();
+</script>
+</body>
+</html>

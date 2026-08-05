@@ -8,20 +8,27 @@
 // (index.js aplica auth.requireMaster nessas rotas).
 const db = require('./firestore');
 const subgroups = require('./vaultSubgroups');
+const { createCache } = require('./liveCache');
 
 const groupsRef = db.collection('vaultGroups');
 
-async function list() {
+// cache de 20s: a lista entra no boot do Cofre, de Usuarios e na exportacao -
+// muda raramente (so o Master cria/renomeia grupo), nao precisa reler o
+// Firestore a cada carregamento de pagina
+async function listUncached() {
   const snap = await groupsRef.get();
   const groups = snap.docs.map(toGroup);
   groups.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   return groups;
 }
+const groupsCache = createCache(listUncached, 20 * 1000);
+const list = groupsCache.cached;
 
 async function create(name) {
   name = String(name || '').trim();
   if (!name) throw new Error('Nome do grupo é obrigatório.');
   const doc = await groupsRef.add({ name, createdAt: new Date().toISOString() });
+  groupsCache.invalidar();
   return toGroup(await doc.get());
 }
 
@@ -32,6 +39,7 @@ async function rename(id, name) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Grupo não encontrado.');
   await ref.update({ name });
+  groupsCache.invalidar();
   return toGroup(await ref.get());
 }
 
@@ -40,6 +48,7 @@ async function remove(id) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Grupo não encontrado.');
   await ref.delete();
+  groupsCache.invalidar();
 
   // exclui em cascata os subgrupos desse grupo - as senhas deles ficam "sem
   // subgrupo" em vez de serem apagadas (mesma logica de vaultSubgroups.remove)

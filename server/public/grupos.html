@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grupos (franquias) · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:640px;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  .back:hover{color:var(--text);border-color:var(--accent);}
+  .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  @media(max-width:640px){ .panel{padding:14px;} }
+  .panel h2{font-size:13px;margin:0 0 14px;}
+  .tablewrap{overflow-x:auto;}
+  table{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
+  tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:320px;}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
+  .tag.kpi{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.08);}
+  .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
+  .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .rowacts button:hover{border-color:var(--accent);}
+  form.create{display:flex;flex-direction:column;gap:10px;max-width:560px;}
+  form.create label{font-size:11.5px;color:var(--muted);}
+  form.create input{width:100%;margin-top:4px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
+  fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;}
+  legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;padding:0 6px;max-width:100%;overflow-wrap:break-word;}
+  .checks{display:flex;flex-wrap:wrap;gap:10px;}
+  .checks label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text);white-space:nowrap;}
+  .checks input{width:auto;margin:0;}
+  .unidades-secao{margin-top:14px;}
+  .unidades-secao:first-child{margin-top:0;}
+  .unidades-secao-titulo{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--line);}
+  .unidades-grupo-titulo{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px;}
+  .unidades-grupo-titulo:first-of-type{margin-top:0;}
+  button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;align-self:flex-start;}
+  .err{color:var(--bad);font-size:11.5px;}
+  .ok-msg{color:var(--ok);font-size:11.5px;}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:560px;}
+  .modal h3{margin:0 0 14px;font-size:14px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+  .linha-kpi{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-kpi.com-tipo{grid-template-columns:1fr 170px auto;}
+  .linha-kpi.com-opcoes{row-gap:6px;}
+  .linha-kpi input,.linha-kpi select{padding:9px 10px;font-size:13px;}
+  .linha-kpi select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;}
+  .linha-kpi-opcoes{grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--muted);}
+  .linha-kpi-opcoes label{display:flex;align-items:center;gap:6px;}
+  .linha-kpi-opcoes select{font-size:11px;padding:4px 7px;}
+  .linha-kpi-opcoes input[type=checkbox]{width:auto;margin:0;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:34px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Grupos (franquias)</h1>
+        <div class="sub-intro">Cada franquia lança o fechamento de um jeito - defina aqui quais lojas pertencem a cada grupo e quais KPI's extras aparecem no formulário de fechamento delas (além de TC e Cancelados, que são fixos pra todo mundo).</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-actions">
+      <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" href="/painel.html">🏠 Painel</a>
+  <a class="back" href="/">📈 Monitor</a>
+  <a class="back" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back" href="/entregas.html">🛵 Entregas</a>
+  <a class="back" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back" href="/ifood.html">🍔 iFood</a>
+  <a class="back" href="/central.html">📋 Central</a>
+  <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back" href="/usuarios.html">👤 Usuários</a>
+  <a class="back active" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Só o acesso Master pode gerenciar grupos.</div>
+
+<div id="root" class="hidden">
+  <div class="panel">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>Grupos cadastrados</span>
+      <span style="display:flex;gap:4px;">
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioGrupos('csv')">📄 CSV</button>
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioGrupos('pdf')">📄 PDF</button>
+      </span>
+    </h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Nome</th><th>Lojas</th><th>Canais extras</th><th>Formas extras</th><th>KPI's extras</th><th>Responsáveis</th><th></th></tr></thead>
+        <tbody id="grupos-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Criar novo grupo</h2>
+    <form class="create" id="create-form">
+      <label>Nome do grupo<input type="text" id="c-nome" placeholder="ex: Dominos - GBE" required></label>
+
+      <fieldset>
+        <legend>Lojas desse grupo</legend>
+        <div id="c-unidades"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Seções do lançamento (loja)</legend>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
+          <input type="checkbox" id="c-caixa-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Caixa (caixa inicial/final, entrada em dinheiro, depósito)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:8px;">
+          <input type="checkbox" id="c-maquininhas-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Maquininhas (cartão)
+        </label>
+        <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Nome padrão das maquininhas (ex: "Getnet" vira Getnet 1, Getnet 2...)</label>
+        <input type="text" id="c-maquininha-prefixo" placeholder="Maquininha" value="Maquininha" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
+          <input type="checkbox" id="c-saidas-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Outras saídas de caixa
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Canais de venda extras (somam no Faturamento, além de Delivery/Carryout/Pickup/Loja)</legend>
+        <div id="c-canais"></div>
+        <button type="button" class="btn-add" onclick="adicionarKpi('c-canais')">+ Adicionar canal</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Formas de pagamento extras (somam no Total Declarado, além de Adyen/Ifood/99Food/Pix/Pix CNPJ/Outros)</legend>
+        <div id="c-formas"></div>
+        <button type="button" class="btn-add" onclick="adicionarKpi('c-formas')">+ Adicionar forma de pagamento</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>KPI's extras (além de TC e Cancelados, que são fixos)</legend>
+        <div id="c-kpis"></div>
+        <button type="button" class="btn-add" onclick="adicionarKpi('c-kpis')">+ Adicionar KPI</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Responsáveis (Master/Admin) - quem pede solicitação pra esse grupo pode direcionar pra um deles</legend>
+        <div id="c-responsaveis"></div>
+      </fieldset>
+
+      <p class="err hidden" id="create-err"></p>
+      <button type="submit" class="primary">Criar grupo</button>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="grupo-overlay">
+  <form class="modal" id="grupo-form">
+    <h3 id="grupo-title">Editar grupo</h3>
+    <label style="font-size:11.5px;color:var(--muted);">Nome do grupo</label>
+    <input type="text" id="e-nome" required style="width:100%;margin:4px 0 12px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;">
+
+    <fieldset>
+      <legend>Lojas desse grupo</legend>
+      <div id="e-unidades"></div>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Seções do lançamento (loja)</legend>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
+        <input type="checkbox" id="e-caixa-habilitado" style="width:auto;margin:0;"> Habilitar seção Caixa (caixa inicial/final, entrada em dinheiro, depósito)
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:8px;">
+        <input type="checkbox" id="e-maquininhas-habilitado" style="width:auto;margin:0;"> Habilitar seção Maquininhas (cartão)
+      </label>
+      <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Nome padrão das maquininhas (ex: "Getnet" vira Getnet 1, Getnet 2...)</label>
+      <input type="text" id="e-maquininha-prefixo" placeholder="Maquininha" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
+        <input type="checkbox" id="e-saidas-habilitado" style="width:auto;margin:0;"> Habilitar seção Outras saídas de caixa
+      </label>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Canais de venda extras</legend>
+      <div id="e-canais"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" onclick="adicionarKpi('e-canais')">+ Adicionar canal</button>
+        <button type="button" class="btn-add" style="color:var(--bad);" onclick="limparExtras('e-canais')">🗑️ Limpar tudo</button>
+      </div>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Formas de pagamento extras</legend>
+      <div id="e-formas"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" onclick="adicionarKpi('e-formas')">+ Adicionar forma de pagamento</button>
+        <button type="button" class="btn-add" style="color:var(--bad);" onclick="limparExtras('e-formas')">🗑️ Limpar tudo</button>
+      </div>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>KPI's extras</legend>
+      <div id="e-kpis"></div>
+      <button type="button" class="btn-add" onclick="adicionarKpi('e-kpis')">+ Adicionar KPI</button>
+    </fieldset>
+
+    <fieldset style="margin-top:10px;">
+      <legend>Responsáveis (Master/Admin)</legend>
+      <div id="e-responsaveis"></div>
+    </fieldset>
+
+    <p class="err hidden" id="grupo-err"></p>
+    <div class="modal-actions">
+      <button type="button" id="grupo-cancel">Cancelar</button>
+      <button type="submit" class="primary">Salvar grupo</button>
+    </div>
+  </form>
+</div>
+
+<!-- opcoes de autocomplete pros inputs de Canais/Formas/KPI's extras (ver
+     adicionarKpi/atualizarDatalistsExtras) - reaproveita nomes ja usados em
+     outros grupos, tanto no form de criar quanto no de editar -->
+<datalist id="datalist-canais"></datalist>
+<datalist id="datalist-formas"></datalist>
+<datalist id="datalist-kpis"></datalist>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let UNIDADES = [];
+let GRUPOS = [];
+let EDITING_GRUPO = null;
+
+// unidade de medida de um KPI - so faz sentido pra KPI's (Canais de venda e
+// Formas de pagamento sempre somam em R$, entao esse seletor nem aparece
+// nessas 2 secoes, ver adicionarKpi). "Arquivo/Imagem" guarda o anexo no
+// Storage (ex: nota fiscal assinada, comprovante) em vez de um numero.
+const TIPOS_KPI = [
+  ['quantidade', 'Quantidade (número)'],
+  ['moeda', 'R$ (valor em reais)'],
+  ['kg', 'Peso (Kg)'],
+  ['arquivo', 'Arquivo/Imagem (anexo)'],
+  ['texto', 'Texto livre'],
+];
+
+// linhas repetiveis de Canal/Forma/KPI - mesmo padrao visual de "Itens da
+// compra" na Central de Solicitações. O input usa <datalist> (ver
+// atualizarDatalistsExtras) com os nomes ja usados em OUTROS grupos pra esse
+// mesmo tipo de campo - assim o Master pode reaproveitar um nome existente
+// em vez de digitar de novo (e arriscar duplicar com grafia diferente, ex
+// "Pix CNPJ" vs "PIX cnpj", virando 2 colunas diferentes na tabela de
+// Fechamentos). Só KPI's ganham o seletor de unidade de medida - Canais de
+// venda/Formas de pagamento sempre somam em R$ (Faturamento/Total
+// Declarado), não faz sentido escolher outro tipo pra eles.
+// Canais/Formas ganham, em vez disso, controle de Operação (soma/subtrai no
+// PRÓPRIO total) e "também contar em [outro total]" - pra casos como TEF:
+// é um Canal de venda, mas já é forma de pagamento validada, então precisa
+// também somar no Total Declarado (senão sobra "falta no caixa" - o valor
+// aparece no Faturamento mas nunca é creditado no Total Declarado).
+function adicionarKpi(containerId, valorInicial, tipoInicial, operacaoInicial, tambemInicial){
+  const container = document.getElementById(containerId);
+  const ehKpi = containerId.includes('kpis');
+  const ehCanal = containerId.includes('canais');
+  const ehForma = containerId.includes('formas');
+  const div = document.createElement('div');
+  div.className = 'linha-kpi' + (ehKpi ? ' com-tipo' : (ehCanal||ehForma) ? ' com-opcoes' : '');
+  const datalistId = ehCanal ? 'datalist-canais' : ehForma ? 'datalist-formas' : 'datalist-kpis';
+  const seletorTipo = ehKpi ? `<select class="kpi-tipo-select">${TIPOS_KPI.map(([v,l])=>`<option value="${v}" ${(tipoInicial||'quantidade')===v?'selected':''}>${l}</option>`).join('')}</select>` : '';
+  const outroTotal = ehCanal ? 'Total Declarado' : ehForma ? 'Faturamento' : '';
+  const opcoes = (ehCanal||ehForma) ? `<div class="linha-kpi-opcoes">
+      <label>Operação <select class="extra-operacao-select"><option value="soma" ${(operacaoInicial||'soma')==='soma'?'selected':''}>Soma</option><option value="subtrai" ${operacaoInicial==='subtrai'?'selected':''}>Subtrai</option></select></label>
+      <label><input type="checkbox" class="extra-tambem-checkbox" ${tambemInicial?'checked':''}> também contar em ${outroTotal}</label>
+    </div>` : '';
+  div.innerHTML = `<input type="text" value="${escapeHtml(valorInicial||'')}" list="${datalistId}" placeholder="ex: Taxa de entrega, LegTime, OTD... (ou escolha um já usado)">
+    ${seletorTipo}
+    <button type="button" class="btn-remover" onclick="this.closest('.linha-kpi').remove()">✕</button>
+    ${opcoes}`;
+  container.appendChild(div);
+}
+// junta os labels ja usados em QUALQUER grupo existente, por tipo de campo,
+// pra alimentar o autocomplete (datalist) dos inputs acima
+function atualizarDatalistsExtras(){
+  const preencher = (datalistId, chave) => {
+    const labels = new Set();
+    GRUPOS.forEach(g=>(g[chave]||[]).forEach(k=>{ if(k.label) labels.add(k.label); }));
+    document.getElementById(datalistId).innerHTML = [...labels].sort((a,b)=>a.localeCompare(b,'pt-BR')).map(l=>`<option value="${escapeHtml(l)}"></option>`).join('');
+  };
+  preencher('datalist-canais', 'canaisVendaExtras');
+  preencher('datalist-formas', 'formasPagamentoExtras');
+  preencher('datalist-kpis', 'kpisExtras');
+}
+function lerKpis(containerId){
+  const ehKpi = containerId.includes('kpis');
+  const ehCanalOuForma = containerId.includes('canais') || containerId.includes('formas');
+  return [...document.querySelectorAll('#'+containerId+' .linha-kpi')]
+    .map(linha=>{
+      const label = linha.querySelector('input').value.trim();
+      if(!label) return null;
+      const item = { label };
+      if(ehKpi){
+        const sel = linha.querySelector('.kpi-tipo-select');
+        item.tipo = sel ? sel.value : 'quantidade';
+      }
+      if(ehCanalOuForma){
+        const selOp = linha.querySelector('.extra-operacao-select');
+        item.operacao = selOp ? selOp.value : 'soma';
+        const chkTambem = linha.querySelector('.extra-tambem-checkbox');
+        item.tambemNoOutroTotal = chkTambem ? chkTambem.checked : false;
+      }
+      return item;
+    })
+    .filter(Boolean);
+}
+// remove todos os campos de uma vez (em vez de clicar no ✕ de cada linha) -
+// util quando o Master quer recomecar a configuracao do zero pra um grupo
+function limparExtras(containerId){
+  if(!confirm('Remover todos os campos dessa lista? Isso só é aplicado quando você clicar em Salvar.')) return;
+  document.getElementById(containerId).innerHTML = '';
+}
+
+// lojas agrupadas por Seção/Grupo, igual usuarios.html - a mesma fonte
+// (/api/meta/unidades) usada pra montar o checklist de permissões
+function unidadesChecksHtml(name, checkedSet){
+  if(!UNIDADES.length) return `<span style="color:var(--muted);font-size:11.5px;">Nenhuma loja disponível ainda.</span>`;
+  const porSecao = new Map();
+  UNIDADES.forEach(u=>{
+    if(!porSecao.has(u.secao)) porSecao.set(u.secao, new Map());
+    const porGrupo = porSecao.get(u.secao);
+    const grupo = u.grupo || '—';
+    if(!porGrupo.has(grupo)) porGrupo.set(grupo, []);
+    porGrupo.get(grupo).push(u);
+  });
+  return [...porSecao.entries()].map(([secao, porGrupo])=>{
+    const blocos = [...porGrupo.entries()].map(([grupo, itens])=>{
+      const itensHtml = itens.map(u=>{
+        const checked = checkedSet.has(u.codigo) ? 'checked' : '';
+        return `<label><input type="checkbox" name="${name}" value="${escapeHtml(u.codigo)}" ${checked}> ${escapeHtml(u.nome)}</label>`;
+      }).join('');
+      return `<div class="unidades-grupo-titulo">${escapeHtml(grupo)}</div><div class="checks">${itensHtml}</div>`;
+    }).join('');
+    return `<div class="unidades-secao"><div class="unidades-secao-titulo">${escapeHtml(secao)}</div>${blocos}</div>`;
+  }).join('');
+}
+function readChecked(container){
+  return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+}
+
+// checklist de usuarios Master/Admin - quem pede uma solicitação pra uma
+// loja desse grupo pode escolher direcionar pra um desses (ver central.html)
+let USUARIOS_MASTER_ADMIN = [];
+function responsaveisChecksHtml(elId, checkedSet){
+  const el = document.getElementById(elId);
+  if(!USUARIOS_MASTER_ADMIN.length){ el.innerHTML = '<span style="color:var(--muted);font-size:11.5px;">Nenhum usuário Master/Admin cadastrado ainda.</span>'; return; }
+  el.innerHTML = `<div class="checks">${USUARIOS_MASTER_ADMIN.map(u=>{
+    const checked = checkedSet.has(u.id) ? 'checked' : '';
+    return `<label><input type="checkbox" name="${elId}" value="${escapeHtml(u.id)}" ${checked}> ${escapeHtml(u.email)}${u.role==='master'?' <span style="color:var(--muted);">(Master)</span>':''}</label>`;
+  }).join('')}</div>`;
+}
+function nomeUnidade(codigo){
+  const u = UNIDADES.find(x=>x.codigo===codigo);
+  return u ? u.nome : codigo;
+}
+
+const SUFIXO_TIPO_KPI = { quantidade:'#', moeda:'R$', kg:'Kg', arquivo:'📎', texto:'Abc' };
+function tagsExtras(lista){
+  return `<div class="tags">${(lista||[]).map(k=>{
+    const sufixo = k.tipo ? ` <span style="opacity:.6;">· ${SUFIXO_TIPO_KPI[k.tipo]||k.tipo}</span>` : '';
+    return `<span class="tag kpi">${escapeHtml(k.label)}${sufixo}</span>`;
+  }).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div>`;
+}
+function nomeResponsavel(id){
+  const u = USUARIOS_MASTER_ADMIN.find(x=>x.id===id);
+  return u ? u.email : id;
+}
+function renderGrupos(){
+  document.getElementById('grupos-body').innerHTML = GRUPOS.map(g=>`
+    <tr>
+      <td><b>${escapeHtml(g.nome)}</b></td>
+      <td><div class="tags">${(g.unidades||[]).map(u=>`<span class="tag">${escapeHtml(nomeUnidade(u))}</span>`).join('') || '<span style="color:var(--muted);">nenhuma</span>'}</div></td>
+      <td>${tagsExtras(g.canaisVendaExtras)}</td>
+      <td>${tagsExtras(g.formasPagamentoExtras)}</td>
+      <td>${tagsExtras(g.kpisExtras)}</td>
+      <td><div class="tags">${(g.responsaveis||[]).map(id=>`<span class="tag">${escapeHtml(nomeResponsavel(id))}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div></td>
+      <td>
+        <div class="rowacts">
+          <button type="button" onclick="abrirEdicaoGrupo('${g.id}')">Editar</button>
+          <button type="button" onclick="excluirGrupo('${g.id}','${escapeHtml(g.nome)}')">Excluir</button>
+        </div>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</td></tr>`;
+}
+
+document.getElementById('create-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('create-err');
+  errEl.classList.add('hidden');
+  const payload = {
+    nome: document.getElementById('c-nome').value,
+    unidades: readChecked(document.getElementById('c-unidades')),
+    caixaHabilitado: document.getElementById('c-caixa-habilitado').checked,
+    maquininhasHabilitado: document.getElementById('c-maquininhas-habilitado').checked,
+    maquininhaPrefixo: document.getElementById('c-maquininha-prefixo').value,
+    saidasHabilitado: document.getElementById('c-saidas-habilitado').checked,
+    canaisVendaExtras: lerKpis('c-canais'),
+    formasPagamentoExtras: lerKpis('c-formas'),
+    kpisExtras: lerKpis('c-kpis'),
+    responsaveis: readChecked(document.getElementById('c-responsaveis')),
+  };
+  try{
+    const res = await fetch('/api/grupos', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao criar grupo.');
+    document.getElementById('create-form').reset();
+    document.getElementById('c-unidades').innerHTML = unidadesChecksHtml('unidades', new Set());
+    document.getElementById('c-caixa-habilitado').checked = true;
+    document.getElementById('c-maquininhas-habilitado').checked = true;
+    document.getElementById('c-maquininha-prefixo').value = 'Maquininha';
+    document.getElementById('c-saidas-habilitado').checked = true;
+    document.getElementById('c-canais').innerHTML = '';
+    document.getElementById('c-formas').innerHTML = '';
+    document.getElementById('c-kpis').innerHTML = '';
+    responsaveisChecksHtml('c-responsaveis', new Set());
+    await carregarGrupos();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+const grupoOverlay = document.getElementById('grupo-overlay');
+function abrirEdicaoGrupo(id){
+  const g = GRUPOS.find(x=>x.id===id);
+  if(!g) return;
+  EDITING_GRUPO = id;
+  document.getElementById('grupo-title').textContent = 'Editar ' + g.nome;
+  document.getElementById('e-nome').value = g.nome;
+  document.getElementById('e-unidades').innerHTML = unidadesChecksHtml('e-unidades', new Set(g.unidades||[]));
+  document.getElementById('e-caixa-habilitado').checked = g.caixaHabilitado !== false;
+  document.getElementById('e-maquininhas-habilitado').checked = g.maquininhasHabilitado !== false;
+  document.getElementById('e-maquininha-prefixo').value = g.maquininhaPrefixo || 'Maquininha';
+  document.getElementById('e-saidas-habilitado').checked = g.saidasHabilitado !== false;
+  document.getElementById('e-canais').innerHTML = '';
+  (g.canaisVendaExtras||[]).forEach(k=>adicionarKpi('e-canais', k.label, null, k.operacao, k.tambemNoOutroTotal));
+  document.getElementById('e-formas').innerHTML = '';
+  (g.formasPagamentoExtras||[]).forEach(k=>adicionarKpi('e-formas', k.label, null, k.operacao, k.tambemNoOutroTotal));
+  document.getElementById('e-kpis').innerHTML = '';
+  (g.kpisExtras||[]).forEach(k=>adicionarKpi('e-kpis', k.label, k.tipo));
+  responsaveisChecksHtml('e-responsaveis', new Set(g.responsaveis||[]));
+  document.getElementById('grupo-err').classList.add('hidden');
+  grupoOverlay.classList.add('show');
+}
+document.getElementById('grupo-cancel').addEventListener('click', ()=>grupoOverlay.classList.remove('show'));
+grupoOverlay.addEventListener('click', (e)=>{ if(e.target===grupoOverlay) grupoOverlay.classList.remove('show'); });
+
+document.getElementById('grupo-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('grupo-err');
+  const payload = {
+    nome: document.getElementById('e-nome').value,
+    unidades: readChecked(document.getElementById('e-unidades')),
+    caixaHabilitado: document.getElementById('e-caixa-habilitado').checked,
+    maquininhasHabilitado: document.getElementById('e-maquininhas-habilitado').checked,
+    maquininhaPrefixo: document.getElementById('e-maquininha-prefixo').value,
+    saidasHabilitado: document.getElementById('e-saidas-habilitado').checked,
+    canaisVendaExtras: lerKpis('e-canais'),
+    formasPagamentoExtras: lerKpis('e-formas'),
+    kpisExtras: lerKpis('e-kpis'),
+    responsaveis: readChecked(document.getElementById('e-responsaveis')),
+  };
+  try{
+    const res = await fetch('/api/grupos/'+EDITING_GRUPO, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+    grupoOverlay.classList.remove('show');
+    await carregarGrupos();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+async function excluirGrupo(id, nome){
+  if(!confirm(`Excluir o grupo "${nome}"? As lojas dele voltam a não ter KPI's extras no fechamento.`)) return;
+  const res = await fetch('/api/grupos/'+id, {method:'DELETE'});
+  if(!res.ok){ const data = await res.json().catch(()=>({})); alert(data.error||'Erro ao excluir.'); return; }
+  await carregarGrupos();
+}
+
+function baixarRelatorioGrupos(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  window.location.href = `/api/grupos/relatorio.${formato}?${params.toString()}`;
+}
+
+async function carregarGrupos(){
+  GRUPOS = await fetch('/api/grupos').then(r=>r.json());
+  renderGrupos();
+  atualizarDatalistsExtras();
+}
+
+async function boot(){
+  const meRes = await fetch('/api/me');
+  if(!meRes.ok){ logout(); return; }
+  const me = await meRes.json();
+  if(me.role!=='master'){ document.getElementById('sem-acesso').classList.remove('hidden'); return; }
+  document.getElementById('root').classList.remove('hidden');
+
+  UNIDADES = await fetch('/api/meta/unidades').then(r=>r.json());
+  document.getElementById('c-unidades').innerHTML = unidadesChecksHtml('unidades', new Set());
+
+  const todosUsuarios = await fetch('/api/users').then(r=>r.json());
+  USUARIOS_MASTER_ADMIN = todosUsuarios.filter(u=>u.role==='master' || u.isAdmin);
+  responsaveisChecksHtml('c-responsaveis', new Set());
+
+  await carregarGrupos();
+}
+
+boot();
+</script>
+</body>
+</html>

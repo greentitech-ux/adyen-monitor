@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entregas · Zenith Ops</title>
+<title>iFood · Zenith Ops</title>
 <meta name="theme-color" content="#0b0d10">
 <style>
   :root{
@@ -25,7 +25,7 @@
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
   a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
-  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  a.back.active{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:600;}
   .hidden{display:none!important;}
   .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
   .hamburger-btn:hover{border-color:var(--accent);}
@@ -38,6 +38,7 @@
   .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
   .sub{color:var(--muted);font-size:12px;margin-top:4px;font-family:var(--mono);}
+  .aviso{background:var(--warn-dim);border:1px solid #4a3a1a;color:var(--warn);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px;}
 
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
@@ -76,13 +77,6 @@
   .valor{font-family:var(--mono);font-variant-numeric:tabular-nums;}
   .truncate{max-width:160px;overflow:hidden;text-overflow:ellipsis;}
   .tablewrap{max-height:420px;overflow:auto;}
-
-  .ontem-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:14px 16px;}
-  .ontem-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
-  .ontem-card .nome{font-size:11.5px;color:var(--muted);white-space:normal;}
-  .ontem-card .qtd{font-family:var(--mono);font-size:20px;font-weight:600;margin-top:4px;color:var(--ok);}
-  .ontem-card.falta{border-color:var(--bad-dim);}
-  .ontem-card.falta .qtd{font-size:12.5px;color:var(--bad);font-weight:500;}
 </style>
 </head>
 <body>
@@ -91,13 +85,13 @@
   <div style="display:flex;align-items:flex-start;gap:10px;">
     <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
     <div>
-      <div class="eyebrow">Entregas · Solutions Ti Tech</div>
-      <h1>Entregas (motoboys)</h1>
+      <div class="eyebrow">iFood · Solutions Ti Tech</div>
+      <h1>Vendas iFood</h1>
       <div class="sub" id="header-info">carregando...</div>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-    <button class="back hidden" id="btn-sincronizar-planilha" onclick="sincronizarPlanilha()" style="cursor:pointer;">🔄 Sincronizar agora</button>
+    <button class="back hidden" id="btn-sincronizar" onclick="sincronizar()" style="cursor:pointer;">🔄 Sincronizar agora</button>
     <button class="back hidden" id="btn-recarregar" onclick="carregar()" style="cursor:pointer;">🔄 Atualizar</button>
     <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
   </div>
@@ -110,11 +104,11 @@
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
-  <a class="back active" id="nav-entregas-self" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
   <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back active" id="nav-ifood-self" href="/ifood.html">🍔 iFood</a>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
@@ -126,9 +120,13 @@
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
 </nav>
 
-<div id="sem-acesso" class="empty hidden">Você não tem acesso ao painel de Entregas. Fale com o administrador (Master).</div>
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao painel de iFood. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
+
+<div class="aviso">⚠️ Os dados seguem a conciliação do próprio iFood e podem sofrer pequenos ajustes em até 48h - não é um feed em tempo real como o Monitor da Adyen.</div>
+
+<div class="kpis" id="kpis"></div>
 
 <div class="panel">
   <div class="controls">
@@ -145,45 +143,17 @@
   </div>
 </div>
 
-<div class="kpis" id="kpis"></div>
-
-<div class="panel">
-  <h2><div class="title-group"><span id="ontem-titulo">Lançamento de ontem (D-1)</span><span class="n" id="ontem-count"></span></div></h2>
-  <div class="ontem-grid" id="ontem-grid"></div>
-</div>
-
-<div class="panel hidden" id="edicoes-panel">
-  <h2><div class="title-group"><span>Pedidos de correção de entregas</span><span class="n" id="edicoes-count"></span></div></h2>
-  <div id="edicoes-lista" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
-</div>
-
-<div class="panel">
-  <h2>
-    <div class="title-group"><span>Por entregador</span><span class="n" id="entregadores-count"></span></div>
-    <div style="display:flex;gap:4px;">
-      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('entregadores','csv')">📄 CSV</button>
-      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('entregadores','pdf')">📄 PDF</button>
-    </div>
-  </h2>
-  <div class="tablewrap" style="max-height:none;overflow:visible;">
-    <table>
-      <thead><tr><th>Unidade</th><th>Nome</th><th>Quant.</th><th>Valor</th><th>Ajuda de Custo</th><th>Entrega</th><th>Retorno</th><th>Extra</th><th>Valor Gami</th><th>Fora de Área</th><th>COOP recebe</th><th>TM</th></tr></thead>
-      <tbody id="entregadores-body"></tbody>
-    </table>
-  </div>
-</div>
-
 <div class="panel">
   <h2>
     <div class="title-group"><span>Por unidade</span><span class="n" id="unidades-count"></span></div>
     <div style="display:flex;gap:4px;">
-      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('unidades','csv')">📄 CSV</button>
-      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('unidades','pdf')">📄 PDF</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('unidades','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('unidades','pdf')">📄 PDF</button>
     </div>
   </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
-      <thead><tr><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Fora área</th><th>Bônus</th><th>Ajuda custo</th><th>Valor pago</th><th>COOP recebe</th><th>TM</th></tr></thead>
+      <thead><tr><th>Unid.</th><th>Vendas</th><th>Valor bruto</th><th>Comissão</th><th>Valor líquido</th><th>Ticket médio</th></tr></thead>
       <tbody id="unidades-body"></tbody>
     </table>
   </div>
@@ -191,16 +161,16 @@
 
 <div class="panel">
   <h2>
-    <div class="title-group"><span>Lançamentos</span><span class="n" id="lancamentos-count"></span></div>
+    <div class="title-group"><span>Vendas</span><span class="n" id="vendas-count"></span></div>
     <div style="display:flex;gap:4px;">
-      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('lancamentos','csv')">📄 CSV</button>
-      <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('lancamentos','pdf')">📄 PDF</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('vendas','csv')">📄 CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioIfood('vendas','pdf')">📄 PDF</button>
     </div>
   </h2>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Data</th><th>Unid.</th><th>Entregador</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Pos 00hs</th><th>Fora área</th><th>Bônus</th><th>Ajuda custo</th><th>Valor</th><th>COOP</th><th>Qtd. total</th><th>Etiqueta</th><th>Observação</th></tr></thead>
-      <tbody id="lancamentos-body"></tbody>
+      <thead><tr><th>Data</th><th>Unid.</th><th>Nº pedido</th><th>Valor bruto</th><th>Comissão</th><th>Valor líquido</th><th>Forma pagto</th><th>Status</th></tr></thead>
+      <tbody id="vendas-body"></tbody>
     </table>
   </div>
 </div>
@@ -223,21 +193,13 @@ function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hi
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
 let DATA = [];
-let EDICOES = [];
-let UNIDADES_NOMES = { 'Tirol Natal':'Dom Natal', 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Dom Bessa', Caruaru:'Dom Caruaru', Garanhuns:'Dom Garanhuns' };
-// codigos que sao de fato do dominio Entregas - capturado ANTES do merge com
-// /api/meta/unidades em carregar() (que devolve o cadastro geral de lojas,
-// usado por Fechamento/Monitor/etc - unidades tem codigos diferentes lá, ex:
-// "19855" ou "Dominos Bessa", nao "Bessa"). Sem isso, o roster de Entregas
-// (painel de ontem, tabela Por unidade) ficava com unidades duplicadas/
-// alheias ao mesclar os dois cadastros no mesmo objeto de nomes
-const ENTREGAS_UNIDADES_BASE = Object.keys(UNIDADES_NOMES);
+let UNIDADES_NOMES = {};
 let UNIDADES_PERMITIDAS = null; // null = Master (sem restrição)
 const SEL_UNIDADE = new Set();
 let IS_MASTER = false;
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
+function fmtData(iso){ if(!iso) return '—'; const d = new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}); }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 const FUSO_BR = 'America/Sao_Paulo';
 function agoraBrasilia(){
@@ -253,7 +215,7 @@ function pad2(n){ return String(n).padStart(2,'0'); }
 function isoLocal(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
 
 function codigosDisponiveis(){
-  const base = [...new Set([...ENTREGAS_UNIDADES_BASE, ...DATA.map(d=>d.unidade)])];
+  const base = [...new Set([...Object.keys(UNIDADES_NOMES), ...DATA.map(d=>d.unidade)])];
   if(!UNIDADES_PERMITIDAS) return base;
   return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
 }
@@ -262,16 +224,17 @@ let SYNC_INFO_SUFIXO = '';
 let SYNC_INFO_TITLE = '';
 async function carregarStatusSincronizacao(){
   try{
-    const status = await fetch('/api/entregas/sincronizacao').then(r=>r.json());
+    const status = await fetch('/api/ifood/sincronizacao').then(r=>r.json());
     if(status.ultimoErro){
-      SYNC_INFO_SUFIXO = ' · ⚠️ planilha não sincronizada';
-      SYNC_INFO_TITLE = `Falha na última tentativa de sincronização: ${status.ultimoErro}`;
+      SYNC_INFO_SUFIXO = ' · ⚠️ ' + status.ultimoErro;
+      SYNC_INFO_TITLE = status.ultimoErro;
     } else if(status.ultimaEm){
       const dt = new Date(status.ultimaEm);
-      SYNC_INFO_SUFIXO = ' · ✅ histórico sincronizado';
-      SYNC_INFO_TITLE = `Última sincronização automática do histórico (planilha MOTOS BRAVO): ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
+      const falhas = Object.values(status.porLoja||{}).filter(l=>!l.ok).length;
+      SYNC_INFO_SUFIXO = falhas ? ` · ⚠️ ${falhas} loja(s) com erro na última sincronização` : ' · ✅ vendas sincronizadas';
+      SYNC_INFO_TITLE = `Última sincronização: ${dt.toLocaleString('pt-BR',{timeZone:FUSO_BR})}`;
     } else {
-      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização do histórico';
+      SYNC_INFO_SUFIXO = ' · aguardando 1ª sincronização';
       SYNC_INFO_TITLE = '';
     }
   }catch(e){
@@ -279,24 +242,22 @@ async function carregarStatusSincronizacao(){
   }
 }
 
-async function sincronizarPlanilha(){
-  const btn = document.getElementById('btn-sincronizar-planilha');
+async function sincronizar(){
+  const btn = document.getElementById('btn-sincronizar');
   btn.disabled = true; btn.textContent = '🔄 Sincronizando...';
   try{
-    const resp = await fetch('/api/entregas/sincronizar-planilha', { method:'POST' });
-    const status = await resp.json();
-    if(!resp.ok) throw new Error(status.ultimoErro || 'Erro ao sincronizar.');
+    await fetch('/api/ifood/sincronizar', { method:'POST' });
     await carregar();
   }catch(err){
-    alert('Não foi possível sincronizar a planilha: ' + err.message);
+    alert('Não foi possível sincronizar: ' + err.message);
   }finally{
     btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
   }
 }
 
-// relatorio (CSV/PDF) de uma das 3 tabelas de Entregas - usa o mesmo filtro
-// de periodo/unidades ativo na tela no momento
-function baixarRelatorioEntregas(tabela, formato){
+// relatorio (CSV/PDF) de uma das 2 tabelas de iFood - usa o mesmo filtro de
+// periodo/unidades ativo na tela
+function baixarRelatorioIfood(tabela, formato){
   const inicio = document.getElementById('f-date-start').value;
   const fim = document.getElementById('f-date-end').value;
   const unidades = [...SEL_UNIDADE].join(',');
@@ -304,63 +265,31 @@ function baixarRelatorioEntregas(tabela, formato){
   if(inicio) params.set('inicio', inicio);
   if(fim) params.set('fim', fim);
   if(unidades) params.set('unidades', unidades);
-  window.location.href = `/api/entregas/relatorio-${tabela}.${formato}?${params.toString()}`;
+  window.location.href = `/api/ifood/relatorio-${tabela}.${formato}?${params.toString()}`;
 }
 
 async function carregar(){
   const [dados, unidadesMeta] = await Promise.all([
-    fetch('/api/entregas').then(r=>r.json()),
+    fetch('/api/ifood/vendas').then(r=>r.json()),
     IS_MASTER ? fetch('/api/meta/unidades').then(r=>r.json()).catch(()=>[]) : Promise.resolve([]),
   ]);
   DATA = dados;
   unidadesMeta.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
   await carregarStatusSincronizacao();
-  const datas = DATA.map(d=>d.data).filter(Boolean).sort();
+  const datas = DATA.map(d=>d.dataHora).filter(Boolean).sort();
   const elHeaderInfo = document.getElementById('header-info');
   elHeaderInfo.textContent = datas.length
-    ? `${DATA.length} lançamentos · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
-    : `nenhuma entrega lançada ainda${SYNC_INFO_SUFIXO}`;
+    ? `${DATA.length} vendas · ${fmtData(datas[0])} → ${fmtData(datas[datas.length-1])}${SYNC_INFO_SUFIXO}`
+    : `nenhuma venda sincronizada ainda${SYNC_INFO_SUFIXO}`;
   elHeaderInfo.title = SYNC_INFO_TITLE;
-  setupPresets();
+  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
+  setupPresets(isoLocal(ontem));
   setupMultiselect();
   render();
 }
 
-async function carregarEdicoes(){
-  EDICOES = await fetch('/api/entregas/edicoes').then(r=>r.json());
-  const pendentes = EDICOES.filter(e=>e.status==='PENDENTE');
-  document.getElementById('edicoes-panel').classList.toggle('hidden', pendentes.length===0);
-  document.getElementById('edicoes-count').textContent = pendentes.length;
-  document.getElementById('edicoes-lista').innerHTML = pendentes.map(p=>`
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;">
-      <div style="font-size:12.5px;font-weight:600;">${escapeHtml(p.entregador)} · ${escapeHtml(p.unidadeNome||p.unidade)} · ${fmtData(p.data)}</div>
-      <div class="sub" style="margin:2px 0 6px;">pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</div>
-      <div style="font-size:12px;margin-bottom:6px;">${Object.entries(p.mudancas).map(([campo,valor])=>`<div>${campo}: <b>${valor}</b></div>`).join('')}</div>
-      <div style="font-size:12px;color:var(--text);margin-bottom:8px;white-space:pre-wrap;">${escapeHtml(p.motivo)}</div>
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="preset-btn" style="color:var(--ok);border-color:var(--ok-dim);" onclick="decidirEdicaoEntrega('${p.id}','APROVADO')">✓ Aprovar</button>
-        <button type="button" class="preset-btn" style="color:var(--bad);border-color:var(--bad-dim);" onclick="decidirEdicaoEntrega('${p.id}','REJEITADO')">✕ Rejeitar</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-async function decidirEdicaoEntrega(id, status){
-  const pergunta = status==='APROVADO' ? 'Tem certeza que deseja aprovar essa correção? O valor será aplicado no lançamento.' : 'Tem certeza que deseja rejeitar essa correção?';
-  if(!confirm(pergunta)) return;
-  let motivoDecisao = '';
-  if(status==='REJEITADO'){ motivoDecisao = prompt('Motivo da rejeição (opcional):') || ''; }
-  await fetch(`/api/entregas/edicoes/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
-  await carregarEdicoes();
-  await carregar();
-}
-
 function calcularPreset(tipo, refIso){
   const ref = new Date(refIso+'T00:00:00');
-  if(tipo==='ontem'){
-    const ontem = new Date(ref); ontem.setDate(ontem.getDate()-1);
-    return {inicio:isoLocal(ontem), fim:isoLocal(ontem)};
-  }
   if(tipo==='semana'){
     const dow = ref.getDay();
     const inicio = new Date(ref); inicio.setDate(ref.getDate()-dow);
@@ -377,15 +306,9 @@ function calcularPreset(tipo, refIso){
   return {inicio:isoLocal(inicio), fim:isoLocal(fim)};
 }
 
-// mesmo padrao de server/public/fechamentos.html: por padrao nenhum preset
-// ativo e os campos mostram D-1 (ontem) - so passa a seguir um preset quando
-// o usuario escolhe um explicitamente; editar os campos de data na mao
-// sempre desativa o preset (intervalo livre, inclusive um unico dia) em vez
-// de "re-encaixar" no periodo cheio
 let presetAtivo = null;
-function setupPresets(){
+function setupPresets(refPadraoIso){
   const presets = [
-    {lbl:'Ontem', tipo:'ontem'},
     {lbl:'Semana', tipo:'semana'},
     {lbl:'Mês', tipo:'mes'},
     {lbl:'Trimestre', tipo:'trimestre'},
@@ -404,23 +327,25 @@ function setupPresets(){
   }
 
   cont.querySelectorAll('.preset-btn').forEach(btn=>{
-    // ao clicar num preset a referencia e sempre hoje (nao a data ja
-    // selecionada) - Ontem/Semana/Mes/Trimestre sempre voltam pro periodo atual
     btn.addEventListener('click', ()=>{
       aplicarPreset(btn.dataset.tipo, isoLocal(agoraBrasilia()), btn);
     });
   });
 
-  presetAtivo = null;
-  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
-  const ontemIso = isoLocal(ontem);
-  document.getElementById('f-date-start').value = ontemIso;
-  document.getElementById('f-date-end').value = ontemIso;
+  aplicarPreset('mes', refPadraoIso, cont.children[1]);
 
   ['f-date-start','f-date-end'].forEach(id=>{
     document.getElementById(id).addEventListener('input', ()=>{
-      presetAtivo = null;
-      cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      if(presetAtivo){
+        const refIso = document.getElementById(id).value;
+        if(refIso){
+          const range = calcularPreset(presetAtivo, refIso);
+          document.getElementById('f-date-start').value = range.inicio;
+          document.getElementById('f-date-end').value = range.fim;
+        }
+      } else {
+        cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      }
       render();
     });
   });
@@ -468,167 +393,73 @@ function setupMultiselect(){
 function filtrar(){
   const start = document.getElementById('f-date-start').value;
   const end = document.getElementById('f-date-end').value;
-  return DATA.filter(d=>
-    (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
-    (!start || (d.data||'') >= start) &&
-    (!end || (d.data||'') <= end)
-  );
+  return DATA.filter(d=>{
+    const dataVenda = (d.dataHora||'').slice(0,10);
+    return (SEL_UNIDADE.size===0 || SEL_UNIDADE.has(d.unidade)) &&
+      (!start || dataVenda >= start) &&
+      (!end || dataVenda <= end);
+  });
 }
 
 function renderKpis(rows){
   const soma = (list,campo) => +list.reduce((s,d)=>s+(d[campo]||0),0).toFixed(2);
-  const entregadores = new Set(rows.map(r=>r.entregador)).size;
-  const totalEntregas = soma(rows,'entrega');
-  const totalValor = soma(rows,'valor');
-  const ticketMedio = totalEntregas ? totalValor/totalEntregas : 0;
+  const lojas = new Set(rows.map(r=>r.unidade)).size;
+  const bruto = soma(rows,'valorBruto');
+  const liquido = soma(rows,'valorLiquido');
   const kpis = [
-    {lbl:'Entregadores ativos', val:entregadores, cls:''},
-    {lbl:'Entregas', val:totalEntregas.toFixed(0), cls:'ok'},
-    {lbl:'Extra', val:soma(rows,'extra').toFixed(0), cls:''},
-    {lbl:'Valor pago', val:fmtMoney(totalValor), cls:'ok'},
-    {lbl:'Retorno', val:soma(rows,'retorno').toFixed(0), cls:''},
-    {lbl:'Fora de área', val:soma(rows,'foraDeArea').toFixed(0), cls:''},
-    {lbl:'Ticket médio (TM)', val:fmtMoney(ticketMedio), cls:''},
+    {lbl:'Vendas', val:rows.length, cls:''},
+    {lbl:'Lojas com venda', val:lojas, cls:''},
+    {lbl:'Valor bruto', val:fmtMoney(bruto), cls:'ok'},
+    {lbl:'Comissão iFood', val:fmtMoney(soma(rows,'taxaComissao')), cls:'warn'},
+    {lbl:'Valor líquido', val:fmtMoney(liquido), cls:'ok'},
+    {lbl:'Ticket médio', val:fmtMoney(rows.length ? bruto/rows.length : 0), cls:''},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="lbl">${k.lbl}</div><div class="val ${k.cls}">${k.val}</div></div>`
   ).join('');
 }
 
-// visao fixa de "ontem" (D-1), independente do filtro de periodo ativo -
-// mostra pra cada unidade do roster (nao so as que tem dado) se ela ja
-// lancou as entregas de ontem, pra loja/gestor identificar rapido quem
-// ainda nao mandou o fechamento das motos
-function renderOntemPanel(){
-  const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
-  const ontemIso = isoLocal(ontem);
-  document.getElementById('ontem-titulo').textContent = `Lançamento de ontem (D-1) · ${fmtData(ontemIso)}`;
-
-  const porUnidadeOntem = {};
-  DATA.forEach(d=>{
-    if(d.data !== ontemIso) return;
-    const c = (porUnidadeOntem[d.unidade] ||= {entrega:0, valor:0});
-    c.entrega += d.entrega||0;
-    c.valor += d.valor||0;
-  });
-
-  const roster = codigosDisponiveis().sort((a,b)=>(UNIDADES_NOMES[a]||a).localeCompare(UNIDADES_NOMES[b]||b,'pt-BR'));
-  const lancaram = roster.filter(c=>porUnidadeOntem[c]);
-  document.getElementById('ontem-count').textContent = `${lancaram.length} de ${roster.length} unidades lançaram`;
-
-  document.getElementById('ontem-grid').innerHTML = roster.length ? roster.map(c=>{
-    const dado = porUnidadeOntem[c];
-    return `
-      <div class="ontem-card ${dado?'':'falta'}">
-        <div class="nome">${escapeHtml(UNIDADES_NOMES[c]||c)}</div>
-        <div class="qtd">${dado ? `${dado.entrega} entregas` : 'Não lançou'}</div>
-        ${dado ? `<div class="sub" style="margin-top:2px;">${fmtMoney(dado.valor)}</div>` : ''}
-      </div>`;
-  }).join('') : '<div class="empty">Nenhuma unidade liberada.</div>';
-}
-
-function renderEntregadoresTable(rows){
-  const porEntregador = {};
-  rows.forEach(r=>{
-    const chave = r.entregador+'::'+r.unidade;
-    const c = (porEntregador[chave] ||= {entregador:r.entregador, unidade:r.unidade, entrega:0, retorno:0, extra:0, foraDeArea:0, ajudaCusto:0, bonus:0, valor:0, coopRecebe:0});
-    c.entrega += r.entrega||0;
-    c.retorno += r.retorno||0;
-    c.extra += r.extra||0;
-    c.foraDeArea += r.foraDeArea||0;
-    c.ajudaCusto += r.ajudaCusto||0;
-    c.bonus += r.bonus||0;
-    c.valor += r.valor||0;
-    c.coopRecebe += r.coopRecebe||0;
-  });
-  // Quant. = quantidade real de corridas do entregador, somando entrega com
-  // extra/retorno (que tambem sao corridas extras, nao so a entrega em si)
-  const linhas = Object.values(porEntregador)
-    .map(c=>({...c, quant: c.entrega+c.extra+c.retorno}))
-    .sort((a,b)=>b.valor-a.valor);
-  document.getElementById('entregadores-count').textContent = linhas.length;
-  document.getElementById('entregadores-body').innerHTML = linhas.length ? linhas.map(c=>`
-    <tr>
-      <td>${escapeHtml(UNIDADES_NOMES[c.unidade]||c.unidade)}</td>
-      <td>${escapeHtml(c.entregador)}</td>
-      <td class="valor">${c.quant}</td>
-      <td class="valor">${fmtMoney(c.valor)}</td>
-      <td class="valor">${fmtMoney(c.ajudaCusto)}</td>
-      <td class="valor">${c.entrega}</td>
-      <td class="valor">${c.retorno}</td>
-      <td class="valor">${c.extra}</td>
-      <td class="valor">${fmtMoney(c.bonus)}</td>
-      <td class="valor">${c.foraDeArea}</td>
-      <td class="valor">${fmtMoney(c.coopRecebe)}</td>
-      <td class="valor">${fmtMoney(c.entrega ? c.valor/c.entrega : 0)}</td>
-    </tr>`).join('') : '<tr><td colspan="12" class="empty">Sem dados no período.</td></tr>';
-}
-
-// tabela "Por unidade" cobre o roster inteiro (codigosDisponiveis()), nao so
-// as unidades que tem lancamento no periodo filtrado - assim uma loja que
-// nao lancou nada aparece com zeros em vez de simplesmente sumir da lista
 function renderUnidadesTable(rows){
   const porUnidade = {};
   rows.forEach(r=>{
-    const c = (porUnidade[r.unidade] ||= {corridas:0, entrega:0, retorno:0, extra:0, foraDeArea:0, bonus:0, ajudaCusto:0, valor:0, coopRecebe:0});
-    c.corridas++;
-    c.entrega += r.entrega||0;
-    c.retorno += r.retorno||0;
-    c.extra += r.extra||0;
-    c.foraDeArea += r.foraDeArea||0;
-    c.bonus += r.bonus||0;
-    c.ajudaCusto += r.ajudaCusto||0;
-    c.valor += r.valor||0;
-    c.coopRecebe += r.coopRecebe||0;
+    const c = (porUnidade[r.unidade] ||= {vendas:0, bruto:0, comissao:0, liquido:0});
+    c.vendas++;
+    c.bruto += r.valorBruto||0;
+    c.comissao += r.taxaComissao||0;
+    c.liquido += r.valorLiquido||0;
   });
-  const vazio = {corridas:0, entrega:0, retorno:0, extra:0, foraDeArea:0, bonus:0, ajudaCusto:0, valor:0, coopRecebe:0};
-  const roster = codigosDisponiveis();
-  const linhas = roster.map(u=>[u, porUnidade[u]||vazio]).sort((a,b)=>b[1].valor-a[1].valor);
+  const linhas = Object.entries(porUnidade).sort((a,b)=>b[1].bruto-a[1].bruto);
   document.getElementById('unidades-count').textContent = linhas.length;
   document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>`
     <tr>
       <td>${escapeHtml(UNIDADES_NOMES[u]||u)}</td>
-      <td class="valor">${c.corridas}</td>
-      <td class="valor">${c.entrega}</td>
-      <td class="valor">${c.retorno}</td>
-      <td class="valor">${c.extra}</td>
-      <td class="valor">${c.foraDeArea}</td>
-      <td class="valor">${fmtMoney(c.bonus)}</td>
-      <td class="valor">${fmtMoney(c.ajudaCusto)}</td>
-      <td class="valor">${fmtMoney(c.valor)}</td>
-      <td class="valor">${fmtMoney(c.coopRecebe)}</td>
-      <td class="valor">${fmtMoney(c.entrega ? c.valor/c.entrega : 0)}</td>
-    </tr>`).join('') : '<tr><td colspan="11" class="empty">Nenhuma unidade liberada.</td></tr>';
+      <td class="valor">${c.vendas}</td>
+      <td class="valor">${fmtMoney(c.bruto)}</td>
+      <td class="valor">${fmtMoney(c.comissao)}</td>
+      <td class="valor">${fmtMoney(c.liquido)}</td>
+      <td class="valor">${fmtMoney(c.vendas ? c.bruto/c.vendas : 0)}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Sem dados no período.</td></tr>';
 }
 
 function renderTabela(rows){
-  const ordenadas = [...rows].sort((a,b)=>(b.data||'').localeCompare(a.data||'') || (b.criadoEm||'').localeCompare(a.criadoEm||''));
-  document.getElementById('lancamentos-count').textContent = ordenadas.length;
-  document.getElementById('lancamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>`
+  const ordenadas = [...rows].sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+  document.getElementById('vendas-count').textContent = ordenadas.length;
+  document.getElementById('vendas-body').innerHTML = ordenadas.length ? ordenadas.map(d=>`
     <tr>
-      <td>${fmtData(d.data)}</td>
+      <td>${fmtData(d.dataHora)}</td>
       <td>${escapeHtml(UNIDADES_NOMES[d.unidade]||d.unidade)}</td>
-      <td>${escapeHtml(d.entregador)}</td>
-      <td class="valor">${d.entrega}</td>
-      <td class="valor" title="${escapeHtml(d.obsRetorno||'')}">${d.retorno}</td>
-      <td class="valor" title="${escapeHtml(d.obsExtra||'')}">${d.extra}</td>
-      <td class="valor">${d.pos00hs}</td>
-      <td class="valor">${d.foraDeArea}</td>
-      <td class="valor">${fmtMoney(d.bonus)}</td>
-      <td class="valor">${fmtMoney(d.ajudaCusto)}</td>
-      <td class="valor">${fmtMoney(d.valor)}</td>
-      <td class="valor">${fmtMoney(d.coopRecebe)}</td>
-      <td class="valor">${d.quantTotal}</td>
-      <td>${d.etiquetaPath ? `<a href="/api/entregas/etiqueta/${d.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank" style="color:var(--accent);">📎 ver</a>` : (d.etiquetaOrigem ? `<span class="sub" title="Ainda não migrada pro app - referência original do AppSheet/Drive">📎 ${escapeHtml(d.etiquetaOrigem)}</span>` : '—')}</td>
-      <td class="truncate" title="${escapeHtml(d.observacao||'')}">${escapeHtml(d.observacao||'—')}</td>
-    </tr>`).join('') : '<tr><td colspan="15" class="empty">Nenhuma entrega no período/unidade selecionados.</td></tr>';
+      <td>${escapeHtml(d.numeroPedido||'—')}</td>
+      <td class="valor">${fmtMoney(d.valorBruto)}</td>
+      <td class="valor">${fmtMoney(d.taxaComissao)}</td>
+      <td class="valor">${fmtMoney(d.valorLiquido)}</td>
+      <td>${escapeHtml(d.formaPagamento||'—')}</td>
+      <td>${escapeHtml(d.status||'—')}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Nenhuma venda no período/unidade selecionados.</td></tr>';
 }
 
 function render(){
   const rows = filtrar();
   renderKpis(rows);
-  renderOntemPanel();
-  renderEntregadoresTable(rows);
   renderUnidadesTable(rows);
   renderTabela(rows);
 }
@@ -646,9 +477,9 @@ async function boot(){
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
   document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
-  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
@@ -656,15 +487,14 @@ async function boot(){
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
-  document.getElementById('btn-sincronizar-planilha').classList.toggle('hidden', !isMaster);
+  document.getElementById('btn-sincronizar').classList.toggle('hidden', !isMaster);
 
-  if(!secoes.includes('entregas')){
+  if(!secoes.includes('ifood')){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
   document.getElementById('root').classList.remove('hidden');
   await carregar();
-  if(isMaster) await carregarEdicoes();
 }
 
 boot();

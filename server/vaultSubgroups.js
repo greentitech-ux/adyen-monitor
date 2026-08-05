@@ -6,22 +6,25 @@
 // controle fino (ex: acesso só a DOM_BESSA, sem ver SPO_TACARUNA). Criar/
 // renomear/excluir subgrupo e restrito ao Master.
 const db = require('./firestore');
+const { createCache } = require('./liveCache');
 
 const subgroupsRef = db.collection('vaultSubgroups');
 const entriesRef = db.collection('vaultEntries');
 
-async function listAll() {
+// cache de 20s, mesmo racional de vaultGroups.js: lista muda raramente e e
+// lida a cada boot de Cofre/Usuarios - listByGroup deriva do mesmo cache em
+// vez de fazer uma query propria no Firestore
+async function listAllUncached() {
   const snap = await subgroupsRef.get();
   const list = snap.docs.map(toSubgroup);
   list.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   return list;
 }
+const subgroupsCache = createCache(listAllUncached, 20 * 1000);
+const listAll = subgroupsCache.cached;
 
 async function listByGroup(groupId) {
-  const snap = await subgroupsRef.where('groupId', '==', groupId).get();
-  const list = snap.docs.map(toSubgroup);
-  list.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  return list;
+  return (await listAll()).filter((s) => s.groupId === groupId);
 }
 
 async function create(groupId, name) {
@@ -29,6 +32,7 @@ async function create(groupId, name) {
   if (!groupId) throw new Error('Grupo é obrigatório.');
   if (!name) throw new Error('Nome do subgrupo é obrigatório.');
   const doc = await subgroupsRef.add({ groupId, name, createdAt: new Date().toISOString() });
+  subgroupsCache.invalidar();
   return toSubgroup(await doc.get());
 }
 
@@ -39,6 +43,7 @@ async function rename(id, name) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Subgrupo não encontrado.');
   await ref.update({ name });
+  subgroupsCache.invalidar();
   return toSubgroup(await ref.get());
 }
 
@@ -47,6 +52,7 @@ async function remove(id) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Subgrupo não encontrado.');
   await ref.delete();
+  subgroupsCache.invalidar();
 
   // as senhas que estavam nesse subgrupo ficam "sem subgrupo" em vez de
   // serem apagadas

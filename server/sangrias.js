@@ -7,19 +7,36 @@
 // que a sangria é registrada pode ainda não existir nenhum fechamento pra
 // aquele dia.
 const db = require('./firestore');
+const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('sangrias');
+
 
 function num(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
-async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, criadoPorId, criadoPorEmail }) {
+function validarPeriodo(periodoInicio, periodoFim) {
+  if (!periodoInicio || !/^\d{4}-\d{2}-\d{2}$/.test(periodoInicio)) throw new Error('Informe a data inicial do período do depósito.');
+  if (!periodoFim || !/^\d{4}-\d{2}-\d{2}$/.test(periodoFim)) throw new Error('Informe a data final do período do depósito.');
+  if (periodoFim < periodoInicio) throw new Error('A data final do período não pode ser anterior à data inicial.');
+  return { periodoInicio, periodoFim };
+}
+
+function validarNomeDepositante(nomeDepositante) {
+  const nome = String(nomeDepositante || '').trim();
+  if (!nome) throw new Error('Informe o nome de quem depositou.');
+  return nome.slice(0, 120);
+}
+
+async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, periodoInicio, periodoFim, nomeDepositante, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
   const v = num(valor);
   if (v <= 0) throw new Error('Informe o valor retirado.');
+  const periodo = validarPeriodo(periodoInicio, periodoFim);
+  const nome = validarNomeDepositante(nomeDepositante);
 
   const ref = COLLECTION.doc();
   const registro = {
@@ -30,18 +47,25 @@ async function criar({ unidade, unidadeNome, grupo, data, valor, descricao, cria
     data,
     valor: v,
     descricao: (descricao || '').slice(0, 300),
+    periodoInicio: periodo.periodoInicio,
+    periodoFim: periodo.periodoFim,
+    nomeDepositante: nome,
     criadoPorId,
     criadoPorEmail,
     criadoEm: new Date().toISOString(),
   };
   await ref.set(registro);
+  sangriasCache.invalidar();
   return registro;
 }
 
-async function listAll() {
+async function listAllUncached() {
   const snap = await COLLECTION.orderBy('data', 'desc').get();
   return snap.docs.map((d) => d.data());
 }
+const sangriasCache = createCache(listAllUncached, 20 * 1000);
+const listAll = sangriasCache.cached;
+
 
 // Firestore "in" aceita no maximo 30 valores por consulta
 async function listByUnidades(unidades) {
@@ -73,4 +97,49 @@ function comoFechamento(s) {
   };
 }
 
-module.exports = { criar, listAll, listByUnidades, comoFechamento };
+async function getOne(id) {
+  const doc = await COLLECTION.doc(id).get();
+  return doc.exists ? doc.data() : null;
+}
+
+// edicao/exclusao direta - poder do Master de corrigir ou apagar uma
+// sangria lançada errado. Como a sangria só existe nessa coleção (o
+// fechamento só a enxerga mesclada na leitura, ver comoFechamento), editar
+// ou excluir aqui já reflete automaticamente em qualquer lugar que mostra
+// o fechamento mesclado - não precisa (nem dá) mexer no fechamento em si
+async function atualizar(id, { valor, descricao, data, periodoInicio, periodoFim, nomeDepositante }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Sangria não encontrada.');
+  const patch = {};
+  if (valor != null && valor !== '') {
+    const v = num(valor);
+    if (v <= 0) throw new Error('Informe o valor retirado.');
+    patch.valor = v;
+  }
+  if (descricao != null) patch.descricao = String(descricao).slice(0, 300);
+  if (data != null) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
+    patch.data = data;
+  }
+  if (periodoInicio !== undefined || periodoFim !== undefined) {
+    const periodo = validarPeriodo(periodoInicio, periodoFim);
+    patch.periodoInicio = periodo.periodoInicio;
+    patch.periodoFim = periodo.periodoFim;
+  }
+  if (nomeDepositante !== undefined) {
+    patch.nomeDepositante = validarNomeDepositante(nomeDepositante);
+  }
+  await ref.update(patch);
+  sangriasCache.invalidar();
+  return getOne(id);
+}
+
+async function remover(id) {
+  const snap = await COLLECTION.doc(id).get();
+  if (!snap.exists) throw new Error('Sangria não encontrada.');
+  await COLLECTION.doc(id).delete();
+  sangriasCache.invalidar();
+}
+
+module.exports = { criar, listAll, listByUnidades, comoFechamento, getOne, atualizar, remover };

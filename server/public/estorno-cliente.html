@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Pedido de estorno · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:560px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  p.intro{font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.5;}
+  .hidden{display:none!important;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  .ajuda{font-size:11px;color:var(--muted);margin:-2px 0 6px;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .radios{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+  .radios label{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:13.5px;color:var(--text);margin:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;cursor:pointer;}
+  .radios input{width:auto;flex:none;}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .sucesso{text-align:center;padding:36px 10px;}
+  .sucesso .icone{font-size:40px;margin-bottom:10px;}
+  .sucesso h2{font-size:16px;margin:0 0 8px;}
+  .sucesso p{font-size:13px;color:var(--muted);line-height:1.6;margin:0;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+  <h1>Pedido de estorno</h1>
+  <p class="intro">Preencha os dados da compra e anexe o comprovante da maquininha. Nossa equipe vai analisar o pedido e, se aprovado, encaminha o estorno.</p>
+</header>
+
+<div id="sucesso" class="panel sucesso hidden">
+  <div class="icone">✅</div>
+  <h2>Pedido recebido!</h2>
+  <p>Recebemos seu pedido de estorno. Nossa equipe vai avaliar e, se você informou telefone, pode ser contatado por lá.</p>
+</div>
+
+<form id="form-estorno" class="panel">
+  <div class="secao">
+    <div class="secao-titulo">Loja</div>
+    <label>Loja onde comprou *</label>
+    <select id="unidade" required>
+      <option value="" disabled selected>Carregando lojas...</option>
+    </select>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Motivo do estorno</div>
+    <label>Motivo do estorno *</label>
+    <select id="motivoEstorno" required>
+      <option value="" disabled selected>Escolher</option>
+      <option>Cobrança em duplicidade (cliente pagou duas vezes)</option>
+      <option>Valor cobrado errado</option>
+      <option>Pedido cancelado</option>
+      <option>Cliente desistiu da compra</option>
+      <option>Erro de operação no caixa</option>
+      <option>Outro</option>
+    </select>
+    <div id="wrap-motivo-outro" class="hidden">
+      <label>Explique o motivo *</label>
+      <textarea id="motivoOutro"></textarea>
+    </div>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Valor a estornar</div>
+    <label>Valor a estornar (R$) *</label>
+    <div class="ajuda">Se for total, repita o valor da venda.</div>
+    <input type="number" step="0.01" min="0" inputmode="decimal" id="valorEstornar" required>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Dados da venda</div>
+    <label>Valor total da venda (R$) *</label>
+    <div class="ajuda">Ex.: 89,90</div>
+    <input type="number" step="0.01" min="0" inputmode="decimal" id="valorVenda" required>
+
+    <label>Forma de pagamento *</label>
+    <div class="radios" id="formaPagamento">
+      <label><input type="radio" name="formaPagamento" value="Crédito à vista" required> Crédito à vista</label>
+      <label><input type="radio" name="formaPagamento" value="Online"> Online</label>
+      <label><input type="radio" name="formaPagamento" value="Débito"> Débito</label>
+      <label><input type="radio" name="formaPagamento" value="Voucher (vale-refeição ou alimentação)"> Voucher (vale-refeição ou alimentação)</label>
+      <label><input type="radio" name="formaPagamento" value="Pix na maquininha"> Pix na maquininha</label>
+      <label><input type="radio" name="formaPagamento" value="Não sei informar"> Não sei informar</label>
+    </div>
+
+    <label>Bandeira do cartão *</label>
+    <select id="bandeira" required>
+      <option value="" disabled selected>Escolher</option>
+      <option>Visa</option>
+      <option>Mastercard</option>
+      <option>Elo</option>
+      <option>Pix</option>
+      <option>Outra / não sei</option>
+    </select>
+
+    <label>Últimos 4 números do cartão</label>
+    <div class="ajuda">⚠️ Somente os 4 últimos. Nunca envie o número completo do cartão.</div>
+    <input type="text" inputmode="numeric" maxlength="4" pattern="[0-9]{0,4}" id="ultimos4">
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Comprovante da transação</div>
+    <div class="ajuda">Anexe a foto ou o PDF do comprovante da maquininha. Se a cobrança caiu em duplicidade, anexe os dois comprovantes.</div>
+    <label>Comprovante da maquininha (foto ou PDF) *</label>
+    <div class="ajuda">Até 5 arquivos, 10 MB cada.</div>
+    <input type="file" id="comprovantes" accept="image/*,.pdf" multiple required>
+
+    <div class="grid2">
+      <div>
+        <label>Data da venda *</label>
+        <input type="date" id="dataVenda" required>
+      </div>
+      <div>
+        <label>Hora aproximada da venda</label>
+        <input type="time" id="horaVenda">
+      </div>
+    </div>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Cliente</div>
+    <label>Nome do cliente</label>
+    <input type="text" id="nomeCliente">
+    <label>Telefone do cliente</label>
+    <input type="tel" id="telefoneCliente" placeholder="(11) 99999-9999">
+  </div>
+
+  <button type="submit" class="btn-primary" id="btn-enviar">Enviar pedido</button>
+  <div id="msg" class="msg hidden"></div>
+</form>
+
+<script>
+// link direto da loja (ex: gerado em Central de Solicitações) vem com
+// ?unidade=codigo - pre-seleciona e trava o campo, pra quem recebeu o link
+// pelo WhatsApp/QR code nao precisar (e nao poder errar) escolher a loja
+async function boot(){
+  const unidadeFixa = new URLSearchParams(location.search).get('unidade');
+  try{
+    const unidades = await fetch('/api/meta/unidades-publico').then(r=>r.json());
+    const sel = document.getElementById('unidade');
+    if(unidadeFixa && unidades.some(u=>u.codigo===unidadeFixa)){
+      const nome = unidades.find(u=>u.codigo===unidadeFixa).nome;
+      sel.innerHTML = `<option value="${escapeHtml(unidadeFixa)}" selected>${escapeHtml(nome)}</option>`;
+      sel.disabled = true;
+    } else {
+      sel.innerHTML = '<option value="" disabled selected>Escolher</option>' +
+        unidades.map(u=>`<option value="${u.codigo}">${escapeHtml(u.nome)}</option>`).join('');
+    }
+  }catch(e){
+    document.getElementById('unidade').innerHTML = '<option value="" disabled selected>Erro ao carregar lojas - recarregue a página</option>';
+  }
+}
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+document.getElementById('motivoEstorno').addEventListener('change', (e)=>{
+  const ehOutro = e.target.value === 'Outro';
+  document.getElementById('wrap-motivo-outro').classList.toggle('hidden', !ehOutro);
+  document.getElementById('motivoOutro').required = ehOutro;
+});
+
+document.getElementById('form-estorno').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  msg.classList.add('hidden');
+  const btn = document.getElementById('btn-enviar');
+
+  const arquivos = document.getElementById('comprovantes').files;
+  if(!arquivos.length){
+    msg.textContent = 'Anexe pelo menos um comprovante da maquininha.'; msg.className = 'msg err'; msg.classList.remove('hidden');
+    return;
+  }
+  for(const f of arquivos){
+    if(f.size > 10 * 1024 * 1024){
+      msg.textContent = `O arquivo "${f.name}" passa de 10 MB.`; msg.className = 'msg err'; msg.classList.remove('hidden');
+      return;
+    }
+  }
+
+  const formaPagamento = document.querySelector('input[name=formaPagamento]:checked');
+  if(!formaPagamento){
+    msg.textContent = 'Selecione a forma de pagamento.'; msg.className = 'msg err'; msg.classList.remove('hidden');
+    return;
+  }
+
+  const payload = {
+    unidade: document.getElementById('unidade').value,
+    motivoEstorno: document.getElementById('motivoEstorno').value,
+    motivoOutro: document.getElementById('motivoOutro').value,
+    valorEstornar: document.getElementById('valorEstornar').value,
+    valorVenda: document.getElementById('valorVenda').value,
+    formaPagamento: formaPagamento.value,
+    bandeira: document.getElementById('bandeira').value,
+    ultimos4: document.getElementById('ultimos4').value,
+    dataVenda: document.getElementById('dataVenda').value,
+    horaVenda: document.getElementById('horaVenda').value,
+    nomeCliente: document.getElementById('nomeCliente').value,
+    telefoneCliente: document.getElementById('telefoneCliente').value,
+  };
+
+  const fd = new FormData();
+  fd.append('payload', JSON.stringify(payload));
+  for(const f of arquivos) fd.append('anexos', f);
+
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const resp = await fetch('/api/refund-requests/publico', { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar o pedido.');
+    document.getElementById('form-estorno').classList.add('hidden');
+    document.getElementById('sucesso').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Enviar pedido';
+  }
+});
+
+boot();
+</script>
+</body>
+</html>

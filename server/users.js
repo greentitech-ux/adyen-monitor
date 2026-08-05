@@ -4,11 +4,12 @@
 // chamar essas funcoes (aplicado nas rotas via auth.requireMaster).
 const bcrypt = require('bcryptjs');
 const db = require('./firestore');
-const { emptyPermissions } = require('./auth');
+const { emptyPermissions, invalidarUsuario } = require('./auth');
+const { createCache } = require('./liveCache');
 
 const usersRef = db.collection('users');
 
-const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'entregas', 'entregas-lancamento'];
+const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'inventario'];
 
 function sanitizePermissions(input) {
   const p = input || {};
@@ -19,10 +20,29 @@ function sanitizePermissions(input) {
   };
 }
 
-async function list() {
+const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function sanitizeHorarioPermitido(input) {
+  const h = input || {};
+  const ativo = !!h.ativo;
+  if (!ativo) return { ativo: false, inicio: '', fim: '' };
+  if (!HORA_RE.test(h.inicio) || !HORA_RE.test(h.fim)) {
+    throw new Error('Informe início e fim no formato HH:MM.');
+  }
+  return { ativo: true, inicio: h.inicio, fim: h.fim };
+}
+
+// cache de 20s: a listagem passou a ser lida tambem por rotas quentes fora
+// da tela de Usuarios (ex: GET /api/grupos/responsaveis, chamada a cada
+// troca de unidade no formulario da Central) - sem cache, cada uma dessas
+// chamadas relia a colecao users inteira do Firestore. Toda mutacao abaixo
+// invalida (create/permissions/active/horario/isAdmin/cargo/senha/remove)
+async function listUncached() {
   const snap = await usersRef.orderBy('createdAt', 'asc').get();
   return snap.docs.map(toPublic);
 }
+const usersCache = createCache(listUncached, 20 * 1000);
+const list = usersCache.cached;
 
 async function create({ email, password, permissions }) {
   email = String(email || '').trim().toLowerCase();
@@ -41,6 +61,7 @@ async function create({ email, password, permissions }) {
     permissions: sanitizePermissions(permissions),
     createdAt: new Date().toISOString(),
   });
+  usersCache.invalidar();
   return toPublic(await doc.get());
 }
 
@@ -50,6 +71,8 @@ async function updatePermissions(id, permissions) {
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   if (snap.data().role === 'master') throw new Error('O acesso Master não usa permissões.');
   await ref.update({ permissions: sanitizePermissions(permissions) });
+  invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -59,6 +82,46 @@ async function setActive(id, active) {
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   if (snap.data().role === 'master') throw new Error('O acesso Master não pode ser desativado.');
   await ref.update({ active: !!active });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
+async function updateHorarioPermitido(id, horarioPermitido) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master não usa horário restrito.');
+  await ref.update({ horarioPermitido: sanitizeHorarioPermitido(horarioPermitido) });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
+async function updateIsAdmin(id, isAdmin) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master já pode tudo, não precisa da tag Admin.');
+  await ref.update({ isAdmin: !!isAdmin });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
+// tag de cargo/funcao (Loja, Gerente) - so um rotulo de organizacao na tela
+// de Usuarios, nao muda nenhuma permissao (diferente da tag Admin)
+const CARGOS_VALIDOS = ['loja', 'gerente'];
+async function updateCargo(id, cargo) {
+  const limpo = cargo ? String(cargo).toLowerCase() : null;
+  if (limpo && !CARGOS_VALIDOS.includes(limpo)) throw new Error('Tag inválida. Use "loja" ou "gerente".');
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master não usa tag de cargo.');
+  await ref.update({ cargo: limpo });
+  invalidarUsuario(id);
+  usersCache.invalidar();
   return toPublic(await ref.get());
 }
 
@@ -70,6 +133,8 @@ async function resetPassword(id, password) {
   const passwordHash = await bcrypt.hash(password, 12);
   // o Master trocando a senha tambem desbloqueia o acesso (ex: apos 3 tentativas erradas)
   await ref.update({ passwordHash, locked: false, failedAttempts: 0 });
+  invalidarUsuario(id);
+  usersCache.invalidar();
   return { ok: true };
 }
 
@@ -79,6 +144,8 @@ async function remove(id) {
   if (!snap.exists) return;
   if (snap.data().role === 'master') throw new Error('O acesso Master não pode ser excluído.');
   await ref.delete();
+  invalidarUsuario(id);
+  usersCache.invalidar();
 }
 
 function toPublic(doc) {
@@ -90,8 +157,11 @@ function toPublic(doc) {
     active: data.active !== false,
     locked: !!data.locked,
     permissions: data.role === 'master' ? null : data.permissions || emptyPermissions(),
+    horarioPermitido: data.role === 'master' ? null : data.horarioPermitido || { ativo: false, inicio: '', fim: '' },
+    isAdmin: data.role === 'master' ? null : !!data.isAdmin,
+    cargo: data.role === 'master' ? null : data.cargo || null,
     createdAt: data.createdAt,
   };
 }
 
-module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, resetPassword, remove };
+module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, updateIsAdmin, updateCargo, resetPassword, remove };

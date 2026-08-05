@@ -25,13 +25,21 @@
   header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
-  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   .back:hover{color:var(--text);border-color:var(--accent);}
   .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-sair{color:var(--bad);}
@@ -39,8 +47,10 @@
   .hidden{display:none!important;}
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  @media(max-width:640px){ .panel{padding:14px;} }
   .panel h2{font-size:13px;margin:0 0 14px;}
-  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .tablewrap{overflow-x:auto;}
+  table{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px;}
   thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
   tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;}
@@ -49,10 +59,31 @@
   .badge.on{background:var(--ok-dim);color:var(--ok);}
   .badge.off{background:var(--bad-dim);color:var(--bad);}
   .badge.locked{background:var(--bad-dim);color:var(--bad);}
+  .badge.horario{background:#132029;color:var(--accent);border:1px solid var(--line);}
+  .badge.admin{background:#2a1a3d;color:#c299ff;border:1px solid var(--line);}
+  .badge.loja{background:#12303a;color:var(--accent);border:1px solid var(--line);}
+  .badge.gerente{background:#0f2f22;color:var(--ok);border:1px solid var(--line);}
+  .btn-acoes{font-family:var(--sans);font-size:11.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;white-space:nowrap;}
+  .btn-acoes:hover{border-color:var(--accent);}
+  .acoes-lista{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
+  .acoes-lista button{width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:11px 12px;font-size:12.5px;cursor:pointer;font-family:var(--sans);}
+  .acoes-lista button:hover{border-color:var(--accent);}
+  .acoes-lista button.danger{color:var(--bad);}
+  .acoes-lista button.danger:hover{border-color:var(--bad);}
+  .acoes-lista .acoes-sep{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 0;}
   .checks .group-heading{width:100%;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
   .checks .group-heading:first-child{margin-top:0;}
+  .unidades-secao{margin-top:14px;}
+  .unidades-secao:first-child{margin-top:0;}
+  .unidades-secao-titulo{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--line);}
+  .unidades-grupo-titulo{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px;}
+  .unidades-grupo-titulo:first-of-type{margin-top:0;}
   .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:280px;}
-  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+  .tag-mais{cursor:pointer;color:var(--accent);border-color:var(--accent);flex:none;}
+  .tag-mais:hover{background:rgba(92,200,255,.12);}
+  .tags .tag-extra{display:none;}
+  .tags.expanded .tag-extra{display:inline-block;}
   .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
   .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .rowacts button:hover{border-color:var(--accent);}
@@ -60,13 +91,14 @@
   form.create label{font-size:11.5px;color:var(--muted);}
   form.create input{width:100%;margin-top:4px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
   fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;}
-  legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;padding:0 6px;}
+  legend{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;padding:0 6px;max-width:100%;overflow-wrap:break-word;}
   .checks{display:flex;flex-wrap:wrap;gap:10px;}
   .checks label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text);white-space:nowrap;}
   .checks input{width:auto;margin:0;}
   button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;align-self:flex-start;}
   .err{color:var(--bad);font-size:11.5px;}
   .ok-msg{color:var(--ok);font-size:11.5px;}
+  #restaurar-fechamento-overlay input[type=text],#restaurar-fechamento-overlay select{width:100%;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
   .overlay.show{display:flex;}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:480px;}
@@ -74,28 +106,24 @@
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
   .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+  .legend-actions{display:inline-flex;gap:6px;margin-left:8px;text-transform:none;}
+  .legend-actions button{font-family:var(--sans);font-size:10.5px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .legend-actions button:hover{border-color:var(--accent);color:var(--text);}
 </style>
 </head>
 <body>
 
 <header>
   <div class="header-top">
-    <div>
-      <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-      <h1>Usuários e permissões</h1>
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Usuários e permissões</h1>
+      </div>
     </div>
   </div>
   <div class="header-nav">
-    <div class="nav-links">
-      <a class="back" href="/">📈 Monitor</a>
-      <a class="back" href="/lancamento.html">🧾 Fechamento</a>
-      <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
-      <a class="back" href="/entregas.html">🛵 Entregas</a>
-      <a class="back" href="/entrega-lancamento.html">📦 Lançar entrega</a>
-      <a class="back" href="/relatorios.html">📊 Relatórios</a>
-      <a class="back" href="/cofre.html">🔐 Cofre</a>
-      <a class="back active" href="/usuarios.html">👤 Usuários</a>
-    </div>
     <div class="nav-actions">
       <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
       <div class="nav-divider"></div>
@@ -104,15 +132,45 @@
   </div>
 </header>
 
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" href="/painel.html">🏠 Painel</a>
+  <a class="back" href="/">📈 Monitor</a>
+  <a class="back" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back" href="/entregas.html">🛵 Entregas</a>
+  <a class="back" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back" href="/ifood.html">🍔 iFood</a>
+  <a class="back" href="/central.html">📋 Central</a>
+  <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back active" href="/usuarios.html">👤 Usuários</a>
+  <a class="back" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
 <div id="sem-acesso" class="empty hidden">Só o acesso Master pode gerenciar usuários.</div>
 
 <div id="root" class="hidden">
   <div class="panel">
-    <h2>Acessos cadastrados</h2>
-    <table>
-      <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
-      <tbody id="users-body"></tbody>
-    </table>
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>Acessos cadastrados</span>
+      <span style="display:flex;gap:4px;">
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('csv')">📄 CSV</button>
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('pdf')">📄 PDF</button>
+      </span>
+    </h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel">
@@ -122,17 +180,18 @@
       <label>Senha temporária (mín. 8 caracteres)<input type="text" id="c-password" required minlength="8"></label>
 
       <fieldset>
-        <legend>Seções</legend>
+        <legend>Seções <span class="legend-actions"><button type="button" onclick="marcarTodos('c-sections',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-sections',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-sections"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Unidades (monitor/disputas/fechamentos/lançamento/entregas)</legend>
-        <div class="checks" id="c-unidades"></div>
+        <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('c-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-unidades',false)">Desmarcar todos</button></span></legend>
+        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria/depósito e entregas. Chamados de TI não depende de unidade (marca todas automaticamente - o técnico vê os chamados atribuídos a ele em qualquer loja).</div>
+        <div id="c-unidades"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Cofre (subgrupos)</legend>
+        <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('c-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-groups',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-groups"></div>
       </fieldset>
 
@@ -144,12 +203,17 @@
   <div class="panel">
     <h2>Backup do banco de dados</h2>
     <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Backup automático todo dia, guardado no Storage por 30 dias. Use "Fazer backup agora" antes de qualquer mudança grande, por segurança.</p>
-    <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button type="button" class="primary" id="btn-backup-run" onclick="rodarBackupAgora()">Fazer backup agora</button>
+      <button type="button" class="back" onclick="abrirRestaurarFechamento()">🔍 Recuperar fechamento excluído</button>
+    </div>
     <p class="ok-msg hidden" id="backup-msg" style="margin-top:10px;"></p>
-    <table style="margin-top:14px;">
-      <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
-      <tbody id="backups-body"></tbody>
-    </table>
+    <div class="tablewrap" style="margin-top:14px;">
+      <table style="min-width:420px;">
+        <thead><tr><th>Arquivo</th><th>Criado em</th><th>Tamanho</th></tr></thead>
+        <tbody id="backups-body"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel">
@@ -157,10 +221,37 @@
     <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">A cada 2 dias o sistema gera um PDF/CSV com tudo que aconteceu no período (aprovado, recusado, estornado, chargeback, fraude...) e depois apaga do banco o que não é chargeback nem fraude suspeita - esses dois ficam guardados pra sempre pra continuar gerando alerta. Use "Gerar agora" pra rodar fora do horário automático.</p>
     <button type="button" class="primary" id="btn-relatorio-run" onclick="rodarRelatorioAgora()">Gerar relatório agora</button>
     <p class="ok-msg hidden" id="relatorio-msg" style="margin-top:10px;"></p>
-    <table style="margin-top:14px;">
-      <thead><tr><th>Período</th><th>Criado em</th><th></th></tr></thead>
-      <tbody id="relatorios-body"></tbody>
-    </table>
+    <div class="tablewrap" style="margin-top:14px;">
+      <table style="min-width:420px;">
+        <thead><tr><th>Período</th><th>Criado em</th><th></th></tr></thead>
+        <tbody id="relatorios-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="restaurar-fechamento-overlay">
+  <div class="modal" style="max-width:560px;">
+    <h3 style="margin-top:0;">Recuperar fechamento excluído</h3>
+    <p style="font-size:11.5px;color:var(--muted);margin:-4px 0 12px;">Escolha um backup de antes da exclusão, busque pela unidade/data/gerente e restaure o registro exatamente como estava.</p>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Backup</label>
+    <div style="display:flex;gap:8px;">
+      <select id="restaurar-backup-select" style="flex:1;"></select>
+      <button type="button" class="primary" id="btn-restaurar-buscar" onclick="buscarFechamentosBackup()">Buscar</button>
+    </div>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;">Filtrar por unidade, gerente ou data (aaaa-mm-dd)</label>
+    <input type="text" id="restaurar-busca" placeholder="ex: Bessa" oninput="renderResultadosRestaurar()">
+    <p class="err hidden" id="restaurar-msg" style="margin-top:10px;"></p>
+    <div id="restaurar-resultados" style="margin-top:12px;max-height:320px;overflow-y:auto;"></div>
+    <button type="button" class="back" style="margin-top:14px;" onclick="fecharRestaurarFechamento()">Fechar</button>
+  </div>
+</div>
+
+<div class="overlay" id="acoes-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="acoes-titulo" style="margin:0;word-break:break-all;"></h3>
+    <div class="acoes-lista" id="acoes-lista"></div>
+    <button type="button" class="back" style="margin-top:14px;cursor:pointer;" onclick="fecharAcoes()">Fechar</button>
   </div>
 </div>
 
@@ -168,21 +259,51 @@
   <form class="modal" id="perm-form">
     <h3 id="perm-title">Editar permissões</h3>
     <fieldset>
-      <legend>Seções</legend>
+      <legend>Seções <span class="legend-actions"><button type="button" onclick="marcarTodos('p-sections',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-sections',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-sections"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Unidades</legend>
-      <div class="checks" id="p-unidades"></div>
+      <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('p-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-unidades',false)">Desmarcar todos</button></span></legend>
+      <div id="p-unidades"></div>
     </fieldset>
     <fieldset style="margin-top:10px;">
-      <legend>Cofre (subgrupos)</legend>
+      <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('p-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-groups',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-groups"></div>
     </fieldset>
     <p class="err hidden" id="perm-err"></p>
     <div class="modal-actions">
       <button type="button" id="perm-cancel">Cancelar</button>
       <button type="submit" class="primary">Salvar permissões</button>
+    </div>
+  </form>
+</div>
+
+<div class="overlay" id="horario-overlay">
+  <form class="modal" id="horario-form">
+    <h3 id="horario-title">Horário de acesso</h3>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);">
+      <input type="checkbox" id="h-ativo" style="width:auto;margin:0;" onchange="document.getElementById('h-campos').classList.toggle('hidden', !this.checked)">
+      Restringir o acesso a um horário do dia
+    </label>
+    <div id="h-campos" class="hidden" style="display:flex;gap:10px;margin-top:10px;">
+      <div style="flex:1;">
+        <label style="font-size:11.5px;color:var(--muted);">Início</label>
+        <input type="time" id="h-inicio" style="width:100%;margin-top:4px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;">
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:11.5px;color:var(--muted);">Fim</label>
+        <input type="time" id="h-fim" style="width:100%;margin-top:4px;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;">
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:10px;">
+      Fora desse horário o acesso é bloqueado automaticamente (login recusado
+      e, se já estiver logado, desconectado na próxima ação). Pode virar a
+      meia-noite (ex: 22:00 às 06:00).
+    </p>
+    <p class="err hidden" id="horario-err"></p>
+    <div class="modal-actions">
+      <button type="button" id="horario-cancel">Cancelar</button>
+      <button type="submit" class="primary">Salvar horário</button>
     </div>
   </form>
 </div>
@@ -199,8 +320,10 @@ window.fetch = (url, opts = {}) => {
   return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['inventario','Inventário (estoque/CMV)'] ];
 const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];
@@ -228,8 +351,36 @@ function subgroupChecksHtml(checkedSet){
   }).join('');
   return html || `<span style="color:var(--muted);font-size:11.5px;">Nenhum subgrupo criado ainda no Cofre.</span>`;
 }
+// unidades agrupadas por Seção (Fechamento/Entregas/Monitor-Adyen) e, dentro
+// de cada seção, por Grupo (ARCFOOD/Grupo Bravo) - a mesma loja física pode
+// ter mais de um código (um por sistema, ver server/index.js) e por isso
+// pode aparecer mais de uma vez, mas assim fica claro o porquê de cada uma
+function unidadesChecksHtml(checkedSet){
+  if(!UNIDADES.length) return `<span style="color:var(--muted);font-size:11.5px;">Nenhuma opção disponível ainda.</span>`;
+  const porSecao = new Map();
+  UNIDADES.forEach(u=>{
+    if(!porSecao.has(u.secao)) porSecao.set(u.secao, new Map());
+    const porGrupo = porSecao.get(u.secao);
+    const grupo = u.grupo || '—';
+    if(!porGrupo.has(grupo)) porGrupo.set(grupo, []);
+    porGrupo.get(grupo).push(u);
+  });
+  return [...porSecao.entries()].map(([secao, porGrupo])=>{
+    const blocos = [...porGrupo.entries()].map(([grupo, itens])=>{
+      const itensHtml = itens.map(u=>{
+        const checked = checkedSet.has(u.codigo) ? 'checked' : '';
+        return `<label><input type="checkbox" name="unidades" value="${escapeHtml(u.codigo)}" ${checked}> ${escapeHtml(u.nome)}</label>`;
+      }).join('');
+      return `<div class="unidades-grupo-titulo">${escapeHtml(grupo)}</div><div class="checks">${itensHtml}</div>`;
+    }).join('');
+    return `<div class="unidades-secao"><div class="unidades-secao-titulo">${escapeHtml(secao)}</div>${blocos}</div>`;
+  }).join('');
+}
 function readChecked(container){
   return [...container.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+}
+function marcarTodos(containerId, marcar){
+  document.getElementById(containerId).querySelectorAll('input[type=checkbox]').forEach(cb=>{ cb.checked = marcar; });
 }
 function caminhoSubgrupo(id){
   const s = VAULT_SUBGROUPS.find(x=>x.id===id);
@@ -254,12 +405,17 @@ async function boot(){
   UNIDADES.forEach(u=>{ UNIDADES_NOMES[u.codigo] = u.nome; });
 
   document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-  document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
+  document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
 
   await carregarUsuarios();
   await carregarBackups();
   await carregarRelatorios();
+}
+
+function baixarRelatorioUsuarios(formato){
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  window.location.href = `/api/users/relatorio.${formato}?${params.toString()}`;
 }
 
 async function carregarUsuarios(){
@@ -274,11 +430,92 @@ function fmtBytes(n){
   return (n/1024/1024).toFixed(1)+' MB';
 }
 
+let BACKUPS = [];
 async function carregarBackups(){
-  const backups = await fetch('/api/backups').then(r=>r.json());
-  document.getElementById('backups-body').innerHTML = backups.length ? backups.map(b=>`
+  BACKUPS = await fetch('/api/backups').then(r=>r.json());
+  document.getElementById('backups-body').innerHTML = BACKUPS.length ? BACKUPS.map(b=>`
     <tr><td>${escapeHtml(b.nome)}</td><td>${new Date(b.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</td><td>${fmtBytes(b.tamanhoBytes)}</td></tr>
   `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum backup ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+// ---------- recuperar fechamento excluido a partir de um backup ----------
+function fmtDataYMD(d){ if(!d) return '—'; const [y,m,dd]=String(d).split('-'); return `${dd}/${m}/${y}`; }
+function fmtMoneyBR(v){ return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+let RESTAURAR_FECHAMENTOS = [];
+function abrirRestaurarFechamento(){
+  if(!BACKUPS.length){ alert('Nenhum backup disponível ainda.'); return; }
+  document.getElementById('restaurar-backup-select').innerHTML = BACKUPS.map(b=>
+    `<option value="${escapeHtml(b.nome)}">${new Date(b.criadoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</option>`
+  ).join('');
+  document.getElementById('restaurar-busca').value = '';
+  RESTAURAR_FECHAMENTOS = [];
+  document.getElementById('restaurar-resultados').innerHTML = '';
+  document.getElementById('restaurar-msg').classList.add('hidden');
+  document.getElementById('restaurar-fechamento-overlay').classList.add('show');
+}
+function fecharRestaurarFechamento(){
+  document.getElementById('restaurar-fechamento-overlay').classList.remove('show');
+}
+
+async function buscarFechamentosBackup(){
+  const nome = document.getElementById('restaurar-backup-select').value;
+  if(!nome) return;
+  const msg = document.getElementById('restaurar-msg');
+  msg.classList.add('hidden');
+  const btn = document.getElementById('btn-restaurar-buscar');
+  btn.disabled = true;
+  try{
+    const res = await fetch(`/api/backups/${encodeURIComponent(nome)}/fechamentos`);
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Erro ao ler o backup.');
+    RESTAURAR_FECHAMENTOS = data;
+    renderResultadosRestaurar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function renderResultadosRestaurar(){
+  const termo = document.getElementById('restaurar-busca').value.trim().toLowerCase();
+  const el = document.getElementById('restaurar-resultados');
+  if(!RESTAURAR_FECHAMENTOS.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Clique em "Buscar" pra carregar os fechamentos desse backup.</div>';
+    return;
+  }
+  const filtrados = !termo ? RESTAURAR_FECHAMENTOS : RESTAURAR_FECHAMENTOS.filter(f=>
+    (f.unidadeNome||f.unidade||'').toLowerCase().includes(termo) ||
+    (f.gerente||'').toLowerCase().includes(termo) ||
+    (f.data||'').includes(termo)
+  );
+  const lista = filtrados.slice(0,50);
+  el.innerHTML = lista.length ? lista.map(f=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--line);">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;">
+        <span>${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtDataYMD(f.data)}</span>
+        <b>${fmtMoneyBR(f.faturamento)}</b>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escapeHtml(f.gerente||'—')}</div>
+      <button type="button" class="back" style="margin-top:6px;" onclick="restaurarFechamento('${f.id}')">↩️ Restaurar este fechamento</button>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:12px;">Nenhum resultado pra essa busca.</div>';
+}
+
+async function restaurarFechamento(id){
+  const f = RESTAURAR_FECHAMENTOS.find(x=>x.id===id);
+  const rotulo = f ? `${f.unidadeNome||f.unidade} · ${fmtDataYMD(f.data)}` : id;
+  if(!confirm(`Restaurar o fechamento de ${rotulo}? Isso recria o registro exatamente como estava nesse backup, sobrescrevendo se já existir um com esse mesmo id.`)) return;
+  const nome = document.getElementById('restaurar-backup-select').value;
+  const msg = document.getElementById('restaurar-msg');
+  try{
+    const res = await fetch(`/api/backups/${encodeURIComponent(nome)}/fechamentos/${id}/restaurar`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Erro ao restaurar.');
+    msg.textContent = `Fechamento de ${rotulo} restaurado com sucesso.`; msg.className = 'ok-msg'; msg.classList.remove('hidden');
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err'; msg.classList.remove('hidden');
+  }
 }
 
 async function rodarBackupAgora(){
@@ -335,9 +572,22 @@ async function rodarRelatorioAgora(){
   }
 }
 
-function tagList(items, labelFn){
+// lista compacta: mostra so as 2 primeiras tags + um chip "+N" clicavel que
+// expande/recolhe o resto - antes cada secao/unidade virava uma tag empilhada
+// e uma linha de usuario ocupava a tela inteira no celular
+function tagList(items, labelFn, limite = 2){
   if(!items || !items.length) return '<span style="color:var(--muted);">—</span>';
-  return `<div class="tags">${items.map(i=>`<span class="tag">${escapeHtml(labelFn?labelFn(i):i)}</span>`).join('')}</div>`;
+  const labels = items.map(i=>labelFn?labelFn(i):i);
+  const tituloCompleto = escapeHtml(labels.join(', '));
+  const tagHtml = (l, extra) => `<span class="tag${extra?' tag-extra':''}" title="${escapeHtml(l)}">${escapeHtml(l)}</span>`;
+  if(labels.length <= limite){
+    return `<div class="tags" title="${tituloCompleto}">${labels.map(l=>tagHtml(l,false)).join('')}</div>`;
+  }
+  return `<div class="tags" title="${tituloCompleto}">`
+    + labels.slice(0,limite).map(l=>tagHtml(l,false)).join('')
+    + labels.slice(limite).map(l=>tagHtml(l,true)).join('')
+    + `<span class="tag tag-mais" onclick="this.closest('.tags').classList.toggle('expanded'); this.textContent = this.closest('.tags').classList.contains('expanded') ? '− ver menos' : '+${labels.length-limite}';">+${labels.length-limite}</span>`
+    + `</div>`;
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -347,28 +597,54 @@ function renderUsers(){
     const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
     const subgroupNames = (perms.vaultSubgroups||[]).map(caminhoSubgrupo);
     const isMaster = u.role==='master';
-    const statusBadges = u.locked
+    const horario = u.horarioPermitido;
+    const statusBadges = (u.locked
       ? `<span class="badge locked" title="Bloqueado após 3 tentativas de senha erradas - use \"Nova senha\" pra destravar">bloqueado</span>`
-      : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`;
+      : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`)
+      + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '')
+      + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '');
+    const cargoBadge = u.cargo ? ` <span class="badge ${u.cargo}" title="Tag de cargo (só organização, não muda permissão)">${u.cargo==='loja'?'🏬 loja':'👔 gerente'}</span>` : '';
     return `
     <tr>
       <td>${escapeHtml(u.email)}</td>
-      <td><span class="badge ${u.role}">${u.role}</span></td>
+      <td><span class="badge ${u.role}">${u.role}</span>${cargoBadge}</td>
       <td>${statusBadges}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
-      <td>
-        ${isMaster ? '' : `
-        <div class="rowacts">
-          <button type="button" onclick="editarPermissoes('${u.id}')">Permissões</button>
-          <button type="button" onclick="resetarSenha('${u.id}')">Nova senha</button>
-          <button type="button" onclick="alternarAtivo('${u.id}', ${!u.active})">${u.active?'Desativar':'Ativar'}</button>
-          <button type="button" onclick="excluirUsuario('${u.id}','${escapeHtml(u.email)}')">Excluir</button>
-        </div>`}
-      </td>
+      <td>${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}</td>
     </tr>`;
   }).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
+}
+
+// ---------- modal de acoes por usuario - substitui a fileira de 6 botoes
+// que deixava a tabela poluida (um "⚙️ Ações" por linha abre este modal) ----------
+function abrirAcoes(id){
+  const u = USERS.find(x=>x.id===id);
+  if(!u) return;
+  document.getElementById('acoes-titulo').textContent = u.email;
+  document.getElementById('acoes-lista').innerHTML = `
+    <button type="button" onclick="fecharAcoes();editarPermissoes('${u.id}')">🔑 Permissões</button>
+    <button type="button" onclick="fecharAcoes();abrirHorario('${u.id}')">🕐 Horário de acesso</button>
+    <button type="button" onclick="fecharAcoes();resetarSenha('${u.id}')">🔒 Nova senha</button>
+    <div class="acoes-sep">Tags</div>
+    <button type="button" onclick="fecharAcoes();alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'⭐ Remover tag Admin':'⭐ Tornar Admin'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
+    <div class="acoes-sep">Conta</div>
+    <button type="button" class="danger" onclick="fecharAcoes();alternarAtivo('${u.id}', ${!u.active})">${u.active?'🚫 Desativar acesso':'✅ Reativar acesso'}</button>
+    <button type="button" class="danger" onclick="fecharAcoes();excluirUsuario('${u.id}','${escapeHtml(u.email)}')">🗑️ Excluir acesso</button>
+  `;
+  document.getElementById('acoes-overlay').classList.add('show');
+}
+function fecharAcoes(){ document.getElementById('acoes-overlay').classList.remove('show'); }
+document.getElementById('acoes-overlay').addEventListener('click', (e)=>{ if(e.target.id==='acoes-overlay') fecharAcoes(); });
+
+async function definirCargo(id, cargo){
+  const res = await fetch('/api/users/'+id+'/cargo', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cargo})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao definir a tag.'); return; }
+  await carregarUsuarios();
 }
 
 document.getElementById('create-form').addEventListener('submit', async (e)=>{
@@ -390,7 +666,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     if(!res.ok) throw new Error(data.error || 'Erro ao criar acesso.');
     document.getElementById('create-form').reset();
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
-    document.getElementById('c-unidades').innerHTML = checksHtml('unidades', UNIDADES, u=>u.codigo, u=>u.nome, new Set());
+    document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
     document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
@@ -404,13 +680,47 @@ function editarPermissoes(id){
   document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
   const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
   document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
-  document.getElementById('p-unidades').innerHTML = checksHtml('unidades', UNIDADES, x=>x.codigo, x=>x.nome, new Set(perms.unidades));
+  document.getElementById('p-unidades').innerHTML = unidadesChecksHtml(new Set(perms.unidades));
   document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');
 }
 document.getElementById('perm-cancel').addEventListener('click', ()=>permOverlay.classList.remove('show'));
 permOverlay.addEventListener('click', (e)=>{ if(e.target===permOverlay) permOverlay.classList.remove('show'); });
+
+const horarioOverlay = document.getElementById('horario-overlay');
+function abrirHorario(id){
+  const u = USERS.find(x=>x.id===id);
+  if(!u) return;
+  EDITING_USER = id;
+  document.getElementById('horario-title').textContent = 'Horário de acesso de ' + u.email;
+  const h = u.horarioPermitido || {ativo:false, inicio:'', fim:''};
+  document.getElementById('h-ativo').checked = !!h.ativo;
+  document.getElementById('h-inicio').value = h.inicio || '';
+  document.getElementById('h-fim').value = h.fim || '';
+  document.getElementById('h-campos').classList.toggle('hidden', !h.ativo);
+  document.getElementById('horario-err').classList.add('hidden');
+  horarioOverlay.classList.add('show');
+}
+document.getElementById('horario-cancel').addEventListener('click', ()=>horarioOverlay.classList.remove('show'));
+horarioOverlay.addEventListener('click', (e)=>{ if(e.target===horarioOverlay) horarioOverlay.classList.remove('show'); });
+
+document.getElementById('horario-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('horario-err');
+  const ativo = document.getElementById('h-ativo').checked;
+  const horarioPermitido = { ativo, inicio: document.getElementById('h-inicio').value, fim: document.getElementById('h-fim').value };
+  if(ativo && (!horarioPermitido.inicio || !horarioPermitido.fim)){
+    errEl.textContent = 'Informe início e fim.'; errEl.classList.remove('hidden'); return;
+  }
+  try{
+    const res = await fetch('/api/users/'+EDITING_USER+'/horario-permitido', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({horarioPermitido})});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+    horarioOverlay.classList.remove('show');
+    await carregarUsuarios();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
 
 document.getElementById('perm-form').addEventListener('submit', async (e)=>{
   e.preventDefault();
@@ -444,11 +754,27 @@ async function alternarAtivo(id, active){
   await carregarUsuarios();
 }
 
+async function alternarAdmin(id, isAdmin){
+  const res = await fetch('/api/users/'+id+'/is-admin', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({isAdmin})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao atualizar tag admin.'); return; }
+  await carregarUsuarios();
+}
+
 async function excluirUsuario(id, email){
   if(!confirm(`Excluir o acesso de ${email}?`)) return;
   await fetch('/api/users/'+id, {method:'DELETE'});
   await carregarUsuarios();
 }
+
+// tecnico atende chamado em qualquer loja (manutencao ou suporte de TI) -
+// os chamados dele sao filtrados por quem esta atribuido, nao por unidade,
+// entao marcar essa secao ja marca todas as unidades pra deixar isso claro
+document.addEventListener('change', (e)=>{
+  if(!e.target.matches('input[name=sections][value=tecnico]') || !e.target.checked) return;
+  const unidadesContainer = e.target.closest('#c-sections') ? document.getElementById('c-unidades') : document.getElementById('p-unidades');
+  unidadesContainer.querySelectorAll('input[name=unidades]').forEach(cb=>{ cb.checked = true; });
+});
 
 boot();
 </script>

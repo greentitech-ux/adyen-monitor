@@ -25,13 +25,21 @@
   header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
-  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   a.back,button.back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
   a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-sair{color:var(--bad);}
@@ -46,6 +54,19 @@
   .kpi .val.ok{color:var(--ok);} .kpi .val.bad{color:var(--bad);} .kpi .val.warn{color:var(--warn);}
   .kpi .delta{font-family:var(--mono);font-size:11px;margin-top:4px;font-variant-numeric:tabular-nums;}
   .kpi .delta.ok{color:var(--ok);} .kpi .delta.bad{color:var(--bad);} .kpi .delta.muted{color:var(--muted);}
+
+  .comp-row{display:grid;grid-template-columns:120px 1fr 70px;align-items:center;gap:10px;padding:7px 16px;border-bottom:1px solid var(--line);}
+  .comp-row:last-child{border-bottom:none;}
+  .comp-nome{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .comp-bars{display:flex;flex-direction:column;gap:3px;}
+  .comp-bar-line{display:flex;align-items:center;gap:8px;}
+  .comp-bar-track{position:relative;flex:1;height:12px;background:var(--panel2);border-radius:4px;overflow:hidden;}
+  .comp-bar{height:100%;border-radius:4px;}
+  .comp-bar.atual{background:var(--accent);}
+  .comp-bar.anterior{background:var(--muted);opacity:.5;}
+  .comp-bar-val{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;min-width:78px;text-align:right;}
+  .comp-delta{font-family:var(--mono);font-size:11.5px;font-weight:600;text-align:right;}
+  .comp-delta.ok{color:var(--ok);} .comp-delta.bad{color:var(--bad);} .comp-delta.muted{color:var(--muted);}
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px;}
   .panel h2{font-size:13px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;}
@@ -83,6 +104,12 @@
   .truncate{max-width:160px;overflow:hidden;text-overflow:ellipsis;}
   .tablewrap{max-height:360px;overflow:auto;}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
+  .fech-grupo-titulo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin:16px 2px 8px;}
+  #fechamentos-tabelas > .fech-grupo-titulo:first-child{margin-top:4px;}
+  .fech-grupo-titulo .n{font-family:var(--mono);color:var(--muted);font-weight:400;font-size:12px;}
+  .fech-subtitulo{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 2px 6px;padding-top:8px;border-top:1px dashed var(--line);}
+  .fech-subtitulo:first-of-type{border-top:none;padding-top:0;}
+  .fech-subtitulo .n{font-weight:400;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
 
@@ -112,29 +139,43 @@
   .multiple-card .mc-title{font-size:11px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .multiple-card .mc-total{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;}
   .multiple-card svg{width:100%;height:44px;display:block;margin-top:6px;}
+
+  .acao-btn{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;}
+  .acao-btn:hover{border-color:var(--accent);color:var(--text);}
+  .acao-btn.excluir:hover{border-color:var(--bad);color:var(--bad);}
+
+  .fech-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:3000;padding:20px;}
+  .fech-overlay.hidden{display:none!important;}
+  .fech-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .fech-modal h3{margin:0 0 4px;font-size:15px;}
+  .fech-modal .sub{margin-bottom:14px;}
+  .fech-modal .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px;}
+  .fech-modal .secao-titulo:first-of-type{margin-top:0;}
+  .fech-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
+  @media(max-width:480px){ .fech-grid{grid-template-columns:1fr;} }
+  .fech-modal label{display:block;font-size:11px;color:var(--muted);margin:8px 0 4px;font-family:var(--mono);}
+  .fech-modal input,.fech-modal textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:13.5px;font-family:var(--sans);}
+  .fech-modal input:focus,.fech-modal textarea:focus{outline:none;border-color:var(--accent);}
+  .fech-modal textarea{resize:vertical;min-height:52px;}
+  .fech-msg{margin-top:10px;font-size:12.5px;padding:9px 11px;border-radius:8px;}
+  .fech-msg.err{background:var(--bad-dim);color:var(--bad);}
+  .fech-msg.ok{background:var(--ok-dim);color:var(--ok);}
 </style>
 </head>
 <body>
 
 <header>
   <div class="header-top">
-    <div>
-      <div class="eyebrow" id="eyebrow-grupos">Solutions Ti Tech · ARCFOOD · Grupo Bravo</div>
-      <h1>Fechamentos de caixa</h1>
-      <div class="sub" id="sync-info">carregando...</div>
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow" id="eyebrow-grupos">ARCFOOD · Grupo Bravo · Solutions Ti Tech</div>
+        <h1>Fechamentos de caixa</h1>
+        <div class="sub" id="sync-info">carregando...</div>
+      </div>
     </div>
   </div>
   <div class="header-nav">
-    <div class="nav-links">
-      <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
-      <a class="back active" id="nav-fechamentos-self" href="/fechamentos.html">💰 Fechamentos</a>
-      <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
-      <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
-      <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-      <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
-      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    </div>
     <div class="nav-actions">
       <button class="back hidden" id="btn-sincronizar-planilhas" onclick="sincronizarPlanilhas()" style="cursor:pointer;">🔄 Sincronizar agora</button>
       <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
@@ -143,6 +184,29 @@
     </div>
   </div>
 </header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back active" id="nav-fechamentos-self" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso aos Fechamentos. Fale com o administrador (Master).</div>
 
@@ -177,6 +241,14 @@
 
 <div class="panel">
   <h2>
+    <div class="title-group"><span>📊 Comparação com período anterior</span></div>
+  </h2>
+  <div class="sub" id="comparativo-periodo-info" style="margin:-2px 0 12px;"></div>
+  <div id="comparativo-periodo-chart"></div>
+</div>
+
+<div class="panel">
+  <h2>
     <div class="title-group"><span>Faturamento</span><span class="n" id="fat-info"></span></div>
   </h2>
   <div class="legend" id="fat-legend"></div>
@@ -201,7 +273,13 @@
 
 
 <div class="panel">
-  <h2>Comparativo por unidade <span class="n" id="unidades-count"></span></h2>
+  <h2>
+    <div class="title-group"><span>Comparativo por unidade</span><span class="n" id="unidades-count"></span></div>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentosUnidades('csv')">📄 Relatório CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentosUnidades('pdf')">📄 Relatório PDF</button>
+    </div>
+  </h2>
   <div class="tablewrap" style="max-height:none;overflow:visible;">
     <table>
       <thead><tr><th>Unid.</th><th>Previsão (mês)</th><th>Fechamentos</th><th>Faturamento</th><th>Diferença</th><th>TC total</th><th>Cancelados</th></tr></thead>
@@ -213,22 +291,89 @@
 <div class="panel">
   <h2>
     <div class="title-group"><span>Fechamentos</span><span class="n" id="fechamentos-count"></span></div>
-    <div class="daterange">
-      <span class="sep">até</span>
-      <input type="date" id="fech-date-fim" title="Filtrar esta tabela até uma data específica, dentro do período principal">
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('csv')">📄 Relatório CSV</button>
+      <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('pdf')">📄 Relatório PDF</button>
     </div>
   </h2>
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th><th>Adyen</th><th>Ifood</th><th>99Food</th><th>Pix</th><th>Loja</th><th>Observação</th></tr></thead>
-      <tbody id="fechamentos-body"></tbody>
-    </table>
+  <div class="controls" title="Filtro exclusivo desta tabela - a tabela obedece tanto este filtro quanto o filtro principal lá em cima">
+    <div class="presets" id="fech-presets"></div>
+    <div class="daterange">
+      <input type="date" id="fech-date-inicio" title="Data inicial (exclusivo desta tabela)">
+      <span class="sep">até</span>
+      <input type="date" id="fech-date-fim" title="Data final (exclusivo desta tabela)">
+    </div>
+    <select id="fech-grupo">
+      <option value="">Todos os grupos</option>
+      <option id="fech-grupo-arcfood" value="ARCFOOD">ARCFOOD</option>
+      <option id="fech-grupo-bravo" value="BRAVO">Grupo Bravo</option>
+    </select>
+    <div class="multiselect" id="ms-fech-unidade">
+      <button type="button" class="multiselect-btn" id="ms-fech-unidade-btn">Todas as unidades</button>
+      <div class="multiselect-panel" id="ms-fech-unidade-panel"></div>
+    </div>
   </div>
+  <!-- um bloco de tabela POR GRUPO (franquia) - cada franquia lança um
+       fechamento diferente (canais/formas próprios em /grupos.html), então
+       misturar tudo numa tabela só criava colunas cheias de R$ 0,00 pra quem
+       não usa aquele campo. Ver renderTabela(). -->
+  <div id="fechamentos-tabelas"></div>
 </div>
 
 </div><!-- /#root -->
 
 <div class="viz-tooltip" id="viz-tooltip"></div>
+
+<div class="fech-overlay hidden" id="fech-overlay">
+  <div class="fech-modal">
+    <h3 id="fech-modal-titulo">Editar fechamento</h3>
+    <div class="sub" id="fech-modal-sub"></div>
+    <div class="fech-msg hidden" id="fech-aviso-sangria" style="background:var(--warn-dim);color:var(--warn);"></div>
+
+    <div class="secao-titulo">Responsável</div>
+    <label>Gerente</label>
+    <input type="text" id="ef-gerente">
+
+    <div class="secao-titulo">Caixa</div>
+    <div class="fech-grid">
+      <div><label>Caixa inicial</label><input type="number" step="0.01" id="ef-caixaInicial"></div>
+      <div><label>Caixa final</label><input type="number" step="0.01" id="ef-caixaFinal"></div>
+    </div>
+
+    <div class="secao-titulo">Canais de venda</div>
+    <div class="fech-grid hidden" id="ef-canais-extras"></div>
+    <div class="fech-msg hidden" id="ef-canais-vazio">Nenhum campo configurado pra essa loja - configure em Grupos.</div>
+
+    <div class="secao-titulo">Formas de pagamento</div>
+    <div class="fech-grid">
+      <div><label>Adyen</label><input type="number" step="0.01" id="ef-adyen"></div>
+    </div>
+    <div class="fech-grid hidden" id="ef-formas-extras"></div>
+    <div class="fech-msg hidden" id="ef-formas-vazio">Nenhum campo configurado pra essa loja - configure em Grupos.</div>
+
+    <div class="secao-titulo">KPI's</div>
+    <div class="fech-grid">
+      <div><label>Total de saída</label><input type="number" step="0.01" id="ef-totalSaida"></div>
+      <div><label>Quebra de caixa</label><input type="number" step="0.01" id="ef-quebra"></div>
+      <div><label>Entrada em dinheiro</label><input type="number" step="0.01" id="ef-entradaDinheiro"></div>
+      <div><label>Depósito</label><input type="number" step="0.01" id="ef-deposito"></div>
+    </div>
+    <div class="fech-grid hidden" id="ef-kpis-extras"></div>
+    <div class="fech-msg hidden" id="ef-kpis-vazio">Nenhum KPI extra configurado pra essa loja - configure em Grupos.</div>
+
+    <label>Observação</label>
+    <textarea id="ef-observacao"></textarea>
+    <label>Motivo da edição (opcional, fica no histórico)</label>
+    <textarea id="ef-motivo"></textarea>
+
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button type="button" class="back" style="background:var(--accent);color:#06202b;border-color:var(--accent);cursor:pointer;" onclick="salvarEdicaoFechamento()">💾 Salvar</button>
+      <button type="button" class="back" style="cursor:pointer;" onclick="fecharEdicaoFechamento()">Cancelar</button>
+      <button type="button" class="back" style="cursor:pointer;color:var(--bad);border-color:var(--bad);margin-left:auto;" onclick="excluirFechamento(FECHAMENTO_EDITANDO_ID)">🗑️ Remover fechamento</button>
+    </div>
+    <div class="fech-msg hidden" id="fech-msg"></div>
+  </div>
+</div>
 
 <script>
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
@@ -242,14 +387,32 @@ window.fetch = (url, opts = {}) => {
   return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
 let DATA = [];
+let IS_MASTER = false;
 const GRUPOS = {
   ARCFOOD: ['19821','19855','19888','19889'],
-  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
+  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Natal","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
 };
-const UNIDADES_NOMES = { '19821':'São Miguel', '19855':'Carrão', '19888':'Mooca', '19889':'Tatuapé' };
-GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = u; });
+const UNIDADES_NOMES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
+const BRAVO_UNIDADES_NOMES = {
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dom Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+};
+GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = BRAVO_UNIDADES_NOMES[u] || u; });
 
 // paleta categorica validada (8 tons, ordem fixa - ver color-formula.md do
 // skill de dataviz). Usada so quando ate 6 series aparecem juntas no mesmo
@@ -261,6 +424,10 @@ Object.keys(UNIDADES_NOMES).forEach((u,i)=>{ CORES_UNIDADE[u] = PALETA_CATEGORIC
 const LIMIAR_SMALL_MULTIPLES = 6; // acima disso, facet em vez de multi-linha
 
 const SEL_UNIDADE = new Set();
+// filtro exclusivo da tabela "Fechamentos" (presets/período/grupo/unidades
+// próprios, em paralelo ao filtro principal acima) - a tabela obedece aos
+// DOIS filtros ao mesmo tempo (interseção), ver renderTabela()
+const SEL_UNIDADE_FECH = new Set();
 let UNIDADES_PERMITIDAS = null; // null = sem restrição (Master); senao, Set das unidades liberadas pro usuario
 let GRUPO_VISIVEL = { ARCFOOD:true, BRAVO:true }; // false quando o usuario nao tem nenhuma unidade do grupo
 
@@ -275,9 +442,15 @@ function atualizarVisibilidadeGrupos(){
   if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('f-grupo').value==='ARCFOOD') document.getElementById('f-grupo').value = '';
   if(!GRUPO_VISIVEL.BRAVO && document.getElementById('f-grupo').value==='BRAVO') document.getElementById('f-grupo').value = '';
 
-  const nomes = ['Solutions Ti Tech'];
+  document.getElementById('fech-grupo-arcfood').classList.toggle('hidden', !GRUPO_VISIVEL.ARCFOOD);
+  document.getElementById('fech-grupo-bravo').classList.toggle('hidden', !GRUPO_VISIVEL.BRAVO);
+  if(!GRUPO_VISIVEL.ARCFOOD && document.getElementById('fech-grupo').value==='ARCFOOD') document.getElementById('fech-grupo').value = '';
+  if(!GRUPO_VISIVEL.BRAVO && document.getElementById('fech-grupo').value==='BRAVO') document.getElementById('fech-grupo').value = '';
+
+  const nomes = [];
   if(GRUPO_VISIVEL.ARCFOOD) nomes.push('ARCFOOD');
   if(GRUPO_VISIVEL.BRAVO) nomes.push('Grupo Bravo');
+  nomes.push('Solutions Ti Tech');
   document.getElementById('eyebrow-grupos').textContent = nomes.join(' · ');
 }
 
@@ -286,6 +459,15 @@ function codigosDoGrupo(){
   const base = grupo ? (GRUPOS[grupo] || []) : Object.keys(UNIDADES_NOMES);
   // so mostra unidades que o usuario realmente tem acesso (o backend ja
   // filtra os dados, mas o seletor tambem nao deve oferecer as outras)
+  if(!UNIDADES_PERMITIDAS) return base;
+  return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
+}
+
+// mesma logica de codigosDoGrupo(), so que pro seletor de grupo exclusivo
+// da tabela "Fechamentos" (fech-grupo)
+function codigosDoGrupoFech(){
+  const grupo = document.getElementById('fech-grupo').value;
+  const base = grupo ? (GRUPOS[grupo] || []) : Object.keys(UNIDADES_NOMES);
   if(!UNIDADES_PERMITIDAS) return base;
   return base.filter(c=>UNIDADES_PERMITIDAS.has(c));
 }
@@ -358,6 +540,7 @@ async function carregar(){
     : 'nenhum fechamento importado ainda';
   elSyncInfo.title = SYNC_INFO_TITLE;
   setupPresets(); // estado inicial: D-1 nos KPIs/tabelas; o grafico usa os ultimos 30 dias (ver chartRange())
+  setupPresetsFech(); // filtro exclusivo da tabela Fechamentos (em paralelo ao de cima)
   setupMultiselect();
   render();
 }
@@ -383,6 +566,8 @@ async function carregarEdicoes(){
 }
 
 async function decidirEdicaoFechamento(id, status){
+  const pergunta = status==='APROVADO' ? 'Tem certeza que deseja aprovar essa correção? O valor será aplicado no fechamento.' : 'Tem certeza que deseja rejeitar essa correção?';
+  if(!confirm(pergunta)) return;
   let motivoDecisao = '';
   if(status==='REJEITADO'){ motivoDecisao = prompt('Motivo da rejeição (opcional):') || ''; }
   await fetch(`/api/fechamentos/edicoes/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
@@ -501,10 +686,12 @@ function setupPresets(){
   });
 }
 
-function setupMultiselect(){
-  const wrap = document.getElementById('ms-unidade');
-  const btn = document.getElementById('ms-unidade-btn');
-  const panel = document.getElementById('ms-unidade-panel');
+// generico pra montar um multiselect de unidades - usado tanto pro filtro
+// principal (SEL_UNIDADE) quanto pro filtro exclusivo da tabela Fechamentos
+// (SEL_UNIDADE_FECH), cada um com seus proprios ids/estado/callback
+function criarMultiselectUnidade({wrapId, btnId, panelId, selSet, codigosFn, grupoElId, onChange}){
+  const btn = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
   document.body.appendChild(panel);
   function posicionar(){
     const r = btn.getBoundingClientRect();
@@ -512,22 +699,22 @@ function setupMultiselect(){
     panel.style.left = r.left+'px';
   }
   function renderPanel(){
-    const codigos = codigosDoGrupo();
-    for(const v of [...SEL_UNIDADE]) if(!codigos.includes(v)) SEL_UNIDADE.delete(v);
+    const codigos = codigosFn();
+    for(const v of [...selSet]) if(!codigos.includes(v)) selSet.delete(v);
     panel.innerHTML = `
-      <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${SEL_UNIDADE.size===0?'checked':''}></label>
-      ${codigos.map(c=>`<label><span>${escapeHtml(UNIDADES_NOMES[c])} (${escapeHtml(c)})</span><input type="checkbox" value="${escapeHtml(c)}" ${SEL_UNIDADE.has(c)?'checked':''}></label>`).join('')}
+      <label class="all-option"><span>Todas as unidades</span><input type="checkbox" data-all ${selSet.size===0?'checked':''}></label>
+      ${codigos.map(c=>`<label><span>${escapeHtml(UNIDADES_NOMES[c])} (${escapeHtml(c)})</span><input type="checkbox" value="${escapeHtml(c)}" ${selSet.has(c)?'checked':''}></label>`).join('')}
     `;
-    panel.querySelector('[data-all]').addEventListener('change', ()=>{ SEL_UNIDADE.clear(); renderPanel(); render(); });
+    panel.querySelector('[data-all]').addEventListener('change', ()=>{ selSet.clear(); renderPanel(); onChange(); });
     panel.querySelectorAll('input[type=checkbox]:not([data-all])').forEach(cb=>{
       cb.addEventListener('change', ()=>{
-        if(cb.checked) SEL_UNIDADE.add(cb.value); else SEL_UNIDADE.delete(cb.value);
-        renderPanel(); render();
+        if(cb.checked) selSet.add(cb.value); else selSet.delete(cb.value);
+        renderPanel(); onChange();
       });
     });
-    btn.textContent = SEL_UNIDADE.size===0 ? 'Todas as unidades'
-      : SEL_UNIDADE.size===1 ? UNIDADES_NOMES[[...SEL_UNIDADE][0]]
-      : `${SEL_UNIDADE.size} unidades selecionadas`;
+    btn.textContent = selSet.size===0 ? 'Todas as unidades'
+      : selSet.size===1 ? UNIDADES_NOMES[[...selSet][0]]
+      : `${selSet.size} unidades selecionadas`;
   }
   btn.addEventListener('click', (e)=>{
     e.stopPropagation();
@@ -539,7 +726,51 @@ function setupMultiselect(){
     if(!panel.contains(e.target) && e.target!==btn) panel.classList.remove('open');
   });
   renderPanel();
-  document.getElementById('f-grupo').addEventListener('change', ()=>{ renderPanel(); render(); });
+  document.getElementById(grupoElId).addEventListener('change', ()=>{ renderPanel(); onChange(); });
+}
+
+function setupMultiselect(){
+  criarMultiselectUnidade({
+    wrapId:'ms-unidade', btnId:'ms-unidade-btn', panelId:'ms-unidade-panel',
+    selSet:SEL_UNIDADE, codigosFn:codigosDoGrupo, grupoElId:'f-grupo', onChange:render,
+  });
+  criarMultiselectUnidade({
+    wrapId:'ms-fech-unidade', btnId:'ms-fech-unidade-btn', panelId:'ms-fech-unidade-panel',
+    selSet:SEL_UNIDADE_FECH, codigosFn:codigosDoGrupoFech, grupoElId:'fech-grupo', onChange:()=>renderTabela(filtrar()),
+  });
+}
+
+// presets/periodo exclusivos da tabela Fechamentos (paralelo ao setupPresets()
+// principal, mas sem o estado "D-1 por padrao" - aqui comeca em branco e so
+// restringe quando o usuario escolhe algo, como o campo "de/ate" ja fazia)
+function setupPresetsFech(){
+  const presets = [
+    {lbl:'Ontem', tipo:'ontem'},
+    {lbl:'Semana', tipo:'semana'},
+    {lbl:'Mês', tipo:'mes'},
+    {lbl:'Trimestre', tipo:'trimestre'},
+  ];
+  const cont = document.getElementById('fech-presets');
+  cont.innerHTML = presets.map(p=>`<button type="button" class="preset-btn" data-tipo="${p.tipo}">${p.lbl}</button>`).join('');
+
+  function aplicarPreset(tipo, btn){
+    cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    const range = calcularPreset(tipo, isoLocal(agoraBrasilia()));
+    document.getElementById('fech-date-inicio').value = range.inicio;
+    document.getElementById('fech-date-fim').value = range.fim;
+    renderTabela(filtrar());
+  }
+  cont.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>aplicarPreset(btn.dataset.tipo, btn));
+  });
+
+  ['fech-date-inicio','fech-date-fim'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>{
+      cont.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+      renderTabela(filtrar());
+    });
+  });
 }
 
 function filtrarPorIntervalo(start, end){
@@ -553,6 +784,113 @@ function filtrarPorIntervalo(start, end){
 }
 function filtrar(){
   return filtrarPorIntervalo(document.getElementById('f-date-start').value, document.getElementById('f-date-end').value);
+}
+
+// ---- Comparação com período anterior, por unidade - da pra enxergar
+// evolução/previsibilidade da unidade (nao so o agregado que os KPIs de cima
+// ja mostram). Segue o mesmo período que o filtro principal estiver usando
+// (dia/semana/mes/trimestre/intervalo livre); sem filtro nenhum escolhido
+// ainda, o padrao e a semana atual (ao inves do D-1 que os KPIs/tabelas usam)
+//
+// Comparação "like-for-like", igual mercado/financeiro: nunca compara com o
+// dia/período imediatamente anterior corrido, e sim com o mesmo ponto do
+// ciclo anterior - segunda com segunda, terça com terça, mês com o mesmo
+// intervalo do mês anterior, trimestre com trimestre. Isso evita comparar
+// sábado (fraco) com sexta (forte) só por estarem "coladas" no calendário,
+// que distorceria a variação % sem refletir uma queda de verdade.
+function periodoAnterior(inicio, fim, tipoPreset){
+  // ancora pelo FIM (mes de referencia usado pelo calcularPreset pra montar
+  // tanto "Mês" quanto "Trimestre" - o trimestre e sempre o mes de
+  // referencia + os 2 anteriores, entao "voltar 3 meses" tem que partir do
+  // mes final do periodo atual, nao do inicial, senao o trimestre anterior
+  // sai deslocado (ver teste)
+  const dEnd = new Date(fim+'T00:00:00');
+  if(tipoPreset === 'mes'){
+    const prevRef = new Date(dEnd.getFullYear(), dEnd.getMonth()-1, 1);
+    return calcularPreset('mes', isoLocal(prevRef));
+  }
+  if(tipoPreset === 'trimestre'){
+    const prevRef = new Date(dEnd.getFullYear(), dEnd.getMonth()-3, 1);
+    return calcularPreset('trimestre', isoLocal(prevRef));
+  }
+  // dia (Ontem) / semana / intervalo livre: desloca a janela inteira 7 dias
+  // pra trás, preservando o dia da semana de cada data - "semana" já é um
+  // bloco de 7 dias (dom-sáb), entao esse mesmo deslocamento já devolve a
+  // semana anterior certinha, sem precisar de um caso especial pra ela
+  const dStart = new Date(inicio+'T00:00:00');
+  const prevStart = new Date(dStart); prevStart.setDate(prevStart.getDate()-7);
+  const prevEnd = new Date(dEnd); prevEnd.setDate(prevEnd.getDate()-7);
+  return { inicio: isoLocal(prevStart), fim: isoLocal(prevEnd) };
+}
+
+function comparativoRange(){
+  if(filtroDataAtivo){
+    return { inicio: document.getElementById('f-date-start').value, fim: document.getElementById('f-date-end').value };
+  }
+  return calcularPreset('semana', isoLocal(agoraBrasilia()));
+}
+
+const ROTULO_PRESET_COMPARATIVO = {ontem:'dia (mesmo dia da semana)', semana:'semana', mes:'mês', trimestre:'trimestre'};
+
+function renderComparativoPeriodo(){
+  const {inicio, fim} = comparativoRange();
+  const info = document.getElementById('comparativo-periodo-info');
+  const el = document.getElementById('comparativo-periodo-chart');
+  if(!inicio || !fim){
+    info.textContent = '';
+    el.innerHTML = '<div class="empty">Selecione um período.</div>';
+    return;
+  }
+  // sem filtro escolhido ainda: padrao semana atual. Preset conhecido
+  // (Ontem/Semana/Mês/Trimestre): segue a logica dele. Intervalo livre
+  // (datas editadas na mao, sem preset ativo): trata como "dia" - desloca 7
+  // dias pra tras preservando o dia da semana, mesma logica profissional
+  let tipoPreset, rotulo;
+  if(!filtroDataAtivo){
+    tipoPreset = 'semana'; rotulo = 'semana';
+  } else if(presetAtivo){
+    tipoPreset = presetAtivo; rotulo = ROTULO_PRESET_COMPARATIVO[presetAtivo] || 'período (mesmo dia da semana)';
+  } else {
+    tipoPreset = null; rotulo = 'período (mesmo dia da semana)';
+  }
+  const anterior = periodoAnterior(inicio, fim, tipoPreset);
+  const atuais = filtrarPorIntervalo(inicio, fim);
+  const anteriores = filtrarPorIntervalo(anterior.inicio, anterior.fim);
+
+  info.textContent = `Comparação por ${rotulo}: ${fmtData(inicio)} → ${fmtData(fim)} (atual) vs ${fmtData(anterior.inicio)} → ${fmtData(anterior.fim)} (anterior)`;
+
+  const porUnidade = {};
+  function acumula(lista, chave){
+    lista.forEach(d=>{
+      const c = (porUnidade[d.unidade] ||= { nome: UNIDADES_NOMES[d.unidade]||d.unidadeNome||d.unidade, atual:0, anterior:0 });
+      c[chave] += d.faturamento||0;
+    });
+  }
+  acumula(atuais, 'atual');
+  acumula(anteriores, 'anterior');
+
+  const linhas = Object.values(porUnidade)
+    .filter(c=>c.atual>0 || c.anterior>0)
+    .sort((a,b)=>b.atual-a.atual);
+
+  if(!linhas.length){ el.innerHTML = '<div class="empty">Sem dados no período.</div>'; return; }
+
+  const maxVal = Math.max(1, ...linhas.map(c=>Math.max(c.atual,c.anterior)));
+  el.innerHTML = linhas.map(c=>{
+    const pctAtual = Math.max(2, c.atual/maxVal*100);
+    const pctAnterior = Math.max(2, c.anterior/maxVal*100);
+    const delta = c.anterior ? ((c.atual-c.anterior)/c.anterior*100) : (c.atual>0 ? 100 : 0);
+    const deltaCls = delta>0.5?'ok':(delta<-0.5?'bad':'muted');
+    const seta = delta>0.5?'▲':(delta<-0.5?'▼':'—');
+    return `<div class="comp-row">
+      <div class="comp-nome" title="${escapeHtml(c.nome)}">${escapeHtml(c.nome)}</div>
+      <div class="comp-bars">
+        <div class="comp-bar-line"><div class="comp-bar-track"><div class="comp-bar atual" style="width:${pctAtual}%;"></div></div><span class="comp-bar-val">${fmtMoney(c.atual)}</span></div>
+        <div class="comp-bar-line"><div class="comp-bar-track"><div class="comp-bar anterior" style="width:${pctAnterior}%;"></div></div><span class="comp-bar-val">${fmtMoney(c.anterior)}</span></div>
+      </div>
+      <div class="comp-delta ${deltaCls}">${seta} ${Math.abs(delta).toFixed(1)}%</div>
+    </div>`;
+  }).join('');
 }
 
 // ---- KPIs: valor + variacao contra o periodo anterior de mesmo tamanho ----
@@ -946,14 +1284,70 @@ function renderUnidadesTable(rows){
   }).join('') : '<tr><td colspan="7" class="empty">Sem dados no período.</td></tr>';
 }
 
-function renderTabela(rows){
-  // segue sempre o filtro de data principal; o campo "até" deste painel e
-  // opcional, so pra restringir ainda mais so esta tabela quando desejado
+// intervalo efetivo desta tabela: o periodo principal (f-date-start/f-date-end),
+// estreitado pelos campos opcionais "de"/"até" deste painel quando preenchidos
+function intervaloEfetivoTabela(){
+  let inicio = document.getElementById('f-date-start').value;
+  let fim = document.getElementById('f-date-end').value;
+  const inicioExtra = document.getElementById('fech-date-inicio').value;
   const fimExtra = document.getElementById('fech-date-fim').value;
-  const filtradas = fimExtra ? rows.filter(d=>(d.data||'')<=fimExtra) : rows;
-  const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
-  document.getElementById('fechamentos-count').textContent = ordenadas.length;
-  document.getElementById('fechamentos-body').innerHTML = ordenadas.length ? ordenadas.map(d=>{
+  if(inicioExtra && (!inicio || inicioExtra>inicio)) inicio = inicioExtra;
+  if(fimExtra && (!fim || fimExtra<fim)) fim = fimExtra;
+  return {inicio, fim};
+}
+
+// colunas extras (Canais de venda / Formas de pagamento) que os grupos
+// definem em /grupos.html - a tabela so mostra a coluna se pelo menos um
+// fechamento do resultado atual de fato preencheu aquele campo, entao ela
+// sempre reflete o que cada loja realmente lança, sem colunas fantasmas
+// vazias pras lojas que nao usam aquele canal/forma
+function colunasExtras(rows, chave){
+  const vistas = new Map(); // campo -> label
+  rows.forEach(d=>{
+    const mapa = d[chave] || {};
+    if(!Object.keys(mapa).length) return;
+    const grupo = grupoKpiDaUnidade(d.unidade);
+    const defs = grupo ? (grupo[chave]||[]) : [];
+    Object.keys(mapa).forEach(campo=>{
+      if(!vistas.has(campo)) vistas.set(campo, (defs.find(k=>k.campo===campo)||{}).label || campo);
+    });
+  });
+  return [...vistas.entries()].map(([campo,label])=>({campo,label}));
+}
+
+// os 5 campos "fixos" (Adyen/Ifood/99Food/Pix/Loja) sao o schema antigo, de
+// antes do grupo poder definir os proprios Canais de venda/Formas de
+// pagamento (ver grupos.html) - hoje so quem lanca fechamento importado de
+// planilha (sheetsSync.js) ainda usa esses campos; loja que lanca pelo
+// sistema usa exclusivamente as extras do proprio grupo. Mesma logica de
+// colunasExtras: so aparece se pelo menos uma linha do conjunto de fato usa
+const CAMPOS_FIXOS = [
+  {campo:'adyen', label:'Adyen'}, {campo:'ifood', label:'Ifood'}, {campo:'food99', label:'99Food'},
+  {campo:'pix', label:'Pix'}, {campo:'loja', label:'Loja'},
+];
+function colunasFixasUsadas(rows){
+  return CAMPOS_FIXOS.filter(c => rows.some(d => Math.abs(d[c.campo]||0) > 0.001));
+}
+
+// monta UMA tabela de fechamentos a partir de um conjunto de linhas - as
+// colunas fixas e extras (canais/formas) sao calculadas so com essas linhas,
+// entao cada tabela mostra apenas os campos que aquele conjunto de fato
+// preenche (ver renderTabela: cada bloco so recebe linhas de UMA origem -
+// sistema OU planilha - pra essas colunas nunca se misturarem)
+function tabelaFechamentosHtml(rows){
+  const colunasFixas = colunasFixasUsadas(rows);
+  const colunasCanais = colunasExtras(rows, 'canaisVendaExtras');
+  const colunasFormas = colunasExtras(rows, 'formasPagamentoExtras');
+
+  const thead =
+    '<th>Data</th><th>Unid.</th><th>Gerente</th><th>Previsão (dia seguinte)</th><th>Faturamento</th><th>Total declarado</th><th>Diferença</th><th>Quebra</th>' +
+    colunasFixas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
+    colunasCanais.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
+    colunasFormas.map(c=>`<th>${escapeHtml(c.label)}</th>`).join('') +
+    '<th>Observação</th>' +
+    (IS_MASTER ? '<th>Ações</th>' : '');
+
+  const corpo = rows.map(d=>{
     const cor = d.diferenca<0?'var(--bad)':(d.diferenca>0?'var(--warn)':'var(--ok)');
     const previsao = previsaoDiaSeguinte(d.unidade, d.data);
     return `<tr>
@@ -965,14 +1359,236 @@ function renderTabela(rows){
       <td class="valor">${fmtMoney(d.totalDeclarado)}</td>
       <td class="valor" style="color:${cor}">${fmtMoney(d.diferenca)}</td>
       <td class="valor">${fmtMoney(d.quebra)}</td>
-      <td class="valor">${fmtMoney(d.adyen)}</td>
-      <td class="valor">${fmtMoney(d.ifood)}</td>
-      <td class="valor">${fmtMoney(d.food99)}</td>
-      <td class="valor">${fmtMoney(d.pix)}</td>
-      <td class="valor">${fmtMoney(d.loja)}</td>
+      ${colunasFixas.map(c=>`<td class="valor">${fmtMoney(d[c.campo])}</td>`).join('')}
+      ${colunasCanais.map(c=>`<td class="valor">${fmtMoney((d.canaisVendaExtras||{})[c.campo]||0)}</td>`).join('')}
+      ${colunasFormas.map(c=>`<td class="valor">${fmtMoney((d.formasPagamentoExtras||{})[c.campo]||0)}</td>`).join('')}
       <td class="truncate" title="${escapeHtml(d.observacao||d.obsDif||'')}">${escapeHtml(d.observacao||d.obsDif||'—')}</td>
+      ${IS_MASTER ? `<td>${d.criadoPorId ? `
+        <button type="button" class="acao-btn" title="Editar" onclick="abrirEdicaoFechamento('${d.id}')">✏️</button>
+        <button type="button" class="acao-btn excluir" title="Excluir" onclick="excluirFechamento('${d.id}')">🗑️</button>
+      ` : '<span class="sub" style="margin:0;" title="Não lançado pelo sistema - vem de importação/planilha, não pode ser editado aqui">—</span>'}</td>` : ''}
     </tr>`;
-  }).join('') : '<tr><td colspan="14" class="empty">Nenhum fechamento no período/unidade selecionados.</td></tr>';
+  }).join('');
+
+  return `<div class="tablewrap"><table><thead><tr>${thead}</tr></thead><tbody>${corpo}</tbody></table></div>`;
+}
+
+function renderTabela(rows){
+  // "rows" ja vem filtrado pelo filtro principal (periodo/grupo/unidades de
+  // cima); aqui aplicamos, POR CIMA, o filtro exclusivo desta tabela
+  // (presets/periodo/grupo/unidades proprios) - o resultado obedece aos DOIS
+  // filtros ao mesmo tempo (intersecao)
+  const {inicio, fim} = intervaloEfetivoTabela();
+  const grupoFech = document.getElementById('fech-grupo').value;
+  const filtradas = rows.filter(d=>
+    (!inicio || (d.data||'')>=inicio) && (!fim || (d.data||'')<=fim) &&
+    (!grupoFech || d.grupo===grupoFech) &&
+    (SEL_UNIDADE_FECH.size===0 || SEL_UNIDADE_FECH.has(d.unidade))
+  );
+  const ordenadas = [...filtradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  document.getElementById('fechamentos-count').textContent = ordenadas.length;
+
+  const container = document.getElementById('fechamentos-tabelas');
+  if(!ordenadas.length){
+    container.innerHTML = '<div class="empty">Nenhum fechamento no período/unidade selecionados.</div>';
+    return;
+  }
+
+  // cada grupo (franquia de /grupos.html) lança um fechamento diferente -
+  // canais de venda e formas de pagamento próprios - então cada um ganha a
+  // SUA tabela, só com as colunas dele, em vez de uma tabela única com a
+  // união das colunas de todo mundo (que enchia a tela de R$ 0,00)
+  const blocos = new Map(); // chave -> { nome, rows }
+  ordenadas.forEach(d=>{
+    const g = grupoKpiDaUnidade(d.unidade);
+    const chave = g ? g.id : '__sem_grupo__';
+    if(!blocos.has(chave)) blocos.set(chave, { nome: g ? g.nome : 'Sem grupo definido', semGrupo: !g, rows: [] });
+    blocos.get(chave).rows.push(d);
+  });
+  const lista = [...blocos.values()].sort((a,b)=>{
+    if(a.semGrupo !== b.semGrupo) return a.semGrupo ? 1 : -1; // sem grupo por último
+    return a.nome.localeCompare(b.nome, 'pt-BR');
+  });
+
+  // com um bloco só de unidades sem grupo cadastrado, não tem o que separar -
+  // renderiza a tabela direto, sem título
+  const soSemGrupo = lista.length===1 && lista[0].semGrupo;
+  container.innerHTML = lista.map(b=>{
+    const titulo = soSemGrupo ? '' : `<div class="fech-grupo-titulo">🏪 ${escapeHtml(b.nome)} <span class="n">${b.rows.length}</span></div>`;
+
+    // dentro do grupo, separa por ORIGEM: lançado pelo sistema (tem
+    // criadoPorId, usa exclusivamente os Canais de venda/Formas de
+    // pagamento/KPI's que o Master configurou pro grupo) x importado de
+    // planilha (sheetsSync.js, usa o schema antigo Adyen/Ifood/99Food/Pix/
+    // Loja). Sem essa separação as colunas de UMA origem vazavam pra tabela
+    // da outra (ex: unidade com fechamento antigo de planilha E fechamento
+    // novo pelo sistema no mesmo grupo mostrava as duas "Adyen" ao mesmo
+    // tempo - uma sempre zerada) - a planilha não pode se sobrepor ao
+    // sistema, que é quem organiza os fechamentos lançados hoje
+    const sistemaRows = b.rows.filter(d=>d.criadoPorId);
+    const planilhaRows = b.rows.filter(d=>!d.criadoPorId);
+    const temAsDuas = sistemaRows.length && planilhaRows.length;
+
+    let corpo = '';
+    if(sistemaRows.length){
+      corpo += (temAsDuas ? `<div class="fech-subtitulo">🧾 Lançamentos do sistema <span class="n">${sistemaRows.length}</span></div>` : '') +
+        tabelaFechamentosHtml(sistemaRows);
+    }
+    if(planilhaRows.length){
+      corpo += (temAsDuas ? `<div class="fech-subtitulo">📄 Histórico de planilha (importado) <span class="n">${planilhaRows.length}</span></div>` : '') +
+        tabelaFechamentosHtml(planilhaRows);
+    }
+    return titulo + corpo;
+  }).join('');
+}
+
+// ---------- Master: editar/excluir um fechamento lançado direto pela
+// tabela - so vale pra fechamento de verdade (lancado pelo app, tem
+// criadoPorId); linha vinda de planilha importada ou sangria mapeada nao
+// tem botao (ver renderTabela) ----------
+// os fixos de Canais de venda/Formas de pagamento/KPI's (Delivery/Carryout/
+// .../Outros, TC, Cancelados) nao existem mais - cada loja so tem os campos
+// que o grupo dela define em /grupos.html (ver lancamento.html, mesma
+// logica). So sobra aqui o que nao faz parte dessas 3 secoes.
+const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','adyen','totalSaida','quebra','entradaDinheiro','deposito'];
+let FECHAMENTO_EDITANDO_ID = null;
+// grupos (franquias) cadastrados em /grupos.html - cada loja so mostra os
+// campos que o Master cadastrou pro grupo dela (ver grupos.js/fechamentosLive.js)
+let GRUPOS_KPI = [];
+function grupoKpiDaUnidade(unidade){
+  return GRUPOS_KPI.find(g=>(g.unidades||[]).includes(unidade)) || null;
+}
+// generico pras 3 frentes de campo do fechamento (Canais de venda, Formas de
+// pagamento, KPI's) no modal de edição direta do Master - mesmo padrão usado
+// em lancamento.html
+function renderExtrasEdicaoFechamento(grupo, chaveGrupo, mapaAtual, containerId, vazioId, classe, datasetKey){
+  const campos = grupo ? (grupo[chaveGrupo]||[]) : [];
+  const container = document.getElementById(containerId);
+  document.getElementById(vazioId).classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.classList.add('hidden'); container.innerHTML = ''; return; }
+  container.classList.remove('hidden');
+  const attr = datasetKey.replace(/[A-Z]/g, c=>'-'+c.toLowerCase());
+  container.innerHTML = campos.map(k=>
+    `<div><label>${escapeHtml(k.label)}</label><input type="number" step="0.01" data-${attr}="${escapeHtml(k.campo)}" class="${classe}" value="${num((mapaAtual||{})[k.campo])}"></div>`
+  ).join('');
+}
+// KPI's tem unidade de medida por campo (ver grupos.html) - diferente de
+// Canais/Formas (sempre R$), entao ganha renderização própria: número
+// (quantidade/moeda/kg), texto livre, ou arquivo (mostra link pro anexo
+// atual + input pra trocar - o valor gravado E o caminho no Storage, não dá
+// pra "editar" ele como número)
+function renderKpisEdicaoFechamento(grupo, mapaAtual, fechamentoId){
+  const campos = grupo ? (grupo.kpisExtras||[]) : [];
+  const container = document.getElementById('ef-kpis-extras');
+  document.getElementById('ef-kpis-vazio').classList.toggle('hidden', !!campos.length);
+  if(!campos.length){ container.classList.add('hidden'); container.innerHTML = ''; return; }
+  container.classList.remove('hidden');
+  container.innerHTML = campos.map(k=>{
+    const tipo = k.tipo || 'quantidade';
+    const atual = (mapaAtual||{})[k.campo];
+    if(tipo === 'arquivo'){
+      const linkAtual = atual ? `<a href="/api/fechamentos/${fechamentoId}/kpi-arquivo/${encodeURIComponent(k.campo)}" target="_blank" style="display:block;font-size:11px;color:var(--accent);margin-bottom:4px;">📎 ver arquivo atual</a>` : '';
+      return `<div><label>${escapeHtml(k.label)}</label>${linkAtual}<input type="file" accept="image/*,application/pdf" data-kpi-campo="${escapeHtml(k.campo)}" class="ef-kpi-arquivo-input"></div>`;
+    }
+    if(tipo === 'texto'){
+      return `<div><label>${escapeHtml(k.label)}</label><input type="text" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="texto" class="ef-kpi-extra-input" value="${escapeHtml(atual||'')}"></div>`;
+    }
+    const step = tipo === 'quantidade' ? '1' : (tipo === 'kg' ? '0.001' : '0.01');
+    return `<div><label>${escapeHtml(k.label)}</label><input type="number" step="${step}" data-kpi-campo="${escapeHtml(k.campo)}" data-kpi-tipo="${tipo}" class="ef-kpi-extra-input" value="${num(atual)}"></div>`;
+  }).join('');
+}
+
+async function abrirEdicaoFechamento(id){
+  // busca o registro BRUTO (sem mesclar com sangria/planilha) - editar em
+  // cima do valor mesclado da tabela faria a sangria do dia entrar e sair
+  // duas vezes (ela ja soma automatico na leitura, ver sangrias.js)
+  let d;
+  try{
+    d = await fetch(`/api/fechamentos/${id}/bruto`).then(r=>{ if(!r.ok) throw new Error(); return r.json(); });
+  }catch(e){
+    alert('Não foi possível carregar esse fechamento pra edição.');
+    return;
+  }
+  FECHAMENTO_EDITANDO_ID = id;
+  document.getElementById('fech-modal-titulo').textContent = `Editar fechamento`;
+  document.getElementById('fech-modal-sub').textContent = `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}`;
+  document.getElementById('ef-gerente').value = d.gerente || '';
+  CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ document.getElementById('ef-'+c).value = d[c] ?? 0; });
+  document.getElementById('ef-observacao').value = d.observacao || '';
+  document.getElementById('ef-motivo').value = '';
+
+  const grupoKpi = grupoKpiDaUnidade(d.unidade);
+  renderKpisEdicaoFechamento(grupoKpi, d.kpisExtras, id);
+  renderExtrasEdicaoFechamento(grupoKpi, 'canaisVendaExtras', d.canaisVendaExtras, 'ef-canais-extras', 'ef-canais-vazio', 'ef-canal-extra-input', 'canalCampo');
+  renderExtrasEdicaoFechamento(grupoKpi, 'formasPagamentoExtras', d.formasPagamentoExtras, 'ef-formas-extras', 'ef-formas-vazio', 'ef-forma-extra-input', 'formaCampo');
+
+  const linhaMesclada = DATA.find(x=>x.id===id);
+  const avisoSangria = document.getElementById('fech-aviso-sangria');
+  const diferencaSaida = linhaMesclada ? +(num(linhaMesclada.totalSaida) - num(d.totalSaida)).toFixed(2) : 0;
+  if(diferencaSaida > 0){
+    avisoSangria.textContent = `⚠️ Esse dia também tem ${fmtMoney(diferencaSaida)} de sangria/depósito registrada à parte - some no total exibido na tabela, mas não é editável aqui. Gerencie em Lançamento de fechamento › Últimas sangrias/depósitos registrados.`;
+    avisoSangria.classList.remove('hidden');
+  } else {
+    avisoSangria.classList.add('hidden');
+  }
+
+  document.getElementById('fech-msg').classList.add('hidden');
+  document.getElementById('fech-overlay').classList.remove('hidden');
+}
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function fecharEdicaoFechamento(){
+  document.getElementById('fech-overlay').classList.add('hidden');
+  FECHAMENTO_EDITANDO_ID = null;
+}
+async function salvarEdicaoFechamento(){
+  if(!FECHAMENTO_EDITANDO_ID) return;
+  const msg = document.getElementById('fech-msg');
+  msg.classList.add('hidden');
+  const mudancas = { gerente: document.getElementById('ef-gerente').value, observacao: document.getElementById('ef-observacao').value };
+  CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
+  const mudancasKpis = {};
+  document.querySelectorAll('.ef-kpi-extra-input').forEach(el=>{ mudancasKpis[el.dataset.kpiCampo] = el.value; });
+  const mudancasCanais = {};
+  document.querySelectorAll('.ef-canal-extra-input').forEach(el=>{ mudancasCanais[el.dataset.canalCampo] = el.value; });
+  const mudancasFormas = {};
+  document.querySelectorAll('.ef-forma-extra-input').forEach(el=>{ mudancasFormas[el.dataset.formaCampo] = el.value; });
+  const arquivosKpi = [...document.querySelectorAll('.ef-kpi-arquivo-input')].filter(el=>el.files && el.files[0]);
+  try{
+    const payload = { mudancas, mudancasKpis, mudancasCanais, mudancasFormas, motivo: document.getElementById('ef-motivo').value };
+    let resp;
+    if(arquivosKpi.length){
+      const fd = new FormData();
+      fd.append('payload', JSON.stringify(payload));
+      arquivosKpi.forEach(el=>fd.append('kpiArquivo:'+el.dataset.kpiCampo, el.files[0]));
+      resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, { method:'PATCH', body: fd });
+    } else {
+      resp = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/editar-direto`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+    }
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    fecharEdicaoFechamento();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'fech-msg err'; msg.classList.remove('hidden');
+  }
+}
+async function excluirFechamento(id){
+  if(!id) return;
+  const d = DATA.find(x=>x.id===id);
+  const rotulo = d ? `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}` : id;
+  if(!confirm(`Excluir o fechamento de ${rotulo}? Essa ação não pode ser desfeita.`)) return;
+  try{
+    const resp = await fetch(`/api/fechamentos/${id}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
+    fecharEdicaoFechamento();
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
 }
 
 // grafico de faturamento tem intervalo proprio (chartRange()): segue o
@@ -987,13 +1603,50 @@ function renderChartAtual(){
 function render(){
   const rows = filtrar();
   renderKpis(rows);
+  renderComparativoPeriodo();
   renderChartAtual();
   // renderDiferencaChart(rows); // painel desativado, ver comentario acima da funcao
   renderUnidadesTable(rows);
   renderTabela(rows);
 }
 
-document.getElementById('fech-date-fim').addEventListener('input', ()=>{ renderTabela(filtrar()); });
+// unidades que passam nos DOIS filtros ao mesmo tempo (principal ∩
+// exclusivo da tabela) - usado pro relatorio, ja que o backend so aceita
+// uma lista de unidades (nao dois grupos/multiselects separados pra cruzar)
+function unidadesEfetivasParaRelatorio(){
+  const principal = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
+  const local = SEL_UNIDADE_FECH.size ? [...SEL_UNIDADE_FECH] : codigosDoGrupoFech();
+  const setLocal = new Set(local);
+  return principal.filter(c=>setLocal.has(c));
+}
+
+// relatorio CSV/PDF do periodo/unidades que estiverem filtrados na tela
+// agora - cruza o filtro principal (de cima) com o filtro exclusivo desta
+// tabela, exatamente como renderTabela() faz
+// relatorio CSV/PDF do painel "Comparativo por unidade" - usa so o filtro
+// principal (de cima), igual renderUnidadesTable() ja faz
+function baixarRelatorioFechamentosUnidades(formato){
+  const inicio = document.getElementById('f-date-start').value;
+  const fim = document.getElementById('f-date-end').value;
+  const grupo = document.getElementById('f-grupo').value;
+  const unidades = [...SEL_UNIDADE].join(',');
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(inicio) params.set('inicio', inicio);
+  if(fim) params.set('fim', fim);
+  if(grupo) params.set('grupo', grupo);
+  if(unidades) params.set('unidades', unidades);
+  window.location.href = `/api/fechamentos/relatorio-unidades.${formato}?${params.toString()}`;
+}
+
+function baixarRelatorioFechamentos(formato){
+  const {inicio, fim} = intervaloEfetivoTabela();
+  const unidades = unidadesEfetivasParaRelatorio().join(',');
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(inicio) params.set('inicio', inicio);
+  if(fim) params.set('fim', fim);
+  if(unidades) params.set('unidades', unidades);
+  window.location.href = `/api/fechamentos/relatorio.${formato}?${params.toString()}`;
+}
 
 let resizeTimer = null;
 window.addEventListener('resize', ()=>{
@@ -1006,7 +1659,8 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (me.permissions?.sections||[]);
+  IS_MASTER = isMaster;
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
   atualizarVisibilidadeGrupos();
 
@@ -1016,12 +1670,21 @@ async function boot(){
   document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('btn-sincronizar-planilhas').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('fechamentos')){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
+  }
+  if(isMaster){
+    try{ GRUPOS_KPI = await fetch('/api/grupos').then(r=>r.json()); }catch(e){ GRUPOS_KPI = []; }
   }
   document.getElementById('root').classList.remove('hidden');
   await carregar();

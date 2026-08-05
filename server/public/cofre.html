@@ -25,13 +25,21 @@
   header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
-  .nav-links{display:flex;gap:6px;flex-wrap:wrap;}
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
   .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;}
   .back:hover{color:var(--text);border-color:var(--accent);}
   .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
   .btn-sair{color:var(--bad);}
@@ -39,6 +47,7 @@
   .hidden{display:none!important;}
   .layout{display:flex;gap:16px;align-items:flex-start;}
   .sidebar{width:240px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;}
+  @media(max-width:760px){ .layout{flex-direction:column;align-items:stretch;} .sidebar{width:100%;} }
   .sidebar h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;font-family:var(--mono);font-weight:500;}
   .item-list{list-style:none;margin:0 0 10px;padding:0;}
   .item-list li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;}
@@ -66,8 +75,8 @@
   .new-group{display:flex;gap:6px;margin-top:4px;}
   .new-group input{flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:11.5px;}
   .main{flex:1;min-width:0;}
-  .toolbar{display:flex;gap:10px;margin-bottom:12px;}
-  .toolbar input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
+  .toolbar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .toolbar input{flex:1;min-width:160px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
   button.primary{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#06121a;cursor:pointer;white-space:nowrap;}
   #current-path{font-size:12px;color:var(--muted);margin:0 0 12px;}
   .entries{display:flex;flex-direction:column;gap:8px;}
@@ -107,22 +116,15 @@
 
 <header>
   <div class="header-top">
-    <div>
-      <div class="eyebrow">Solutions Ti Tech · Zenith Ops</div>
-      <h1>Cofre de senhas</h1>
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Cofre de senhas</h1>
+      </div>
     </div>
   </div>
   <div class="header-nav">
-    <div class="nav-links">
-      <a class="back hidden" id="nav-monitor" href="/">📈 Monitor</a>
-      <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
-      <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
-      <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
-      <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
-      <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
-      <a class="back active" id="nav-cofre-self" href="/cofre.html">🔐 Cofre</a>
-      <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
-    </div>
     <div class="nav-actions">
       <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
       <div class="nav-divider"></div>
@@ -130,6 +132,29 @@
     </div>
   </div>
 </header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back active" id="nav-cofre-self" href="/cofre.html">🔐 Cofre</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
 
 <div id="sem-acesso" class="empty hidden">Você não tem acesso ao Cofre de Senhas. Fale com o administrador (Master).</div>
 
@@ -227,6 +252,8 @@ window.fetch = (url, opts = {}) => {
   return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
 };
 function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
 let ME = null;
 let GROUPS = [];
@@ -240,7 +267,7 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   const isMaster = ME.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
@@ -248,7 +275,13 @@ async function boot(){
   document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
   document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
 
   if(!secoes.includes('cofre')){
     document.getElementById('sem-acesso').classList.remove('hidden');
