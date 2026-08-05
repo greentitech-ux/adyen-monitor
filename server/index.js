@@ -40,6 +40,7 @@ const solicitacoes = require('./solicitacoes');
 const chamadosTI = require('./chamadosTI');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
+const inventario = require('./inventario');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -792,6 +793,22 @@ const FECHAMENTO_UNIDADES_NOMES = {
   // aparecerem no checklist de permissoes do Master antes do 1o lançamento
   'Spo Shop Midway': 'Spo Shop Midway',
   'Saltiverso Patteo': 'Saltiverso Patteo',
+};
+
+// unidades do Inventario - por enquanto so as lojas Domino's (mesmos codigos
+// do Fechamento, ver FECHAMENTO_UNIDADES_NOMES acima); as demais redes
+// (Milky Moo, Spoleto etc) tem planilha/dinamica propria de estoque, ainda
+// nao mapeada - entram quando o usuario mandar o modelo de cada uma
+const INVENTARIO_UNIDADES_NOMES = {
+  '19821': 'Dom Sao Miguel', '19855': 'Dom Carrão', '19888': 'Dom Mooca', '19889': 'Dom Tatuape',
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Natal': 'Dom Natal',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dominos Tirol',
 };
 
 // unidades do app de entregas (motoboys) - nomes como aparecem nas planilhas
@@ -1677,6 +1694,160 @@ app.delete('/api/grupos/:id', auth.requireMaster, async (req, res) => {
   try {
     await grupos.remove(req.params.id);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- Inventario (contagem fisica, recebimento de mercadoria e CMV -
+// por enquanto so as lojas Domino's, ver INVENTARIO_UNIDADES_NOMES acima).
+// Secao propria "inventario"; qualquer um com a secao pode lançar contagem/
+// recebimento/saida das unidades liberadas pra ele; editar catalogo e
+// excluir lançamento e Master-only, mesmo padrao do resto do app ----------
+function podeUnidadeInventario(req, unidade) {
+  return req.isMaster || (req.permissions.unidades || []).includes(unidade);
+}
+
+app.get('/api/inventario/unidades', requireSection('inventario'), (req, res) => {
+  const unidades = req.isMaster
+    ? Object.keys(INVENTARIO_UNIDADES_NOMES)
+    : (req.permissions.unidades || []).filter((u) => INVENTARIO_UNIDADES_NOMES[u]);
+  res.json(unidades.map((codigo) => ({ codigo, nome: INVENTARIO_UNIDADES_NOMES[codigo] })));
+});
+
+app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
+  res.json(await inventario.listCatalogo());
+});
+app.post('/api/inventario/catalogo', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.criarItem(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.put('/api/inventario/catalogo/:id', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.atualizarItem(req.params.id, req.body));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete('/api/inventario/catalogo/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await inventario.removerItem(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+// carrega o catalogo padrao extraido das planilhas do Domino's - idempotente
+// (so adiciona o que ainda nao existe pelo nome), pode ser chamado de novo
+// sem duplicar
+app.post('/api/inventario/catalogo/seed', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await inventario.seedCatalogoPadrao());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/recebimentos', requireSection('inventario'), async (req, res) => {
+  const todos = await inventario.listRecebimentos();
+  res.json(req.isMaster ? todos : todos.filter((r) => podeUnidadeInventario(req, r.unidade)));
+});
+app.post('/api/inventario/recebimentos', requireSection('inventario'), async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const registro = await inventario.criarRecebimento({ ...req.body, criadoPorId: req.user.id, criadoPorEmail: req.user.email });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete('/api/inventario/recebimentos/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await inventario.removerRecebimento(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/saidas', requireSection('inventario'), async (req, res) => {
+  const todos = await inventario.listSaidas();
+  res.json(req.isMaster ? todos : todos.filter((s) => podeUnidadeInventario(req, s.unidade)));
+});
+app.post('/api/inventario/saidas', requireSection('inventario'), async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const registro = await inventario.criarSaida({ ...req.body, criadoPorId: req.user.id, criadoPorEmail: req.user.email });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete('/api/inventario/saidas/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await inventario.removerSaida(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/contagens', requireSection('inventario'), async (req, res) => {
+  const { unidade, data } = req.query;
+  if (!unidade || !data) return res.status(400).json({ error: 'Informe unidade e data.' });
+  if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  const registro = await inventario.getContagem(unidade, data);
+  res.json(registro || { unidade, data, contagens: {} });
+});
+app.put('/api/inventario/contagens', requireSection('inventario'), async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const registro = await inventario.upsertContagem({ ...req.body, criadoPorId: req.user.id, criadoPorEmail: req.user.email });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// motor de diferenca (esperado x real) + ranking de ofensores + CMV - ver
+// inventario.js/calcularDiferencas
+app.get('/api/inventario/diferencas', requireSection('inventario'), async (req, res) => {
+  try {
+    const { unidade, inicio, fim } = req.query;
+    if (!unidade || !inicio || !fim) return res.status(400).json({ error: 'Informe unidade, início e fim.' });
+    if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    res.json(await inventario.calcularDiferencas(unidade, inicio, fim));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/inventario/relatorio.:formato(csv|pdf)', requireSection('inventario'), async (req, res) => {
+  try {
+    const { unidade, inicio, fim } = req.query;
+    if (!unidade || !inicio || !fim) return res.status(400).json({ error: 'Informe unidade, início e fim.' });
+    if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    const { ofensores } = await inventario.calcularDiferencas(unidade, inicio, fim);
+    const colunas = [
+      { key: 'itemNome', label: 'Item' }, { key: 'setor', label: 'Setor' },
+      { key: 'entradas', label: 'Entradas' }, { key: 'vendas', label: 'Vendas' }, { key: 'desperdicios', label: 'Desperdício' },
+      { key: 'diferencaQtd', label: 'Diferença (qtd)' }, { key: 'diferencaValor', label: 'Diferença (R$)' },
+    ];
+    const linhas = ofensores.map((o) => ({ ...o, setor: inventario.SETORES[o.setor] || o.setor, diferencaValor: reportUtil.fmtMoneyBR(o.diferencaValor) }));
+    const nomeArquivo = reportUtil.slugify(`inventario-diferencas-${unidade}`);
+    if (req.params.formato === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
+      return res.send(reportUtil.toCSV(colunas, linhas));
+    }
+    reportUtil.writePDF(res, {
+      titulo: 'Inventário - Diferenças (ofensores)',
+      subtitulo: `${INVENTARIO_UNIDADES_NOMES[unidade] || unidade} · ${reportUtil.fmtDataBR(inicio)} a ${reportUtil.fmtDataBR(fim)}`,
+      colunas, linhas, nomeArquivo,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
