@@ -1812,7 +1812,12 @@ app.post('/api/inventario/tipos', auth.requireMasterOuCatalogoEstoque, async (re
 app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
   res.json(await inventario.listCatalogo());
 });
-app.post('/api/inventario/catalogo', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
+// cadastrar item novo fica aberto pra qualquer um com acesso a Inventario -
+// e uma necessidade do dia a dia da loja (contar um item que ainda nao
+// existe no catalogo, ver abrirNovoItemContagem em estoque.html), diferente
+// de REORGANIZAR o catalogo existente (editar setor/tipo/custo/ativo,
+// excluir), que ai sim fica restrito a quem tem a permissao de Catalogo
+app.post('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
   try {
     res.json(await inventario.criarItem(req.body));
   } catch (err) {

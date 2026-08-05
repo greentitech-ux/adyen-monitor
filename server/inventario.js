@@ -30,6 +30,7 @@ const SETORES = {
   geladeira: 'Geladeira',
   makeline: 'Makeline',
   mesa_de_corte: 'Mesa de Corte',
+  comissariado: 'Comissariado',
 };
 const TIPOS_ITEM = ['COMIDA', 'BEBIDA', 'EMBALAGEM'];
 const TIPOS_SAIDA = ['VENDA', 'DESPERDICIO', 'OUTRA'];
