@@ -845,8 +845,20 @@ function resetarForm(){
   carregarSangriaDoDia();
 }
 
+// o formulario tem varios campos de texto/numero soltos (maquininhas,
+// saidas, canais/formas extras) - sem isso, apertar Enter em QUALQUER um
+// deles disparava o submit do form e lancava o fechamento sem querer, antes
+// da loja terminar de preencher. So a Observação (textarea) pode quebrar
+// linha com Enter normalmente.
+document.getElementById('form-lancar').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
 document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  if(!confirm('Tem certeza que deseja finalizar esse fechamento? Confira os valores antes de continuar - depois de lançado, qualquer correção precisa passar por aprovação do Master.')) return;
   const btn = document.getElementById('btn-enviar');
   const msg = document.getElementById('msg');
   msg.classList.add('hidden');
