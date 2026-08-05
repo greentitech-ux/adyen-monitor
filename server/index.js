@@ -1348,6 +1348,15 @@ app.put('/api/users/:id/is-admin', auth.requireMaster, async (req, res) => {
   }
 });
 
+// tag de cargo (Loja/Gerente) - rotulo de organizacao, nao muda permissao
+app.put('/api/users/:id/cargo', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateCargo(req.params.id, req.body.cargo));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/users/:id/reset-password', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.resetPassword(req.params.id, req.body.password));
@@ -1587,19 +1596,43 @@ app.get('/api/grupos', requireAnySection('lancamento', 'fechamentos', 'solicitac
   res.json(await grupos.list());
 });
 
-// so id+email dos Master/Admin responsaveis pelo grupo de uma unidade -
-// usado pra quem NAO e Master/Admin poder "direcionar" uma solicitação pra
-// alguem do proprio grupo de lojas (ver central.html), sem expor a lista
-// inteira de usuarios (essa e Master/Admin-only, ver GET /api/users)
+// so id+email dos Master/Admin que podem receber uma solicitação direcionada
+// da unidade - usado pra quem NAO e Master/Admin poder "direcionar" uma
+// solicitação pra alguem do proprio grupo de lojas (ver central.html), sem
+// expor a lista inteira de usuarios (essa e Master/Admin-only, GET /api/users).
+// Quem entra na lista:
+//   - todo Master ativo (sempre, sem precisar configurar nada);
+//   - Admins configurados como responsaveis do grupo em /grupos.html;
+//   - Admins que ja se ENGAJARAM com solicitações dessas lojas (aprovaram/
+//     rejeitaram alguma, ou mandaram mensagem no chat) - assim o admin que
+//     comeca a atuar num grupo passa a aparecer/ser notificavel sozinho,
+//     sem depender do Master lembrar de cadastra-lo como responsavel
 app.get('/api/grupos/responsaveis', requireSection('solicitacoes'), async (req, res) => {
   const { unidade } = req.query;
   if (!unidade) return res.status(400).json({ error: 'Informe a unidade.' });
   const grupo = await grupos.grupoDaUnidade(unidade);
-  if (!grupo || !(grupo.responsaveis || []).length) return res.json([]);
-  const todos = await users.list();
+  const unidadesDoGrupo = new Set(grupo ? grupo.unidades || [] : [unidade]);
+  const idsConfigurados = new Set(grupo ? grupo.responsaveis || [] : []);
+
+  const [todos, estornos, ajustes, gerais, chats] = await Promise.all([
+    users.list(), refunds.listAll(), fechamentosLive.listarEdicoes(), solicitacoes.listAll(), centralChat.listAllCached(),
+  ]);
+
+  const cardsDoGrupo = [
+    ...estornos.filter((r) => unidadesDoGrupo.has(r.unidade)).map((r) => ({ key: `estorno:${r.id}`, decisor: r.decidedByEmail })),
+    ...ajustes.filter((p) => unidadesDoGrupo.has(p.unidade)).map((p) => ({ key: `ajuste-fechamento:${p.id}`, decisor: p.decididoPorEmail })),
+    ...gerais.filter((s) => unidadesDoGrupo.has(s.unidade)).map((s) => ({ key: `${s.tipo}:${s.id}`, decisor: s.decididoPorEmail })),
+  ];
+  const chavesDoGrupo = new Set(cardsDoGrupo.map((c) => c.key));
+  const emailsEngajados = new Set(cardsDoGrupo.map((c) => c.decisor).filter(Boolean));
+  chats.forEach((m) => { if (chavesDoGrupo.has(m.cardKey) && m.autorEmail) emailsEngajados.add(m.autorEmail); });
+
   const responsaveis = todos
-    .filter((u) => grupo.responsaveis.includes(u.id) && (u.role === 'master' || u.isAdmin))
-    .map((u) => ({ id: u.id, email: u.email }));
+    .filter((u) => u.active !== false && (
+      u.role === 'master' ||
+      (u.isAdmin && (idsConfigurados.has(u.id) || emailsEngajados.has(u.email)))
+    ))
+    .map((u) => ({ id: u.id, email: u.email, papel: u.role === 'master' ? 'master' : 'admin' }));
   res.json(responsaveis);
 });
 

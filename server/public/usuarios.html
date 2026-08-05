@@ -61,6 +61,16 @@
   .badge.locked{background:var(--bad-dim);color:var(--bad);}
   .badge.horario{background:#132029;color:var(--accent);border:1px solid var(--line);}
   .badge.admin{background:#2a1a3d;color:#c299ff;border:1px solid var(--line);}
+  .badge.loja{background:#12303a;color:var(--accent);border:1px solid var(--line);}
+  .badge.gerente{background:#0f2f22;color:var(--ok);border:1px solid var(--line);}
+  .btn-acoes{font-family:var(--sans);font-size:11.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;white-space:nowrap;}
+  .btn-acoes:hover{border-color:var(--accent);}
+  .acoes-lista{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
+  .acoes-lista button{width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:11px 12px;font-size:12.5px;cursor:pointer;font-family:var(--sans);}
+  .acoes-lista button:hover{border-color:var(--accent);}
+  .acoes-lista button.danger{color:var(--bad);}
+  .acoes-lista button.danger:hover{border-color:var(--bad);}
+  .acoes-lista .acoes-sep{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 0;}
   .checks .group-heading{width:100%;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
   .checks .group-heading:first-child{margin-top:0;}
   .unidades-secao{margin-top:14px;}
@@ -217,6 +227,14 @@
     <p class="err hidden" id="restaurar-msg" style="margin-top:10px;"></p>
     <div id="restaurar-resultados" style="margin-top:12px;max-height:320px;overflow-y:auto;"></div>
     <button type="button" class="back" style="margin-top:14px;" onclick="fecharRestaurarFechamento()">Fechar</button>
+  </div>
+</div>
+
+<div class="overlay" id="acoes-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="acoes-titulo" style="margin:0;word-break:break-all;"></h3>
+    <div class="acoes-lista" id="acoes-lista"></div>
+    <button type="button" class="back" style="margin-top:14px;cursor:pointer;" onclick="fecharAcoes()">Fechar</button>
   </div>
 </div>
 
@@ -530,27 +548,48 @@ function renderUsers(){
       : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`)
       + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '')
       + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '');
+    const cargoBadge = u.cargo ? ` <span class="badge ${u.cargo}" title="Tag de cargo (só organização, não muda permissão)">${u.cargo==='loja'?'🏬 loja':'👔 gerente'}</span>` : '';
     return `
     <tr>
       <td>${escapeHtml(u.email)}</td>
-      <td><span class="badge ${u.role}">${u.role}</span></td>
+      <td><span class="badge ${u.role}">${u.role}</span>${cargoBadge}</td>
       <td>${statusBadges}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
-      <td>
-        ${isMaster ? '' : `
-        <div class="rowacts">
-          <button type="button" onclick="editarPermissoes('${u.id}')">Permissões</button>
-          <button type="button" onclick="abrirHorario('${u.id}')">Horário</button>
-          <button type="button" onclick="alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'Remover admin':'Tornar admin'}</button>
-          <button type="button" onclick="resetarSenha('${u.id}')">Nova senha</button>
-          <button type="button" onclick="alternarAtivo('${u.id}', ${!u.active})">${u.active?'Desativar':'Ativar'}</button>
-          <button type="button" onclick="excluirUsuario('${u.id}','${escapeHtml(u.email)}')">Excluir</button>
-        </div>`}
-      </td>
+      <td>${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}</td>
     </tr>`;
   }).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
+}
+
+// ---------- modal de acoes por usuario - substitui a fileira de 6 botoes
+// que deixava a tabela poluida (um "⚙️ Ações" por linha abre este modal) ----------
+function abrirAcoes(id){
+  const u = USERS.find(x=>x.id===id);
+  if(!u) return;
+  document.getElementById('acoes-titulo').textContent = u.email;
+  document.getElementById('acoes-lista').innerHTML = `
+    <button type="button" onclick="fecharAcoes();editarPermissoes('${u.id}')">🔑 Permissões</button>
+    <button type="button" onclick="fecharAcoes();abrirHorario('${u.id}')">🕐 Horário de acesso</button>
+    <button type="button" onclick="fecharAcoes();resetarSenha('${u.id}')">🔒 Nova senha</button>
+    <div class="acoes-sep">Tags</div>
+    <button type="button" onclick="fecharAcoes();alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'⭐ Remover tag Admin':'⭐ Tornar Admin'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
+    <div class="acoes-sep">Conta</div>
+    <button type="button" class="danger" onclick="fecharAcoes();alternarAtivo('${u.id}', ${!u.active})">${u.active?'🚫 Desativar acesso':'✅ Reativar acesso'}</button>
+    <button type="button" class="danger" onclick="fecharAcoes();excluirUsuario('${u.id}','${escapeHtml(u.email)}')">🗑️ Excluir acesso</button>
+  `;
+  document.getElementById('acoes-overlay').classList.add('show');
+}
+function fecharAcoes(){ document.getElementById('acoes-overlay').classList.remove('show'); }
+document.getElementById('acoes-overlay').addEventListener('click', (e)=>{ if(e.target.id==='acoes-overlay') fecharAcoes(); });
+
+async function definirCargo(id, cargo){
+  const res = await fetch('/api/users/'+id+'/cargo', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cargo})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao definir a tag.'); return; }
+  await carregarUsuarios();
 }
 
 document.getElementById('create-form').addEventListener('submit', async (e)=>{
