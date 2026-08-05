@@ -2049,6 +2049,7 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
       tipoCorrecao: payload.tipoCorrecao,
       mudancas: payload.mudancas,
       itemNovo: payload.itemNovo,
+      novaData: payload.novaData,
       motivo: payload.motivo,
       anexos,
       solicitadoPorId: req.user.id,
@@ -2343,7 +2344,11 @@ function normalizarCard(tipo, r) {
   if (tipo === 'ajuste-fechamento') {
     const desc = r.tipoCorrecao === 'item'
       ? `adicionar ${r.itemNovo?.tipo === 'maquininha' ? 'maquininha' : 'saída'} "${r.itemNovo?.descricao || ''}" (${fmtMoneyServer(r.itemNovo?.valor)})`
-      : `corrigir ${Object.keys(r.mudancas || {}).join(', ')}`;
+      : r.tipoCorrecao === 'excluir'
+        ? 'excluir o lançamento inteiro'
+        : r.tipoCorrecao === 'data'
+          ? `corrigir a data para ${r.novaData}`
+          : `corrigir ${Object.keys(r.mudancas || {}).join(', ')}`;
     return {
       ...r,
       tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
