@@ -781,13 +781,37 @@ function filtrar(){
 // ---- Comparação com período anterior, por unidade - da pra enxergar
 // evolução/previsibilidade da unidade (nao so o agregado que os KPIs de cima
 // ja mostram). Segue o mesmo período que o filtro principal estiver usando
-// (semana/mes/trimestre/intervalo livre); sem filtro nenhum escolhido ainda,
-// o padrao e a semana atual (ao inves do D-1 que os KPIs/tabelas usam) ----
-function periodoAnterior(inicio, fim){
-  const dStart = new Date(inicio+'T00:00:00'), dEnd = new Date(fim+'T00:00:00');
-  const dias = Math.round((dEnd-dStart)/86400000)+1;
-  const prevEnd = new Date(dStart); prevEnd.setDate(prevEnd.getDate()-1);
-  const prevStart = new Date(prevEnd); prevStart.setDate(prevStart.getDate()-(dias-1));
+// (dia/semana/mes/trimestre/intervalo livre); sem filtro nenhum escolhido
+// ainda, o padrao e a semana atual (ao inves do D-1 que os KPIs/tabelas usam)
+//
+// Comparação "like-for-like", igual mercado/financeiro: nunca compara com o
+// dia/período imediatamente anterior corrido, e sim com o mesmo ponto do
+// ciclo anterior - segunda com segunda, terça com terça, mês com o mesmo
+// intervalo do mês anterior, trimestre com trimestre. Isso evita comparar
+// sábado (fraco) com sexta (forte) só por estarem "coladas" no calendário,
+// que distorceria a variação % sem refletir uma queda de verdade.
+function periodoAnterior(inicio, fim, tipoPreset){
+  // ancora pelo FIM (mes de referencia usado pelo calcularPreset pra montar
+  // tanto "Mês" quanto "Trimestre" - o trimestre e sempre o mes de
+  // referencia + os 2 anteriores, entao "voltar 3 meses" tem que partir do
+  // mes final do periodo atual, nao do inicial, senao o trimestre anterior
+  // sai deslocado (ver teste)
+  const dEnd = new Date(fim+'T00:00:00');
+  if(tipoPreset === 'mes'){
+    const prevRef = new Date(dEnd.getFullYear(), dEnd.getMonth()-1, 1);
+    return calcularPreset('mes', isoLocal(prevRef));
+  }
+  if(tipoPreset === 'trimestre'){
+    const prevRef = new Date(dEnd.getFullYear(), dEnd.getMonth()-3, 1);
+    return calcularPreset('trimestre', isoLocal(prevRef));
+  }
+  // dia (Ontem) / semana / intervalo livre: desloca a janela inteira 7 dias
+  // pra trás, preservando o dia da semana de cada data - "semana" já é um
+  // bloco de 7 dias (dom-sáb), entao esse mesmo deslocamento já devolve a
+  // semana anterior certinha, sem precisar de um caso especial pra ela
+  const dStart = new Date(inicio+'T00:00:00');
+  const prevStart = new Date(dStart); prevStart.setDate(prevStart.getDate()-7);
+  const prevEnd = new Date(dEnd); prevEnd.setDate(prevEnd.getDate()-7);
   return { inicio: isoLocal(prevStart), fim: isoLocal(prevEnd) };
 }
 
@@ -798,7 +822,7 @@ function comparativoRange(){
   return calcularPreset('semana', isoLocal(agoraBrasilia()));
 }
 
-const ROTULO_PRESET_COMPARATIVO = {ontem:'dia', semana:'semana', mes:'mês', trimestre:'trimestre'};
+const ROTULO_PRESET_COMPARATIVO = {ontem:'dia (mesmo dia da semana)', semana:'semana', mes:'mês', trimestre:'trimestre'};
 
 function renderComparativoPeriodo(){
   const {inicio, fim} = comparativoRange();
@@ -809,11 +833,22 @@ function renderComparativoPeriodo(){
     el.innerHTML = '<div class="empty">Selecione um período.</div>';
     return;
   }
-  const anterior = periodoAnterior(inicio, fim);
+  // sem filtro escolhido ainda: padrao semana atual. Preset conhecido
+  // (Ontem/Semana/Mês/Trimestre): segue a logica dele. Intervalo livre
+  // (datas editadas na mao, sem preset ativo): trata como "dia" - desloca 7
+  // dias pra tras preservando o dia da semana, mesma logica profissional
+  let tipoPreset, rotulo;
+  if(!filtroDataAtivo){
+    tipoPreset = 'semana'; rotulo = 'semana';
+  } else if(presetAtivo){
+    tipoPreset = presetAtivo; rotulo = ROTULO_PRESET_COMPARATIVO[presetAtivo] || 'período (mesmo dia da semana)';
+  } else {
+    tipoPreset = null; rotulo = 'período (mesmo dia da semana)';
+  }
+  const anterior = periodoAnterior(inicio, fim, tipoPreset);
   const atuais = filtrarPorIntervalo(inicio, fim);
   const anteriores = filtrarPorIntervalo(anterior.inicio, anterior.fim);
 
-  const rotulo = (filtroDataAtivo && presetAtivo) ? (ROTULO_PRESET_COMPARATIVO[presetAtivo]||'período') : 'semana';
   info.textContent = `Comparação por ${rotulo}: ${fmtData(inicio)} → ${fmtData(fim)} (atual) vs ${fmtData(anterior.inicio)} → ${fmtData(anterior.fim)} (anterior)`;
 
   const porUnidade = {};
