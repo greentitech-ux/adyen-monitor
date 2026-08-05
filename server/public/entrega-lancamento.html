@@ -430,8 +430,18 @@ function resetarForm(){
   atualizarSugestao();
 }
 
+// mesmo motivo do form de fechamento (ver lancamento.html): varios campos
+// numericos soltos - sem isso, Enter em qualquer um deles lançava a
+// corrida/turno sem querer, antes de terminar de preencher
+document.getElementById('form-lancar').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
 document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  if(!confirm('Tem certeza que deseja finalizar esse lançamento de entrega? Confira os valores antes de continuar - depois de lançado, qualquer correção precisa passar por aprovação do Master.')) return;
   const btn = document.getElementById('btn-enviar');
   const msg = document.getElementById('msg');
   msg.classList.add('hidden');

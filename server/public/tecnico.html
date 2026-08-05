@@ -283,6 +283,7 @@ async function iniciarChamado(){
 
 async function concluirChamado(){
   if(!DETALHE_ATUAL) return;
+  if(!confirm('Tem certeza que deseja concluir esse chamado? Confira as fotos/observações antes de continuar.')) return;
   const msg = document.getElementById('msg-detalhe');
   const btn = document.getElementById('btn-concluir');
   msg.classList.add('hidden');
