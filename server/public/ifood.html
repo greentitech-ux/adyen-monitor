@@ -114,6 +114,7 @@
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
@@ -469,7 +470,7 @@ async function boot(){
   const me = await res.json();
   const isMaster = me.role==='master';
   IS_MASTER = isMaster;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
@@ -484,6 +485,7 @@ async function boot(){
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
   document.getElementById('btn-sincronizar').classList.toggle('hidden', !isMaster);
 
