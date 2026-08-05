@@ -6,6 +6,7 @@
 // edicao de fechamento (fechamentosLive.js EDITS) - por isso sem cache, leitura
 // direta no Firestore a cada chamada, igual aquela colecao.
 const db = require('./firestore');
+const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('centralChat');
 
@@ -37,6 +38,7 @@ async function addMessage({ tipo, cardId, autorId, autorEmail, texto }) {
     criadoEm: new Date().toISOString(),
   };
   await doc.set(registro);
+  chatCache.invalidar();
   return registro;
 }
 
@@ -44,4 +46,14 @@ async function removeMessage(id) {
   await COLLECTION.doc(id).delete();
 }
 
-module.exports = { listByCard, addMessage, removeMessage };
+// lista completa (com cache curto) - usada pela rota de responsaveis do
+// grupo pra descobrir quais Admins ja participaram de chats de solicitações
+// de uma unidade (ver GET /api/grupos/responsaveis em index.js)
+async function listAllUncached() {
+  const snap = await COLLECTION.get();
+  return snap.docs.map((d) => d.data());
+}
+const chatCache = createCache(listAllUncached, 20 * 1000);
+const listAllCached = chatCache.cached;
+
+module.exports = { listByCard, addMessage, removeMessage, listAllCached };

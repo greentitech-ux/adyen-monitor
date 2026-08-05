@@ -358,7 +358,8 @@ async function carregarResponsaveis(){
     const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(unidade)).then(r=>r.json());
     lista.forEach(u=>{
       const opt = document.createElement('option');
-      opt.value = u.id; opt.dataset.email = u.email; opt.textContent = u.email;
+      opt.value = u.id; opt.dataset.email = u.email;
+      opt.textContent = u.email + (u.papel==='master' ? ' (Master)' : ' (Admin)');
       sel.appendChild(opt);
     });
   }catch(e){ /* mantem só a opção padrão */ }
