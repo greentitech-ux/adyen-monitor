@@ -868,11 +868,27 @@ function classificarUnidade(codigo) {
   return { secao: 'Monitor / Disputas (Adyen)', grupo: 'Outras' };
 }
 
+// nome canonico de um codigo de unidade, olhando os mapas fixos nesta ordem
+// (apelidos manuais > fechamento > entregas > ifood) - usado sempre que
+// alguem precisa MOSTRAR o nome de uma unidade a partir do codigo, pra nunca
+// depender do unidadeNome gravado num documento antigo (que pode ter sido
+// salvo errado, ex: entregasSync.js gravava o proprio codigo como nome)
+function nomeCanonicoUnidade(codigo, fallback) {
+  return UNIDADES_APELIDOS[codigo] || FECHAMENTO_UNIDADES_NOMES[codigo] || ENTREGAS_UNIDADES_NOMES[codigo]
+    || ifoodClient.IFOOD_UNIDADES_NOMES[codigo] || fallback || codigo;
+}
+
 // lista de unidades pra montar o seletor de permissoes na tela de Usuarios -
 // junta as unidades ja vistas nas transacoes Adyen (secoes Monitor/Disputas)
 // com as unidades fixas de Fechamento/Lançamento/Entregas (espacos de codigo
 // diferentes, nao e o merchantAccountCode da Adyen) e as que ja aparecem nos
-// dados importados/lançados, pra nunca faltar opcao no checklist do Master
+// dados importados/lançados, pra nunca faltar opcao no checklist do Master.
+// O NOME de cada codigo sempre vem por ultimo de nomeCanonicoUnidade(), nunca
+// do unidadeNome gravado num fechamento/entrega antigo - documentos velhos
+// podem ter guardado um nome cru/errado (ex: o proprio codigo) e isso NAO
+// pode "vazar" e sobrescrever o nome bonito que ja temos fixo aqui; o
+// unidadeNome do documento so serve de fallback pra codigo que ainda nao
+// esta em nenhum mapa fixo (unidade nova, ainda sem apelido cadastrado)
 async function construirUnidadesMapa() {
   const mapa = {};
   store.allTransactions().forEach((t) => { if (t.unidade) mapa[t.unidade] = mapa[t.unidade] || t.unidade; });
@@ -883,9 +899,10 @@ async function construirUnidadesMapa() {
   (await fechamentosLive.listAll()).forEach((f) => { if (f.unidade) mapa[f.unidade] = f.unidadeNome || mapa[f.unidade] || f.unidade; });
   entregasHistoricoData.forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
   (await entregasLive.listAll()).forEach((e) => { if (e.unidade) mapa[e.unidade] = e.unidadeNome || mapa[e.unidade] || e.unidade; });
-  // por ultimo, sempre - garante o nome unificado mesmo que algum dado
-  // importado (planilha, fechamento antigo) tenha trazido um nome diferente
-  Object.entries(UNIDADES_APELIDOS).forEach(([codigo, nome]) => { if (mapa[codigo]) mapa[codigo] = nome; });
+  // ultimo passo, sempre - reaplica os mapas fixos por cima de tudo, pra
+  // garantir o nome unificado mesmo se algum dado importado/lançado tenha
+  // gravado um unidadeNome diferente (cru, com typo, ou desatualizado)
+  Object.keys(mapa).forEach((codigo) => { mapa[codigo] = nomeCanonicoUnidade(codigo, mapa[codigo]); });
   return mapa;
 }
 
@@ -2646,7 +2663,7 @@ function filtrarEntregasPeriodo(lista, req) {
     (!fim || (d.data || '') <= fim)
   );
 }
-function unidadeNomeEntrega(d) { return d.unidadeNome || d.unidade || '—'; }
+function unidadeNomeEntrega(d) { return d.unidade ? nomeCanonicoUnidade(d.unidade, d.unidadeNome) : (d.unidadeNome || '—'); }
 
 function prepararEntregasPorEntregador(rows) {
   const colunas = [

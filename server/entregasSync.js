@@ -61,7 +61,10 @@ function linhaParaEntrega(aba, header, linha) {
   return {
     id: `${aba.toLowerCase()}-${id}`,
     unidade,
-    unidadeNome: unidade,
+    // unidadeNome fica de fora de proposito - se viesse igual ao codigo
+    // (unidade) aqui, ele "envenenava" o nome bonito exibido em outras telas
+    // (ver nomeCanonicoUnidade em index.js, que so usa esse campo de
+    // fallback pra codigo que ainda nao tem apelido cadastrado)
     data,
     entregador: get('Nome') || '',
     entrega: num(get('Entrega')),
