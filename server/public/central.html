@@ -335,6 +335,16 @@ function initNavDrawerAccordion(){
     g.after(wrap);
     itens.forEach(it=>wrap.appendChild(it));
     g.innerHTML = `<span>${nomeGrupo}</span><span class="ndg-seta">▾</span>`;
+    // esconde o grupo inteiro (titulo + itens) se nenhum item dentro dele
+    // estiver visivel pra esse usuario (sem nenhuma permissao do grupo) -
+    // dropdown vazio some sozinho. Administracao nunca some porque sempre
+    // tem Ajuda visivel pra todo mundo
+    const atualizarVazio = ()=>{
+      const temVisivel = itens.some(it=>!it.classList.contains('hidden'));
+      g.classList.toggle('hidden', !temVisivel);
+    };
+    atualizarVazio();
+    new MutationObserver(atualizarVazio).observe(wrap, { attributes:true, attributeFilter:['class'], subtree:true });
     const key = 'ndgAberto:' + nomeGrupo;
     const temAtivo = itens.some(it=>it.classList.contains('active'));
     const aberto = temAtivo || localStorage.getItem(key) === '1';
