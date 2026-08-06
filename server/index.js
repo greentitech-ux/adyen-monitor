@@ -1597,6 +1597,22 @@ app.post('/api/users/:id/reset-password', auth.requireMaster, async (req, res) =
   }
 });
 
+// "Reset Senha" rapido (Painel, menu ☰) - Master ou Admin acham o acesso so
+// pelo usuario/email (sem precisar abrir a tela de Usuarios) e definem uma
+// senha nova na hora - mesmo efeito do "Nova senha" de Usuarios (desbloqueia
+// e obriga trocar no proximo login, ver users.resetPassword)
+app.post('/api/users/reset-senha-rapido', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const alvo = await users.findByIdentifier(req.body.identificador);
+    if (!alvo) return res.status(404).json({ error: 'Nenhum acesso encontrado com esse usuário/email.' });
+    if (alvo.role === 'master') return res.status(400).json({ error: 'Não é possível redefinir a senha do Master por aqui.' });
+    await users.resetPassword(alvo.id, req.body.novaSenha);
+    res.json({ ok: true, email: alvo.email });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.put('/api/users/:id/username', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.updateUsername(req.params.id, req.body.username));
@@ -2837,6 +2853,22 @@ app.patch('/api/solicitacoes/:id/tipo', auth.requireMasterOrAdmin, async (req, r
       return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     }
     const registro = await solicitacoes.mudarTipo(req.params.id, req.body.novoTipo, req.user.email);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// andamento de execucao (Pendente/Em andamento/Finalizado) de um ticket ja
+// Aprovado - acompanha o trabalho de verdade depois da decisao, separado do
+// status de aprovar/rejeitar (ver solicitacoes.atualizarExecucao)
+app.patch('/api/solicitacoes/:id/execucao', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
+    const registro = await solicitacoes.atualizarExecucao(req.params.id, req.body.execucaoStatus);
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json(registro);
   } catch (err) {

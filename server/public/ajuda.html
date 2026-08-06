@@ -172,9 +172,9 @@ const TOPICOS = [
     <div class="dica"><b>Esqueceu a senha?</b> Peça pro Master usar "Nova senha" na página Usuários - ele te passa uma senha temporária por fora do sistema (telefone/WhatsApp).</div>
     <div class="dica"><b>Conta bloqueada?</b> Depois de 3 senhas erradas o acesso trava sozinho. O Master destrava trocando a senha.</div>
     <h3>Troca de senha obrigatória no primeiro acesso</h3>
-    <p>Toda vez que o Master cria um acesso novo ou reseta sua senha, no login seguinte o sistema pede pra você definir uma senha nova antes de liberar o resto do app - a senha temporária só serve pra esse primeiro login.</p>
-    <h3>Trocar a senha quando quiser</h3>
-    <p>A qualquer momento, abra o menu (☰) no Painel e clique em <b>🔑 Alterar senha</b>. Você continua logado no seu aparelho; só os outros locais logados com a senha antiga são desconectados.</p>
+    <p>Toda vez que o Master/Admin cria um acesso novo ou reseta sua senha, no login seguinte o sistema pede pra você definir uma senha nova antes de liberar o resto do app - a senha temporária só serve pra esse primeiro login.</p>
+    <h3>🔑 Reset Senha (Master/Admin)</h3>
+    <p>Master e Admin encontram no menu (☰) do Painel a opção <b>🔑 Reset Senha</b> - um jeito rápido de redefinir a senha de qualquer acesso, sem precisar abrir a tela de Usuários: basta informar o usuário (login) ou e-mail da pessoa, digitar a senha nova e confirmar. A pessoa é obrigada a trocar por uma senha própria no próximo login, e os outros locais logados com a senha antiga são desconectados.</p>
   `},
   { id:'painel', icone:'🏠', secoes:null, titulo:'Painel (visão geral)', corpo:`
     <p>É a primeira tela depois do login: mostra um resumo rápido de cada área que você tem acesso (Monitor do dia, Fechamentos de ontem, Entregas de ontem, Central de Solicitações pendentes, Chamados de TI, iFood).</p>
@@ -265,14 +265,16 @@ const TOPICOS = [
     </ul>
     <h3>🎫 Número do ticket</h3>
     <p>Toda solicitação (de qualquer tipo) ganha um número sequencial único ao ser criada, tipo <b>Ticket #10000</b>, <b>#10001</b>... Esse número aparece no cartão e no detalhe, e é o mesmo nas notificações push.</p>
-    <h3>🔀 Mudar ou converter o tipo do ticket</h3>
-    <p>Um ticket não precisa ficar preso ao tipo com que nasceu. Master e Admin encontram essas opções na seção <b>"Tipo do ticket"</b> do detalhe:</p>
+    <h3>🔀 Mudar ou converter a categoria do ticket</h3>
+    <p>Um ticket não precisa ficar preso ao tipo com que nasceu. Master e Admin encontram essas opções na seção <b>"Categoria do ticket"</b> do detalhe:</p>
     <ul>
-      <li><b>Mudar tipo:</b> um ticket de Compra, Manutenção, Suporte de TI, Pagamento ou Nota pode virar qualquer um dos outros quatro - ex: um chamado de Manutenção vira Pagamento assim que o serviço é executado e é hora de pagar o prestador. O número do ticket, o histórico e o chat continuam os mesmos.</li>
-      <li><b>Converter em Estorno:</b> qualquer um desses 5 tipos pode virar um pedido de Estorno, se for pra esse lado que o caso evoluiu.</li>
+      <li><b>Mudar categoria:</b> um ticket de Compra, Manutenção, Suporte de TI, Pagamento ou Nota pode virar qualquer um dos outros quatro - ex: um chamado de Manutenção vira Pagamento assim que o serviço é executado e é hora de pagar o prestador. O número do ticket, o histórico e o chat continuam os mesmos.</li>
+      <li><b>"Este ticket virou um Estorno":</b> qualquer um desses 5 tipos pode virar um pedido de Estorno, se for pra esse lado que o caso evoluiu.</li>
       <li><b>Converter a partir de Estorno:</b> um Estorno também pode virar um dos 5 tipos gerais (ex: virou uma Manutenção em vez de reembolso).</li>
     </ul>
     <p>Ao converter, o ticket original fica marcado como <b>convertido</b> e some das colunas do Kanban - quem continuar a história é o novo registro, com o <b>mesmo número de ticket</b> e um link de volta pro ticket de origem (e vice-versa). O <b>Ajuste de fechamento</b> fica de fora desse fluxo de troca/conversão, porque está sempre amarrado a um fechamento específico.</p>
+    <h3>📍 Andamento (depois de aprovado)</h3>
+    <p>Pra Compra, Manutenção, Suporte de TI, Pagamento e Nota, depois de <b>Aprovado</b> o ticket ganha uma seção <b>"Andamento"</b> no detalhe: Master e Admin marcam se está <b>Pendente</b>, <b>Em andamento</b> ou <b>Finalizado</b>, pra acompanhar a execução de verdade (ex: um Suporte de TI aprovado que ainda não teve o técnico despachado, está com o técnico a caminho, ou já foi resolvido). Todo ticket aprovado começa como Pendente.</p>
     <h3>🔓 Login bloqueado</h3>
     <p>Quando um acesso é bloqueado automaticamente (3 tentativas de senha erradas seguidas), o Zenith cria sozinho um ticket de <b>Suporte de TI</b> chamado "Login bloqueado: &lt;email&gt;" na Central, e Master/Admin recebem a notificação normalmente. Esse ticket é diferente dos outros de Suporte de TI: ao <b>aprovar</b>, não precisa escolher técnico - o acesso é desbloqueado e a senha é redefinida direto para <b>"inicial1"</b>, já obrigando a pessoa a trocar por uma senha própria no próximo login. É só avisar pra ela entrar com essa senha padrão.</p>
     <h3>👤 Trocar o agente responsável</h3>

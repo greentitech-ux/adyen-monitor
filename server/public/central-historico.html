@@ -305,7 +305,10 @@
   <div class="sheet-wrap">
     <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharDetalhe()">✕</span>
     <div class="sheet">
-    <h3 id="d-titulo"></h3>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+      <h3 id="d-titulo" style="margin:0;"></h3>
+      <button type="button" class="link-btn" id="btn-atribuir-responsavel" style="flex:none;white-space:nowrap;" onclick="toggleResponsavel()">👤 Atribuir responsável</button>
+    </div>
     <div class="sub" id="d-sub"></div>
     <div id="d-corpo" style="font-size:13px;display:flex;flex-direction:column;gap:8px;"></div>
     <div id="d-master-crud" class="hidden" style="display:flex;gap:14px;margin-top:10px;">
@@ -319,8 +322,8 @@
       <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarResponsavel()">Salvar responsável</button>
     </div>
     <div id="d-tipo-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-      <div class="secao-titulo">🔀 Tipo do ticket</div>
-      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de tipo ou virar Estorno conforme o atendimento evolui.</div>
+      <div class="secao-titulo">🔀 Categoria do ticket</div>
+      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de categoria ou virar Estorno conforme o atendimento evolui.</div>
       <div id="d-tipo-corpo"></div>
     </div>
     <div id="d-editar" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;"></div>
@@ -339,6 +342,11 @@
     <div id="d-comprada" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">🛍️ Comprada</div>
       <div id="d-comprada-corpo"></div>
+    </div>
+    <div id="d-andamento" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">📍 Andamento</div>
+      <div class="sub" style="margin:-2px 0 8px;">Depois de aprovado, acompanhe a execução de verdade do ticket.</div>
+      <div id="d-andamento-corpo"></div>
     </div>
     <div id="d-chat" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">💬 Chat</div>
@@ -474,6 +482,7 @@ function kcardHtml(c){
         ${c.status==='CONVERTIDO' ? '<span class="tipo-badge" style="background:#12303a;color:var(--accent);">🔀 convertido</span>' : ''}
         ${c.ehOrcamento ? '<span class="tipo-badge" style="background:#3d2f0f;color:#e0b84c;">💰 orçamento</span>' : ''}
         ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
+        ${TIPOS_GERAIS.includes(c.tipo) && c.status==='APROVADO' ? `<span class="tipo-badge" style="background:#181d24;">${ANDAMENTO_INFO[c.execucaoStatus||'PENDENTE'].icone} ${ANDAMENTO_INFO[c.execucaoStatus||'PENDENTE'].label}</span>` : ''}
         ${badgeVencimento(c)}
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
@@ -598,7 +607,8 @@ function abrirDetalhe(tipo, id){
   document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
 
   const podeReatribuir = IS_MASTER || IS_ADMIN;
-  document.getElementById('d-responsavel').classList.toggle('hidden', !podeReatribuir);
+  document.getElementById('btn-atribuir-responsavel').classList.toggle('hidden', !podeReatribuir);
+  document.getElementById('d-responsavel').classList.add('hidden'); // sempre comeca fechado, abre so no clique do botao ao lado do nome
   if(podeReatribuir) carregarResponsavelSelect(c);
 
   const podeMudarTipo = podeReatribuir && c.status !== 'CONVERTIDO' && (TIPOS_GERAIS.includes(c.tipo) || c.tipo === 'estorno');
@@ -606,9 +616,51 @@ function abrirDetalhe(tipo, id){
   if(podeMudarTipo) renderTipoAcoes(c);
 
   renderComprada(c);
+  renderAndamento(c);
 
   document.getElementById('overlay-detalhe').classList.remove('hidden');
   carregarChat(c.tipo, c.id);
+}
+
+// andamento pos-aprovacao (Pendente/Em Andamento/Finalizado) - so pros 5
+// tipos gerais (Compra/Manutencao/Suporte-TI/Pagamento/Nota), independente
+// do "Comprada" (que e um marcador a parte, so pra Compra). Master/Admin
+// mudam livremente entre os 3 estados; quem nao decide so ve o estado atual
+const ANDAMENTO_INFO = {
+  PENDENTE: { label: 'Pendente', icone: '🟡' },
+  EM_ANDAMENTO: { label: 'Em andamento', icone: '🔵' },
+  FINALIZADO: { label: 'Finalizado', icone: '✅' },
+};
+function renderAndamento(c){
+  const wrap = document.getElementById('d-andamento');
+  const podeVer = TIPOS_GERAIS.includes(c.tipo) && c.status==='APROVADO';
+  wrap.classList.toggle('hidden', !podeVer);
+  if(!podeVer) return;
+  const atual = c.execucaoStatus || 'PENDENTE';
+  const podeMudar = IS_MASTER || IS_ADMIN;
+  const corpo = document.getElementById('d-andamento-corpo');
+  const estiloBase = 'font-family:var(--sans);font-size:12px;padding:8px 12px;border-radius:10px;cursor:pointer;';
+  const botoes = Object.keys(ANDAMENTO_INFO).map(st=>{
+    const info = ANDAMENTO_INFO[st];
+    const ativo = st===atual;
+    const estilo = ativo
+      ? `${estiloBase}border:1px solid var(--accent);background:rgba(92,200,255,.12);color:var(--text);font-weight:600;`
+      : `${estiloBase}border:1px solid var(--line);background:var(--panel2);color:${podeMudar?'var(--text)':'var(--muted)'};`;
+    return `<button type="button" ${podeMudar && !ativo ? `onclick="salvarAndamento('${st}')"` : 'disabled'} style="${estilo}">${info.icone} ${info.label}</button>`;
+  }).join('');
+  corpo.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;">${botoes}</div>`;
+}
+async function salvarAndamento(novoStatus){
+  const c = DETALHE_ATUAL;
+  if(!c) return;
+  try{
+    const resp = await fetch(`/api/solicitacoes/${c.id}/execucao`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ execucaoStatus: novoStatus }) });
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao atualizar andamento.');
+    DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
+    renderAndamento(DETALHE_ATUAL);
+    await carregarCentral();
+  }catch(err){ alert(err.message); }
 }
 
 // bloco de Comprada - so pra pedidos de Compra ja Aprovados, visivel pra
@@ -664,6 +716,13 @@ async function marcarComprada(){
     await carregarCentral();
   }catch(err){ alert(err.message); }
 }
+// botao "👤 Atribuir responsável" ao lado do nome no topo do detalhe -
+// abre/fecha a secao (fica fechada por padrao, pra nao poluir o detalhe
+// com uma secao grande em todo ticket que Master/Admin abre)
+function toggleResponsavel(){
+  document.getElementById('d-responsavel').classList.toggle('hidden');
+}
+
 // ---------- reatribuir o agente responsavel de um ticket ja existente
 // (Master/Admin) - qualquer tipo de solicitacao, independente do status.
 // Reaproveita o mesmo endpoint de responsaveis do grupo ja usado no
@@ -713,10 +772,10 @@ function renderTipoAcoes(c){
   if(TIPOS_GERAIS.includes(c.tipo)){
     const opcoes = TIPOS_GERAIS.filter(t=>t!==c.tipo).map(t=>`<option value="${t}">${iconeTipo(t)} ${TIPOS_INFO[t].label}</option>`).join('');
     corpo.innerHTML = `
-      <label>Mudar para outro tipo</label>
+      <label>Mudar categoria para</label>
       <select id="tipo-novo-select">${opcoes}</select>
-      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarMudarTipo()">Salvar novo tipo</button>
-      <button type="button" class="link-btn" style="margin-top:12px;display:block;" onclick="toggleConverterEstorno()">🔁 Converter este ticket em Estorno</button>
+      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarMudarTipo()">Salvar categoria</button>
+      <button type="button" class="link-btn" style="margin-top:12px;display:block;" onclick="toggleConverterEstorno()">🔁 Este ticket virou um Estorno</button>
       <div id="converter-estorno-form" class="hidden" style="margin-top:8px;">
         <label>Valor a estornar</label>
         <input type="number" step="0.01" id="ce-valor" value="${c.valorEstimado!=null?c.valorEstimado:''}">
@@ -728,7 +787,7 @@ function renderTipoAcoes(c){
   } else if(c.tipo==='estorno'){
     const opcoes = TIPOS_GERAIS.map(t=>`<option value="${t}">${iconeTipo(t)} ${TIPOS_INFO[t].label}</option>`).join('');
     corpo.innerHTML = `
-      <label>Converter este ticket em outro tipo</label>
+      <label>Este ticket virou outra categoria</label>
       <select id="tipo-conv-select">${opcoes}</select>
       <label>Unidade (código - obrigatório se não veio preenchida)</label>
       <input type="text" id="cv-unidade" value="${escapeHtml(c.unidade||'')}">

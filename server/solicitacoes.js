@@ -21,6 +21,13 @@ const TIPOS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
 // historia e o novo registro em refunds.js (convertidoParaId)
 const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO', 'CONVERTIDO'];
 
+// andamento da EXECUCAO de verdade, depois que o ticket ja foi Aprovado -
+// diferente do `status` (que e a decisao de aprovar/rejeitar). Ex: um
+// Suporte de TI aprovado comeca Pendente, vira Em andamento quando o
+// tecnico esta resolvendo, e Finalizado quando termina. So faz sentido
+// (e so fica visivel) com status==='APROVADO'
+const EXECUCAO_STATUSES = ['PENDENTE', 'EM_ANDAMENTO', 'FINALIZADO'];
+
 const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // itens da lista de compra (nome do que comprar + quantidade) - so pra
@@ -82,6 +89,9 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     fornecedor: fornecedor ? String(fornecedor).trim().slice(0, 120) : null,
     vencimento: vencimento || null,
     status: 'PENDENTE',
+    // andamento da execucao, so preenchido (e so relevante) apos Aprovado -
+    // ver EXECUCAO_STATUSES/atualizarExecucao
+    execucaoStatus: null,
     criadoPorId,
     criadoPorEmail,
     // Master/Admin escolhido por quem lançou (opcional, ver grupos.js) - so
@@ -137,12 +147,29 @@ async function updateStatus(id, status, { motivoDecisao, decidedByEmail }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Solicitação não encontrada.');
-  await ref.update({
+  const patch = {
     status,
     motivoDecisao: motivoDecisao || null,
     decididoPorEmail: decidedByEmail,
     decididoEm: new Date().toISOString(),
-  });
+  };
+  // aprovar comeca o andamento de execucao em Pendente (ver EXECUCAO_STATUSES)
+  if (status === 'APROVADO') patch.execucaoStatus = 'PENDENTE';
+  await ref.update(patch);
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+// atualiza o andamento de execucao (Pendente/Em andamento/Finalizado) de um
+// ticket ja Aprovado - Master/Admin acompanham a execucao de verdade depois
+// da decisao (ex: tecnico ainda nao foi, esta indo, ja resolveu)
+async function atualizarExecucao(id, execucaoStatus) {
+  if (!EXECUCAO_STATUSES.includes(execucaoStatus)) throw new Error('Status de execução inválido.');
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  if (snap.data().status !== 'APROVADO') throw new Error('Só é possível atualizar o andamento de um ticket já aprovado.');
+  await ref.update({ execucaoStatus });
   solicitacoesCache.invalidar();
   return getOne(id);
 }
@@ -308,6 +335,7 @@ async function converterParaEstorno(id, dadosEstorno, porEmail) {
 }
 
 module.exports = {
-  TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove,
+  TIPOS, STATUSES, EXECUCAO_STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove,
   marcarNotificacaoVista, marcarComprada, desmarcarComprada, redirecionar, mudarTipo, converterParaEstorno,
+  atualizarExecucao,
 };
