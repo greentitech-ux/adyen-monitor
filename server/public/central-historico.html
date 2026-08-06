@@ -327,11 +327,6 @@
       <select id="d-responsavel-select"></select>
       <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarResponsavel()">Salvar responsável</button>
     </div>
-    <div id="d-tipo-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-      <div class="secao-titulo">🔀 Categoria do ticket</div>
-      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de categoria ou virar Estorno conforme o atendimento evolui.</div>
-      <div id="d-tipo-corpo"></div>
-    </div>
     <div id="d-editar" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;"></div>
     <div id="d-master-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div id="d-tecnico-wrap" class="hidden">
@@ -349,6 +344,11 @@
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--ok);" onclick="decidir('APROVADO')">✓ Aprovar</button>
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
       </div>
+    </div>
+    <div id="d-tipo-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">🔀 Categoria do ticket</div>
+      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de categoria ou virar Estorno conforme o atendimento evolui.</div>
+      <div id="d-tipo-corpo"></div>
     </div>
     <div id="d-comprada" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">🛍️ Comprada</div>
@@ -830,8 +830,10 @@ function renderTipoAcoes(c){
     const opcoes = TIPOS_GERAIS.filter(t=>t!==c.tipo).map(t=>`<option value="${t}">${iconeTipo(t)} ${TIPOS_INFO[t].label}</option>`).join('');
     corpo.innerHTML = `
       <label>Mudar categoria para</label>
-      <select id="tipo-novo-select">${opcoes}</select>
-      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarMudarTipo()">Salvar categoria</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="tipo-novo-select" style="flex:1;min-width:0;margin:0;">${opcoes}</select>
+        <button type="button" class="btn-primary" style="margin:0;width:auto;flex:none;white-space:nowrap;" onclick="salvarMudarTipo()">Salvar</button>
+      </div>
       <button type="button" class="link-btn" style="margin-top:12px;display:block;" onclick="toggleConverterEstorno()">🔁 Este ticket virou um Estorno</button>
       <div id="converter-estorno-form" class="hidden" style="margin-top:8px;">
         <label>Valor a estornar</label>
