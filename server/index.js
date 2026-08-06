@@ -2763,35 +2763,51 @@ app.delete('/api/solicitacoes/:id/comprada', auth.requireMasterOrAdmin, async (r
 });
 
 // aprovar/rejeitar - so o Master. Se for suporte-ti e for aprovado, ja cria
-// o Chamado vinculado (precisa escolher o tecnico no corpo da requisicao)
+// o Chamado vinculado (precisa escolher o tecnico no corpo da requisicao) -
+// EXCETO se for um ticket automatico de "Login bloqueado" (ver
+// auth.criarChamadoBloqueio): aprovar esse tipo especifico nao despacha
+// tecnico nenhum, e uma acao direto na conta - desbloqueia e redefine a
+// senha pro padrao (SENHA_PADRAO_DESBLOQUEIO), forcando trocar no proximo login
 app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const { status, motivoDecisao, tecnicoId, tecnicoEmail } = req.body;
     const atual = await solicitacoes.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
     if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
-    if (status === 'APROVADO' && atual.tipo === 'suporte-ti' && !tecnicoId) {
+    const ehBloqueioLogin = atual.tipo === 'suporte-ti' && atual.criadoPorEmail === auth.ROBO_BLOQUEIO_EMAIL;
+    if (status === 'APROVADO' && atual.tipo === 'suporte-ti' && !ehBloqueioLogin && !tecnicoId) {
       return res.status(400).json({ error: 'Escolha o técnico responsável pelo chamado.' });
     }
     const registro = await solicitacoes.updateStatus(req.params.id, status, { motivoDecisao, decidedByEmail: req.user.email });
 
     let chamado = null;
+    let senhaPadrao = null;
+    let avisoSenha = null;
     if (status === 'APROVADO' && atual.tipo === 'suporte-ti') {
-      chamado = await chamadosTI.create({
-        unidade: atual.unidade,
-        unidadeNome: atual.unidadeNome,
-        titulo: atual.titulo,
-        descricao: atual.observacao,
-        tecnicoId,
-        tecnicoEmail,
-        solicitacaoId: atual.id,
-        criadoPorEmail: req.user.email,
-      });
-      await solicitacoes.vincularChamado(atual.id, chamado.id);
-      broadcast('chamado-criado', chamado, 'tecnico');
+      if (ehBloqueioLogin) {
+        try {
+          await users.resetPassword(atual.criadoPorId, auth.SENHA_PADRAO_DESBLOQUEIO);
+          senhaPadrao = auth.SENHA_PADRAO_DESBLOQUEIO;
+        } catch (e) {
+          avisoSenha = `Ticket aprovado, mas não foi possível redefinir a senha automaticamente: ${e.message}`;
+        }
+      } else {
+        chamado = await chamadosTI.create({
+          unidade: atual.unidade,
+          unidadeNome: atual.unidadeNome,
+          titulo: atual.titulo,
+          descricao: atual.observacao,
+          tecnicoId,
+          tecnicoEmail,
+          solicitacaoId: atual.id,
+          criadoPorEmail: req.user.email,
+        });
+        await solicitacoes.vincularChamado(atual.id, chamado.id);
+        broadcast('chamado-criado', chamado, 'tecnico');
+      }
     }
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
-    res.json({ ...registro, chamado });
+    res.json({ ...registro, chamado, senhaPadrao, avisoSenha });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -441,6 +441,14 @@ function limparFiltrosExtra(){
   aplicarFiltrosExtra();
 }
 
+// ticket automatico de "Login bloqueado" (criado por auth.criarChamadoBloqueio
+// quando um login toma 3 tentativas erradas) - aprovar esse tipo especifico
+// nao despacha tecnico, so desbloqueia a conta e reseta a senha (ver
+// PATCH /api/solicitacoes/:id/status em index.js)
+function ehBloqueioLogin(c){
+  return c.tipo==='suporte-ti' && c.criadoPorEmail==='robô de bloqueio (login)';
+}
+
 function iconeTipo(tipo){
   return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻', pagamento:'💸', nota:'📄' }[tipo] || '📋';
 }
@@ -539,6 +547,9 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}` + (c.direcionadoParaEmail ? ` · direcionado a ${c.direcionadoParaEmail}` : '');
 
   let corpo = c.ehOrcamento ? `<div style="color:#e0b84c;font-weight:600;">💰 É um orçamento — precisa de aprovação de um Admin ou Master.</div>` : '';
+  if(ehBloqueioLogin(c) && c.status==='PENDENTE'){
+    corpo += `<div style="color:var(--accent);font-weight:600;">🔓 Ao aprovar, o acesso é desbloqueado e a senha é redefinida automaticamente para "inicial1" — a pessoa é obrigada a trocar no próximo login. Não precisa escolher técnico.</div>`;
+  }
   corpo += `<div><b>${escapeHtml(c.titulo)}</b></div>`;
   if(c.fornecedor) corpo += `<div>Fornecedor: <b>${escapeHtml(c.fornecedor)}</b></div>`;
   if(c.vencimento) corpo += `<div>Vencimento: <b>${fmtData(c.vencimento)}</b></div>`;
@@ -572,8 +583,8 @@ function abrirDetalhe(tipo, id){
 
   const podeDecidir = (IS_MASTER || IS_ADMIN) && c.status==='PENDENTE';
   document.getElementById('d-master-acoes').classList.toggle('hidden', !podeDecidir);
-  document.getElementById('d-tecnico-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='suporte-ti'));
-  if(podeDecidir && c.tipo==='suporte-ti'){
+  document.getElementById('d-tecnico-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='suporte-ti' && !ehBloqueioLogin(c)));
+  if(podeDecidir && c.tipo==='suporte-ti' && !ehBloqueioLogin(c)){
     document.getElementById('d-tecnico').innerHTML = TECNICOS.length
       ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}">${escapeHtml(t.email)}</option>`).join('')
       : '<option value="" disabled selected>nenhum técnico cadastrado</option>';
@@ -1052,7 +1063,7 @@ async function decidir(status){
       resp = await fetch(`/api/fechamentos/edicoes/${c.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
     } else {
       const body = { status, motivoDecisao };
-      if(c.tipo==='suporte-ti' && status==='APROVADO'){
+      if(c.tipo==='suporte-ti' && status==='APROVADO' && !ehBloqueioLogin(c)){
         const sel = document.getElementById('d-tecnico');
         if(!sel.value) throw new Error('Escolha o técnico responsável.');
         body.tecnicoId = sel.value;
@@ -1064,6 +1075,11 @@ async function decidir(status){
     if(!resp.ok) throw new Error(data.error || 'Erro ao decidir.');
     fecharDetalhe();
     await carregarCentral();
+    if(data.senhaPadrao){
+      alert(`🔓 Login desbloqueado! A senha desse acesso foi redefinida para "${data.senhaPadrao}" - avise a pessoa pra entrar com essa senha e trocar por uma própria em seguida.`);
+    } else if(data.avisoSenha){
+      alert(data.avisoSenha);
+    }
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }

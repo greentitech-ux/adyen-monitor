@@ -18,6 +18,17 @@ if (!JWT_SECRET) {
 
 const usersRef = db.collection('users');
 
+// email "de sistema" usado nesses tickets automaticos de bloqueio - index.js
+// usa essa mesma constante pra reconhecer o ticket na hora de aprovar (ver
+// PATCH /api/solicitacoes/:id/status) e disparar o desbloqueio automatico,
+// em vez do fluxo normal de Chamado de TI com tecnico
+const ROBO_BLOQUEIO_EMAIL = 'robô de bloqueio (login)';
+// senha padrao aplicada automaticamente quando o Master/Admin aprova um
+// ticket de "Login bloqueado" (ver index.js) - a pessoa entra com essa senha
+// e e obrigada a trocar por uma propria no primeiro login (mesmo fluxo de
+// precisaTrocarSenha usado em toda criacao/reset de acesso)
+const SENHA_PADRAO_DESBLOQUEIO = 'inicial1';
+
 // require tardio (nao no topo) so pra deixar bem explicito que e uma
 // dependencia "de efeito colateral" do login, nao do modulo em si -
 // solicitacoes.js nao depende de auth.js, entao nao ha ciclo real.
@@ -35,9 +46,9 @@ function criarChamadoBloqueio(email, userId, unidadesUsuario) {
       unidade,
       unidadeNome,
       titulo: `Login bloqueado: ${email}`,
-      observacao: `Acesso bloqueado automaticamente após 3 tentativas de senha erradas seguidas.\n\nLogin: ${email}\nUnidade(s) vinculada(s): ${unidadeNome}\nBloqueado em: ${agora}\n\nPara desbloquear: Usuários > Ações > "Nova senha" nesse login (o acesso volta a funcionar assim que a senha é trocada).`,
+      observacao: `Acesso bloqueado automaticamente após 3 tentativas de senha erradas seguidas.\n\nLogin: ${email}\nUnidade(s) vinculada(s): ${unidadeNome}\nBloqueado em: ${agora}\n\nAo aprovar este ticket, o acesso é desbloqueado e a senha é redefinida automaticamente para "${SENHA_PADRAO_DESBLOQUEIO}" - avise a pessoa pra entrar com essa senha e trocar por uma própria em seguida (obrigatório no primeiro login).`,
       criadoPorId: userId,
-      criadoPorEmail: 'robô de bloqueio (login)',
+      criadoPorEmail: ROBO_BLOQUEIO_EMAIL,
     })
     .catch((e) => console.error('Falha ao criar chamado automático de Suporte TI (bloqueio de senha):', e.message));
 }
@@ -276,4 +287,6 @@ module.exports = {
   emptyPermissions,
   dentroDoHorarioPermitido,
   invalidarUsuario,
+  ROBO_BLOQUEIO_EMAIL,
+  SENHA_PADRAO_DESBLOQUEIO,
 };
