@@ -224,6 +224,8 @@
         <div><label>Horário inicial (deixe vazio se ainda não fez check-in)</label><input type="time" id="m-hora"></div>
         <div><label>Tempo (min)</label><input type="number" step="1" id="m-tempo"></div>
       </div>
+      <label>Horário previsto de entrada</label>
+      <input type="time" id="m-horario-previsto">
       <label>Observação</label>
       <textarea id="m-observacao"></textarea>
       <label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);margin-top:12px;">
@@ -367,7 +369,9 @@ function renderLista(lista){
     html += grupo.map(c=>{
       const criancas = (c.criancas||[]).map(cr=>cr.nome).join(', ');
       const status = statusCheckin(c);
-      const horario = c.iniciado ? `${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)}` : `${c.tempoMinutos}min · horário definido no check-in`;
+      const horario = c.iniciado
+        ? `${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)}${c.autoCheckin?' · 🤖 automático':''}`
+        : `${c.tempoMinutos}min · previsto ${(c.horarioPrevisto||'').slice(0,5) || '—'}`;
       return `
       <div class="card">
         <div class="linha1">
@@ -471,6 +475,7 @@ function abrirMaster(id){
   document.getElementById('m-data').value = c.dataUtilizacao || '';
   document.getElementById('m-hora').value = (c.timeInicial||'').slice(0,5);
   document.getElementById('m-tempo').value = c.tempoMinutos || 60;
+  document.getElementById('m-horario-previsto').value = (c.horarioPrevisto||'').slice(0,5);
   document.getElementById('m-observacao').value = c.observacao || '';
   document.getElementById('m-termo').checked = !!c.termoAssinado;
   document.getElementById('msg-master').classList.add('hidden');
@@ -495,6 +500,7 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
     // outros campos de um check-in que ainda nao teve o check-in feito
     const horaDigitada = document.getElementById('m-hora').value;
     if(horaDigitada) patch.timeInicial = horaDigitada;
+    patch.horarioPrevisto = document.getElementById('m-horario-previsto').value || null;
     const res = await fetch(`/api/parque/checkins/${EDITANDO_ID}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao salvar');
@@ -548,6 +554,10 @@ async function boot(){
   document.getElementById('root').classList.remove('hidden');
   await carregar();
   setInterval(renderAgora, 30000);
+  // recarrega os check-ins periodicamente pra refletir os que o servidor
+  // dispara sozinho quando o horario previsto vence (ver rodarAutoCheckins
+  // em parque.js) - essa tela nao tem SSE proprio
+  setInterval(carregar, 30000);
 }
 
 boot();
