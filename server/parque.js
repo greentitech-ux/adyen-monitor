@@ -73,7 +73,7 @@ async function criar({
       cpf: String(responsavel.cpf || '').trim().slice(0, 20),
       contato: String(responsavel.contato).trim().slice(0, 30),
       email: String(responsavel.email || '').trim().slice(0, 150),
-      cep: String(responsavel.cep || '').trim().slice(0, 20),
+      cep: String(responsavel.cep || '').trim().slice(0, 300),
       numero: String(responsavel.numero || '').trim().slice(0, 20),
       complemento: String(responsavel.complemento || '').trim().slice(0, 100),
     },
@@ -170,4 +170,21 @@ async function remover(id) {
   parqueCache.invalidar();
 }
 
-module.exports = { TEMPOS_VALIDOS, criar, listAll, listByUnidades, getOne, atualizar, remover };
+function soDigitos(v) {
+  return String(v || '').replace(/\D/g, '');
+}
+
+// pra autopreenchimento do formulario de check-in: acha o cadastro mais
+// recente com o mesmo CPF (comparando so os digitos, ja que a planilha
+// importada tem CPF as vezes com pontuacao e as vezes sem)
+async function buscarPorCpf(cpf) {
+  const alvo = soDigitos(cpf);
+  if (!alvo) return null;
+  const todos = await listAll();
+  const encontrados = todos.filter((c) => soDigitos(c.responsavel?.cpf) === alvo);
+  if (!encontrados.length) return null;
+  encontrados.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
+  return encontrados[0];
+}
+
+module.exports = { TEMPOS_VALIDOS, criar, listAll, listByUnidades, getOne, atualizar, remover, buscarPorCpf, invalidar: () => parqueCache.invalidar() };

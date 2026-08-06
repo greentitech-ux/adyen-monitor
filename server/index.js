@@ -48,6 +48,7 @@ const parque = require('./parque');
 const festas = require('./festas');
 const mensalistas = require('./mensalistas');
 const termoResponsabilidade = require('./termoResponsabilidade');
+const saltiversoImport = require('./saltiversoImport');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2058,6 +2059,32 @@ app.post('/api/parque/checkins', requireSection('parque-checkin'), async (req, r
 app.get('/api/parque/checkins', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
   if (req.isMaster) return res.json(await parque.listAll());
   res.json(await parque.listByUnidades(req.permissions.unidades || []));
+});
+
+// autopreenchimento do formulario de check-in: acha o cadastro mais recente
+// com o mesmo CPF (de check-ins anteriores, inclusive os importados da
+// planilha antiga) pra loja nao ter que digitar tudo de novo num cliente
+// recorrente
+app.get('/api/parque/cliente-por-cpf', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
+  const encontrado = await parque.buscarPorCpf(req.query.cpf);
+  if (!encontrado) return res.json(null);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(encontrado.unidade)) return res.json(null);
+  res.json({ responsavel: encontrado.responsavel });
+});
+
+// importacao unica (idempotente) dos dados historicos da planilha antiga -
+// so o Master pode rodar, ja que reprocessa tudo de novo toda vez que e
+// chamada (custa leituras/escritas no Firestore e uma chamada a API do
+// Google Sheets)
+app.post('/api/parque/importar-planilha', auth.requireMaster, async (req, res) => {
+  try {
+    const resultado = await saltiversoImport.importar();
+    broadcast('parque-checkin-criado', { unidade: 'Saltiverso Patteo' }, 'parque');
+    broadcast('festa-criada', { unidade: 'Saltiverso Patteo' }, 'festas');
+    res.json(resultado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get('/api/parque/checkins/:id/termo.pdf', requireAnySection('parque', 'parque-checkin'), async (req, res) => {

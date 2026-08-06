@@ -281,6 +281,30 @@ function atualizarPreviewFim(){
 }
 document.getElementById('f-hora').addEventListener('input', atualizarPreviewFim);
 
+// autopreenchimento por CPF: ao sair do campo, busca o cadastro mais
+// recente com esse CPF (de check-ins anteriores, inclusive os importados da
+// planilha antiga) e preenche so os campos que ainda estao vazios - nunca
+// sobrescreve o que a pessoa ja digitou na tela
+document.getElementById('f-cpf').addEventListener('blur', async (ev) => {
+  const cpf = ev.target.value.replace(/\D/g, '');
+  if (cpf.length < 8) return;
+  try {
+    const dados = await fetch(`/api/parque/cliente-por-cpf?cpf=${encodeURIComponent(cpf)}`).then(r => r.json());
+    if (!dados || !dados.responsavel) return;
+    const r = dados.responsavel;
+    const preencherSeVazio = (id, valor) => {
+      const el = document.getElementById(id);
+      if (el && !el.value && valor) el.value = valor;
+    };
+    preencherSeVazio('f-nome', r.nome);
+    preencherSeVazio('f-contato', r.contato);
+    preencherSeVazio('f-email', r.email);
+    preencherSeVazio('f-cep', r.cep);
+    preencherSeVazio('f-numero', r.numero);
+    preencherSeVazio('f-complemento', r.complemento);
+  } catch (err) { /* falha silenciosa - autopreenchimento e so uma conveniencia */ }
+});
+
 function setAC(ativo){
   AC_ATIVO = ativo;
   document.getElementById('ac-nao').classList.toggle('ativo', !ativo);

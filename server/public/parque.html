@@ -154,6 +154,15 @@
   </div>
 </div>
 
+<div class="panel hidden" id="painel-importar">
+  <h2>Importar dados da planilha antiga</h2>
+  <div class="sub" style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+    Traz check-ins e festas já cadastrados na planilha do Google Sheets (abas "Entradas" e "Vendas de Festa") pra dentro do Zenith Ops. Pode rodar mais de uma vez sem duplicar - cada importação atualiza os mesmos registros.
+  </div>
+  <button type="button" class="btn-secundario" id="btn-importar-planilha" onclick="importarPlanilha()">📥 Importar da planilha</button>
+  <div class="msg hidden" id="msg-importar"></div>
+</div>
+
 <div class="panel">
   <div class="kpi-grid">
     <div class="kpi"><div class="val" id="kpi-checkins">0</div><div class="lbl">check-ins no período</div></div>
@@ -430,6 +439,29 @@ async function excluirCheckin(id){
   await carregar();
 }
 
+async function importarPlanilha(){
+  if(!confirm('Importar os dados históricos da planilha (Entradas e Vendas de Festa)? Pode rodar mais de uma vez sem duplicar.')) return;
+  const btn = document.getElementById('btn-importar-planilha');
+  const msg = document.getElementById('msg-importar');
+  msg.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Importando...';
+  try{
+    const res = await fetch('/api/parque/importar-planilha', { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao importar');
+    msg.textContent = `Importado: ${data.checkins.importados} de ${data.checkins.lidos} check-ins, ${data.festas.importados} de ${data.festas.lidos} festas.`;
+    msg.className = 'msg ok';
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = '📥 Importar da planilha';
+  }
+}
+
 function abrirMaster(id){
   EDITANDO_ID = id;
   const c = TODOS.find(x=>x.id===id);
@@ -498,6 +530,7 @@ async function boot(){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
+  document.getElementById('painel-importar').classList.toggle('hidden', !isMaster);
 
   const unidades = isMaster ? Object.keys(PARQUE_UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>PARQUE_UNIDADES_NOMES[u]);
   const selUnidade = document.getElementById('f-unidade');
