@@ -46,6 +46,7 @@ const grupos = require('./grupos');
 const inventario = require('./inventario');
 const parque = require('./parque');
 const festas = require('./festas');
+const mensalistas = require('./mensalistas');
 const termoResponsabilidade = require('./termoResponsabilidade');
 
 const upload = multer({
@@ -2187,6 +2188,56 @@ app.get('/api/festas/relatorio.:formato(csv|pdf)', requireSection('festas'), asy
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
   reportUtil.writePDF(res, { titulo: 'Saltiverso - Reservas de Festa', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} reserva(s)`, colunas, linhas, nomeArquivo });
+});
+
+// ---------- Saltiverso Patteo: passaporte mensal (mensalistas) - reaproveita
+// a secao 'parque' (mesmo publico que ja gerencia o painel do parque) em vez
+// de criar uma quarta secao de permissao so pra isso ----------
+app.post('/api/mensalistas', requireSection('parque'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento, dataInicial, usuarios } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await mensalistas.criar({
+      unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento, dataInicial, usuarios,
+      criadoPorId: req.user.id, criadoPorEmail: req.user.email,
+    });
+    broadcast('mensalista-criado', registro, 'parque');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/mensalistas', requireSection('parque'), async (req, res) => {
+  if (req.isMaster) return res.json(await mensalistas.listAll());
+  res.json(await mensalistas.listByUnidades(req.permissions.unidades || []));
+});
+
+app.patch('/api/mensalistas/:id', requireSection('parque'), async (req, res) => {
+  try {
+    const atual = await mensalistas.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Mensalista não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await mensalistas.atualizar(req.params.id, req.body);
+    broadcast('mensalista-atualizado', registro, 'parque');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/mensalistas/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await mensalistas.remover(req.params.id);
+    broadcast('mensalista-excluido', { id: req.params.id }, 'parque');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ---------- sangria (retirada de caixa) registrada em campo, ao longo do
