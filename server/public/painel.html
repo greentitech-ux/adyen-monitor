@@ -149,7 +149,7 @@
   <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
-  <button type="button" class="back" style="cursor:pointer;" onclick="abrirTrocarSenha()">🔑 Alterar senha</button>
+  <button type="button" class="back hidden" id="nav-reset-senha" style="cursor:pointer;" onclick="abrirResetSenha()">🔑 Reset senha</button>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
   <div class="nav-drawer-sep"></div>
   <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
@@ -159,12 +159,12 @@
 <div id="painel-grid" class="painel-grid hidden"></div>
 <div id="painel-vazio" class="empty hidden">Você ainda não tem nenhuma área liberada. Fale com o administrador (Master).</div>
 
-<div class="ts-overlay hidden" id="ts-overlay" onclick="if(event.target===this) fecharTrocarSenha()">
+<div class="ts-overlay hidden" id="ts-overlay" onclick="if(event.target===this) fecharResetSenha()">
   <form class="ts-card" id="ts-form">
-    <h3 style="margin:0 0 4px;font-size:14px;">Alterar minha senha</h3>
-    <p style="font-size:11.5px;color:var(--muted);margin:0 0 14px;">Você vai continuar logado neste dispositivo; outros locais logados com a senha antiga serão desconectados.</p>
-    <label class="ts-label">Senha atual
-      <input type="password" id="ts2-atual" required autocomplete="current-password">
+    <h3 style="margin:0 0 4px;font-size:14px;">Reset Senha</h3>
+    <p style="font-size:11.5px;color:var(--muted);margin:0 0 14px;">Redefina rapidamente a senha de qualquer acesso, informando o usuário (login) ou e-mail da pessoa. Ela é obrigada a trocar por uma senha própria no próximo login.</p>
+    <label class="ts-label">Usuário ou e-mail de quem precisa do reset
+      <input type="text" id="ts2-usuario" required autocomplete="off" placeholder="ex: jn ou jn@empresa.com">
     </label>
     <label class="ts-label">Nova senha
       <input type="password" id="ts2-nova" required minlength="8" autocomplete="new-password">
@@ -174,7 +174,7 @@
     </label>
     <p id="ts2-msg" class="ts-msg hidden"></p>
     <div style="display:flex;gap:8px;margin-top:14px;">
-      <button type="button" class="btn-secundario-full" onclick="fecharTrocarSenha()" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;flex:1;">Cancelar</button>
+      <button type="button" class="btn-secundario-full" onclick="fecharResetSenha()" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;flex:1;">Cancelar</button>
       <button type="submit" id="ts2-btn" style="background:var(--accent);color:#06121a;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">Salvar</button>
     </div>
   </form>
@@ -206,13 +206,13 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
-function abrirTrocarSenha(){
+function abrirResetSenha(){
   fecharMenu();
   document.getElementById('ts-form').reset();
   document.getElementById('ts2-msg').classList.add('hidden');
   document.getElementById('ts-overlay').classList.remove('hidden');
 }
-function fecharTrocarSenha(){ document.getElementById('ts-overlay').classList.add('hidden'); }
+function fecharResetSenha(){ document.getElementById('ts-overlay').classList.add('hidden'); }
 document.getElementById('ts-form').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const msgEl = document.getElementById('ts2-msg');
@@ -225,14 +225,14 @@ document.getElementById('ts-form').addEventListener('submit', async (e)=>{
   }
   btn.disabled = true; btn.textContent = 'Salvando...';
   try{
-    const res = await fetch('/api/me/senha', {
+    const res = await fetch('/api/users/reset-senha-rapido', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ senhaAtual: document.getElementById('ts2-atual').value, novaSenha: nova }),
+      body: JSON.stringify({ identificador: document.getElementById('ts2-usuario').value, novaSenha: nova }),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Não foi possível trocar a senha.');
-    msgEl.textContent = 'Senha atualizada com sucesso.'; msgEl.className = 'ts-msg ok';
-    setTimeout(fecharTrocarSenha, 1200);
+    msgEl.textContent = `Senha de ${data.email} atualizada com sucesso.`; msgEl.className = 'ts-msg ok';
+    setTimeout(fecharResetSenha, 1500);
   }catch(err){
     msgEl.textContent = err.message; msgEl.className = 'ts-msg err';
   }finally{
@@ -693,6 +693,7 @@ async function boot(){
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
   document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
+  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || IS_ADMIN_GLOBAL));
 
   const aplicaveis = CARDS_POR_SECAO.filter(c=>secoes.includes(c.secao));
   document.getElementById('painel-loading').classList.add('hidden');

@@ -46,6 +46,19 @@ async function garantirUsernameLivre(username, idAtual) {
   if (!existing.empty && existing.docs[0].id !== idAtual) throw new Error('Já existe um acesso com esse usuário.');
 }
 
+// acha um acesso pelo usuário (login curto) ou email - mesmo criterio de
+// auth.login() (se tem "@" busca por email, senao por username). Usado no
+// Reset Senha rapido do Painel (ver index.js), onde o Master/Admin so tem o
+// usuario/email de quem precisa do reset, nao o id do documento
+async function findByIdentifier(identifier) {
+  const valor = String(identifier || '').trim().toLowerCase();
+  if (!valor) return null;
+  const campo = valor.includes('@') ? 'email' : 'username';
+  const snap = await usersRef.where(campo, '==', valor).limit(1).get();
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() };
+}
+
 function sanitizeHorarioPermitido(input) {
   const h = input || {};
   const ativo = !!h.ativo;
@@ -282,6 +295,7 @@ function toPublic(doc) {
 module.exports = {
   VALID_SECTIONS,
   TIPOS_SOLICITACAO,
+  findByIdentifier,
   list,
   create,
   updatePermissions,
