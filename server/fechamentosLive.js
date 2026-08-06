@@ -418,14 +418,17 @@ async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail }) {
 }
 
 // troca o Master/Admin responsavel por um pedido de ajuste ja existente -
-// mesmo criterio do redirecionar() de solicitacoes.js
-async function redirecionarEdicao(id, { direcionadoParaId, direcionadoParaEmail }) {
+// mesmo criterio do redirecionar() de solicitacoes.js (atribuidosIds/Emails
+// e quem de fato enxerga o card na Central quando nao e Master)
+async function redirecionarEdicao(id, { direcionadoParaId, direcionadoParaEmail, atribuidosIds, atribuidosEmails }) {
   const ref = EDITS.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Pedido não encontrado.');
   await ref.update({
     direcionadoParaId: direcionadoParaId || null,
     direcionadoParaEmail: direcionadoParaEmail || null,
+    atribuidosIds: Array.isArray(atribuidosIds) ? atribuidosIds.filter(Boolean) : [],
+    atribuidosEmails: Array.isArray(atribuidosEmails) ? atribuidosEmails.filter(Boolean) : [],
   });
   edicoesCache.invalidar();
   return getEdicao(id);

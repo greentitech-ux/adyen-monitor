@@ -175,14 +175,17 @@ async function remove(id) {
 }
 
 // troca o Master/Admin responsavel por um pedido de estorno ja existente -
-// mesmo criterio do redirecionar() de solicitacoes.js
-async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail }) {
+// mesmo criterio do redirecionar() de solicitacoes.js (atribuidosIds/Emails
+// e quem de fato enxerga o card na Central quando nao e Master)
+async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail, atribuidosIds, atribuidosEmails }) {
   const ref = refundsRef.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Solicitação não encontrada.');
   await ref.update({
     direcionadoParaId: direcionadoParaId || null,
     direcionadoParaEmail: direcionadoParaEmail || null,
+    atribuidosIds: Array.isArray(atribuidosIds) ? atribuidosIds.filter(Boolean) : [],
+    atribuidosEmails: Array.isArray(atribuidosEmails) ? atribuidosEmails.filter(Boolean) : [],
   });
   refundsCache.invalidar();
   return getOne(id);

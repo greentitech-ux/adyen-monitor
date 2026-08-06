@@ -251,14 +251,19 @@ async function remove(id) {
 
 // troca o Master/Admin responsavel por um pedido ja existente, seja qual for
 // o status - ex: pedido foi direcionado a alguem que esta de folga, outro
-// Admin assume. null limpa (volta a ser "qualquer Master/Admin do grupo")
-async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail }) {
+// Admin assume. null limpa (volta a ser "qualquer Master/Admin do grupo").
+// atribuidosIds/atribuidosEmails (arrays, 1+ pessoas) sao quem de fato
+// enxerga o card na Central (ver todosCardsCentral em index.js) - so o
+// Master ve tudo, os demais so o que criaram ou o que estiver aqui
+async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail, atribuidosIds, atribuidosEmails }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Solicitação não encontrada.');
   await ref.update({
     direcionadoParaId: direcionadoParaId || null,
     direcionadoParaEmail: direcionadoParaEmail || null,
+    atribuidosIds: Array.isArray(atribuidosIds) ? atribuidosIds.filter(Boolean) : [],
+    atribuidosEmails: Array.isArray(atribuidosEmails) ? atribuidosEmails.filter(Boolean) : [],
   });
   solicitacoesCache.invalidar();
   return getOne(id);

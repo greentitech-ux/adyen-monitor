@@ -399,7 +399,7 @@ function mostrarNotificacaoSolicitacao(card){
   el.innerHTML = `
     <div class="ns-titulo">🔔 Nova solicitação</div>
     <div class="ns-corpo">${ICONES_TIPO_CENTRAL[card.tipo]||'📋'} ${escapeHtml(TIPOS_CENTRAL_LABEL[card.tipo]||card.tipo)} · ${escapeHtml(card.unidadeNome||card.unidade||'—')}<br>${escapeHtml(card.titulo||'')}</div>
-    ${card.direcionadoParaEmail ? `<div class="ns-direcionado">👤 direcionado a ${escapeHtml(card.direcionadoParaEmail)}</div>` : ''}
+    ${(card.atribuidosEmails && card.atribuidosEmails.length) ? `<div class="ns-direcionado">👤 atribuído a ${escapeHtml(card.atribuidosEmails.join(', '))}</div>` : (card.direcionadoParaEmail ? `<div class="ns-direcionado">👤 direcionado a ${escapeHtml(card.direcionadoParaEmail)}</div>` : '')}
     <button type="button" class="ns-ok">✓ Sinalizar (já vi)</button>
   `;
   el.querySelector('.ns-ok').addEventListener('click', ()=>marcarVistoNotificacao(card.tipo, card.id));
