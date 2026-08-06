@@ -41,6 +41,7 @@ const ifoodStore = require('./ifoodStore');
 const ifoodSync = require('./ifoodSync');
 const solicitacoes = require('./solicitacoes');
 const chamadosTI = require('./chamadosTI');
+const chamadosManutencao = require('./chamadosManutencao');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 const inventario = require('./inventario');
@@ -2786,13 +2787,16 @@ app.delete('/api/solicitacoes/:id/comprada', auth.requireMasterOrAdmin, async (r
 // senha pro padrao (SENHA_PADRAO_DESBLOQUEIO), forcando trocar no proximo login
 app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
   try {
-    const { status, motivoDecisao, tecnicoId, tecnicoEmail } = req.body;
+    const { status, motivoDecisao, tecnicoId, tecnicoEmail, responsaveis } = req.body;
     const atual = await solicitacoes.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
     if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const ehBloqueioLogin = atual.tipo === 'suporte-ti' && atual.criadoPorEmail === auth.ROBO_BLOQUEIO_EMAIL;
     if (status === 'APROVADO' && atual.tipo === 'suporte-ti' && !ehBloqueioLogin && !tecnicoId) {
       return res.status(400).json({ error: 'Escolha o técnico responsável pelo chamado.' });
+    }
+    if (status === 'APROVADO' && atual.tipo === 'manutencao' && (!Array.isArray(responsaveis) || !responsaveis.length)) {
+      return res.status(400).json({ error: 'Escolha quem vai fazer a manutenção.' });
     }
     const registro = await solicitacoes.updateStatus(req.params.id, status, { motivoDecisao, decidedByEmail: req.user.email });
 
@@ -2821,6 +2825,18 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
         await solicitacoes.vincularChamado(atual.id, chamado.id);
         broadcast('chamado-criado', chamado, 'tecnico');
       }
+    } else if (status === 'APROVADO' && atual.tipo === 'manutencao') {
+      chamado = await chamadosManutencao.create({
+        unidade: atual.unidade,
+        unidadeNome: atual.unidadeNome,
+        titulo: atual.titulo,
+        descricao: atual.observacao,
+        responsaveis,
+        solicitacaoId: atual.id,
+        criadoPorEmail: req.user.email,
+      });
+      await solicitacoes.vincularChamado(atual.id, chamado.id);
+      broadcast('chamado-manutencao-criado', chamado, 'manutencao');
     }
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json({ ...registro, chamado, senhaPadrao, avisoSenha });
@@ -3188,6 +3204,144 @@ app.get('/api/chamados/foto/:chamadoId/:campo/:index', requireSection('tecnico')
   const chamado = await chamadosTI.getOne(req.params.chamadoId);
   if (!chamado) return res.sendStatus(404);
   if (!req.isMaster && chamado.tecnicoId !== req.user.id) return res.sendStatus(404);
+  const campo = ['fotosAntes', 'fotosDepois'].includes(req.params.campo) ? req.params.campo : null;
+  if (!campo) return res.status(400).end();
+  const foto = chamado[campo] && chamado[campo][Number(req.params.index)];
+  if (!foto) return res.sendStatus(404);
+  storage.streamArquivo(foto.path, foto.tipo, res);
+});
+
+// ---------- Chamados de Manutenção (secao "manutencao") - cada chamado pode
+// ter 1 ou 2 responsaveis (hoje sao 2 pessoas de manutencao); quem nao esta
+// atribuido nao ve o chamado. Master tem autonomia total: ve/cria/edita/
+// exclui qualquer chamado. Fluxo: ABERTO -> (ACEITO com Data da Execucao |
+// RECUSADO) -> INICIADO (check-in) -> EM_ESPERA (opcional, ex: falta peca) ->
+// CONCLUIDO. Nasce vinculado a uma solicitacao de Manutencao aprovada (rota
+// acima) ou criado direto pelo Master ----------
+function ehResponsavelManutencao(chamado, userId) {
+  return (chamado.responsaveis || []).some((r) => r.id === userId);
+}
+
+app.get('/api/chamados-manutencao', requireSection('manutencao'), async (req, res) => {
+  const todos = await chamadosManutencao.listAll();
+  if (req.isMaster) return res.json(todos);
+  res.json(todos.filter((c) => ehResponsavelManutencao(c, req.user.id)));
+});
+
+app.post('/api/chamados-manutencao', auth.requireMaster, async (req, res) => {
+  try {
+    const { unidade, unidadeNome, titulo, descricao, responsaveis } = req.body;
+    const chamado = await chamadosManutencao.create({ unidade, unidadeNome, titulo, descricao, responsaveis, criadoPorEmail: req.user.email });
+    broadcast('chamado-manutencao-criado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/chamados-manutencao/:id/aceitar', requireSection('manutencao'), async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.aceitar(req.params.id, { userId: req.user.id, dataExecucao: req.body.dataExecucao });
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/chamados-manutencao/:id/recusar', requireSection('manutencao'), async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.recusar(req.params.id, { userId: req.user.id, motivo: req.body.motivo });
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// check-in: responsavel chegou na loja, registra as fotos de "como esta antes"
+app.post('/api/chamados-manutencao/:id/iniciar', requireSection('manutencao'), upload.array('fotosAntes', 6), async (req, res) => {
+  try {
+    const fotosAntes = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-manutencao-antes');
+      fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosManutencao.iniciar(req.params.id, { fotosAntes, userId: req.user.id });
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/chamados-manutencao/:id/em-espera', requireSection('manutencao'), async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.marcarEmEspera(req.params.id, { userId: req.user.id, motivo: req.body.motivo });
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/chamados-manutencao/:id/retomar', requireSection('manutencao'), async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.retomar(req.params.id, { userId: req.user.id });
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// finalizar: fotos do "depois", observacao do que foi feito e pecas compradas (se precisou)
+app.post('/api/chamados-manutencao/:id/concluir', requireSection('manutencao'), upload.array('fotosDepois', 6), async (req, res) => {
+  try {
+    const payload = JSON.parse(req.body.payload || '{}');
+    const fotosDepois = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-manutencao-depois');
+      fotosDepois.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosManutencao.concluir(req.params.id, {
+      fotosDepois,
+      observacaoResponsavel: payload.observacaoResponsavel,
+      pecas: payload.pecas,
+      userId: req.user.id,
+    });
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Master: autonomia total pra corrigir titulo/descricao/data/responsaveis/status
+app.patch('/api/chamados-manutencao/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.atualizar(req.params.id, req.body);
+    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/chamados-manutencao/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await chamadosManutencao.remover(req.params.id);
+    broadcast('chamado-manutencao-excluido', { id: req.params.id }, 'manutencao');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/chamados-manutencao/foto/:chamadoId/:campo/:index', requireSection('manutencao'), async (req, res) => {
+  const chamado = await chamadosManutencao.getOne(req.params.chamadoId);
+  if (!chamado) return res.sendStatus(404);
+  if (!req.isMaster && !ehResponsavelManutencao(chamado, req.user.id)) return res.sendStatus(404);
   const campo = ['fotosAntes', 'fotosDepois'].includes(req.params.campo) ? req.params.campo : null;
   if (!campo) return res.status(400).end();
   const foto = chamado[campo] && chamado[campo][Number(req.params.index)];

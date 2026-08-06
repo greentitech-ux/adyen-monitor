@@ -123,6 +123,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -555,6 +556,7 @@ async function boot(){
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-manutencao').classList.toggle('hidden', !secoes.includes('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);

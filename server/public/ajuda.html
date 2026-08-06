@@ -124,6 +124,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -436,6 +437,17 @@ const TOPICOS = [
       <li>Ao terminar, clica em <b>Concluir chamado</b> e pode anexar foto do serviço feito.</li>
     </ul>
   `},
+  { id:'manutencao', icone:'🔧', secoes:['manutencao'], titulo:'Manutenção', corpo:`
+    <p>Fila de chamados de manutenção - nasce automaticamente quando uma solicitação de Manutenção é aprovada na Central (quem aprova escolhe 1 ou mais responsáveis), ou pode ser criada direto pelo Master.</p>
+    <ul>
+      <li>Cada responsável só vê os chamados em que foi escolhido. Se o chamado tem 2 responsáveis, os 2 enxergam.</li>
+      <li>Ao abrir o chamado, escolha <b>✓ Aceitar o serviço</b> (informando a <b>Data da execução</b>) ou <b>✕ Recusar</b>.</li>
+      <li>No dia da execução, chegando na loja, clique em <b>📍 Fazer check-in</b>.</li>
+      <li>Se faltar peça ou precisar pausar, use <b>⏸ Em espera</b> - depois é só <b>▶ Retomar execução</b> pra continuar de onde parou.</li>
+      <li>Ao terminar, clique em <b>✓ Finalizar</b>, registrando peças compradas, observação e foto do serviço feito.</li>
+    </ul>
+    <div class="dica"><b>Master tem autonomia total:</b> pode editar título, descrição, data de execução e responsáveis, ou excluir o chamado inteiro, em qualquer momento do fluxo (botões <b>✎ Editar chamado</b> / <b>🗑 Excluir chamado</b> dentro do chamado).</div>
+  `},
   { id:'relatorios', icone:'📊', secoes:['disputas'], titulo:'Relatórios de disputa', corpo:`
     <p>Acompanhamento das disputas/chargebacks abertos pela operadora, com prazo de resposta e status.</p>
     <ol>
@@ -556,6 +568,7 @@ async function boot(){
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-manutencao').classList.toggle('hidden', !secoes.includes('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);

@@ -143,6 +143,7 @@
   <a class="back active" id="nav-solicitacoes-self" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -645,6 +646,7 @@ async function boot(){
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
   document.getElementById('nav-historico').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
+  document.getElementById('nav-manutencao').classList.toggle('hidden', !SECOES.includes('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);

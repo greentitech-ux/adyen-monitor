@@ -270,6 +270,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -552,6 +553,7 @@ function aplicarNav(){
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !podeSecao('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !podeSecao('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !podeSecao('tecnico'));
+  document.getElementById('nav-manutencao').classList.toggle('hidden', !podeSecao('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
   document.getElementById('nav-grupos').classList.toggle('hidden', ME.role!=='master');
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', ME.role!=='master');
