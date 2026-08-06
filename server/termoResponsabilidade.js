@@ -74,7 +74,7 @@ function gerarTermoPDF(res, checkin) {
     : 'horário definido no check-in';
   linhaCampo('Data de utilização', `${fmtDataBR(checkin.dataUtilizacao)} · ${horarioTexto} (${checkin.tempoMinutos} min)`);
   if (checkin.adultoCortesia) {
-    linhaCampo('Adulto cortesia (A.C.)', `Sim — ${checkin.quantAC || 1} adulto(s) com entrada permitida sem brincar`);
+    linhaCampo('Adulto cortesia (A.C.)', `Sim — ${checkin.quantAC || 1} adulto(s) com entrada permitida`);
   }
 
   doc.moveDown(0.3);
