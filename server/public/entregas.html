@@ -124,6 +124,7 @@
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
@@ -231,6 +232,7 @@ function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidd
 let DATA = [];
 let EDICOES = [];
 let UNIDADES_NOMES = { 'MMTirol Natal':'Milky Moo Tirol Natal', Bessa:'Dom Bessa', Caruaru:'Dom Caruaru', Garanhuns:'Dom Garanhuns' };
+const MOTIVOS_REMOCAO_LABEL = { atraso:'Atraso', saiu_antes:'Saiu antes do fim do turno', prejuizo:'Gerou prejuízo', outro:'Outro' };
 // codigos que sao de fato do dominio Entregas - capturado ANTES do merge com
 // /api/meta/unidades em carregar() (que devolve o cadastro geral de lojas,
 // usado por Fechamento/Monitor/etc - unidades tem codigos diferentes lá, ex:
@@ -243,6 +245,12 @@ const SEL_UNIDADE = new Set();
 let IS_MASTER = false;
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+// resumo (tooltip) do detalhamento por campo de valor, quando a unidade usa
+// regra "fixo" (ver entregasRegras.js) - registros manuais/históricos nao tem isso
+function detalhesValorTitle(d){
+  if(!d.detalhesValor || !d.detalhesValor.length) return '';
+  return d.detalhesValor.map(l=>`${l.label}: ${fmtMoney(l.valor)}${l.removido?' (removido)':''}`).join(' · ');
+}
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 const FUSO_BR = 'America/Sao_Paulo';
@@ -621,7 +629,7 @@ function renderTabela(rows){
       <td class="valor">${d.pos00hs}</td>
       <td class="valor">${d.foraDeArea}</td>
       <td class="valor">${fmtMoney(d.bonus)}</td>
-      <td class="valor">${fmtMoney(d.ajudaCusto)}</td>
+      <td class="valor" title="${escapeHtml(detalhesValorTitle(d))}">${fmtMoney(d.ajudaCusto)}${(d.camposRemovidos&&d.camposRemovidos.length)?' <span style="color:var(--bad);" title="'+escapeHtml(d.camposRemovidos.join(', ')+' removido(s) - '+(MOTIVOS_REMOCAO_LABEL[d.motivoRemocaoCampos]||''))+'">✕</span>':''}</td>
       <td class="valor">${fmtMoney(d.valor)}</td>
       <td class="valor">${fmtMoney(d.coopRecebe)}</td>
       <td class="valor">${d.quantTotal}</td>
@@ -660,6 +668,7 @@ async function boot(){
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
   document.getElementById('btn-sincronizar-planilha').classList.toggle('hidden', !isMaster);

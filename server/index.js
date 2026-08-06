@@ -31,6 +31,7 @@ const monitorReport = require('./monitorReport');
 const reportUtil = require('./reportUtil');
 const sangrias = require('./sangrias');
 const entregasLive = require('./entregasLive');
+const entregasRegras = require('./entregasRegras');
 const backup = require('./backup');
 const relatorios = require('./relatorios');
 const sheetsSync = require('./sheetsSync');
@@ -2705,14 +2706,35 @@ app.post('/api/entregas/sincronizar-planilha', auth.requireMaster, async (req, r
   res.json(status);
 });
 
+// regra de pagamento por unidade (ver entregasRegras.js) - leitura liberada
+// pra quem lança ou vê Entregas (o formulário de lançamento precisa saber se
+// a unidade é "fixo" - esconde os campos de valor - ou "plataforma" - mantém
+// digitação manual); edição só o Master
+app.get('/api/entregas/regras', requireAnySection('entregas', 'entregas-lancamento'), async (req, res) => {
+  const todas = await entregasRegras.listAll();
+  const porUnidade = {};
+  todas.forEach((r) => { porUnidade[r.unidade] = r; });
+  const unidades = req.isMaster ? Object.keys({ ...ENTREGAS_UNIDADES_NOMES, ...porUnidade }) : (req.permissions.unidades || []);
+  res.json(unidades.map((u) => porUnidade[u] || entregasRegras.defaultRegra(u)));
+});
+
+app.put('/api/entregas/regras/:unidade', auth.requireMaster, async (req, res) => {
+  try {
+    const registro = await entregasRegras.salvar(req.params.unidade, req.body, req.user.email);
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/entregas/lancar', requireSection('entregas-lancamento'), upload.single('etiqueta'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao } = JSON.parse(req.body.payload || '{}');
+    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos } = JSON.parse(req.body.payload || '{}');
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await entregasLive.create({
-      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao,
+      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos,
       etiquetaFile: req.file || null,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
@@ -2798,18 +2820,24 @@ function prepararEntregasPorUnidade(rows) {
   return { colunas, linhas };
 }
 
+const MOTIVOS_REMOCAO_CAMPO_LABEL = { atraso: 'Atraso', saiu_antes: 'Saiu antes do fim do turno', prejuizo: 'Gerou prejuízo', outro: 'Outro' };
+
 function prepararEntregasLancamentos(rows) {
   const colunas = [
     { key: 'data', label: 'Data' }, { key: 'unidade', label: 'Unid.' }, { key: 'entregador', label: 'Entregador' },
     { key: 'entrega', label: 'Entregas' }, { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' },
     { key: 'pos00hs', label: 'Pos 00hs' }, { key: 'foraDeArea', label: 'Fora área' }, { key: 'bonus', label: 'Bônus' },
-    { key: 'ajudaCusto', label: 'Ajuda custo' }, { key: 'valor', label: 'Valor' }, { key: 'coopRecebe', label: 'COOP' },
+    { key: 'ajudaCusto', label: 'Ajuda custo' }, { key: 'camposRemovidos', label: 'Campos removidos' },
+    { key: 'valor', label: 'Valor' }, { key: 'coopRecebe', label: 'COOP' },
     { key: 'quantTotal', label: 'Qtd. total' }, { key: 'observacao', label: 'Observação' },
   ];
   const linhas = [...rows].sort((a, b) => (b.data || '').localeCompare(a.data || '')).map((d) => ({
     data: reportUtil.fmtDataBR(d.data), unidade: unidadeNomeEntrega(d), entregador: d.entregador || '—',
     entrega: d.entrega || 0, retorno: d.retorno || 0, extra: d.extra || 0, pos00hs: d.pos00hs || 0, foraDeArea: d.foraDeArea || 0,
     bonus: reportUtil.fmtMoneyBR(d.bonus), ajudaCusto: reportUtil.fmtMoneyBR(d.ajudaCusto),
+    camposRemovidos: (d.camposRemovidos && d.camposRemovidos.length)
+      ? `${d.camposRemovidos.join(', ')} (${MOTIVOS_REMOCAO_CAMPO_LABEL[d.motivoRemocaoCampos] || 'Sim'})`
+      : '—',
     valor: reportUtil.fmtMoneyBR(d.valor), coopRecebe: reportUtil.fmtMoneyBR(d.coopRecebe),
     quantTotal: d.quantTotal || 0, observacao: d.observacao || '—',
   }));
