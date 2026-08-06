@@ -86,6 +86,14 @@
   .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
   .msg.ok{background:var(--ok-dim);color:var(--ok);}
   .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;}
+  .btn-secundario-full{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+  .crianca-linha{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;}
+  .crianca-linha-nasc{display:flex;gap:6px;align-items:end;}
+  .crianca-linha-nasc>div{flex:1;min-width:0;}
+  @media(min-width:440px){ .crianca-linha{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end;} .crianca-linha-nasc{grid-column:2;} }
+  .crianca-linha input{margin:0;}
+  .btn-remover-crianca{background:none;border:1px solid var(--line);color:var(--bad);border-radius:8px;height:44px;width:38px;flex:none;cursor:pointer;font-size:14px;}
 </style>
 </head>
 <body>
@@ -197,6 +205,16 @@
       <div><label>Data de início</label><input type="date" id="ms-data-inicial" required></div>
       <div><label>Validade (calculada)</label><input type="text" id="ms-validade-preview" disabled></div>
     </div>
+    <label>Valor do plano</label>
+    <input type="number" step="0.01" min="0" id="ms-valor" placeholder="0,00">
+
+    <div class="secao-titulo">Crianças que vão utilizar o plano</div>
+    <div class="sub" style="font-family:var(--sans);color:var(--muted);font-size:12px;margin-top:-4px;margin-bottom:6px;">
+      O responsável geralmente só assina pelo plano - quem brinca são as crianças cadastradas aqui.
+    </div>
+    <div id="ms-lista-criancas"></div>
+    <button type="button" class="btn-secundario-full" onclick="adicionarCriancaMensalista()">+ Adicionar criança</button>
+
     <div class="msg hidden" id="msg-mensalista"></div>
     <button class="btn-primary" type="submit" style="width:100%;margin-top:10px;">Cadastrar mensalista</button>
   </form>
@@ -282,6 +300,8 @@ async function carregar(){
   renderMensalistas();
 }
 
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
 function renderMensalistas(){
   const hoje = hojeBrasilia();
   const el = document.getElementById('lista-mensalistas');
@@ -289,16 +309,45 @@ function renderMensalistas(){
   const ordenados = [...MENSALISTAS].sort((a,b)=>(b.dataInicial||'').localeCompare(a.dataInicial||''));
   el.innerHTML = ordenados.map(m=>{
     const ativo = m.dataInicial<=hoje && hoje<=m.dataFinal;
+    const criancas = (m.usuarios||[]).map(u=>u.nome).join(', ');
     return `
     <div class="card">
       <div class="linha1">
         <span>${escapeHtml(m.nome)} · ${escapeHtml(m.unidadeNome||m.unidade)}</span>
         <span class="badge ${ativo?'liberado':'aguardando'}">${ativo?'ativo':'expirado'}</span>
       </div>
-      <div class="sub">válido de ${fmtData(m.dataInicial)} até ${fmtData(m.dataFinal)}${m.contato?' · '+escapeHtml(m.contato):''}</div>
+      <div class="sub">válido de ${fmtData(m.dataInicial)} até ${fmtData(m.dataFinal)}${m.contato?' · '+escapeHtml(m.contato):''}${m.valorPlano?' · '+fmtMoney(m.valorPlano):''}</div>
+      ${criancas?`<div class="criancas">${escapeHtml(criancas)}</div>`:''}
       ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirMensalista('${m.id}')">✕ Excluir</button>`:''}
     </div>`;
   }).join('');
+}
+
+let MS_CRIANCA_SEQ = 0;
+function adicionarCriancaMensalista(){
+  if(document.querySelectorAll('#ms-lista-criancas .crianca-linha').length >= 4){
+    alert('O passaporte mensal aceita no máximo 4 usuários.');
+    return;
+  }
+  MS_CRIANCA_SEQ++;
+  const id = 'ms-crianca-' + MS_CRIANCA_SEQ;
+  const div = document.createElement('div');
+  div.className = 'crianca-linha';
+  div.id = id;
+  div.innerHTML = `
+    <div><label style="margin-top:0;">Nome da criança</label><input type="text" class="ms-crianca-nome"></div>
+    <div class="crianca-linha-nasc">
+      <div><label style="margin-top:0;">Nascimento</label><input type="date" class="ms-crianca-nasc"></div>
+      <button type="button" class="btn-remover-crianca" onclick="document.getElementById('${id}').remove();" title="Remover">✕</button>
+    </div>
+  `;
+  document.getElementById('ms-lista-criancas').appendChild(div);
+}
+function coletarCriancasMensalista(){
+  return [...document.querySelectorAll('#ms-lista-criancas .crianca-linha')].map(div=>({
+    nome: div.querySelector('.ms-crianca-nome').value.trim(),
+    dataNascimento: div.querySelector('.ms-crianca-nasc').value || null,
+  })).filter(c=>c.nome);
 }
 
 async function excluirMensalista(id){
@@ -329,6 +378,8 @@ document.getElementById('form-mensalista').addEventListener('submit', async (ev)
       cpf: document.getElementById('ms-cpf').value,
       contato: document.getElementById('ms-contato').value,
       dataInicial: document.getElementById('ms-data-inicial').value,
+      valorPlano: document.getElementById('ms-valor').value,
+      usuarios: coletarCriancasMensalista(),
     };
     const res = await fetch('/api/mensalistas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const data = await res.json();
@@ -336,6 +387,8 @@ document.getElementById('form-mensalista').addEventListener('submit', async (ev)
     msg.textContent = 'Mensalista cadastrado.'; msg.className = 'msg ok';
     document.getElementById('form-mensalista').reset();
     document.getElementById('ms-validade-preview').value = '';
+    document.getElementById('ms-lista-criancas').innerHTML = '';
+    adicionarCriancaMensalista();
     await carregar();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
@@ -544,6 +597,7 @@ async function boot(){
   document.getElementById('f-ate').value = hoje;
   document.getElementById('ms-data-inicial').value = hoje;
   atualizarValidadePreview();
+  adicionarCriancaMensalista();
 
   document.getElementById('root').classList.remove('hidden');
   await carregar();
