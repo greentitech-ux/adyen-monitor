@@ -215,7 +215,7 @@ app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, 
       bandeira, ultimos4, dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente, anexos,
     });
     broadcast('refund-requested', registro, 'monitor');
-    push.notifySolicitacao('Pedido de estorno (cliente)', `${unidadeNome} · R$ ${(Number(valorEstornar) || 0).toFixed(2)}`, registro.id);
+    push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Pedido de estorno (cliente)`, `${unidadeNome} · R$ ${(Number(valorEstornar) || 0).toFixed(2)}`, registro.id);
     res.json({ ok: true, id: registro.id });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -261,7 +261,7 @@ app.post('/api/solicitacoes/publico', upload.array('anexos', 4), async (req, res
       direcionadoParaEmail: null,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
-    push.notifySolicitacao('Nova solicitação (formulário público)', `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
+    push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Nova solicitação (formulário público)`, `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
     res.json({ ok: true, id: registro.id });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -290,7 +290,7 @@ app.post('/api/bot/solicitacoes', async (req, res) => {
       direcionadoParaEmail: null,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
-    push.notifySolicitacao('Nova solicitação (robô de cobranças)', `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
+    push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Nova solicitação (robô de cobranças)`, `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1369,7 +1369,7 @@ app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => 
     });
     broadcast('refund-requested', registro, 'monitor');
     broadcast('refund-requested', registro, 'solicitacoes');
-    push.notifySolicitacao('Pedido de estorno', `${req.user.email} · ${unidade || ''}`, registro.id);
+    push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Pedido de estorno`, `${req.user.email} · ${unidade || ''}`, registro.id);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1402,6 +1402,21 @@ app.patch('/api/refund-requests/:id/direcionar', auth.requireMasterOrAdmin, asyn
     const registro = await refunds.redirecionar(req.params.id, req.body);
     broadcast('refund-request-changed', registro, 'monitor');
     res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// converte um ticket de Estorno num dos 5 tipos gerais da Central (ex: virou
+// uma Manutenção em vez de reembolso) - mesmo numero de ticket, novo
+// registro em solicitacoes.js (ver refunds.converterParaSolicitacao)
+app.post('/api/refund-requests/:id/converter', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const { novoTipo, dados } = req.body;
+    const novo = await refunds.converterParaSolicitacao(req.params.id, novoTipo, dados, req.user.email);
+    broadcast('refund-request-changed', await refunds.getOne(req.params.id), 'monitor');
+    broadcast('solicitacao-criada', novo, 'solicitacoes');
+    res.json(novo);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -2508,7 +2523,7 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
     });
     broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
     broadcast('fechamento-edicao-solicitada', pedido, 'solicitacoes');
-    push.notifySolicitacao('Correção de fechamento solicitada', `${req.user.email} · ${payload.tipoCorrecao || ''}`, pedido.id);
+    push.notifySolicitacao(`Ticket #${pedido.numeroTicket} · Correção de fechamento solicitada`, `${req.user.email} · ${payload.tipoCorrecao || ''}`, pedido.id);
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2657,7 +2672,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       direcionadoParaEmail,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
-    push.notifySolicitacao('Nova solicitação', `${req.user.email} · ${registro.titulo || tipo || ''}`, registro.id);
+    push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Nova solicitação`, `${req.user.email} · ${registro.titulo || tipo || ''}`, registro.id);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2755,6 +2770,33 @@ app.patch('/api/solicitacoes/:id/direcionar', auth.requireMasterOrAdmin, async (
     const registro = await solicitacoes.redirecionar(req.params.id, req.body);
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// troca o tipo de um ticket dentro dos 5 tipos gerais (Compra, Manutenção,
+// Suporte de TI, Pagamento, Nota) - ex: virou Pagamento apos a execucao do
+// servico de Manutencao. Mesmo registro, so o tipo muda (ver solicitacoes.mudarTipo)
+app.patch('/api/solicitacoes/:id/tipo', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const registro = await solicitacoes.mudarTipo(req.params.id, req.body.novoTipo, req.user.email);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// converte um ticket de Compra/Manutenção/Suporte de TI/Pagamento/Nota num
+// pedido de Estorno (outra colecao) - mesmo numero de ticket, novo registro
+// em refunds.js (ver solicitacoes.converterParaEstorno)
+app.post('/api/solicitacoes/:id/converter-estorno', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const novo = await solicitacoes.converterParaEstorno(req.params.id, req.body, req.user.email);
+    broadcast('solicitacao-decidida', await solicitacoes.getOne(req.params.id), 'solicitacoes');
+    broadcast('refund-requested', novo, 'monitor');
+    res.json(novo);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

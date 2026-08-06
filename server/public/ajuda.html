@@ -263,6 +263,16 @@ const TOPICOS = [
       <li>Filtros de loja, grupo e período de data, lado a lado no topo.</li>
       <li>Clique num cartão pra ver todos os detalhes, anexos e o chat da solicitação.</li>
     </ul>
+    <h3>🎫 Número do ticket</h3>
+    <p>Toda solicitação (de qualquer tipo) ganha um número sequencial único ao ser criada, tipo <b>Ticket #10000</b>, <b>#10001</b>... Esse número aparece no cartão e no detalhe, e é o mesmo nas notificações push.</p>
+    <h3>🔀 Mudar ou converter o tipo do ticket</h3>
+    <p>Um ticket não precisa ficar preso ao tipo com que nasceu. Master e Admin encontram essas opções na seção <b>"Tipo do ticket"</b> do detalhe:</p>
+    <ul>
+      <li><b>Mudar tipo:</b> um ticket de Compra, Manutenção, Suporte de TI, Pagamento ou Nota pode virar qualquer um dos outros quatro - ex: um chamado de Manutenção vira Pagamento assim que o serviço é executado e é hora de pagar o prestador. O número do ticket, o histórico e o chat continuam os mesmos.</li>
+      <li><b>Converter em Estorno:</b> qualquer um desses 5 tipos pode virar um pedido de Estorno, se for pra esse lado que o caso evoluiu.</li>
+      <li><b>Converter a partir de Estorno:</b> um Estorno também pode virar um dos 5 tipos gerais (ex: virou uma Manutenção em vez de reembolso).</li>
+    </ul>
+    <p>Ao converter, o ticket original fica marcado como <b>convertido</b> e some das colunas do Kanban - quem continuar a história é o novo registro, com o <b>mesmo número de ticket</b> e um link de volta pro ticket de origem (e vice-versa). O <b>Ajuste de fechamento</b> fica de fora desse fluxo de troca/conversão, porque está sempre amarrado a um fechamento específico.</p>
     <h3>👤 Trocar o agente responsável</h3>
     <p>Master e Admin podem abrir qualquer solicitação (de qualquer tipo, em qualquer status) e, na seção <b>"Agente responsável"</b> do detalhe, escolher outra pessoa pra cuidar do ticket - útil quando o pedido foi direcionado a alguém de folga ou outro Admin precisa assumir.</p>
     <h3>🛍️ Status Comprada (pedidos de Compra)</h3>

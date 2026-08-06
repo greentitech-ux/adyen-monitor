@@ -8,6 +8,7 @@
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
 const grupos = require('./grupos');
+const ticketCounter = require('./ticketCounter');
 
 const COLLECTION = db.collection('fechamentosLive');
 const EDITS = db.collection('fechamentoEdicoes');
@@ -234,6 +235,11 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
 
   const pedido = {
     id: null,
+    // Ticket #10000 em diante, mesma sequencia global de refunds.js/
+    // solicitacoes.js. Ajuste de fechamento nao entra no fluxo de
+    // troca/conversao de tipo (fica preso a um fechamentoId especifico), mas
+    // ainda ganha um numero de ticket pra identificacao/notificacao
+    numeroTicket: null,
     fechamentoId,
     unidade: atual.unidade,
     unidadeNome: atual.unidadeNome,
@@ -293,6 +299,7 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
   const ref = EDITS.doc();
   const agora = new Date().toISOString();
   pedido.id = ref.id;
+  pedido.numeroTicket = await ticketCounter.proximoTicket();
   pedido.criadoEm = agora;
   await ref.set(pedido);
   edicoesCache.invalidar();

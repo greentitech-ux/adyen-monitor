@@ -12,10 +12,18 @@
 // estorno na Adyen por fora) ou Rejeita (com um motivo).
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
+const ticketCounter = require('./ticketCounter');
+const centralChat = require('./centralChat');
 
 const refundsRef = db.collection('refundRequests');
-const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO'];
-const ORIGENS = ['interno', 'cliente'];
+// 'CONVERTIDO': o ticket saiu de Estorno e virou um dos tipos gerais (ver
+// converterParaSolicitacao) - o registro fica de historico, quem continua a
+// historia e o novo registro em solicitacoes.js (convertidoParaId)
+const STATUSES = ['PENDENTE', 'APROVADO', 'REJEITADO', 'CONVERTIDO'];
+// 'conversao': registro nascido de um ticket de outro tipo que virou Estorno
+// (ver converterParaEstorno em solicitacoes.js) - os dados ja foram
+// validados na criacao do ticket original, entao pula a validacao normal
+const ORIGENS = ['interno', 'cliente', 'conversao'];
 
 
 async function create({
@@ -23,13 +31,14 @@ async function create({
   motivoEstorno, motivoOutro, valorVenda, formaPagamento, bandeira, ultimos4,
   dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente, anexos,
   requestedById, requestedByEmail, direcionadoParaId, direcionadoParaEmail,
+  numeroTicket, convertidoDeTipo, convertidoDeId,
 }) {
   origem = ORIGENS.includes(origem) ? origem : 'interno';
 
   if (origem === 'interno') {
     if (!pedidoId) throw new Error('pedidoId é obrigatório.');
     if (!String(observacao || '').trim()) throw new Error('Descreva o motivo do estorno.');
-  } else {
+  } else if (origem === 'cliente') {
     if (!unidade) throw new Error('Selecione a loja onde comprou.');
     if (!motivoEstorno) throw new Error('Selecione o motivo do estorno.');
     if (motivoEstorno === 'Outro' && !String(motivoOutro || '').trim()) throw new Error('Explique o motivo do estorno.');
@@ -43,8 +52,25 @@ async function create({
 
   const doc = refundsRef.doc();
   const agora = new Date().toISOString();
+  // numeroTicket normalmente e novo (Ticket #10000 em diante, sequencia unica
+  // compartilhada com solicitacoes.js/fechamentosLive.js) - so vem
+  // pre-definido quando esse registro nasce de uma conversao de outro ticket
+  // (ver converterParaEstorno em solicitacoes.js), pra manter o mesmo numero
+  const ticket = numeroTicket != null ? numeroTicket : await ticketCounter.proximoTicket();
   const registro = {
     id: doc.id,
+    numeroTicket: ticket,
+    // trilha de qual(is) tipo(s) esse ticket ja passou
+    historicoTipos: [{ tipo: 'estorno', em: agora, porEmail: requestedByEmail || null }],
+    // preenchido só quando esse registro NASCEU de uma conversão de outro
+    // ticket (ver converterParaSolicitacao) - referencia de onde ele veio
+    convertidoDeTipo: convertidoDeTipo || null,
+    convertidoDeId: convertidoDeId || null,
+    // preenchido quando ESSE ticket vira outro tipo (ver converterParaSolicitacao)
+    // - status vira 'CONVERTIDO' e esses dois campos apontam pro registro que
+    // continua a historia do ticket
+    convertidoParaTipo: null,
+    convertidoParaId: null,
     origem,
     pedidoId: pedidoId || null,
     unidade: unidade || null,
@@ -162,6 +188,54 @@ async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail }) {
   return getOne(id);
 }
 
+// converte um pedido de Estorno num dos 5 tipos gerais da Central (Compra,
+// Manutencao, Suporte de TI, Pagamento, Nota) - ex: virou uma manutencao em
+// vez de reembolso ao cliente. Marca este registro como CONVERTIDO e cria um
+// novo em solicitacoes.js com o MESMO numero de ticket, preservando o
+// historico (ver historicoTipos/convertidoDeTipo/convertidoDeId). Require
+// tardio de solicitacoes.js (dependencia "de efeito colateral", nao do
+// modulo em si) pra evitar require circular no topo do arquivo, ja que
+// solicitacoes.js tambem precisa chamar de volta pra converterParaEstorno.
+async function converterParaSolicitacao(id, novoTipo, dadosExtras, porEmail) {
+  const solicitacoes = require('./solicitacoes');
+  if (!solicitacoes.TIPOS.includes(novoTipo)) throw new Error('Tipo de destino inválido.');
+  const ref = refundsRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  const atual = snap.data();
+  if (atual.status === 'CONVERTIDO') throw new Error('Este ticket já foi convertido.');
+  const d = dadosExtras || {};
+  const novo = await solicitacoes.create({
+    tipo: novoTipo,
+    unidade: d.unidade || atual.unidade,
+    unidadeNome: d.unidadeNome || atual.unidadeNome || d.unidade || atual.unidade,
+    titulo: d.titulo || atual.observacao || `Estorno #${atual.numeroTicket} convertido`,
+    valorEstimado: d.valorEstimado != null && d.valorEstimado !== '' ? d.valorEstimado : atual.valorEstornar,
+    observacao: d.observacao || atual.observacao || '',
+    itens: d.itens,
+    anexos: atual.anexos,
+    ehOrcamento: false,
+    fornecedor: d.fornecedor,
+    vencimento: d.vencimento,
+    criadoPorId: atual.requestedById,
+    criadoPorEmail: atual.requestedByEmail,
+    direcionadoParaId: atual.direcionadoParaId,
+    direcionadoParaEmail: atual.direcionadoParaEmail,
+    numeroTicket: atual.numeroTicket,
+    convertidoDeTipo: 'estorno',
+    convertidoDeId: atual.id,
+  });
+  await ref.update({
+    status: 'CONVERTIDO',
+    convertidoParaTipo: novoTipo,
+    convertidoParaId: novo.id,
+  });
+  await centralChat.reatribuirCard('estorno', id, novoTipo, novo.id);
+  refundsCache.invalidar();
+  return novo;
+}
+
 module.exports = {
   STATUSES, create, listAll, getOne, updateStatus, update, remove, marcarNotificacaoVista, redirecionar,
+  converterParaSolicitacao,
 };

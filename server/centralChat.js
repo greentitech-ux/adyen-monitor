@@ -56,4 +56,15 @@ async function listAllUncached() {
 const chatCache = createCache(listAllUncached, 20 * 1000);
 const listAllCached = chatCache.cached;
 
-module.exports = { listByCard, addMessage, removeMessage, listAllCached };
+// reatribui todas as mensagens de um card pra uma nova chave tipo:id - usado
+// quando um ticket muda de tipo (mudarTipo, mesmo id) ou e convertido pra
+// outra colecao (converterParaEstorno/converterParaSolicitacao, id novo),
+// pra nao perder o historico de chat que ficava vinculado ao tipo/id antigo
+async function reatribuirCard(tipoAntigo, idAntigo, tipoNovo, idNovo) {
+  const snap = await COLLECTION.where('cardKey', '==', chaveCard(tipoAntigo, idAntigo)).get();
+  const novaChave = chaveCard(tipoNovo, idNovo);
+  await Promise.all(snap.docs.map((d) => d.ref.update({ cardKey: novaChave, tipo: tipoNovo, cardId: idNovo })));
+  chatCache.invalidar();
+}
+
+module.exports = { listByCard, addMessage, removeMessage, listAllCached, reatribuirCard };
