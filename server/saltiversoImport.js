@@ -119,6 +119,7 @@ function linhaParaCheckin(header, linha) {
     // mas marcar como "aguardando" pra visita que ja aconteceu so
     // atrapalharia a operacao com pendencias falsas)
     termoAssinado: true,
+    iniciado: true, // dado historico ja aconteceu - timeInicial/timeFinal ja vem preenchidos da planilha
     criadoPorId: null,
     criadoPorEmail: 'importado-planilha',
     criadoEm: parseCriadoEm(get(header, linha, 'DataTime'), dataUtilizacao),

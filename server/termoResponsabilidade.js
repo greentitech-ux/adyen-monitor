@@ -68,8 +68,11 @@ function gerarTermoPDF(res, checkin) {
   linhaCampo('Contratante (responsável)', checkin.responsavel?.nome);
   linhaCampo('CPF', checkin.responsavel?.cpf);
   linhaCampo('Contato', checkin.responsavel?.contato);
-  linhaCampo('Endereço', [checkin.responsavel?.cep, checkin.responsavel?.numero, checkin.responsavel?.complemento].filter(Boolean).join(', '));
-  linhaCampo('Data de utilização', `${fmtDataBR(checkin.dataUtilizacao)} · ${fmtHora(checkin.timeInicial)} às ${fmtHora(checkin.timeFinal)} (${checkin.tempoMinutos} min)`);
+  linhaCampo('Endereço', [checkin.responsavel?.endereco || checkin.responsavel?.cep, checkin.responsavel?.numero, checkin.responsavel?.complemento].filter(Boolean).join(', '));
+  const horarioTexto = checkin.iniciado
+    ? `${fmtHora(checkin.timeInicial)} às ${fmtHora(checkin.timeFinal)}`
+    : 'horário definido no check-in';
+  linhaCampo('Data de utilização', `${fmtDataBR(checkin.dataUtilizacao)} · ${horarioTexto} (${checkin.tempoMinutos} min)`);
   if (checkin.adultoCortesia) {
     linhaCampo('Adulto cortesia (A.C.)', `Sim — ${checkin.quantAC || 1} adulto(s) com entrada permitida sem brincar`);
   }

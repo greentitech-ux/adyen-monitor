@@ -30,6 +30,20 @@ function somarMinutos(hora, minutos) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
 }
 
+const FUSO_BR = 'America/Sao_Paulo';
+// hora atual em Brasilia, no formato HH:MM:SS - usada pelo botao de
+// check-in (o horario que realmente conta pra pulseira e o do check-in
+// fisico, nao o cadastro/pagamento que pode ter acontecido bem antes)
+function horaAgoraBrasilia() {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: FUSO_BR, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const o = {};
+  partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  const hora = o.hour === '24' ? '00' : o.hour;
+  return `${hora}:${o.minute}:${o.second}`;
+}
+
 function sanitizarCriancas(lista) {
   if (!Array.isArray(lista)) return [];
   return lista
@@ -41,17 +55,20 @@ function sanitizarCriancas(lista) {
     .slice(0, 30);
 }
 
-function validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, timeInicial, criancas }) {
+// timeInicial NAO faz mais parte do cadastro - a compra/cadastro de acesso
+// costuma acontecer bem antes da pessoa efetivamente entrar (minutos ou ate
+// horas depois), entao o horario que realmente conta e definido no momento
+// do check-in (ver funcao checkin() abaixo), nao aqui
+function validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, criancas }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!responsavel || !String(responsavel.nome || '').trim()) throw new Error('Informe o nome do responsável.');
   if (!responsavel.contato || !String(responsavel.contato).trim()) throw new Error('Informe o contato do responsável.');
   if (!dataUtilizacao || !/^\d{4}-\d{2}-\d{2}$/.test(dataUtilizacao)) throw new Error('Data de utilização inválida.');
   const tempo = Number(tempoMinutos);
   if (!TEMPOS_VALIDOS.includes(tempo)) throw new Error('Escolha um tempo válido.');
-  const inicio = validarHora(timeInicial, 'o horário inicial');
   const criancasOk = sanitizarCriancas(criancas);
   if (!criancasOk.length) throw new Error('Cadastre pelo menos uma criança.');
-  return { tempo, inicio, criancasOk };
+  return { tempo, criancasOk };
 }
 
 async function criar({
@@ -60,7 +77,11 @@ async function criar({
   observacao, adultoCortesia, quantAC, criancas, usou,
   criadoPorId, criadoPorEmail,
 }) {
-  const { tempo, inicio, criancasOk } = validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, timeInicial, criancas });
+  const { tempo, criancasOk } = validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, criancas });
+  // timeInicial e opcional na criacao (usado so pela importacao da planilha
+  // antiga, que ja tem o horario real de visitas que ja aconteceram) - no
+  // fluxo normal do formulario isso fica em branco ate o check-in
+  const inicio = timeInicial ? validarHora(timeInicial, 'o horário inicial') : null;
   const ref = COLLECTION.doc();
   const registro = {
     id: ref.id,
@@ -74,13 +95,15 @@ async function criar({
       contato: String(responsavel.contato).trim().slice(0, 30),
       email: String(responsavel.email || '').trim().slice(0, 150),
       cep: String(responsavel.cep || '').trim().slice(0, 300),
+      endereco: String(responsavel.endereco || '').trim().slice(0, 300),
       numero: String(responsavel.numero || '').trim().slice(0, 20),
       complemento: String(responsavel.complemento || '').trim().slice(0, 100),
     },
     dataUtilizacao,
     tempoMinutos: tempo,
     timeInicial: inicio,
-    timeFinal: somarMinutos(inicio, tempo),
+    timeFinal: inicio ? somarMinutos(inicio, tempo) : null,
+    iniciado: !!inicio,
     observacao: String(observacao || '').slice(0, 300),
     adultoCortesia: adultoCortesia === true,
     quantAC: adultoCortesia === true ? Math.max(0, Math.min(10, num(quantAC) || 1)) : 0,
@@ -95,6 +118,25 @@ async function criar({
   await ref.set(registro);
   parqueCache.invalidar();
   return registro;
+}
+
+// aciona o relogio de verdade: a pulseira/tempo contratado passa a valer a
+// partir de AGORA, nao do horario em que a compra/cadastro foi feita
+async function checkin(id) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Check-in não encontrado.');
+  const atual = snap.data();
+  const inicio = horaAgoraBrasilia();
+  const merge = {
+    timeInicial: inicio,
+    timeFinal: somarMinutos(inicio, atual.tempoMinutos),
+    iniciado: true,
+    checkinEm: new Date().toISOString(),
+  };
+  await ref.update(merge);
+  parqueCache.invalidar();
+  return getOne(id);
 }
 
 async function listAllUncached() {
@@ -139,9 +181,11 @@ async function atualizar(id, patch) {
   }
   if (patch.timeInicial !== undefined) {
     merge.timeInicial = validarHora(patch.timeInicial, 'o horário inicial');
+    merge.iniciado = true; // ajuste manual do Master tambem conta como check-in feito
   }
   if (patch.timeInicial !== undefined || patch.tempoMinutos !== undefined) {
-    merge.timeFinal = somarMinutos(merge.timeInicial || atual.timeInicial, tempo);
+    const inicioBase = merge.timeInicial || atual.timeInicial;
+    if (inicioBase) merge.timeFinal = somarMinutos(inicioBase, tempo);
   }
   if (patch.observacao !== undefined) merge.observacao = String(patch.observacao).slice(0, 300);
   if (patch.adultoCortesia !== undefined) {
@@ -187,4 +231,4 @@ async function buscarPorCpf(cpf) {
   return encontrados[0];
 }
 
-module.exports = { TEMPOS_VALIDOS, criar, listAll, listByUnidades, getOne, atualizar, remover, buscarPorCpf, invalidar: () => parqueCache.invalidar() };
+module.exports = { TEMPOS_VALIDOS, criar, checkin, listAll, listByUnidades, getOne, atualizar, remover, buscarPorCpf, invalidar: () => parqueCache.invalidar() };

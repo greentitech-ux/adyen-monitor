@@ -67,6 +67,8 @@
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
   .badge.aguardando{background:var(--warn-dim);color:var(--warn);}
   .badge.liberado{background:var(--ok-dim);color:var(--ok);}
+  .badge.pendente-checkin{background:rgba(92,200,255,.12);color:var(--accent);}
+  .btn-checkin{width:100%;margin-top:8px;background:var(--ok);color:#06231a;border:none;border-radius:8px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:var(--sans);}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);margin-right:12px;}
   .toggle-grupo{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
   .toggle-btn{flex:1;min-width:56px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 6px;font-size:12.5px;font-family:var(--sans);cursor:pointer;text-align:center;}
@@ -150,24 +152,24 @@
       </div>
       <label>Email (opcional)</label>
       <input type="email" id="f-email">
+      <label>CEP</label>
+      <input type="text" id="f-cep" inputmode="numeric" placeholder="00000-000">
+      <label>Endereço <span style="text-transform:none;font-weight:400;">(preenchido pelo CEP)</span></label>
+      <input type="text" id="f-endereco" placeholder="rua, bairro, cidade - UF">
       <div class="grid2">
-        <div><label>CEP</label><input type="text" id="f-cep" inputmode="numeric"></div>
         <div><label>Número</label><input type="text" id="f-numero"></div>
+        <div><label>Complemento (opcional)</label><input type="text" id="f-complemento"></div>
       </div>
-      <label>Complemento (opcional)</label>
-      <input type="text" id="f-complemento">
     </div>
 
     <div class="secao">
       <div class="secao-titulo">Data e tempo</div>
-      <div class="grid2">
-        <div><label>Data de utilização</label><input type="date" id="f-data" required></div>
-        <div><label>Horário inicial</label><input type="time" id="f-hora" required></div>
-      </div>
+      <label>Data de utilização</label>
+      <input type="date" id="f-data" required>
       <label>Tempo contratado</label>
       <div class="toggle-grupo" id="tempos"></div>
       <div class="resumo">
-        <div class="linha"><span>Horário final (calculado)</span><b id="preview-fim">—</b></div>
+        <div class="linha"><span>Horário</span><b>Definido no momento do check-in</b></div>
       </div>
     </div>
 
@@ -206,12 +208,13 @@
 </div>
 
 <div class="panel hidden" id="painel-termo">
-  <h2>Termo de responsabilidade</h2>
+  <h2>Cadastro registrado</h2>
   <div class="sub" style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
-    Imprima e peça a assinatura do responsável. <b style="color:var(--warn);">A entrada no parque só é permitida após o termo assinado.</b>
+    Imprima o termo e peça a assinatura do responsável. <b style="color:var(--warn);">A entrada no parque só é permitida depois do termo assinado E do check-in feito</b> - o check-in é quem inicia a contagem do tempo contratado, então só clique nele quando o grupo realmente for entrar.
   </div>
   <a class="btn-secundario" style="display:block;text-align:center;text-decoration:none;" id="link-termo" target="_blank">🖨️ Imprimir termo de responsabilidade</a>
-  <button type="button" class="btn-primary" id="btn-marcar-assinado" onclick="marcarAssinado()">Confirmar termo assinado (liberar entrada)</button>
+  <button type="button" class="btn-primary" id="btn-marcar-assinado" onclick="marcarAssinado()">Confirmar termo assinado</button>
+  <button type="button" class="btn-checkin" id="btn-fazer-checkin" onclick="fazerCheckinUltimo()">▶ Fazer check-in agora (inicia a contagem)</button>
 </div>
 
 <div class="panel">
@@ -268,18 +271,7 @@ function renderTempos(){
     `<button type="button" class="toggle-btn ${t===TEMPO_SELECIONADO?'ativo':''}" data-tempo="${t}" onclick="selecionarTempo(${t})">${t}min</button>`
   ).join('');
 }
-function selecionarTempo(t){ TEMPO_SELECIONADO = t; renderTempos(); atualizarPreviewFim(); }
-function atualizarPreviewFim(){
-  const hora = document.getElementById('f-hora').value;
-  const el = document.getElementById('preview-fim');
-  if(!hora){ el.textContent = '—'; return; }
-  const [h,m] = hora.split(':').map(Number);
-  const total = h*60 + m + TEMPO_SELECIONADO;
-  const hh = String(Math.floor((total%1440)/60)).padStart(2,'0');
-  const mm = String(total%60).padStart(2,'0');
-  el.textContent = `${hh}:${mm}`;
-}
-document.getElementById('f-hora').addEventListener('input', atualizarPreviewFim);
+function selecionarTempo(t){ TEMPO_SELECIONADO = t; renderTempos(); }
 
 // autopreenchimento por CPF: ao sair do campo, busca o cadastro mais
 // recente com esse CPF (de check-ins anteriores, inclusive os importados da
@@ -300,8 +292,22 @@ document.getElementById('f-cpf').addEventListener('blur', async (ev) => {
     preencherSeVazio('f-contato', r.contato);
     preencherSeVazio('f-email', r.email);
     preencherSeVazio('f-cep', r.cep);
+    preencherSeVazio('f-endereco', r.endereco);
     preencherSeVazio('f-numero', r.numero);
     preencherSeVazio('f-complemento', r.complemento);
+  } catch (err) { /* falha silenciosa - autopreenchimento e so uma conveniencia */ }
+});
+
+// autopreenchimento de endereco pelo CEP (ViaCEP, publico e sem chave) -
+// deixa so numero/complemento pra digitar
+document.getElementById('f-cep').addEventListener('blur', async (ev) => {
+  const cep = ev.target.value.replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  try {
+    const dados = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r => r.json());
+    if (!dados || dados.erro) return;
+    const partes = [dados.logradouro, dados.bairro, [dados.localidade, dados.uf].filter(Boolean).join(' - ')].filter(Boolean);
+    if (partes.length) document.getElementById('f-endereco').value = partes.join(', ');
   } catch (err) { /* falha silenciosa - autopreenchimento e so uma conveniencia */ }
 });
 
@@ -347,22 +353,31 @@ async function carregar(){
   renderLista();
 }
 
+function statusCheckin(c){
+  if(!c.iniciado) return { classe:'pendente-checkin', texto:'aguardando check-in' };
+  if(!c.termoAssinado) return { classe:'aguardando', texto:'aguardando assinatura' };
+  return { classe:'liberado', texto:'liberado' };
+}
+
 function renderLista(){
   const el = document.getElementById('lista-checkins');
   if(!CHECKINS.length){ el.innerHTML = '<div class="empty">Nenhum check-in ainda.</div>'; return; }
   el.innerHTML = CHECKINS.map(c=>{
     const criancas = (c.criancas||[]).map(cr=>cr.nome).join(', ');
+    const status = statusCheckin(c);
+    const horario = c.iniciado ? `${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)}` : `${c.tempoMinutos}min · horário definido no check-in`;
     return `
     <div class="card">
       <div class="linha1">
         <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtData(c.dataUtilizacao)}</span>
-        <span class="badge ${c.termoAssinado?'liberado':'aguardando'}">${c.termoAssinado?'liberado':'aguardando assinatura'}</span>
+        <span class="badge ${status.classe}">${status.texto}</span>
       </div>
-      <div class="sub">${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}</div>
+      <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}</div>
       <div class="criancas">${escapeHtml(criancas)}</div>
       <div style="margin-top:8px;">
         <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
         ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
+        ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
         ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">✕ Excluir</button>`:''}
       </div>
     </div>`;
@@ -373,15 +388,38 @@ async function marcarAssinadoId(id){
   await fetch(`/api/parque/checkins/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ termoAssinado:true }) });
   await carregar();
 }
+// o painel de "cadastro registrado" so some quando os dois requisitos pra
+// entrar no parque estiverem prontos: termo assinado E check-in feito
+function atualizarPainelTermoVisibilidade(){
+  if(!ULTIMO_CRIADO_ID) return;
+  const c = CHECKINS.find(x=>x.id===ULTIMO_CRIADO_ID);
+  if(c && c.termoAssinado && c.iniciado) document.getElementById('painel-termo').classList.add('hidden');
+}
 async function marcarAssinado(){
   if(!ULTIMO_CRIADO_ID) return;
   await marcarAssinadoId(ULTIMO_CRIADO_ID);
-  document.getElementById('painel-termo').classList.add('hidden');
+  atualizarPainelTermoVisibilidade();
 }
 async function excluirCheckin(id){
   if(!confirm('Excluir esse check-in?')) return;
   await fetch(`/api/parque/checkins/${id}`, { method:'DELETE' });
   await carregar();
+}
+
+async function fazerCheckin(id){
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/checkin`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao fazer check-in');
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+async function fazerCheckinUltimo(){
+  if(!ULTIMO_CRIADO_ID) return;
+  await fazerCheckin(ULTIMO_CRIADO_ID);
+  atualizarPainelTermoVisibilidade();
 }
 
 function resetarForm(){
@@ -390,9 +428,9 @@ function resetarForm(){
   document.getElementById('lista-criancas').innerHTML = '';
   TEMPO_SELECIONADO = 60;
   renderTempos();
-  atualizarPreviewFim();
   setAC(false);
   atualizarPreviewPulseiras();
+  adicionarCrianca();
 }
 
 document.getElementById('form-checkin').addEventListener('keydown', (ev)=>{
@@ -420,12 +458,12 @@ document.getElementById('form-checkin').addEventListener('submit', async (ev)=>{
         contato: document.getElementById('f-contato').value,
         email: document.getElementById('f-email').value,
         cep: document.getElementById('f-cep').value,
+        endereco: document.getElementById('f-endereco').value,
         numero: document.getElementById('f-numero').value,
         complemento: document.getElementById('f-complemento').value,
       },
       dataUtilizacao: document.getElementById('f-data').value,
       tempoMinutos: TEMPO_SELECIONADO,
-      timeInicial: document.getElementById('f-hora').value,
       observacao: document.getElementById('f-observacao').value,
       adultoCortesia: AC_ATIVO,
       quantAC: AC_ATIVO ? document.getElementById('f-quantAC').value : 0,
@@ -434,7 +472,7 @@ document.getElementById('form-checkin').addEventListener('submit', async (ev)=>{
     const res = await fetch('/api/parque/checkins', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao registrar check-in');
-    msg.textContent = 'Check-in registrado. Imprima o termo de responsabilidade abaixo.'; msg.className = 'msg ok';
+    msg.textContent = 'Cadastro registrado. Imprima o termo abaixo - o check-in só deve ser feito quando o grupo for entrar de verdade.'; msg.className = 'msg ok';
     ULTIMO_CRIADO_ID = data.id;
     document.getElementById('link-termo').href = `/api/parque/checkins/${data.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}`;
     document.getElementById('painel-termo').classList.remove('hidden');
