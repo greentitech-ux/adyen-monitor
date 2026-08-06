@@ -10,7 +10,7 @@ const sessions = require('./sessions');
 
 const usersRef = db.collection('users');
 
-const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'inventario'];
+const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'inventario', 'parque', 'parque-checkin', 'festas'];
 
 function sanitizePermissions(input) {
   const p = input || {};

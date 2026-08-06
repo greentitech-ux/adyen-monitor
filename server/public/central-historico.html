@@ -168,10 +168,13 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back active" id="nav-historico-self" href="/central-historico.html">📜 Histórico</a>
@@ -1160,7 +1163,7 @@ async function boot(){
   ME = await res.json();
   IS_MASTER = ME.role==='master';
   IS_ADMIN = !!ME.isAdmin;
-  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
@@ -1170,12 +1173,15 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !SECOES.includes('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !SECOES.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !SECOES.includes('ifood'));
+  document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-inventario').classList.toggle('hidden', !SECOES.includes('inventario'));
+  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
 
   if(!SECOES.includes('solicitacoes')){
     document.getElementById('sem-acesso').classList.remove('hidden');

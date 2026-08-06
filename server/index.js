@@ -44,6 +44,9 @@ const chamadosTI = require('./chamadosTI');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 const inventario = require('./inventario');
+const parque = require('./parque');
+const festas = require('./festas');
+const termoResponsabilidade = require('./termoResponsabilidade');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2027,6 +2030,163 @@ app.get('/api/inventario/relatorio.:formato(csv|pdf)', requireSection('inventari
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// ---------- Saltiverso Patteo (parque de trampolins): controle de entrada
+// (check-ins) e reservas de festa. Duas secoes de checkin/painel (mesmo
+// padrao entregas/entregas-lancamento) + uma secao de festas ----------
+app.post('/api/parque/checkins', requireSection('parque-checkin'), async (req, res) => {
+  try {
+    const { unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, observacao, adultoCortesia, quantAC, criancas, usou } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await parque.criar({
+      unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, observacao, adultoCortesia, quantAC, criancas, usou,
+      colaboradorId: req.user.id, colaboradorNome: req.user.email,
+      criadoPorId: req.user.id, criadoPorEmail: req.user.email,
+    });
+    broadcast('parque-checkin-criado', registro, 'parque');
+    broadcast('parque-checkin-criado', registro, 'parque-checkin');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/parque/checkins', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
+  if (req.isMaster) return res.json(await parque.listAll());
+  res.json(await parque.listByUnidades(req.permissions.unidades || []));
+});
+
+app.get('/api/parque/checkins/:id/termo.pdf', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
+  const checkin = await parque.getOne(req.params.id);
+  if (!checkin) return res.sendStatus(404);
+  if (!req.isMaster && !(req.permissions.unidades || []).includes(checkin.unidade)) return res.sendStatus(404);
+  termoResponsabilidade.gerarTermoPDF(res, checkin);
+});
+
+app.patch('/api/parque/checkins/:id', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
+  try {
+    const atual = await parque.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Check-in não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    // qualquer um com acesso pode marcar o termo como assinado (operacao de
+    // balcao); demais campos (editar cadastro) seguem liberados do mesmo jeito
+    const registro = await parque.atualizar(req.params.id, req.body);
+    broadcast('parque-checkin-atualizado', registro, 'parque');
+    broadcast('parque-checkin-atualizado', registro, 'parque-checkin');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/parque/checkins/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await parque.remover(req.params.id);
+    broadcast('parque-checkin-excluido', { id: req.params.id }, 'parque');
+    broadcast('parque-checkin-excluido', { id: req.params.id }, 'parque-checkin');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/parque/relatorio.:formato(csv|pdf)', requireSection('parque'), async (req, res) => {
+  const lista = req.isMaster ? await parque.listAll() : await parque.listByUnidades(req.permissions.unidades || []);
+  const colunas = [
+    { key: 'unidade', label: 'Unidade' }, { key: 'responsavel', label: 'Responsável' }, { key: 'contato', label: 'Contato' },
+    { key: 'data', label: 'Data' }, { key: 'horario', label: 'Horário' }, { key: 'criancas', label: 'Crianças' },
+    { key: 'ac', label: 'A.C.' }, { key: 'termo', label: 'Termo assinado' },
+  ];
+  const linhas = lista.map((c) => ({
+    unidade: c.unidadeNome || c.unidade,
+    responsavel: c.responsavel?.nome,
+    contato: c.responsavel?.contato,
+    data: reportUtil.fmtDataBR(c.dataUtilizacao),
+    horario: `${(c.timeInicial || '').slice(0, 5)} às ${(c.timeFinal || '').slice(0, 5)}`,
+    criancas: (c.criancas || []).map((cr) => cr.nome).join(', '),
+    ac: c.adultoCortesia ? `Sim (${c.quantAC})` : 'Não',
+    termo: c.termoAssinado ? 'Sim' : 'Não',
+  }));
+  const nomeArquivo = reportUtil.slugify('parque-checkins');
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Saltiverso - Check-ins do Parque', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} check-in(s)`, colunas, linhas, nomeArquivo });
+});
+
+// ---------- Saltiverso Patteo: reservas de festa ----------
+app.post('/api/festas', requireSection('festas'), async (req, res) => {
+  try {
+    const { unidade, cliente, dataVenda, dataDeUso, horaInicio, horaFim, valorTotal, sinal, restante, observacao, referenciaVendaOriginal } = req.body;
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await festas.criar({
+      unidade, cliente, dataVenda, dataDeUso, horaInicio, horaFim, valorTotal, sinal, restante, observacao, referenciaVendaOriginal,
+      criadoPorId: req.user.id, criadoPorEmail: req.user.email,
+    });
+    broadcast('festa-criada', registro, 'festas');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/festas', requireSection('festas'), async (req, res) => {
+  if (req.isMaster) return res.json(await festas.listAll());
+  res.json(await festas.listByUnidades(req.permissions.unidades || []));
+});
+
+app.patch('/api/festas/:id', requireSection('festas'), async (req, res) => {
+  try {
+    const atual = await festas.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Reserva não encontrada.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await festas.atualizar(req.params.id, req.body);
+    broadcast('festa-atualizada', registro, 'festas');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/festas/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await festas.remover(req.params.id);
+    broadcast('festa-excluida', { id: req.params.id }, 'festas');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/festas/relatorio.:formato(csv|pdf)', requireSection('festas'), async (req, res) => {
+  const lista = req.isMaster ? await festas.listAll() : await festas.listByUnidades(req.permissions.unidades || []);
+  const colunas = [
+    { key: 'codigo', label: 'Código' }, { key: 'unidade', label: 'Unidade' }, { key: 'cliente', label: 'Cliente' },
+    { key: 'dataDeUso', label: 'Data do evento' }, { key: 'valorTotal', label: 'Valor total' }, { key: 'status', label: 'Status' }, { key: 'utilizado', label: 'Utilizado' },
+  ];
+  const linhas = lista.map((f) => ({
+    codigo: f.codigo, unidade: f.unidade, cliente: f.cliente?.nome,
+    dataDeUso: reportUtil.fmtDataBR(f.dataDeUso), valorTotal: reportUtil.fmtMoneyBR(f.valorTotal),
+    status: f.status, utilizado: f.utilizado ? 'Sim' : 'Não',
+  }));
+  const nomeArquivo = reportUtil.slugify('festas');
+  if (req.params.formato === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
+    return res.send(reportUtil.toCSV(colunas, linhas));
+  }
+  reportUtil.writePDF(res, { titulo: 'Saltiverso - Reservas de Festa', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} reserva(s)`, colunas, linhas, nomeArquivo });
 });
 
 // ---------- sangria (retirada de caixa) registrada em campo, ao longo do
