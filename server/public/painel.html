@@ -266,14 +266,65 @@ function pcardWrap(icone, titulo, link, corpoHtml){
   </div>`;
 }
 
+// mesma logica do Monitor ao vivo (monitor.html): pedido marcado como FRAUDE
+// (direto ou por identidade ja confirmada antes) fica de fora dos KPIs, e
+// identidades com >4 tentativas no dia sao capeadas em 2 - senao um ataque de
+// cartao testado em massa infla "Transacoes"/"Recusadas" e derruba a taxa de
+// aprovacao aqui igual acontecia antes (numeros batendo diferente do ao vivo)
+function orderKeyOfPainel(t){ return t.merchantReference || t.originalReference || t.pspReference; }
+function chaveClienteIdentificavelPainel(t){
+  if(t.last4) return `cartao:${t.last4}:${t.cardHolder||t.nomeCliente||''}`;
+  if(t.cardHolder) return `nome:${t.cardHolder}`;
+  if(t.nomeCliente) return `nome:${t.nomeCliente}`;
+  return null;
+}
+function identidadeFraudeDoPedidoPainel(t){
+  const nome = (t.nomeCliente || t.cardHolder || '').trim().toLowerCase();
+  return nome || null;
+}
+function capearIdentidadesEmMassaPainel(rows){
+  const porIdentidade = new Map();
+  rows.forEach(t=>{
+    const idKey = identidadeFraudeDoPedidoPainel(t);
+    if(!idKey) return;
+    (porIdentidade.get(idKey) || porIdentidade.set(idKey, []).get(idKey)).push(t);
+  });
+  const excluidos = new Set();
+  porIdentidade.forEach(grupo=>{
+    if(grupo.length <= 4) return;
+    const ordenado = [...grupo].sort((a,b)=>(b.dataHora||'').localeCompare(a.dataHora||''));
+    ordenado.slice(2).forEach(t=>excluidos.add(orderKeyOfPainel(t)));
+  });
+  return excluidos.size ? rows.filter(t=>!excluidos.has(orderKeyOfPainel(t))) : rows;
+}
+
 async function cardMonitor(){
   const hoje = hojeBrasilia();
-  const rows = await fetch('/api/transactions').then(r=>r.json());
+  const [rows, fraudeMarks] = await Promise.all([
+    fetch('/api/transactions').then(r=>r.json()),
+    fetch('/api/fraude').then(r=>r.json()),
+  ]);
+  const fraudePorPedido = {};
+  const fraudeChavesCliente = new Set();
+  fraudeMarks.forEach(m=>{
+    fraudePorPedido[m.pedidoId] = m;
+    if(m.nivel==='FRAUDE' && m.clienteChave) fraudeChavesCliente.add(m.clienteChave);
+  });
+  const ehFraudeMarcada = (t) => {
+    if(fraudePorPedido[orderKeyOfPainel(t)]) return true;
+    const chave = chaveClienteIdentificavelPainel(t);
+    return !!(chave && fraudeChavesCliente.has(chave));
+  };
+
   const doDia = rows.filter(t=>(t.dataHora||'').slice(0,10)===hoje);
-  const semChargeback = doDia.filter(t=>!(t.status||'').includes('CHARGEBACK'));
+  const semFraudeMarcada = doDia.filter(t=>!ehFraudeMarcada(t));
+  const paraKpis = capearIdentidadesEmMassaPainel(semFraudeMarcada);
+
+  const semChargeback = paraKpis.filter(t=>!(t.status||'').includes('CHARGEBACK'));
   const aprovadas = semChargeback.filter(t=>t.status==='APROVADO');
   const recusadas = semChargeback.filter(t=>t.status==='RECUSADO');
-  const chargebacks = doDia.filter(t=>(t.status||'').includes('CHARGEBACK'));
+  const estornos = semChargeback.filter(t=>t.status==='ESTORNADO');
+  const chargebacks = paraKpis.filter(t=>(t.status||'').includes('CHARGEBACK'));
   const fraude = semChargeback.filter(t=>t.fraudeSuspeita);
   const volume = +aprovadas.reduce((s,t)=>s+(t.valor||0),0).toFixed(2);
   const taxa = semChargeback.length ? Math.round(aprovadas.length/semChargeback.length*100) : 0;
@@ -288,6 +339,7 @@ async function cardMonitor(){
       ${statRow('Volume aprovado', fmtMoney(volume))}
     </div>
     <div class="pstats-row center">
+      ${statRow('Estornos', estornos.length, estornos.length ? 'warn' : '')}
       ${statRow('Chargebacks', chargebacks.length, chargebacks.length ? 'warn' : '')}
       ${statRow('Fraude suspeita', fraude.length, fraude.length ? 'bad' : '')}
     </div>
