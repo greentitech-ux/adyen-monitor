@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regras de Entregas · Zenith Ops</title>
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;}
+  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+  .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:680px;}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  @media(max-width:640px){ .header-nav{flex-direction:column;align-items:stretch;} .nav-actions{justify-content:flex-end;} }
+  .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+  .back:hover{color:var(--text);border-color:var(--accent);}
+  .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .hidden{display:none!important;}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  @media(max-width:640px){ .panel{padding:14px;} }
+  .panel h2{font-size:13px;margin:0 0 14px;}
+  .tablewrap{overflow-x:auto;}
+  table{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
+  tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.fixo{background:var(--ok-dim);color:var(--ok);}
+  .badge.plataforma{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:360px;}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);white-space:nowrap;}
+  .tag.removivel{border-color:var(--warn);color:var(--warn);}
+  .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .rowacts button:hover{border-color:var(--accent);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:640px;}
+  .modal h3{margin:0 0 4px;font-size:14px;}
+  .modal .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+  .modal label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;}
+  .modal label:first-of-type{margin-top:0;}
+  .modal input,.modal select{width:100%;padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
+  .modo-radios{display:flex;gap:14px;margin-top:6px;}
+  .modo-radios label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin:0;}
+  .modo-radios input{width:auto;}
+  .campos-fixo{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;}
+  .campo-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px;}
+  .campo-card .linha-topo{display:flex;gap:8px;align-items:flex-start;}
+  .campo-card .linha-topo input[data-f=label]{flex:1;}
+  .campo-card .btn-remover-campo{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:34px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .campo-card .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin-top:8px;}
+  .campo-card .grid2 > div{margin-top:0;}
+  .campo-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:10px;}
+  .campo-toggle input{width:auto;}
+  .semana-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px;}
+  .semana-grid div{display:flex;flex-direction:column;gap:2px;}
+  .semana-grid label{font-size:9.5px;text-align:center;margin:0;text-transform:uppercase;}
+  .semana-grid input{padding:6px 4px;font-size:11px;text-align:center;}
+  .meta-wrap,.semana-wrap{display:none;border-top:1px dashed var(--line);margin-top:10px;padding-top:10px;}
+  .meta-wrap.show,.semana-wrap.show{display:block;}
+  .btn-add-campo{margin-top:10px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:9px 10px;font-size:12.5px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
+  .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
+  .err{color:var(--bad);font-size:11.5px;margin-top:10px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>Regras de Entregas</h1>
+        <div class="sub-intro">Cada unidade monta sua própria lista de campos de valor (Entrega, Retorno, Extra, Fora de Área, Encosta, Ajuda de Custo, Cooperativa, ou qualquer nome) - com taxa fixa ou variando por dia da semana, meta mínima com valor parcial, e opção de a loja remover aquele campo específico num lançamento (atraso, saiu antes, gerou prejuízo). Unidades sem regra ficam no modo "Plataforma" - a loja continua digitando o valor à mão (ex: pagamento definido pela GAMI/NEXT).</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-actions">
+      <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+      <div class="nav-divider"></div>
+      <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" href="/painel.html">🏠 Painel</a>
+  <a class="back" href="/">📈 Monitor</a>
+  <a class="back" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back" href="/entregas.html">🛵 Entregas</a>
+  <a class="back" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back" href="/ifood.html">🍔 iFood</a>
+  <a class="back" href="/central.html">📋 Central</a>
+  <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back" href="/usuarios.html">👤 Usuários</a>
+  <a class="back" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back" href="/estoque.html">📦 Estoque</a>
+  <a class="back active" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Só o acesso Master pode gerenciar as regras de Entregas.</div>
+
+<div id="root" class="hidden">
+  <div class="panel">
+    <h2>Unidades</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Unidade</th><th>Modo</th><th>Campos de valor</th><th>Atualizado</th><th></th></tr></thead>
+        <tbody id="regras-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="regra-overlay">
+  <form class="modal" id="regra-form">
+    <h3 id="regra-title">Editar regra</h3>
+    <div class="sub" id="regra-sub"></div>
+
+    <label>Modo</label>
+    <div class="modo-radios">
+      <label><input type="radio" name="modo" value="plataforma" checked> Plataforma (sem valor fixo)</label>
+      <label><input type="radio" name="modo" value="fixo"> Valor fixo (campos personalizados)</label>
+    </div>
+
+    <div id="campos-plataforma">
+      <label>Nome da plataforma (opcional, ex: GAMI, NEXT)</label>
+      <input type="text" id="r-plataformaNome" placeholder="GAMI, NEXT...">
+    </div>
+
+    <div id="campos-fixo" class="campos-fixo hidden">
+      <div id="lista-campos"></div>
+      <button type="button" class="btn-add-campo" onclick="adicionarCampo()">+ Adicionar campo de valor</button>
+    </div>
+
+    <p class="err hidden" id="regra-err"></p>
+    <div class="modal-actions">
+      <button type="button" id="regra-cancel">Cancelar</button>
+      <button type="submit" class="primary">Salvar regra</button>
+    </div>
+  </form>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+const FUSO_BR = 'America/Sao_Paulo';
+
+const BASES = [ ['entrega','Entrega'], ['retorno','Retorno'], ['extra','Extra'], ['foraDeArea','Fora de Área'], ['flat','Valor fixo por lançamento'] ];
+const DESTINOS = [ ['valor','Soma no Valor a pagar'], ['coopRecebe','Soma no repasse da Cooperativa'] ];
+const DIAS_SEMANA = [ ['dom','Dom'], ['seg','Seg'], ['ter','Ter'], ['qua','Qua'], ['qui','Qui'], ['sex','Sex'], ['sab','Sáb'] ];
+
+let UNIDADES = [];
+let REGRAS = [];
+let EDITANDO_UNIDADE = null;
+
+function regraDaUnidade(codigo){
+  return REGRAS.find(r=>r.unidade===codigo) || { unidade: codigo, modo:'plataforma', plataformaNome:'', camposValor:[], atualizadoEm:null };
+}
+
+function renderRegras(){
+  const unidadesEntregas = UNIDADES.filter(u=>u.secao==='Entregas');
+  document.getElementById('regras-body').innerHTML = unidadesEntregas.length ? unidadesEntregas.map(u=>{
+    const r = regraDaUnidade(u.codigo);
+    const fixo = r.modo==='fixo';
+    const tags = fixo
+      ? (r.camposValor||[]).map(c=>`<span class="tag ${c.removivelPelaLoja?'removivel':''}" title="${c.destino==='coopRecebe'?'Cooperativa':'Valor a pagar'}${c.meta?' · tem meta':''}">${escapeHtml(c.label)}${c.base!=='flat'?' ('+escapeHtml(BASES.find(b=>b[0]===c.base)?.[1]||c.base)+')':''}</span>`).join('')
+      : `<span style="color:var(--muted);">${r.plataformaNome?escapeHtml(r.plataformaNome):'sem valor fixo'}</span>`;
+    return `
+    <tr>
+      <td><b>${escapeHtml(u.nome)}</b></td>
+      <td><span class="badge ${r.modo}">${fixo?'Valor fixo':'Plataforma'}</span></td>
+      <td><div class="tags">${tags || '<span style="color:var(--muted);">nenhum campo ainda</span>'}</div></td>
+      <td>${r.atualizadoEm ? new Date(r.atualizadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR}) : '<span style="color:var(--muted);">nunca configurada</span>'}</td>
+      <td class="rowacts"><button type="button" onclick="abrirEdicao('${u.codigo}')">Editar</button></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px;">Nenhuma unidade de Entregas encontrada ainda.</td></tr>`;
+}
+
+document.querySelectorAll('input[name=modo]').forEach(r=>{
+  r.addEventListener('change', ()=>{
+    const fixo = document.querySelector('input[name=modo]:checked').value==='fixo';
+    document.getElementById('campos-fixo').classList.toggle('hidden', !fixo);
+    document.getElementById('campos-plataforma').classList.toggle('hidden', fixo);
+  });
+});
+
+// ---------- construtor de campos de valor (um "card" por campo) ----------
+function campoCardHtml(c){
+  c = c || { campo:'', label:'', base:'flat', destino:'valor', valorPadrao:0, valoresPorDiaSemana:null, meta:null, removivelPelaLoja:false };
+  const temSemana = !!c.valoresPorDiaSemana;
+  const temMeta = !!c.meta;
+  return `
+    <div class="campo-card" data-campo="${escapeHtml(c.campo||'')}">
+      <div class="linha-topo">
+        <input type="text" data-f="label" placeholder="Nome do campo (ex: Ajuda de Custo)" value="${escapeHtml(c.label||'')}" required>
+        <button type="button" class="btn-remover-campo" onclick="this.closest('.campo-card').remove()">✕</button>
+      </div>
+      <div class="grid2">
+        <div><label>Aplica sobre</label>
+          <select data-f="base">${BASES.map(b=>`<option value="${b[0]}" ${c.base===b[0]?'selected':''}>${b[1]}</option>`).join('')}</select>
+        </div>
+        <div><label>Destino</label>
+          <select data-f="destino">${DESTINOS.map(d=>`<option value="${d[0]}" ${c.destino===d[0]?'selected':''}>${d[1]}</option>`).join('')}</select>
+        </div>
+      </div>
+      <label>Valor padrão (R$)</label>
+      <input type="number" step="0.01" data-f="valorPadrao" value="${c.valorPadrao||0}">
+
+      <label class="campo-toggle"><input type="checkbox" data-f="temSemana" ${temSemana?'checked':''}> Varia por dia da semana</label>
+      <div class="semana-wrap ${temSemana?'show':''}" data-w="semana">
+        <div class="semana-grid">
+          ${DIAS_SEMANA.map(d=>`<div><label>${d[1]}</label><input type="number" step="0.01" data-dia="${d[0]}" value="${c.valoresPorDiaSemana&&c.valoresPorDiaSemana[d[0]]!=null?c.valoresPorDiaSemana[d[0]]:''}" placeholder="${c.valorPadrao||0}"></div>`).join('')}
+        </div>
+      </div>
+
+      <label class="campo-toggle"><input type="checkbox" data-f="temMeta" ${temMeta?'checked':''}> Tem meta mínima (senão usa valor parcial)</label>
+      <div class="meta-wrap ${temMeta?'show':''}" data-w="meta">
+        <div class="grid2">
+          <div><label>Meta mínima em</label>
+            <select data-f="metaBase">${BASES.filter(b=>b[0]!=='flat').concat([['quantTotal','Total (Entrega+Retorno+Extra)']]).map(b=>`<option value="${b[0]}" ${c.meta&&c.meta.baseContagem===b[0]?'selected':''}>${b[1]}</option>`).join('')}</select>
+          </div>
+          <div><label>Quantidade mínima</label>
+            <input type="number" step="1" data-f="metaMinimo" value="${c.meta?c.meta.minimo:0}">
+          </div>
+        </div>
+        <label>Valor parcial (se não bater a meta)</label>
+        <input type="number" step="0.01" data-f="metaValorParcial" value="${c.meta?c.meta.valorParcial:0}">
+      </div>
+
+      <label class="campo-toggle"><input type="checkbox" data-f="removivelPelaLoja" ${c.removivelPelaLoja?'checked':''}> Loja pode remover esse campo no lançamento (atraso, saiu antes, gerou prejuízo)</label>
+    </div>`;
+}
+function adicionarCampo(c){
+  document.getElementById('lista-campos').insertAdjacentHTML('beforeend', campoCardHtml(c));
+  const card = document.getElementById('lista-campos').lastElementChild;
+  card.querySelector('[data-f=temSemana]').addEventListener('change', (e)=>card.querySelector('[data-w=semana]').classList.toggle('show', e.target.checked));
+  card.querySelector('[data-f=temMeta]').addEventListener('change', (e)=>card.querySelector('[data-w=meta]').classList.toggle('show', e.target.checked));
+}
+function lerCamposValor(){
+  return [...document.querySelectorAll('#lista-campos .campo-card')].map(card=>{
+    const label = card.querySelector('[data-f=label]').value.trim();
+    if(!label) return null;
+    const base = card.querySelector('[data-f=base]').value;
+    const destino = card.querySelector('[data-f=destino]').value;
+    const valorPadrao = card.querySelector('[data-f=valorPadrao]').value;
+    const temSemana = card.querySelector('[data-f=temSemana]').checked;
+    let valoresPorDiaSemana = null;
+    if(temSemana){
+      valoresPorDiaSemana = {};
+      card.querySelectorAll('[data-dia]').forEach(inp=>{
+        if(inp.value !== '') valoresPorDiaSemana[inp.dataset.dia] = inp.value;
+      });
+    }
+    const temMeta = card.querySelector('[data-f=temMeta]').checked;
+    const meta = temMeta ? {
+      ativo: true,
+      baseContagem: card.querySelector('[data-f=metaBase]').value,
+      minimo: card.querySelector('[data-f=metaMinimo]').value,
+      valorParcial: card.querySelector('[data-f=metaValorParcial]').value,
+    } : null;
+    const removivelPelaLoja = card.querySelector('[data-f=removivelPelaLoja]').checked;
+    return { campo: card.dataset.campo || undefined, label, base, destino, valorPadrao, valoresPorDiaSemana, meta, removivelPelaLoja };
+  }).filter(Boolean);
+}
+
+const regraOverlay = document.getElementById('regra-overlay');
+function abrirEdicao(codigo){
+  const u = UNIDADES.find(x=>x.codigo===codigo);
+  const r = regraDaUnidade(codigo);
+  EDITANDO_UNIDADE = codigo;
+  document.getElementById('regra-title').textContent = 'Regra de ' + (u?u.nome:codigo);
+  document.getElementById('regra-sub').textContent = 'Vale a partir de agora - lançamentos já feitos não são recalculados.';
+  document.querySelector(`input[name=modo][value="${r.modo}"]`).checked = true;
+  document.getElementById('campos-fixo').classList.toggle('hidden', r.modo!=='fixo');
+  document.getElementById('campos-plataforma').classList.toggle('hidden', r.modo==='fixo');
+  document.getElementById('r-plataformaNome').value = r.plataformaNome || '';
+  document.getElementById('lista-campos').innerHTML = '';
+  (r.camposValor||[]).forEach(c=>adicionarCampo(c));
+  document.getElementById('regra-err').classList.add('hidden');
+  regraOverlay.classList.add('show');
+}
+document.getElementById('regra-cancel').addEventListener('click', ()=>regraOverlay.classList.remove('show'));
+regraOverlay.addEventListener('click', (e)=>{ if(e.target===regraOverlay) regraOverlay.classList.remove('show'); });
+
+document.getElementById('regra-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById('regra-err');
+  const payload = {
+    modo: document.querySelector('input[name=modo]:checked').value,
+    plataformaNome: document.getElementById('r-plataformaNome').value,
+    camposValor: lerCamposValor(),
+  };
+  try{
+    const res = await fetch('/api/entregas/regras/'+encodeURIComponent(EDITANDO_UNIDADE), {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+    regraOverlay.classList.remove('show');
+    await carregar();
+  }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+async function carregar(){
+  const [unidades, regras] = await Promise.all([
+    fetch('/api/meta/unidades').then(r=>r.json()),
+    fetch('/api/entregas/regras').then(r=>r.json()),
+  ]);
+  UNIDADES = unidades;
+  REGRAS = regras;
+  renderRegras();
+}
+
+async function boot(){
+  const meRes = await fetch('/api/me');
+  if(!meRes.ok){ logout(); return; }
+  const me = await meRes.json();
+  if(me.role!=='master'){ document.getElementById('sem-acesso').classList.remove('hidden'); return; }
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+}
+
+boot();
+</script>
+</body>
+</html>

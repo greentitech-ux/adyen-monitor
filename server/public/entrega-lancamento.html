@@ -114,6 +114,7 @@
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
@@ -169,14 +170,42 @@
 
     <div class="secao">
       <div class="secao-titulo">Valores</div>
-      <div class="grid2">
-        <div><label>Bônus (Gami/NEXT)</label><input type="number" step="0.01" inputmode="decimal" id="f-bonus" value="0"></div>
-        <div><label>Ajuda de custo</label><input type="number" step="0.01" inputmode="decimal" id="f-ajudaCusto" value="0"></div>
+
+      <!-- unidade "plataforma" (sem tabela de valor fixo, ex: paga o que a
+           GAMI/NEXT informar naquele dia) - loja digita os valores, como
+           sempre foi -->
+      <div id="campos-manual">
+        <div class="grid2">
+          <div><label>Ajuda de custo</label><input type="number" step="0.01" inputmode="decimal" id="f-ajudaCusto" value="0"></div>
+          <div><label>Valor a pagar</label><input type="number" step="0.01" inputmode="decimal" id="f-valor" value="0"></div>
+        </div>
+        <label>COOP recebe</label>
+        <input type="number" step="0.01" inputmode="decimal" id="f-coopRecebe" value="0">
       </div>
-      <div class="grid2">
-        <div><label>Valor a pagar</label><input type="number" step="0.01" inputmode="decimal" id="f-valor" value="0"></div>
-        <div><label>COOP recebe</label><input type="number" step="0.01" inputmode="decimal" id="f-coopRecebe" value="0"></div>
+
+      <!-- unidade "fixo" (tem sua propria lista de campos de valor,
+           configurada em Regras de Entregas) - o servidor calcula tudo a
+           partir das contagens acima; aqui só mostramos a prévia (por
+           campo) e a opção de remover algum campo específico daquele
+           entregador (ex: atrasou, saiu antes, gerou prejuízo) -->
+      <div id="campos-calculados" class="hidden">
+        <div class="resumo" id="preview-detalhes"></div>
+        <div class="resumo" style="margin-top:8px;">
+          <div class="linha"><span>Valor a pagar (calculado)</span><b id="preview-valor">R$ 0,00</b></div>
+          <div class="linha"><span>COOP recebe (calculado)</span><b id="preview-coopRecebe">R$ 0,00</b></div>
+        </div>
+        <div id="wrap-campos-removiveis"></div>
+        <div id="wrap-motivo-campos" class="hidden">
+          <label>Motivo</label>
+          <select id="f-motivoRemocaoCampos">
+            <option value="atraso">Atraso</option>
+            <option value="saiu_antes">Saiu antes do fim do turno</option>
+            <option value="prejuizo">Gerou prejuízo</option>
+            <option value="outro">Outro (detalhar na Observação)</option>
+          </select>
+        </div>
       </div>
+
       <label>Quantidade total</label>
       <input type="number" step="1" inputmode="numeric" id="f-quantTotal" value="0">
       <div class="resumo">
@@ -283,6 +312,8 @@ let MEUS = [];
 let EDICOES = [];
 let EDITANDO_ID = null;
 let EDITANDO_MASTER_ID = null;
+let REGRAS_POR_UNIDADE = {}; // unidade -> regra (ver entregasRegras.js) - decide se o form pede contagem (calcula sozinho) ou valor digitado
+const MOTIVOS_REMOCAO_LABEL = { atraso:'Atraso', saiu_antes:'Saiu antes do fim do turno', prejuizo:'Gerou prejuízo', outro:'Outro' };
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtValorCampo(campo,v){ return CAMPOS_MONETARIOS.has(campo) ? fmtMoney(v) : (Number(v)||0).toString(); }
@@ -308,6 +339,86 @@ function atualizarSugestao(){
 }
 ['f-entrega','f-extra'].forEach(id=>{
   document.getElementById(id).addEventListener('input', atualizarSugestao);
+});
+
+// ---------- regra de pagamento da unidade (ver entregas-regras.html) ----------
+// unidade "fixo": esconde os campos de valor e mostra a prévia calculada a
+// partir das contagens; unidade "plataforma" (sem valor fixo, ex: paga o que
+// a GAMI/NEXT informar) mantém os campos de valor manuais, como sempre foi
+function regraAtual(){
+  const unidade = document.getElementById('f-unidade').value;
+  return REGRAS_POR_UNIDADE[unidade] || { modo:'plataforma' };
+}
+const DIAS_SEMANA_JS = ['dom','seg','ter','qua','qui','sex','sab']; // Date.getDay() ja retorna 0=dom
+function diaSemanaDe(dataIso){
+  if(!dataIso) return null;
+  return DIAS_SEMANA_JS[new Date(dataIso+'T00:00:00Z').getUTCDay()];
+}
+function atualizarModoUnidade(){
+  const fixo = regraAtual().modo === 'fixo';
+  document.getElementById('campos-manual').classList.toggle('hidden', fixo);
+  document.getElementById('campos-calculados').classList.toggle('hidden', !fixo);
+  if(fixo){ renderCamposRemoviveis(); atualizarPreviewCalculado(); }
+}
+// checklist dinâmico - só os campos que o Master marcou como removíveis
+// pela loja aparecem aqui (varia por unidade, ver entregas-regras.html)
+function renderCamposRemoviveis(){
+  const regra = regraAtual();
+  const removiveis = (regra.camposValor||[]).filter(c=>c.removivelPelaLoja);
+  const wrap = document.getElementById('wrap-campos-removiveis');
+  wrap.innerHTML = removiveis.map(c=>`
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-family:var(--sans);font-size:12.5px;color:var(--text);">
+      <input type="checkbox" class="chk-campo-removido" data-campo="${escapeHtml(c.campo)}" style="width:auto;">
+      Remover ${escapeHtml(c.label)} desse entregador
+    </label>`).join('');
+  wrap.querySelectorAll('.chk-campo-removido').forEach(chk=>{
+    chk.addEventListener('change', ()=>{
+      const algum = [...wrap.querySelectorAll('.chk-campo-removido')].some(c=>c.checked);
+      document.getElementById('wrap-motivo-campos').classList.toggle('hidden', !algum);
+      atualizarPreviewCalculado();
+    });
+  });
+}
+function camposRemovidosMarcados(){
+  return [...document.querySelectorAll('.chk-campo-removido:checked')].map(c=>c.dataset.campo);
+}
+// mesma conta de entregasRegras.js (calcular) - Extra/Retorno/Fora de área
+// e "flat" usam a taxa de cada campo (com dia da semana e meta, se tiverem);
+// COOP so soma os campos com destino coopRecebe (normalmente so Entrega)
+function atualizarPreviewCalculado(){
+  const regra = regraAtual();
+  if(regra.modo !== 'fixo') return;
+  const contagens = {
+    entrega: num(document.getElementById('f-entrega').value),
+    retorno: num(document.getElementById('f-retorno').value),
+    extra: num(document.getElementById('f-extra').value),
+    foraDeArea: num(document.getElementById('f-foraDeArea').value),
+  };
+  contagens.quantTotal = contagens.entrega + contagens.retorno + contagens.extra;
+  const dia = diaSemanaDe(document.getElementById('f-data').value);
+  const removidos = new Set(camposRemovidosMarcados());
+  let valor = 0, coopRecebe = 0;
+  const linhas = (regra.camposValor||[]).map(c=>{
+    if(removidos.has(c.campo)) return {label:c.label, valor:0, removido:true};
+    let taxa = (dia && c.valoresPorDiaSemana && c.valoresPorDiaSemana[dia]!=null) ? num(c.valoresPorDiaSemana[dia]) : num(c.valorPadrao);
+    if(c.meta){
+      const contagemMeta = contagens[c.meta.baseContagem] ?? 0;
+      if(contagemMeta < num(c.meta.minimo)) taxa = num(c.meta.valorParcial);
+    }
+    const valorCampo = c.base==='flat' ? taxa : (contagens[c.base]||0)*taxa;
+    if(c.destino==='coopRecebe') coopRecebe += valorCampo; else valor += valorCampo;
+    return {label:c.label, valor:valorCampo, removido:false};
+  });
+  document.getElementById('preview-detalhes').innerHTML = linhas.map(l=>
+    `<div class="linha"><span>${escapeHtml(l.label)}${l.removido?' (removido)':''}</span><b style="${l.removido?'color:var(--muted);text-decoration:line-through;':''}">${fmtMoney(l.valor)}</b></div>`
+  ).join('') || '<div class="linha"><span style="color:var(--muted);">nenhum campo configurado ainda</span></div>';
+  document.getElementById('preview-valor').textContent = fmtMoney(valor);
+  document.getElementById('preview-coopRecebe').textContent = fmtMoney(coopRecebe);
+}
+document.getElementById('f-unidade').addEventListener('change', atualizarModoUnidade);
+document.getElementById('f-data').addEventListener('change', atualizarPreviewCalculado);
+['f-entrega','f-retorno','f-extra','f-foraDeArea'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', atualizarPreviewCalculado);
 });
 
 async function carregar(){
@@ -339,6 +450,7 @@ function renderLista(){
         <span>${escapeHtml(f.entregador)} · ${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
         ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
         ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
+        ${(f.camposRemovidos&&f.camposRemovidos.length)?`<span class="badge REJEITADO" title="${escapeHtml(f.camposRemovidos.join(', '))}">Campo(s) removido(s) · ${escapeHtml(MOTIVOS_REMOCAO_LABEL[f.motivoRemocaoCampos]||'—')}</span>`:''}
       </div>
       <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.etiquetaPath?' · <a href="/api/entregas/etiqueta/'+f.id+'?token='+encodeURIComponent(AUTH_TOKEN)+'" target="_blank" style="color:var(--accent);">📎 etiqueta</a>':''}</div>
       <div class="valores">
@@ -441,7 +553,9 @@ function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
   CAMPOS_NUMERICOS.forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = 0; });
+  document.getElementById('wrap-motivo-campos').classList.add('hidden');
   atualizarSugestao();
+  atualizarModoUnidade();
 }
 
 // mesmo motivo do form de fechamento (ver lancamento.html): varios campos
@@ -467,6 +581,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       const el = document.getElementById('f-'+c);
       campos[c] = el ? el.value : 0;
     });
+    const camposRemovidos = camposRemovidosMarcados();
     const payload = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
@@ -476,6 +591,8 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       obsRetorno: document.getElementById('f-obsRetorno').value,
       obsExtra: document.getElementById('f-obsExtra').value,
       observacao: document.getElementById('f-observacao').value,
+      camposRemovidos,
+      motivoRemocaoCampos: camposRemovidos.length ? document.getElementById('f-motivoRemocaoCampos').value : null,
     };
     const form = new FormData();
     form.append('payload', JSON.stringify(payload));
@@ -515,6 +632,7 @@ async function boot(){
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
 
   if(!secoes.includes('entregas-lancamento')){
@@ -536,6 +654,10 @@ async function boot(){
   document.getElementById('f-data').value = hojeBrasilia();
   document.getElementById('f-data').max = hojeBrasilia();
   atualizarSugestao();
+
+  const regras = await fetch('/api/entregas/regras').then(r=>r.json()).catch(()=>[]);
+  regras.forEach(r=>{ REGRAS_POR_UNIDADE[r.unidade] = r; });
+  atualizarModoUnidade();
 
   document.getElementById('root').classList.remove('hidden');
   await carregar();
