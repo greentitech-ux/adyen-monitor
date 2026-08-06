@@ -618,7 +618,13 @@ async function boot(){
   document.getElementById('f-unidade').addEventListener('change', carregarResponsaveis);
   carregarResponsaveis();
 
-  const tiposDisponiveis = Object.entries(TIPOS_INFO).filter(([tipo,info])=>!info.secaoNecessaria || SECOES.includes(info.secaoNecessaria));
+  // tiposSolicitacao (Master, na tela de Usuários) restringe quais tipos essa
+  // pessoa pode ver/lançar na Central - vazio = sem restrição (todos os tipos
+  // que a seção já libera, comportamento de antes dessa permissão existir)
+  const tiposPermitidos = IS_MASTER ? null : (ME.permissions?.tiposSolicitacao||[]);
+  const tiposDisponiveis = Object.entries(TIPOS_INFO).filter(([tipo,info])=>
+    (!info.secaoNecessaria || SECOES.includes(info.secaoNecessaria)) && (!tiposPermitidos || !tiposPermitidos.length || tiposPermitidos.includes(tipo))
+  );
   document.getElementById('tipos-btns').innerHTML = tiposDisponiveis.map(([tipo,info])=>
     `<button type="button" class="tipo-btn" data-tipo="${tipo}" onclick="selecionarTipo('${tipo}')">${iconeTipo(tipo)} ${info.label}</button>`
   ).join('');

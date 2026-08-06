@@ -183,7 +183,7 @@
     </h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Email</th><th>Usuário</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
+        <thead><tr><th>Email</th><th>Usuário</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th>Tipos (Central)</th><th></th></tr></thead>
         <tbody id="users-body"></tbody>
       </table>
     </div>
@@ -210,6 +210,12 @@
       <fieldset>
         <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('c-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-groups',false)">Desmarcar todos</button></span></legend>
         <div class="checks" id="c-groups"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Tipos de solicitação (Central) <span class="legend-actions"><button type="button" onclick="marcarTodos('c-tipos-solicitacao',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-tipos-solicitacao',false)">Desmarcar todos</button></span></legend>
+        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra quem tem a seção Central de Solicitações. Nenhum marcado = vê todos os tipos (padrão). Marcando algum, só esses ficam visíveis (ex: liberar só Suporte de TI pra um Admin).</div>
+        <div class="checks" id="c-tipos-solicitacao"></div>
       </fieldset>
 
       <p class="err hidden" id="create-err"></p>
@@ -310,6 +316,11 @@
       <legend>Cofre (subgrupos) <span class="legend-actions"><button type="button" onclick="marcarTodos('p-groups',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-groups',false)">Desmarcar todos</button></span></legend>
       <div class="checks" id="p-groups"></div>
     </fieldset>
+    <fieldset style="margin-top:10px;">
+      <legend>Tipos de solicitação (Central) <span class="legend-actions"><button type="button" onclick="marcarTodos('p-tipos-solicitacao',true)">Marcar todos</button><button type="button" onclick="marcarTodos('p-tipos-solicitacao',false)">Desmarcar todos</button></span></legend>
+      <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">Nenhum marcado = vê todos os tipos (padrão). Marcando algum, só esses ficam visíveis na Central.</div>
+      <div class="checks" id="p-tipos-solicitacao"></div>
+    </fieldset>
     <p class="err hidden" id="perm-err"></p>
     <div class="modal-actions">
       <button type="button" id="perm-cancel">Cancelar</button>
@@ -364,6 +375,9 @@ function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hi
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
 const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
+// os 7 tipos de card que aparecem na Central - mesma lista/rotulo de
+// TIPOS_INFO em central.html/central-historico.html
+const TIPOS_SOLICITACAO = [ ['estorno','💳 Estorno'], ['ajuste-fechamento','🧾 Ajuste de fechamento'], ['compra','🛒 Compra'], ['manutencao','🔧 Manutenção'], ['suporte-ti','💻 Suporte de TI'], ['pagamento','💸 Pagamento (despesa)'], ['nota','📄 Solicitação de Nota'] ];
 const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];
@@ -447,6 +461,7 @@ async function boot(){
   document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
   document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
+  document.getElementById('c-tipos-solicitacao').innerHTML = checksHtml('tiposSolicitacao', TIPOS_SOLICITACAO, o=>o[0], o=>o[1], new Set());
 
   await carregarUsuarios();
   await carregarBackups();
@@ -684,9 +699,10 @@ function renderUsers(){
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
+      <td>${isMaster || !(perms.tiposSolicitacao||[]).length ? '<span style="color:var(--muted);">todos</span>' : tagList(perms.tiposSolicitacao, t=>(TIPOS_SOLICITACAO.find(o=>o[0]===t)||[t,t])[1])}</td>
       <td>${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
+  }).join('') || `<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
 }
 
 // ---------- modal de acoes por usuario - substitui a fileira de 6 botoes
@@ -788,6 +804,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
       sections: readChecked(document.getElementById('c-sections')),
       unidades: readChecked(document.getElementById('c-unidades')),
       vaultSubgroups: readChecked(document.getElementById('c-groups')),
+      tiposSolicitacao: readChecked(document.getElementById('c-tipos-solicitacao')),
     },
   };
   try{
@@ -798,6 +815,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
     document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
     document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
+    document.getElementById('c-tipos-solicitacao').innerHTML = checksHtml('tiposSolicitacao', TIPOS_SOLICITACAO, o=>o[0], o=>o[1], new Set());
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
 });
@@ -808,10 +826,11 @@ function editarPermissoes(id){
   if(!u) return;
   EDITING_USER = id;
   document.getElementById('perm-title').textContent = 'Permissões de ' + u.email;
-  const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
+  const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[],tiposSolicitacao:[]};
   document.getElementById('p-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set(perms.sections));
   document.getElementById('p-unidades').innerHTML = unidadesChecksHtml(new Set(perms.unidades));
   document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
+  document.getElementById('p-tipos-solicitacao').innerHTML = checksHtml('tiposSolicitacao', TIPOS_SOLICITACAO, o=>o[0], o=>o[1], new Set(perms.tiposSolicitacao||[]));
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');
 }
@@ -859,6 +878,7 @@ document.getElementById('perm-form').addEventListener('submit', async (e)=>{
     sections: readChecked(document.getElementById('p-sections')),
     unidades: readChecked(document.getElementById('p-unidades')),
     vaultSubgroups: readChecked(document.getElementById('p-groups')),
+    tiposSolicitacao: readChecked(document.getElementById('p-tipos-solicitacao')),
   };
   try{
     const res = await fetch('/api/users/'+EDITING_USER+'/permissions', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({permissions})});
