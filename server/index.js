@@ -1861,8 +1861,13 @@ app.post('/api/inventario/tipos', auth.requireMasterOuCatalogoEstoque, async (re
   }
 });
 
+// catalogo e por loja (cada uma organiza o proprio, ver inventario.js) -
+// toda rota abaixo exige `unidade` e confere acesso a ela, mesmo padrao das
+// rotas de contagem/recebimento/saida
 app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
-  res.json(await inventario.listCatalogo());
+  const unidade = req.query.unidade;
+  if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  res.json(await inventario.listCatalogo(unidade));
 });
 // cadastrar item novo fica aberto pra qualquer um com acesso a Inventario -
 // e uma necessidade do dia a dia da loja (contar um item que ainda nao
@@ -1871,6 +1876,7 @@ app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, re
 // excluir), que ai sim fica restrito a quem tem a permissao de Catalogo
 app.post('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
   try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     res.json(await inventario.criarItem(req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1878,6 +1884,10 @@ app.post('/api/inventario/catalogo', requireSection('inventario'), async (req, r
 });
 app.put('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
+    if (!req.isMaster) {
+      const unidadeDoItem = await inventario.obterItemUnidade(req.params.id);
+      if (unidadeDoItem && !podeUnidadeInventario(req, unidadeDoItem)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
     res.json(await inventario.atualizarItem(req.params.id, req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1885,27 +1895,36 @@ app.put('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, asy
 });
 app.delete('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
+    if (!req.isMaster) {
+      const unidadeDoItem = await inventario.obterItemUnidade(req.params.id);
+      if (unidadeDoItem && !podeUnidadeInventario(req, unidadeDoItem)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
     await inventario.removerItem(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
-// reordenar itens de um setor (drag-and-drop no Contagem/Catalogo) - mesma
-// permissao de "reorganizar catalogo" das rotas de editar/excluir acima
+// reordenar itens de um setor NUMA loja (drag-and-drop no Contagem/
+// Catalogo) - mesma permissao de "reorganizar catalogo" das rotas acima
 app.put('/api/inventario/catalogo/ordem', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
-    res.json(await inventario.reordenarItens(req.body.setor, req.body.ids));
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    res.json(await inventario.reordenarItens(req.body.unidade, req.body.setor, req.body.ids));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 // carrega o catalogo padrao extraido das planilhas do Domino's - idempotente
-// (so adiciona o que ainda nao existe pelo nome), pode ser chamado de novo
-// sem duplicar
+// POR LOJA (so adiciona, em cada loja, o que ainda nao existe la pelo nome -
+// nao mexe no que a loja ja customizou). Sem `unidades` no corpo, aplica em
+// TODAS as lojas de uma vez (uso tipico: popular a rede inteira de uma vez).
 app.post('/api/inventario/catalogo/seed', auth.requireMaster, async (req, res) => {
   try {
-    res.json(await inventario.seedCatalogoPadrao());
+    const unidadesAlvo = Array.isArray(req.body.unidades) && req.body.unidades.length
+      ? req.body.unidades
+      : Object.keys(INVENTARIO_UNIDADES_NOMES);
+    res.json(await inventario.seedCatalogoPadrao(unidadesAlvo));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

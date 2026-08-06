@@ -353,11 +353,12 @@
       <button type="button" class="btn-add" id="btn-catalogo-seed" onclick="carregarCatalogoPadrao()">⬇️ Carregar catálogo padrão (Domino's)</button>
     </div>
   </h2>
+  <div class="sub" style="margin:-6px 0 10px;">Catálogo da loja selecionada acima - cada loja tem o seu (posição, setor e itens ativos são independentes entre lojas).</div>
   <div class="msg hidden" id="msg-catalogo-seed"></div>
   <button type="button" class="btn-add" onclick="abrirNovoItem()">+ Novo item</button>
   <div class="tablewrap" style="margin-top:12px;">
     <table>
-      <thead><tr><th>Nome</th><th>Setor</th><th>Tipo</th><th>Unid.</th><th>Custo ref.</th><th>Lojas</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Nome</th><th>Setor</th><th>Tipo</th><th>Unid.</th><th>Custo ref.</th><th>Status</th><th></th></tr></thead>
       <tbody id="catalogo-body"></tbody>
     </table>
   </div>
@@ -402,12 +403,6 @@
         <div class="hidden" id="i-peso-wrap"><label>Peso da embalagem (g, opcional)</label><input type="number" step="1" min="0" id="i-peso-embalagem" placeholder="ex: 400"></div>
       </div>
       <div class="sub" id="i-peso-sub" style="margin:-4px 0 8px;">Qtd. padrão pré-preenche o Recebimento. Peso da embalagem só aparece pra item medido em KG/G - com ele, o Recebimento aceita "quantas embalagens vieram" e calcula o peso/valor sozinho (útil pra item fracionado, ex: 400g, 300g).</div>
-      <label>Disponível em</label>
-      <div style="display:flex;gap:14px;font-size:12.5px;">
-        <label style="display:flex;align-items:center;gap:5px;font-weight:400;color:var(--text);margin:0;font-family:var(--sans);"><input type="radio" name="i-escopo" id="i-escopo-todas" value="todas" checked onchange="atualizarEscopoLojasItem()"> Todas as lojas</label>
-        <label style="display:flex;align-items:center;gap:5px;font-weight:400;color:var(--text);margin:0;font-family:var(--sans);"><input type="radio" name="i-escopo" id="i-escopo-algumas" value="algumas" onchange="atualizarEscopoLojasItem()"> Só nestas lojas</label>
-      </div>
-      <div class="hidden" id="i-lojas-wrap" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;max-height:140px;overflow-y:auto;"></div>
       <div class="msg hidden" id="msg-item"></div>
       <div class="modal-actions">
         <button type="button" onclick="fecharItem()">Cancelar</button>
@@ -474,7 +469,7 @@ let ABA_ATUAL = 'contagem';
 
 function unidadeAtual(){ return document.getElementById('sel-unidade').value; }
 
-function mudarAba(aba){
+async function mudarAba(aba){
   ABA_ATUAL = aba;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===aba));
   document.getElementById('tab-contagem').classList.toggle('hidden', aba!=='contagem');
@@ -488,14 +483,20 @@ function mudarAba(aba){
   if(aba==='recebimento') renderRecebimentos();
   if(aba==='saida') renderSaidas();
   if(aba==='diferencas') carregarDiferencas();
-  if(aba==='catalogo') renderCatalogo();
+  if(aba==='catalogo'){ await carregarCatalogo(); renderCatalogo(); }
 }
 
-function trocarUnidade(){
+// catalogo e por loja - trocar a loja no seletor do topo exige buscar o
+// catalogo de novo (e repopular os selects de item de Recebimento/Saida,
+// que dependem dele) antes de re-renderizar a aba atual
+async function trocarUnidade(){
+  await carregarCatalogo();
+  popularSelectsItem();
   if(ABA_ATUAL==='contagem') reiniciarContagem();
   else if(ABA_ATUAL==='recebimento') renderRecebimentos();
   else if(ABA_ATUAL==='saida') renderSaidas();
   else if(ABA_ATUAL==='diferencas') carregarDiferencas();
+  else if(ABA_ATUAL==='catalogo') renderCatalogo();
 }
 
 // ordem manual do item dentro do setor (drag-and-drop, ver
@@ -508,16 +509,9 @@ function compararOrdemItem(a,b){
   return a.nome.localeCompare(b.nome,'pt-BR');
 }
 
-// item.unidades null/vazio = disponivel pra rede toda (padrao); array =
-// restrito a essas lojas (ver sanitizarUnidadesRestritas em inventario.js)
-function itemDisponivelNaLoja(item, unidadeCodigo){
-  return !item.unidades || !item.unidades.length || item.unidades.includes(unidadeCodigo);
-}
-
-// ---------- selects de item, agrupados por setor (usados em Recebimento/Saída) ----------
+// ---------- selects de item, agrupados por setor (usados em Recebimento/Saída) - CATALOGO ja vem so da loja atual (ver carregarCatalogo) ----------
 function opcoesItensAgrupadas(){
-  const unidade = unidadeAtual();
-  const ativos = CATALOGO.filter(i=>i.ativo!==false && itemDisponivelNaLoja(i, unidade));
+  const ativos = CATALOGO.filter(i=>i.ativo!==false);
   return ORDEM_SETORES.map(setor=>{
     const itens = ativos.filter(i=>i.setor===setor).sort(compararOrdemItem);
     if(!itens.length) return '';
@@ -580,10 +574,10 @@ function renderContagemSetor(){
   const setor = setorAtualContagem();
   const container = document.getElementById('c-itens');
   if(!setor){ container.innerHTML = '<div class="empty">Nenhum item no catálogo ainda - adicione um item abaixo.</div>'; atualizarProgressoContagem(); return; }
-  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false && itemDisponivelNaLoja(i, unidadeAtual())).sort(compararOrdemItem);
-  // reordenar (arrastar) muda a ordem do catalogo inteiro (todo mundo ve),
-  // entao fica restrito a quem tem a mesma permissao das outras acoes de
-  // "reorganizar catalogo" (editar/excluir item) - ver index.js
+  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort(compararOrdemItem);
+  // reordenar (arrastar) muda a ordem do catalogo da loja atual - fica
+  // restrito a quem tem a mesma permissao das outras acoes de "reorganizar
+  // catalogo" (editar/excluir item) - ver index.js
   const podeArrastar = IS_MASTER || !!ME.podeCatalogoEstoque;
   container.innerHTML = itens.length ? itens.map(i=>{
     const valorAtual = CONTAGEM_VALORES[i.id];
@@ -642,7 +636,7 @@ async function salvarOrdemSetor(setor, ids){
   try{
     const res = await fetch('/api/inventario/catalogo/ordem', {
       method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ setor, ids }),
+      body: JSON.stringify({ unidade: unidadeAtual(), setor, ids }),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Não foi possível salvar a nova ordem.');
@@ -1024,12 +1018,7 @@ function baixarRelatorioDiferencas(formato){
   window.location.href = `/api/inventario/relatorio.${formato}?${params.toString()}`;
 }
 
-// ---------- Catálogo (Master) ----------
-function descreverLojasItem(item){
-  if(!item.unidades || !item.unidades.length) return '<span style="color:var(--muted);">Todas</span>';
-  const nomes = item.unidades.map(cod=>UNIDADES.find(u=>u.codigo===cod)?.nome || cod);
-  return `<span title="${escapeHtml(nomes.join(', '))}">${nomes.length} loja${nomes.length===1?'':'s'}</span>`;
-}
+// ---------- Catálogo (por loja - CATALOGO ja vem so da loja selecionada no topo) ----------
 function renderCatalogo(){
   const porSetor = ORDEM_SETORES.map(setor=>({ setor, itens: CATALOGO.filter(i=>i.setor===setor).sort(compararOrdemItem) }));
   document.getElementById('catalogo-body').innerHTML = porSetor.flatMap(({setor,itens})=>
@@ -1040,25 +1029,25 @@ function renderCatalogo(){
         <td><span class="badge-tipo">${i.tipo}</span></td>
         <td>${escapeHtml(i.unidadeMedida)}</td>
         <td class="valor">${fmtMoney(i.custoReferencia)}</td>
-        <td>${descreverLojasItem(i)}</td>
         <td>${i.ativo===false ? '<span style="color:var(--muted);">Inativo</span>' : '<span style="color:var(--ok);">Ativo</span>'}</td>
         <td>
           <button type="button" class="acao-btn" onclick="abrirEditarItem('${i.id}')">✏️</button>
           <button type="button" class="acao-btn excluir" onclick="excluirItem('${i.id}')">🗑️</button>
         </td>
       </tr>`)
-  ).join('') || '<tr><td colspan="8" class="empty">Nenhum item cadastrado ainda.</td></tr>';
+  ).join('') || '<tr><td colspan="7" class="empty">Nenhum item cadastrado ainda nesta loja.</td></tr>';
 }
 
 async function carregarCatalogoPadrao(){
-  if(!confirm('Carregar o catálogo padrão da rede Domino\'s? Só adiciona os itens que ainda não existem (não duplica nem apaga nada que já foi cadastrado).')) return;
+  if(!confirm('Carregar o catálogo padrão da rede em TODAS as lojas? Cada loja só recebe os itens que ainda não tem (por nome) - não duplica nem mexe no que a loja já customizou (posição, setor, itens removidos).')) return;
   const msg = document.getElementById('msg-catalogo-seed');
   msg.classList.add('hidden');
   try{
-    const res = await fetch('/api/inventario/catalogo/seed', { method:'POST' });
+    const res = await fetch('/api/inventario/catalogo/seed', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao carregar catálogo');
-    msg.textContent = `${data.adicionados} item(ns) adicionado(s) (${data.jaExistiam} já existiam).`; msg.className = 'msg ok';
+    const lojasComNovos = (data.porLoja||[]).filter(l=>l.adicionados>0).length;
+    msg.textContent = `${data.adicionados} item(ns) adicionado(s) no total, em ${lojasComNovos} loja(s).`; msg.className = 'msg ok';
     await carregarCatalogo();
     renderCatalogo();
     popularSelectsItem();
@@ -1084,26 +1073,6 @@ function atualizarCampoPesoItem(){
   if(!usa) document.getElementById('i-peso-embalagem').value = '';
 }
 
-// escopo do item: null/"todas" = vale pra rede toda (padrão de sempre); lista
-// de códigos de loja = item só aparece na Contagem/Recebimento/Saída dessas
-// lojas (ver sanitizarUnidadesRestritas em inventario.js)
-function popularLojasItem(){
-  document.getElementById('i-lojas-wrap').innerHTML = UNIDADES.map(u=>
-    `<label style="display:flex;align-items:center;gap:5px;font-weight:400;color:var(--text);margin:0;font-family:var(--sans);font-size:12.5px;"><input type="checkbox" class="i-loja-check" value="${escapeHtml(u.codigo)}"> ${escapeHtml(u.nome)}</label>`
-  ).join('') || '<span class="sub" style="margin:0;">Nenhuma loja de inventário cadastrada ainda.</span>';
-}
-function atualizarEscopoLojasItem(){
-  const algumas = document.getElementById('i-escopo-algumas').checked;
-  document.getElementById('i-lojas-wrap').classList.toggle('hidden', !algumas);
-}
-function definirLojasItem(unidades){
-  const algumas = Array.isArray(unidades) && unidades.length > 0;
-  document.getElementById('i-escopo-todas').checked = !algumas;
-  document.getElementById('i-escopo-algumas').checked = algumas;
-  document.querySelectorAll('.i-loja-check').forEach(cb=>{ cb.checked = algumas && unidades.includes(cb.value); });
-  atualizarEscopoLojasItem();
-}
-
 function abrirNovoItem(){
   ITEM_EDITANDO_ID = null;
   ITEM_ORIGEM = 'catalogo';
@@ -1111,8 +1080,6 @@ function abrirNovoItem(){
   document.getElementById('form-item').reset();
   document.getElementById('i-custo').value = 0;
   atualizarCampoPesoItem();
-  popularLojasItem();
-  definirLojasItem(null);
   document.getElementById('msg-item').classList.add('hidden');
   document.getElementById('overlay-item').classList.remove('hidden');
 }
@@ -1130,8 +1097,6 @@ function abrirEditarItem(id){
   document.getElementById('i-quantidade-padrao').value = item.quantidadePadrao ?? '';
   document.getElementById('i-peso-embalagem').value = item.pesoEmbalagemG ?? '';
   atualizarCampoPesoItem();
-  popularLojasItem();
-  definirLojasItem(item.unidades);
   document.getElementById('msg-item').classList.add('hidden');
   document.getElementById('overlay-item').classList.remove('hidden');
 }
@@ -1142,10 +1107,8 @@ document.getElementById('form-item').addEventListener('submit', async (ev)=>{
   const msg = document.getElementById('msg-item');
   msg.classList.add('hidden');
   try{
-    const algumasLojas = document.getElementById('i-escopo-algumas').checked;
-    const lojasMarcadas = [...document.querySelectorAll('.i-loja-check:checked')].map(cb=>cb.value);
-    if(algumasLojas && !lojasMarcadas.length){ throw new Error('Marque ao menos uma loja, ou escolha "Todas as lojas".'); }
     const body = {
+      unidade: unidadeAtual(),
       nome: document.getElementById('i-nome').value,
       setor: document.getElementById('i-setor').value,
       tipo: document.getElementById('i-tipo').value,
@@ -1153,7 +1116,6 @@ document.getElementById('form-item').addEventListener('submit', async (ev)=>{
       custoReferencia: document.getElementById('i-custo').value,
       quantidadePadrao: document.getElementById('i-quantidade-padrao').value || null,
       pesoEmbalagemG: unidadeUsaPeso(document.getElementById('i-unidade').value) ? (document.getElementById('i-peso-embalagem').value || null) : null,
-      unidades: algumasLojas ? lojasMarcadas : null,
     };
     const url = ITEM_EDITANDO_ID ? `/api/inventario/catalogo/${ITEM_EDITANDO_ID}` : '/api/inventario/catalogo';
     const res = await fetch(url, { method: ITEM_EDITANDO_ID?'PUT':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -1182,7 +1144,10 @@ async function excluirItem(id){
   popularSelectsItem();
 }
 
-async function carregarCatalogo(){ CATALOGO = await fetch('/api/inventario/catalogo').then(r=>r.json()); }
+async function carregarCatalogo(){
+  const unidade = unidadeAtual();
+  CATALOGO = unidade ? await fetch('/api/inventario/catalogo?unidade='+encodeURIComponent(unidade)).then(r=>r.json()) : [];
+}
 
 // ---------- setores/tipos (Master pode adicionar novos, ver inventario.js) ----------
 async function carregarSetoresTipos(){
@@ -1259,16 +1224,17 @@ async function boot(){
 
   renderPresetsDif();
 
-  const [unidadesResp] = await Promise.all([
-    fetch('/api/inventario/unidades').then(r=>r.json()),
-    carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas(),
-  ]);
-  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
-  document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
-  UNIDADES = unidadesResp;
+  // unidades primeiro e sozinho - o catalogo agora e por loja (ver
+  // carregarCatalogo/unidadeAtual), entao o <select> de loja precisa estar
+  // populado ANTES de buscar o catalogo, senao a primeira busca vai sem loja
+  UNIDADES = await fetch('/api/inventario/unidades').then(r=>r.json());
   document.getElementById('sel-unidade').innerHTML = UNIDADES.length
     ? UNIDADES.map(u=>`<option value="${escapeHtml(u.codigo)}">${escapeHtml(u.nome)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+
+  await Promise.all([carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas()]);
+  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
+  document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
 
   popularSelectsItem();
   aplicarPresetDif('semana');
