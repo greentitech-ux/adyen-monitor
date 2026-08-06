@@ -109,10 +109,13 @@ async function ensureMaster() {
   console.log(`Usuario Master criado: ${email}`);
 }
 
-async function login(email, password, contexto = {}) {
-  email = String(email || '').trim().toLowerCase();
-  const snap = await usersRef.where('email', '==', email).limit(1).get();
-  if (snap.empty) throw new Error('Email ou senha invalidos.');
+// aceita tanto o email quanto o "usuario" (username curto) como
+// identificador de login - decide qual campo consultar pela presenca de "@"
+async function login(identifier, password, contexto = {}) {
+  const valor = String(identifier || '').trim().toLowerCase();
+  const campo = valor.includes('@') ? 'email' : 'username';
+  const snap = await usersRef.where(campo, '==', valor).limit(1).get();
+  if (snap.empty) throw new Error('Usuário/email ou senha inválidos.');
   const doc = snap.docs[0];
   const user = doc.data();
   if (user.active === false) throw new Error('Este acesso foi desativado.');
@@ -129,10 +132,10 @@ async function login(email, password, contexto = {}) {
     const bloqueou = tentativas >= MAX_TENTATIVAS && user.role !== 'master';
     await doc.ref.update({ failedAttempts: tentativas, locked: bloqueou });
     if (bloqueou) {
-      criarChamadoBloqueio(email, doc.id, user.permissions?.unidades);
+      criarChamadoBloqueio(user.email, doc.id, user.permissions?.unidades);
       throw new Error('Acesso bloqueado após 3 tentativas de senha erradas. Fale com o Master.');
     }
-    throw new Error('Email ou senha invalidos.');
+    throw new Error('Usuário/email ou senha inválidos.');
   }
 
   if (user.failedAttempts) await doc.ref.update({ failedAttempts: 0 });
@@ -157,8 +160,10 @@ function toPublicUser(id, user) {
   return {
     id,
     email: user.email,
+    username: user.username || null,
     role: user.role,
     permissions: user.role === 'master' ? null : user.permissions || emptyPermissions(),
+    precisaTrocarSenha: !!user.precisaTrocarSenha,
   };
 }
 
@@ -211,6 +216,7 @@ function requireAuth(req, res, next) {
       }
       if (payload.sid) sessions.tocar(payload.sid);
       req.user = user;
+      req.sid = payload.sid || null;
       req.isMaster = user.role === 'master';
       req.isAdmin = !!user.isAdmin;
       req.podeCatalogoEstoque = !!user.podeCatalogoEstoque;

@@ -183,7 +183,7 @@
     </h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Email</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
+        <thead><tr><th>Email</th><th>Usuário</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th></th></tr></thead>
         <tbody id="users-body"></tbody>
       </table>
     </div>
@@ -193,6 +193,7 @@
     <h2>Criar novo acesso</h2>
     <form class="create" id="create-form">
       <label>Email<input type="email" id="c-email" required></label>
+      <label>Usuário (login curto, opcional - ex: "jn")<input type="text" id="c-username" pattern="[a-z0-9._-]{2,30}" title="Só letras minúsculas, números, ponto, hífen ou underline (2 a 30 caracteres)"></label>
       <label>Senha temporária (mín. 8 caracteres)<input type="text" id="c-password" required minlength="8"></label>
 
       <fieldset>
@@ -214,6 +215,14 @@
       <p class="err hidden" id="create-err"></p>
       <button type="submit" class="primary">Criar acesso</button>
     </form>
+  </div>
+
+  <div class="panel">
+    <h2>Atualizar usuários (login) em massa</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Cole uma linha por acesso, no formato <code>email,usuário</code> (ex: copiado de uma planilha - vírgula ou tab entre as colunas). Aplica um por um e mostra o resultado de cada linha; se algum email não existir ou o usuário já estiver em uso, só aquela linha falha, o resto é aplicado normalmente.</p>
+    <textarea id="bulk-username-texto" rows="6" style="width:100%;font-family:var(--mono);font-size:12px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);" placeholder="jessica.rayana@exemplo.com,jeh&#10;jessica.natacha@exemplo.com,jn&#10;aurea.morais@exemplo.com,aurea"></textarea>
+    <button type="button" class="primary" style="margin-top:10px;" onclick="aplicarUsernamesEmMassa()">Aplicar</button>
+    <div id="bulk-username-resultado" style="margin-top:12px;"></div>
   </div>
 
   <div class="panel">
@@ -669,6 +678,7 @@ function renderUsers(){
     return `
     <tr>
       <td>${escapeHtml(u.email)}</td>
+      <td>${u.username ? escapeHtml(u.username) : '<span style="color:var(--muted);">—</span>'}</td>
       <td><span class="badge ${u.role}">${u.role}</span>${cargoBadge}</td>
       <td>${statusBadges}</td>
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
@@ -676,7 +686,7 @@ function renderUsers(){
       <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
       <td>${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
+  }).join('') || `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
 }
 
 // ---------- modal de acoes por usuario - substitui a fileira de 6 botoes
@@ -689,6 +699,7 @@ function abrirAcoes(id){
     <button type="button" onclick="fecharAcoes();editarPermissoes('${u.id}')">🔑 Permissões</button>
     <button type="button" onclick="fecharAcoes();abrirHorario('${u.id}')">🕐 Horário de acesso</button>
     <button type="button" onclick="fecharAcoes();resetarSenha('${u.id}')">🔒 Nova senha</button>
+    <button type="button" onclick="fecharAcoes();definirUsername('${u.id}', '${escapeHtml(u.username||'')}')">🆔 ${u.username?'Editar usuário':'Definir usuário'}</button>
     <div class="acoes-sep">Tags</div>
     <button type="button" onclick="fecharAcoes();alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'⭐ Remover tag Admin':'⭐ Tornar Admin'}</button>
     <button type="button" onclick="fecharAcoes();alternarCatalogoEstoque('${u.id}', ${!u.podeCatalogoEstoque})">${u.podeCatalogoEstoque?'📦 Remover acesso ao Catálogo':'📦 Liberar Catálogo do Estoque'}</button>
@@ -771,6 +782,7 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
   errEl.classList.add('hidden');
   const payload = {
     email: document.getElementById('c-email').value,
+    username: document.getElementById('c-username').value,
     password: document.getElementById('c-password').value,
     permissions: {
       sections: readChecked(document.getElementById('c-sections')),
@@ -867,6 +879,15 @@ async function resetarSenha(id){
   await carregarUsuarios();
 }
 
+async function definirUsername(id, atual){
+  const novo = prompt('Usuário (login curto) - só letras minúsculas, números, ponto, hífen ou underline. Deixe em branco pra remover:', atual||'');
+  if(novo === null) return;
+  const res = await fetch('/api/users/'+id+'/username', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:novo})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error||'Erro ao definir o usuário.'); return; }
+  await carregarUsuarios();
+}
+
 async function alternarAtivo(id, active){
   await fetch('/api/users/'+id+'/active', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
   await carregarUsuarios();
@@ -883,6 +904,24 @@ async function alternarCatalogoEstoque(id, podeCatalogoEstoque){
   const res = await fetch('/api/users/'+id+'/catalogo-estoque', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoEstoque})});
   const data = await res.json();
   if(!res.ok){ alert(data.error||'Erro ao atualizar permissão do Catálogo do Estoque.'); return; }
+  await carregarUsuarios();
+}
+
+async function aplicarUsernamesEmMassa(){
+  const texto = document.getElementById('bulk-username-texto').value;
+  const resultadoEl = document.getElementById('bulk-username-resultado');
+  const itens = texto.split('\n').map(l=>l.trim()).filter(Boolean).map(linha=>{
+    const [email, username] = linha.split(/[,\t]/).map(s=>(s||'').trim());
+    return { email, username };
+  }).filter(i=>i.email);
+  if(!itens.length){ resultadoEl.innerHTML = `<p class="err">Cole pelo menos uma linha "email,usuário".</p>`; return; }
+  resultadoEl.innerHTML = `<p style="color:var(--muted);font-size:12px;">Aplicando ${itens.length} linha(s)…</p>`;
+  const res = await fetch('/api/users/usernames-em-massa', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({itens})});
+  const data = await res.json();
+  if(!res.ok){ resultadoEl.innerHTML = `<p class="err">${data.error||'Erro ao aplicar em massa.'}</p>`; return; }
+  resultadoEl.innerHTML = `<div class="tablewrap"><table style="min-width:360px;"><thead><tr><th>Email</th><th>Usuário</th><th>Resultado</th></tr></thead><tbody>${
+    data.map(r=>`<tr><td>${escapeHtml(r.email)}</td><td>${escapeHtml(r.username||'')}</td><td>${r.ok?'<span class="badge on">ok</span>':`<span class="badge off" title="${escapeHtml(r.erro||'')}">${escapeHtml(r.erro||'erro')}</span>`}</td></tr>`).join('')
+  }</tbody></table></div>`;
   await carregarUsuarios();
 }
 

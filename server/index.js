@@ -160,7 +160,7 @@ const LEGACY_HMAC_KEY = process.env.ADYEN_HMAC_KEY || '';
 // ---------- login (sem token ainda) e portao de autenticacao pro resto da API ----------
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const result = await auth.login(req.body.email, req.body.password, {
+    const result = await auth.login(req.body.identifier || req.body.email, req.body.password, {
       userAgent: req.headers['user-agent'],
       ip: req.headers['x-forwarded-for'] || req.ip,
     });
@@ -252,7 +252,27 @@ app.post('/api/bot/solicitacoes', async (req, res) => {
 app.use('/api', auth.requireAuth);
 
 app.get('/api/me', (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email, role: req.user.role, permissions: req.permissions, isAdmin: req.isAdmin, podeCatalogoEstoque: req.podeCatalogoEstoque });
+  res.json({
+    id: req.user.id,
+    email: req.user.email,
+    username: req.user.username || null,
+    role: req.user.role,
+    permissions: req.permissions,
+    isAdmin: req.isAdmin,
+    podeCatalogoEstoque: req.podeCatalogoEstoque,
+    precisaTrocarSenha: !!req.user.precisaTrocarSenha,
+  });
+});
+
+// self-service: o proprio usuario logado troca a propria senha (exige a
+// senha atual) - usado tanto pela troca voluntaria (Painel > Alterar senha)
+// quanto pela troca obrigatoria no primeiro login apos um reset do Master
+app.post('/api/me/senha', async (req, res) => {
+  try {
+    res.json(await users.alterarSenhaPropria(req.user.id, req.body.senhaAtual, req.body.novaSenha, req.sid));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // so a secao pedida bloqueia quem nao tem permissao - Master sempre passa
@@ -1469,6 +1489,24 @@ app.put('/api/users/:id/cargo', auth.requireMaster, async (req, res) => {
 app.post('/api/users/:id/reset-password', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.resetPassword(req.params.id, req.body.password));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/username', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateUsername(req.params.id, req.body.username));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// atualizacao em massa: Master cola uma lista "email,username" (ex: de uma
+// planilha) e o backend aplica linha a linha, sem parar no primeiro erro
+app.post('/api/users/usernames-em-massa', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updateUsernamesEmMassa(req.body.itens));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

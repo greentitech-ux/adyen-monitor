@@ -48,8 +48,8 @@
     <img src="/logo.png" alt="Zenith Ops" class="auth-logo">
     <h1 style="text-align:center;">Zenith Ops</h1>
     <p style="font-size:12px;margin:2px 0 0;text-align:center;color:var(--muted);">Entre com seu acesso</p>
-    <label>Email
-      <input type="email" id="auth-email" required autocomplete="email">
+    <label>Usuário ou email
+      <input type="text" id="auth-email" required autocomplete="username">
     </label>
     <label>Senha
       <input type="password" id="auth-password" required autocomplete="current-password">
@@ -57,6 +57,22 @@
     <p id="auth-error" class="auth-error hidden"></p>
     <button type="submit" id="auth-btn">Entrar</button>
     <p class="auth-suporte">Dúvidas ou problemas pra entrar? Suporte: <a href="https://wa.me/5581995148654" target="_blank" rel="noopener">(81) 99514-8654</a></p>
+  </form>
+</section>
+
+<section id="trocar-senha-screen" class="auth-screen hidden">
+  <form id="trocar-senha-form" class="auth-card">
+    <img src="/logo.png" alt="Zenith Ops" class="auth-logo">
+    <h1 style="text-align:center;">Atualize sua senha</h1>
+    <p style="font-size:12px;margin:2px 0 0;text-align:center;color:var(--muted);">Por segurança, defina uma nova senha antes de continuar.</p>
+    <label>Nova senha
+      <input type="password" id="ts-nova" required minlength="8" autocomplete="new-password">
+    </label>
+    <label>Confirmar nova senha
+      <input type="password" id="ts-confirmar" required minlength="8" autocomplete="new-password">
+    </label>
+    <p id="ts-error" class="auth-error hidden"></p>
+    <button type="submit" id="ts-btn">Salvar e continuar</button>
   </form>
 </section>
 
@@ -94,20 +110,66 @@ document.getElementById('auth-form').addEventListener('submit', async (e)=>{
   const btn = document.getElementById('auth-btn');
   erroEl.classList.add('hidden');
   btn.disabled = true; btn.textContent = 'Entrando...';
+  const senhaDigitada = document.getElementById('auth-password').value;
   try{
     const res = await fetch('/api/auth/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email: document.getElementById('auth-email').value, password: document.getElementById('auth-password').value }),
+      body: JSON.stringify({ identifier: document.getElementById('auth-email').value, password: senhaDigitada }),
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Não foi possível entrar.');
     localStorage.setItem('authToken', data.token);
+    if(data.user && data.user.precisaTrocarSenha){
+      mostrarTrocarSenha(data.token, senhaDigitada);
+      return;
+    }
     location.href = '/painel.html';
   }catch(err){
     erroEl.textContent = err.message;
     erroEl.classList.remove('hidden');
     btn.disabled = false; btn.textContent = 'Entrar';
     abrirPopupSuporte(err.message);
+  }
+});
+
+// primeiro login apos o Master resetar a senha (ou conta recem-criada) -
+// obriga a trocar antes de liberar o resto do app. A senha atual ja foi
+// digitada no login, entao so pede a nova (uma vez, ja com confirmacao)
+function mostrarTrocarSenha(token, senhaAtual){
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('trocar-senha-screen').classList.remove('hidden');
+  document.getElementById('trocar-senha-form').dataset.token = token;
+  document.getElementById('trocar-senha-form').dataset.senhaAtual = senhaAtual;
+  document.getElementById('ts-nova').focus();
+}
+
+document.getElementById('trocar-senha-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const form = e.target;
+  const erroEl = document.getElementById('ts-error');
+  const btn = document.getElementById('ts-btn');
+  erroEl.classList.add('hidden');
+  const nova = document.getElementById('ts-nova').value;
+  const confirmar = document.getElementById('ts-confirmar').value;
+  if(nova !== confirmar){
+    erroEl.textContent = 'As senhas não coincidem.';
+    erroEl.classList.remove('hidden');
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try{
+    const res = await fetch('/api/me/senha', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:'Bearer '+form.dataset.token},
+      body: JSON.stringify({ senhaAtual: form.dataset.senhaAtual, novaSenha: nova }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível salvar a nova senha.');
+    location.href = '/painel.html';
+  }catch(err){
+    erroEl.textContent = err.message;
+    erroEl.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Salvar e continuar';
   }
 });
 

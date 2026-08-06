@@ -120,4 +120,19 @@ async function encerrarTodasDoUsuario(userId) {
   sessionsCache.invalidar();
 }
 
-module.exports = { criar, tocar, existeEValida, listarDoUsuario, resumoPorUsuario, encerrar, encerrarTodasDoUsuario };
+// mesma coisa, mas preserva a sessao atual - usado quando o proprio usuario
+// troca a senha (nao faz sentido derrubar o dispositivo de onde ele acabou
+// de trocar; so os OUTROS locais logados com a senha antiga)
+async function encerrarTodasDoUsuarioExceto(userId, sessionIdExcluir) {
+  const snap = await COLLECTION.where('userId', '==', userId).get();
+  await Promise.all(
+    snap.docs
+      .filter((d) => d.id !== sessionIdExcluir)
+      .map((d) => d.ref.delete()),
+  );
+  sessionsCache.invalidar();
+}
+
+module.exports = {
+  criar, tocar, existeEValida, listarDoUsuario, resumoPorUsuario, encerrar, encerrarTodasDoUsuario, encerrarTodasDoUsuarioExceto,
+};
