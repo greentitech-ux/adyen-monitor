@@ -359,12 +359,29 @@ function diaSemanaDe(dataIso){
   if(!dataIso) return null;
   return DIAS_SEMANA_JS[new Date(dataIso+'T00:00:00Z').getUTCDay()];
 }
-function atualizarModoUnidade(){
-  const fixo = regraAtual().modo === 'fixo';
-  document.getElementById('campos-manual').classList.toggle('hidden', fixo);
-  document.getElementById('campos-calculados').classList.toggle('hidden', !fixo);
-  if(fixo){ renderCamposRemoviveis(); atualizarPreviewCalculado(); }
+// acha, se existir, o "nome especial" (empresa de entrega/acordo próprio)
+// cadastrado na unidade que bate com o Nome digitado (ver entregasRegras.js)
+function normalizarNome(s){
+  return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().replace(/\s+/g,' ').toUpperCase();
 }
+function nomeEspecialAtual(){
+  const regra = regraAtual();
+  const alvo = normalizarNome(document.getElementById('f-entregador').value);
+  if(!alvo) return null;
+  return (regra.nomesEspeciais||[]).find(n=>n.nomes.some(x=>normalizarNome(x)===alvo)) || null;
+}
+function atualizarModoUnidade(){
+  const regra = regraAtual();
+  const especial = nomeEspecialAtual();
+  // unidade "fixo" + nome batendo com "manual" -> vira igual ao modo
+  // "plataforma" só pra esse lançamento (empresa terceirizada define o
+  // próprio preço, ex: GAMI/Moovery)
+  const usaManual = regra.modo !== 'fixo' || (especial && especial.modoValor === 'manual');
+  document.getElementById('campos-manual').classList.toggle('hidden', !usaManual);
+  document.getElementById('campos-calculados').classList.toggle('hidden', usaManual);
+  if(!usaManual && regra.modo === 'fixo'){ renderCamposRemoviveis(); atualizarPreviewCalculado(); }
+}
+document.getElementById('f-entregador').addEventListener('input', atualizarModoUnidade);
 // checklist dinâmico - só os campos que o Master marcou como removíveis
 // pela loja aparecem aqui (varia por unidade, ver entregas-regras.html)
 function renderCamposRemoviveis(){
@@ -387,42 +404,120 @@ function renderCamposRemoviveis(){
 function camposRemovidosMarcados(){
   return [...document.querySelectorAll('.chk-campo-removido:checked')].map(c=>c.dataset.campo);
 }
-// mesma conta de entregasRegras.js (calcular) - Extra/Retorno/Fora de área
-// e "flat" usam a taxa de cada campo (com dia da semana e meta, se tiverem);
-// COOP so soma os campos com destino coopRecebe (normalmente so Entrega)
+// campos "entrada manual" (ex: Encosta que varia) viram um input de R$
+// editável na prévia, em vez de um valor calculado - guardamos o que foi
+// digitado aqui pra reaproveitar no submit (valoresManuaisCampos)
+let VALORES_MANUAIS_CAMPOS = {};
+function valorManualCampo(campo, valorAtualDigitado){
+  return valorAtualDigitado !== undefined ? valorAtualDigitado : (VALORES_MANUAIS_CAMPOS[campo] ?? 0);
+}
+// mesma conta de entregasRegras.js (calcular) - Extra/Retorno/Fora de área/
+// Pos 00hs e "flat" usam a taxa de cada campo (com dia da semana e meta, se
+// tiverem); COOP so soma os campos com destino coopRecebe (normalmente so
+// Entrega); "taxa única" (nome especial) substitui os campos de Valor
 function atualizarPreviewCalculado(){
   const regra = regraAtual();
   if(regra.modo !== 'fixo') return;
+  const especial = nomeEspecialAtual();
+  if(especial && especial.modoValor === 'manual') return; // vira campos-manual, ver atualizarModoUnidade
+  const usaTaxaUnica = especial && especial.modoValor === 'taxaUnica';
   const contagens = {
     entrega: num(document.getElementById('f-entrega').value),
     retorno: num(document.getElementById('f-retorno').value),
     extra: num(document.getElementById('f-extra').value),
     foraDeArea: num(document.getElementById('f-foraDeArea').value),
+    pos00hs: num(document.getElementById('f-pos00hs').value),
   };
   contagens.quantTotal = contagens.entrega + contagens.retorno + contagens.extra;
   const dia = diaSemanaDe(document.getElementById('f-data').value);
   const removidos = new Set(camposRemovidosMarcados());
   let valor = 0, coopRecebe = 0;
-  const linhas = (regra.camposValor||[]).map(c=>{
-    if(removidos.has(c.campo)) return {label:c.label, valor:0, removido:true};
-    let taxa = (dia && c.valoresPorDiaSemana && c.valoresPorDiaSemana[dia]!=null) ? num(c.valoresPorDiaSemana[dia]) : num(c.valorPadrao);
-    if(c.meta){
-      const contagemMeta = contagens[c.meta.baseContagem] ?? 0;
-      if(contagemMeta < num(c.meta.minimo)) taxa = num(c.meta.valorParcial);
+  const linhas = [];
+  (regra.camposValor||[]).forEach(c=>{
+    if(removidos.has(c.campo)){ linhas.push({label:c.label, valor:0, removido:true}); return; }
+    if(usaTaxaUnica && c.destino==='valor') return; // taxa única substitui os campos de Valor
+    let valorCampo;
+    if(c.entradaManual){
+      const inputAtual = document.querySelector(`.input-campo-manual[data-campo="${c.campo}"]`);
+      valorCampo = num(inputAtual ? inputAtual.value : valorManualCampo(c.campo));
+    } else {
+      let taxa = (dia && c.valoresPorDiaSemana && c.valoresPorDiaSemana[dia]!=null) ? num(c.valoresPorDiaSemana[dia]) : num(c.valorPadrao);
+      if(c.meta){
+        const contagemMeta = contagens[c.meta.baseContagem] ?? 0;
+        if(contagemMeta < num(c.meta.minimo)) taxa = num(c.meta.valorParcial);
+      }
+      valorCampo = c.base==='flat' ? taxa : (contagens[c.base]||0)*taxa;
     }
-    const valorCampo = c.base==='flat' ? taxa : (contagens[c.base]||0)*taxa;
     if(c.destino==='coopRecebe') coopRecebe += valorCampo; else valor += valorCampo;
-    return {label:c.label, valor:valorCampo, removido:false};
+    linhas.push({label:c.label, valor:valorCampo, removido:false, entradaManual:c.entradaManual, campo:c.campo});
   });
-  document.getElementById('preview-detalhes').innerHTML = linhas.map(l=>
-    `<div class="linha"><span>${escapeHtml(l.label)}${l.removido?' (removido)':''}</span><b style="${l.removido?'color:var(--muted);text-decoration:line-through;':''}">${fmtMoney(l.valor)}</b></div>`
-  ).join('') || '<div class="linha"><span style="color:var(--muted);">nenhum campo configurado ainda</span></div>';
+  if(usaTaxaUnica){
+    const valorTaxaUnica = contagens.quantTotal * num(especial.taxaUnica);
+    valor += valorTaxaUnica;
+    linhas.push({label:`Taxa única (R$ ${especial.taxaUnica}/entrega)`, valor:valorTaxaUnica, removido:false});
+  }
+  document.getElementById('preview-detalhes').innerHTML = linhas.map(l=>{
+    if(l.entradaManual){
+      return `<div class="linha" style="align-items:center;"><span>${escapeHtml(l.label)}</span><input type="number" step="0.01" class="input-campo-manual" data-campo="${escapeHtml(l.campo)}" value="${l.valor||0}" style="width:110px;padding:4px 6px;font-size:12px;"></div>`;
+    }
+    return `<div class="linha"><span>${escapeHtml(l.label)}${l.removido?' (removido)':''}</span><b style="${l.removido?'color:var(--muted);text-decoration:line-through;':''}">${fmtMoney(l.valor)}</b></div>`;
+  }).join('') || '<div class="linha"><span style="color:var(--muted);">nenhum campo configurado ainda</span></div>';
+  document.getElementById('preview-valor').textContent = fmtMoney(valor);
+  document.getElementById('preview-coopRecebe').textContent = fmtMoney(coopRecebe);
+  // religa os inputs manuais recem-criados - digitar neles só recalcula os
+  // totais (recomputarTotaisComManuais), sem reconstruir a lista inteira
+  // (senão o campo perderia o foco a cada tecla digitada)
+  document.querySelectorAll('.input-campo-manual').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      VALORES_MANUAIS_CAMPOS[inp.dataset.campo] = inp.value;
+      recomputarTotaisComManuais();
+    });
+  });
+}
+// recalcula só os totais (Valor/COOP) usando os valores atuais dos inputs
+// manuais na tela, sem re-renderizar a lista - preserva o foco/cursor
+// enquanto a loja está digitando num campo de entrada manual (ex: Encosta)
+function recomputarTotaisComManuais(){
+  const regra = regraAtual();
+  if(regra.modo !== 'fixo') return;
+  const especial = nomeEspecialAtual();
+  if(especial && especial.modoValor === 'manual') return;
+  const usaTaxaUnica = especial && especial.modoValor === 'taxaUnica';
+  const contagens = {
+    entrega: num(document.getElementById('f-entrega').value),
+    retorno: num(document.getElementById('f-retorno').value),
+    extra: num(document.getElementById('f-extra').value),
+    foraDeArea: num(document.getElementById('f-foraDeArea').value),
+    pos00hs: num(document.getElementById('f-pos00hs').value),
+  };
+  contagens.quantTotal = contagens.entrega + contagens.retorno + contagens.extra;
+  const dia = diaSemanaDe(document.getElementById('f-data').value);
+  const removidos = new Set(camposRemovidosMarcados());
+  let valor = 0, coopRecebe = 0;
+  (regra.camposValor||[]).forEach(c=>{
+    if(removidos.has(c.campo)) return;
+    if(usaTaxaUnica && c.destino==='valor') return;
+    let valorCampo;
+    if(c.entradaManual){
+      const inputAtual = document.querySelector(`.input-campo-manual[data-campo="${c.campo}"]`);
+      valorCampo = num(inputAtual ? inputAtual.value : 0);
+    } else {
+      let taxa = (dia && c.valoresPorDiaSemana && c.valoresPorDiaSemana[dia]!=null) ? num(c.valoresPorDiaSemana[dia]) : num(c.valorPadrao);
+      if(c.meta){
+        const contagemMeta = contagens[c.meta.baseContagem] ?? 0;
+        if(contagemMeta < num(c.meta.minimo)) taxa = num(c.meta.valorParcial);
+      }
+      valorCampo = c.base==='flat' ? taxa : (contagens[c.base]||0)*taxa;
+    }
+    if(c.destino==='coopRecebe') coopRecebe += valorCampo; else valor += valorCampo;
+  });
+  if(usaTaxaUnica) valor += contagens.quantTotal * num(especial.taxaUnica);
   document.getElementById('preview-valor').textContent = fmtMoney(valor);
   document.getElementById('preview-coopRecebe').textContent = fmtMoney(coopRecebe);
 }
 document.getElementById('f-unidade').addEventListener('change', atualizarModoUnidade);
 document.getElementById('f-data').addEventListener('change', atualizarPreviewCalculado);
-['f-entrega','f-retorno','f-extra','f-foraDeArea'].forEach(id=>{
+['f-entrega','f-retorno','f-extra','f-foraDeArea','f-pos00hs'].forEach(id=>{
   document.getElementById(id).addEventListener('input', atualizarPreviewCalculado);
 });
 
@@ -559,6 +654,7 @@ function resetarForm(){
   document.getElementById('f-data').value = hojeBrasilia();
   CAMPOS_NUMERICOS.forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = 0; });
   document.getElementById('wrap-motivo-campos').classList.add('hidden');
+  VALORES_MANUAIS_CAMPOS = {};
   atualizarSugestao();
   atualizarModoUnidade();
 }
@@ -587,6 +683,8 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       campos[c] = el ? el.value : 0;
     });
     const camposRemovidos = camposRemovidosMarcados();
+    const valoresManuaisCampos = {};
+    document.querySelectorAll('.input-campo-manual').forEach(inp=>{ valoresManuaisCampos[inp.dataset.campo] = inp.value; });
     const payload = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
@@ -598,6 +696,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       observacao: document.getElementById('f-observacao').value,
       camposRemovidos,
       motivoRemocaoCampos: camposRemovidos.length ? document.getElementById('f-motivoRemocaoCampos').value : null,
+      valoresManuaisCampos,
     };
     const form = new FormData();
     form.append('payload', JSON.stringify(payload));

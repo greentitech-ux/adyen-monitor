@@ -3115,12 +3115,12 @@ app.put('/api/entregas/regras/:unidade', auth.requireMaster, async (req, res) =>
 
 app.post('/api/entregas/lancar', requireSection('entregas-lancamento'), upload.single('etiqueta'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos } = JSON.parse(req.body.payload || '{}');
+    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos, valoresManuaisCampos } = JSON.parse(req.body.payload || '{}');
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await entregasLive.create({
-      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos,
+      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos, valoresManuaisCampos,
       etiquetaFile: req.file || null,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
