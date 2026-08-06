@@ -195,9 +195,9 @@
   .multiselect-panel input[type=checkbox]{accent-color:var(--accent);}
   .empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
   /* modal de historico do cliente */
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:16px;overflow-y:auto;}
   .overlay.show{display:flex;}
-  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(420px,90vw);padding:20px;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(420px,90vw);padding:20px;max-height:88vh;overflow-y:auto;}
   .modal h3{margin:0 0 12px;font-size:14px;}
   .modal .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a1f26;font-size:13px;}
   .modal .close{margin-top:14px;width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font-family:var(--sans);font-size:12.5px;}
