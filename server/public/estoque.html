@@ -184,6 +184,7 @@
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
@@ -1228,6 +1229,7 @@ async function boot(){
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
 
   if(!secoes.includes('inventario')){
     document.getElementById('sem-acesso').classList.remove('hidden');
