@@ -2750,6 +2750,16 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
   }
 });
 
+app.patch('/api/solicitacoes/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const registro = await solicitacoes.redirecionar(req.params.id, req.body);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // edicao/exclusao direta pelo Master - corrigir um dado errado no pedido
 // (titulo, valor, observacao, itens, unidade) ou remove-lo de vez da fila,
 // independente do status
