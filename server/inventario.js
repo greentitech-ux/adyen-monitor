@@ -111,7 +111,15 @@ async function listCatalogoUncached() {
 const catalogoCache = createCache(listCatalogoUncached, 20 * 1000);
 const listCatalogo = catalogoCache.cached;
 
-async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, quantidadePadrao, pesoEmbalagemG }) {
+function sanitizarUnidadesRestritas(unidades) {
+  // null/vazio = item vale pra rede toda (comportamento padrao, o de sempre);
+  // array = item so aparece na Contagem/Recebimento/Saida dessas lojas
+  if (!Array.isArray(unidades) || !unidades.length) return null;
+  const limpo = [...new Set(unidades.map((u) => String(u || '').trim()).filter(Boolean))];
+  return limpo.length ? limpo : null;
+}
+
+async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, quantidadePadrao, pesoEmbalagemG, unidades }) {
   nome = String(nome || '').trim();
   if (!nome) throw new Error('Nome do item é obrigatório.');
   const setores = await listSetores();
@@ -138,6 +146,9 @@ async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, qu
     // embalagem/pacote, usado pra converter embalagens recebidas em peso
     quantidadePadrao: quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null,
     pesoEmbalagemG: pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null,
+    // null = todas as lojas (padrao); array de codigos = restrito a essas
+    // lojas (ver sanitizarUnidadesRestritas) - filtrado no cliente (estoque.html)
+    unidades: sanitizarUnidadesRestritas(unidades),
     ordem: proximaOrdem,
     ativo: true,
     createdAt: new Date().toISOString(),
@@ -167,7 +178,7 @@ async function reordenarItens(setor, ids) {
   return (await listCatalogo()).filter((i) => i.setor === setor);
 }
 
-async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoReferencia, ativo, quantidadePadrao, pesoEmbalagemG }) {
+async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoReferencia, ativo, quantidadePadrao, pesoEmbalagemG, unidades }) {
   const ref = CATALOGO.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Item não encontrado.');
@@ -191,6 +202,7 @@ async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoRefere
   if (ativo != null) patch.ativo = !!ativo;
   if (quantidadePadrao !== undefined) patch.quantidadePadrao = quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null;
   if (pesoEmbalagemG !== undefined) patch.pesoEmbalagemG = pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null;
+  if (unidades !== undefined) patch.unidades = sanitizarUnidadesRestritas(unidades);
   await ref.update(patch);
   catalogoCache.invalidar();
   return (await ref.get()).data();
