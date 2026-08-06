@@ -136,4 +136,4 @@ async function remover(id) {
   festasCache.invalidar();
 }
 
-module.exports = { STATUS_VALIDOS, criar, listAll, listByUnidades, getOne, atualizar, remover };
+module.exports = { STATUS_VALIDOS, criar, listAll, listByUnidades, getOne, atualizar, remover, invalidar: () => festasCache.invalidar() };
