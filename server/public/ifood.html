@@ -118,7 +118,7 @@
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back active" id="nav-ifood-self" href="/ifood.html">🍔 iFood</a>
-  <div class="nav-drawer-grupo">Saltiverso</div>
+  <div class="nav-drawer-grupo" id="nav-grupo-saltiverso">Saltiverso</div>
   <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
   <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
   <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
@@ -550,6 +550,7 @@ async function boot(){
   document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
   document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
   document.getElementById('nav-mensalistas').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-grupo-saltiverso').classList.toggle('hidden', !(secoes.includes('parque') || secoes.includes('parque-checkin') || secoes.includes('festas')));
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || me.isAdmin));
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
   document.getElementById('btn-sincronizar').classList.toggle('hidden', !isMaster);
