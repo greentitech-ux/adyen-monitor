@@ -74,6 +74,16 @@
   .ptipos .linha b{font-family:var(--mono);}
   .pcard-erro{color:var(--bad);font-size:12px;}
   .pcard-vazio{color:var(--muted);font-size:12px;}
+  .pweek-titulo{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .pweek-titulo b{font-family:var(--mono);color:var(--text);font-size:13px;}
+  .pweekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .pweekday{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;}
+  .pweekday.hoje{border-color:var(--accent);background:rgba(92,200,255,.08);}
+  .pweekday .dia{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;}
+  .pweekday.hoje .dia{color:var(--accent);}
+  .pweekday .qtd{font-size:16px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;color:var(--muted);}
+  .pweekday .qtd.tem{color:var(--text);}
+  .pweekday.hoje .qtd.tem{color:var(--accent);}
   .painel-loading{padding:60px 0;text-align:center;color:var(--muted);font-size:13px;}
   .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
   .notif-solicitacao{background:var(--panel);border:2px solid var(--warn);border-radius:12px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.55);animation:notif-in .18s ease,notif-pulse 1.6s ease-in-out infinite;}
@@ -460,37 +470,74 @@ async function cardIfood(){
   </div>`);
 }
 
+const DIAS_SEMANA_ABREV = ['seg','ter','qua','qui','sex','sáb','dom']; // segunda primeiro, igual ao pedido
+// as datas aqui vem de aritmetica local (setDate) em cima do "hoje" ja
+// ancorado em Brasilia - so precisa formatar de volta pra YYYY-MM-DD local,
+// sem reconverter fuso
+function isoLocal(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
 async function cardParque(){
   const hoje = hojeBrasilia();
-  const [checkins, festas] = await Promise.all([
+  const [checkins, festas, mensalistas] = await Promise.all([
     fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]),
     fetch('/api/festas').then(r=>r.json()).catch(()=>[]),
+    fetch('/api/mensalistas').then(r=>r.json()).catch(()=>[]),
   ]);
   const doDia = checkins.filter(c=>c.dataUtilizacao===hoje);
   const criancas = doDia.reduce((s,c)=>s+(c.criancas?.length||0),0);
   const aguardando = doDia.filter(c=>!c.termoAssinado).length;
-  const inicioSemana = new Date(hoje+'T00:00:00');
-  const fimSemana = new Date(inicioSemana); fimSemana.setDate(fimSemana.getDate()+7);
-  const festasSemana = festas.filter(f=>{
-    const d = new Date((f.dataDeUso||'')+'T00:00:00');
-    return d >= inicioSemana && d <= fimSemana && f.status !== 'cancelado';
+  const mensalistasAtivos = mensalistas.filter(m=>m.dataInicial<=hoje && hoje<=m.dataFinal).length;
+
+  // semana corrente (segunda a domingo) contendo "hoje", nao os proximos 7
+  // dias corridos - assim o card sempre mostra a semana inteira de uma vez,
+  // inclusive dias que ja passaram
+  const hojeDate = new Date(hoje+'T00:00:00');
+  const diaSemanaJs = hojeDate.getDay(); // 0=dom
+  const deltaSegunda = diaSemanaJs === 0 ? -6 : 1 - diaSemanaJs;
+  const segunda = new Date(hojeDate); segunda.setDate(segunda.getDate()+deltaSegunda);
+  const diasSemana = Array.from({length:7}, (_,i)=>{
+    const d = new Date(segunda); d.setDate(d.getDate()+i);
+    return isoLocal(d);
   });
-  return pcardWrap('🤸','Saltiverso (hoje)','/parque.html', `<div class="pstats">
-    ${statRow('Check-ins hoje', doDia.length)}
-    ${statRow('Crianças', criancas)}
-    ${statRow('Aguardando termo', aguardando, aguardando ? 'warn' : '')}
-    ${statRow('Festas nos próx. 7 dias', festasSemana.length)}
-  </div>`);
+  const festasPorDia = {};
+  festas.forEach(f=>{
+    if(f.status==='cancelado') return;
+    if(!diasSemana.includes(f.dataDeUso)) return;
+    festasPorDia[f.dataDeUso] = (festasPorDia[f.dataDeUso]||0) + 1;
+  });
+  const totalSemana = Object.values(festasPorDia).reduce((s,n)=>s+n,0);
+
+  const strip = diasSemana.map((data,i)=>{
+    const qtd = festasPorDia[data] || 0;
+    const ehHoje = data === hoje;
+    return `<div class="pweekday${ehHoje?' hoje':''}">
+      <div class="dia">${DIAS_SEMANA_ABREV[i]}</div>
+      <div class="qtd${qtd?' tem':''}">${qtd}</div>
+    </div>`;
+  }).join('');
+
+  return pcardWrap('🤸','Saltiverso (hoje)','/parque.html', `
+    <div class="pstats">
+      ${statRow('Check-ins hoje', doDia.length)}
+      ${statRow('Crianças', criancas)}
+      ${statRow('Aguardando termo', aguardando, aguardando ? 'warn' : '')}
+      ${statRow('Mensalistas ativos', mensalistasAtivos, mensalistasAtivos ? 'ok' : '')}
+    </div>
+    <div>
+      <div class="pweek-titulo">Festas confirmadas essa semana <b>${totalSemana}</b></div>
+      <div class="pweekstrip">${strip}</div>
+    </div>
+  `);
 }
 
 const CARDS_POR_SECAO = [
+  { secao:'parque', build:cardParque },
   { secao:'monitor', build:cardMonitor },
   { secao:'fechamentos', build:cardFechamentos },
   { secao:'entregas', build:cardEntregas },
   { secao:'solicitacoes', build:cardCentral },
   { secao:'tecnico', build:cardChamados },
   { secao:'ifood', build:cardIfood },
-  { secao:'parque', build:cardParque },
 ];
 
 async function boot(){
