@@ -79,6 +79,10 @@ function sanitizarPrefixo(s) {
   const limpo = String(s || '').trim().slice(0, 30);
   return limpo || 'Maquininha';
 }
+function sanitizarPrefixoPos(s) {
+  const limpo = String(s || '').trim().slice(0, 30);
+  return limpo || 'Maquininha POS';
+}
 
 async function listUncached() {
   const snap = await COLLECTION.orderBy('nome', 'asc').get();
@@ -87,7 +91,7 @@ async function listUncached() {
 const gruposCache = createCache(listUncached, 20 * 1000);
 const list = gruposCache.cached;
 
-async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis, caixaHabilitado, maquininhasHabilitado, maquininhaPrefixo, saidasHabilitado }) {
+async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis, caixaHabilitado, maquininhasHabilitado, maquininhaPrefixo, maquininhaPosHabilitado, maquininhaPosPrefixo, saidasHabilitado }) {
   const nomeLimpo = String(nome || '').trim();
   if (!nomeLimpo) throw new Error('Informe o nome do grupo.');
   const ref = COLLECTION.doc();
@@ -108,6 +112,12 @@ async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPag
     caixaHabilitado: caixaHabilitado !== false,
     maquininhasHabilitado: maquininhasHabilitado !== false,
     maquininhaPrefixo: sanitizarPrefixo(maquininhaPrefixo),
+    // secao extra pra loja que vende depois da meia-noite na maquininha - ao
+    // contrario das outras secoes, comeca DESABILITADA (so faz sentido pra
+    // quem realmente precisa, ver adyenPos/ajustePosAnterior em
+    // fechamentosLive.js)
+    maquininhaPosHabilitado: maquininhaPosHabilitado === true,
+    maquininhaPosPrefixo: sanitizarPrefixoPos(maquininhaPosPrefixo),
     saidasHabilitado: saidasHabilitado !== false,
     criadoEm: new Date().toISOString(),
   };
@@ -116,7 +126,7 @@ async function create({ nome, unidades, kpisExtras, canaisVendaExtras, formasPag
   return registro;
 }
 
-async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis, caixaHabilitado, maquininhasHabilitado, maquininhaPrefixo, saidasHabilitado }) {
+async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, formasPagamentoExtras, responsaveis, caixaHabilitado, maquininhasHabilitado, maquininhaPrefixo, maquininhaPosHabilitado, maquininhaPosPrefixo, saidasHabilitado }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Grupo não encontrado.');
@@ -134,6 +144,8 @@ async function update(id, { nome, unidades, kpisExtras, canaisVendaExtras, forma
   if (caixaHabilitado != null) patch.caixaHabilitado = caixaHabilitado !== false;
   if (maquininhasHabilitado != null) patch.maquininhasHabilitado = maquininhasHabilitado !== false;
   if (maquininhaPrefixo != null) patch.maquininhaPrefixo = sanitizarPrefixo(maquininhaPrefixo);
+  if (maquininhaPosHabilitado != null) patch.maquininhaPosHabilitado = maquininhaPosHabilitado === true;
+  if (maquininhaPosPrefixo != null) patch.maquininhaPosPrefixo = sanitizarPrefixoPos(maquininhaPosPrefixo);
   if (saidasHabilitado != null) patch.saidasHabilitado = saidasHabilitado !== false;
   await ref.update(patch);
   gruposCache.invalidar();

@@ -1705,14 +1705,14 @@ async function uploadArquivosKpi(files, ownerId) {
 app.post('/api/fechamentos/lancar', requireSection('lancamento'), upload.any(), async (req, res) => {
   try {
     const body = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
-    const { unidade, unidadeNome, grupo, data, gerente, campos, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas } = body;
+    const { unidade, unidadeNome, grupo, data, gerente, campos, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesMaquinasPos, detalhesSaidas } = body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const arquivosKpi = await uploadArquivosKpi(req.files, unidade || 'geral');
     const kpisExtras = { ...(body.kpisExtras || {}), ...arquivosKpi };
     const registro = await fechamentosLive.create({
-      unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas,
+      unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesMaquinasPos, detalhesSaidas,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
     });
