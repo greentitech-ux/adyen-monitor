@@ -187,6 +187,11 @@
         <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Nome padrão das maquininhas (ex: "Getnet" vira Getnet 1, Getnet 2...)</label>
         <input type="text" id="c-maquininha-prefixo" placeholder="Maquininha" value="Maquininha" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
         <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
+          <input type="checkbox" id="c-maquininha-pos-habilitado" style="width:auto;margin:0;"> Habilitar seção Maquininha POS 01 (loja que vende depois da meia-noite)
+        </label>
+        <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Valor lançado aqui soma no fechamento do dia e é descontado automaticamente no fechamento do dia seguinte (evita contar a mesma venda 2x).</label>
+        <input type="text" id="c-maquininha-pos-prefixo" placeholder="Maquininha POS" value="Maquininha POS" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
           <input type="checkbox" id="c-saidas-habilitado" style="width:auto;margin:0;" checked> Habilitar seção Outras saídas de caixa
         </label>
       </fieldset>
@@ -241,6 +246,11 @@
       </label>
       <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Nome padrão das maquininhas (ex: "Getnet" vira Getnet 1, Getnet 2...)</label>
       <input type="text" id="e-maquininha-prefixo" placeholder="Maquininha" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
+        <input type="checkbox" id="e-maquininha-pos-habilitado" style="width:auto;margin:0;"> Habilitar seção Maquininha POS 01 (loja que vende depois da meia-noite)
+      </label>
+      <label style="display:block;font-size:11px;color:var(--muted);margin:6px 0 4px 22px;">Valor lançado aqui soma no fechamento do dia e é descontado automaticamente no fechamento do dia seguinte (evita contar a mesma venda 2x).</label>
+      <input type="text" id="e-maquininha-pos-prefixo" placeholder="Maquininha POS" style="margin-left:22px;width:calc(100% - 22px);padding:8px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;box-sizing:border-box;">
       <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin-top:10px;">
         <input type="checkbox" id="e-saidas-habilitado" style="width:auto;margin:0;"> Habilitar seção Outras saídas de caixa
       </label>
@@ -479,6 +489,8 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     caixaHabilitado: document.getElementById('c-caixa-habilitado').checked,
     maquininhasHabilitado: document.getElementById('c-maquininhas-habilitado').checked,
     maquininhaPrefixo: document.getElementById('c-maquininha-prefixo').value,
+    maquininhaPosHabilitado: document.getElementById('c-maquininha-pos-habilitado').checked,
+    maquininhaPosPrefixo: document.getElementById('c-maquininha-pos-prefixo').value,
     saidasHabilitado: document.getElementById('c-saidas-habilitado').checked,
     canaisVendaExtras: lerKpis('c-canais'),
     formasPagamentoExtras: lerKpis('c-formas'),
@@ -494,6 +506,8 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
     document.getElementById('c-caixa-habilitado').checked = true;
     document.getElementById('c-maquininhas-habilitado').checked = true;
     document.getElementById('c-maquininha-prefixo').value = 'Maquininha';
+    document.getElementById('c-maquininha-pos-habilitado').checked = false;
+    document.getElementById('c-maquininha-pos-prefixo').value = 'Maquininha POS';
     document.getElementById('c-saidas-habilitado').checked = true;
     document.getElementById('c-canais').innerHTML = '';
     document.getElementById('c-formas').innerHTML = '';
@@ -514,6 +528,8 @@ function abrirEdicaoGrupo(id){
   document.getElementById('e-caixa-habilitado').checked = g.caixaHabilitado !== false;
   document.getElementById('e-maquininhas-habilitado').checked = g.maquininhasHabilitado !== false;
   document.getElementById('e-maquininha-prefixo').value = g.maquininhaPrefixo || 'Maquininha';
+  document.getElementById('e-maquininha-pos-habilitado').checked = g.maquininhaPosHabilitado === true;
+  document.getElementById('e-maquininha-pos-prefixo').value = g.maquininhaPosPrefixo || 'Maquininha POS';
   document.getElementById('e-saidas-habilitado').checked = g.saidasHabilitado !== false;
   document.getElementById('e-canais').innerHTML = '';
   (g.canaisVendaExtras||[]).forEach(k=>adicionarKpi('e-canais', k.label, null, k.operacao, k.tambemNoOutroTotal));
@@ -537,6 +553,8 @@ document.getElementById('grupo-form').addEventListener('submit', async (e)=>{
     caixaHabilitado: document.getElementById('e-caixa-habilitado').checked,
     maquininhasHabilitado: document.getElementById('e-maquininhas-habilitado').checked,
     maquininhaPrefixo: document.getElementById('e-maquininha-prefixo').value,
+    maquininhaPosHabilitado: document.getElementById('e-maquininha-pos-habilitado').checked,
+    maquininhaPosPrefixo: document.getElementById('e-maquininha-pos-prefixo').value,
     saidasHabilitado: document.getElementById('e-saidas-habilitado').checked,
     canaisVendaExtras: lerKpis('e-canais'),
     formasPagamentoExtras: lerKpis('e-formas'),
