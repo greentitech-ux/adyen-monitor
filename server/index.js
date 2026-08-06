@@ -816,7 +816,6 @@ const FECHAMENTO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
-  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
@@ -841,7 +840,6 @@ const INVENTARIO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
-  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dom Tirol',
 };
@@ -852,7 +850,6 @@ const INVENTARIO_UNIDADES_NOMES = {
 // lançamento. O Master pode liberar mais conforme novas unidades entrarem
 // (o app de entregas ainda esta sendo migrado loja a loja do AppSheet).
 const ENTREGAS_UNIDADES_NOMES = {
-  'Tirol Natal': 'Dom Natal',
   'MMTirol Natal': 'Milky Moo Tirol Natal (Entregas)',
   Bessa: 'Dom Bessa',
   Caruaru: 'Dom Caruaru',
@@ -871,7 +868,6 @@ const UNIDADES_APELIDOS = {
   '19889': 'Dom Tatuape', 'DOM_19889': 'Dom Tatuape', Tatuape: 'Dom Tatuape',
   '19821': 'Dom Sao Miguel', 'DOM__19821': 'Dom Sao Miguel', 'Sao Miguel': 'Dom Sao Miguel',
   '19855': 'Dom Carrão', 'DOM__19855': 'Dom Carrão', Carrao: 'Dom Carrão',
-  DOM19940: 'Dom Natal', 'Tirol Natal': 'Dom Natal',
   DOM_19798: 'Dom Caruaru', Caruaru: 'Dom Caruaru', 'Dominos Caruaru': 'Dom Caruaru',
   DOM19911: 'Dom Garanhuns', Garanhuns: 'Dom Garanhuns', 'Dominos Garanhuns': 'Dom Garanhuns',
   DOM_19706: 'Dom Bessa', Bessa: 'Dom Bessa', 'Dominos Bessa': 'Dom Bessa',
@@ -891,7 +887,7 @@ const UNIDADES_APELIDOS = {
 // Usuarios; nao afeta em nada o filtro de permissao em si
 const ARCFOOD_FECHAMENTO = new Set(['19821', '19855', '19888', '19889']);
 const ARCFOOD_MONITOR = new Set(['Mooca', 'Tatuape', 'Carrao', 'Sao Miguel', 'DOM___19888', 'DOM_19889', 'DOM__19821', 'DOM__19855']);
-const GBE_MONITOR = new Set(['DOM19940', 'DOM_19798', 'DOM19911', 'DOM_19706', 'DOM_19633']);
+const GBE_MONITOR = new Set(['DOM_19798', 'DOM19911', 'DOM_19706', 'DOM_19633']);
 function classificarUnidade(codigo) {
   if (ARCFOOD_FECHAMENTO.has(codigo)) return { secao: 'Fechamento', grupo: 'ARCFOOD' };
   if (ARCFOOD_MONITOR.has(codigo)) return { secao: 'Monitor / Disputas (Adyen)', grupo: 'ARCFOOD' };

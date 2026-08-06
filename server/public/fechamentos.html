@@ -402,7 +402,7 @@ let DATA = [];
 let IS_MASTER = false;
 const GRUPOS = {
   ARCFOOD: ['19821','19855','19888','19889'],
-  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Natal","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
+  BRAVO: ["Domino's Carrinho Aeroporto Recife","Dominos Bessa","Dominos Campina Grande","Dominos Caruaru","Dominos Garanhuns","Dominos Praça Aeroporto Recife","Dominos Tirol","Milky Moo Tirol","Spoleto Praça Aeroporto Recife","Spoleto Shopping Recife","Spoleto Shopping Tacaruna","São Braz IL"],
 };
 const UNIDADES_NOMES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
 const BRAVO_UNIDADES_NOMES = {
@@ -411,7 +411,6 @@ const BRAVO_UNIDADES_NOMES = {
   'Dominos Campina Grande': 'Dom Campina Grande',
   'Dominos Caruaru': 'Dom Caruaru',
   'Dominos Garanhuns': 'Dom Garanhuns',
-  'Dominos Natal': 'Dom Natal',
   'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
   'Dominos Tirol': 'Dom Tirol',
   'Milky Moo Tirol': 'MilkyMoo Tirol',
@@ -936,8 +935,12 @@ function renderKpis(rows){
   }
   const deltaFat = delta(faturamento, faturamentoAnt);
 
+  const roster = SEL_UNIDADE.size ? [...SEL_UNIDADE] : codigosDoGrupo();
+  const unidadesFecharam = new Set(rows.map(d=>d.unidade));
+  const lojasFecharam = roster.filter(c=>unidadesFecharam.has(c)).length;
+
   const kpis = [
-    {lbl:'Fechamentos', val:rows.length, cls:''},
+    {lbl:'Fechamentos', val:`${lojasFecharam} de ${roster.length}`, cls:''},
     {lbl:'Faturamento', val:fmtMoney(faturamento), cls:'ok', delta:deltaFat},
     {lbl:'Total declarado', val:fmtMoney(declarado), cls:''},
     {lbl:'Diferença de caixa', val:fmtMoney(diferenca), cls: diferenca<0?'bad':(diferenca>0?'warn':'ok')},
