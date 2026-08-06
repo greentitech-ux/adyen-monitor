@@ -2733,12 +2733,12 @@ app.put('/api/entregas/regras/:unidade', auth.requireMaster, async (req, res) =>
 
 app.post('/api/entregas/lancar', requireSection('entregas-lancamento'), upload.single('etiqueta'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, encostaRemovida, motivoRemocaoEncosta } = JSON.parse(req.body.payload || '{}');
+    const { unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos } = JSON.parse(req.body.payload || '{}');
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await entregasLive.create({
-      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, encostaRemovida, motivoRemocaoEncosta,
+      unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos,
       etiquetaFile: req.file || null,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
@@ -2824,14 +2824,14 @@ function prepararEntregasPorUnidade(rows) {
   return { colunas, linhas };
 }
 
-const MOTIVOS_REMOCAO_ENCOSTA_LABEL = { atraso: 'Atraso', saiu_antes: 'Saiu antes do fim do turno', prejuizo: 'Gerou prejuízo', outro: 'Outro' };
+const MOTIVOS_REMOCAO_CAMPO_LABEL = { atraso: 'Atraso', saiu_antes: 'Saiu antes do fim do turno', prejuizo: 'Gerou prejuízo', outro: 'Outro' };
 
 function prepararEntregasLancamentos(rows) {
   const colunas = [
     { key: 'data', label: 'Data' }, { key: 'unidade', label: 'Unid.' }, { key: 'entregador', label: 'Entregador' },
     { key: 'entrega', label: 'Entregas' }, { key: 'retorno', label: 'Retorno' }, { key: 'extra', label: 'Extra' },
     { key: 'pos00hs', label: 'Pos 00hs' }, { key: 'foraDeArea', label: 'Fora área' }, { key: 'bonus', label: 'Bônus' },
-    { key: 'ajudaCusto', label: 'Ajuda custo' }, { key: 'encostaRemovida', label: 'Encosta removida' },
+    { key: 'ajudaCusto', label: 'Ajuda custo' }, { key: 'camposRemovidos', label: 'Campos removidos' },
     { key: 'valor', label: 'Valor' }, { key: 'coopRecebe', label: 'COOP' },
     { key: 'quantTotal', label: 'Qtd. total' }, { key: 'observacao', label: 'Observação' },
   ];
@@ -2839,7 +2839,9 @@ function prepararEntregasLancamentos(rows) {
     data: reportUtil.fmtDataBR(d.data), unidade: unidadeNomeEntrega(d), entregador: d.entregador || '—',
     entrega: d.entrega || 0, retorno: d.retorno || 0, extra: d.extra || 0, pos00hs: d.pos00hs || 0, foraDeArea: d.foraDeArea || 0,
     bonus: reportUtil.fmtMoneyBR(d.bonus), ajudaCusto: reportUtil.fmtMoneyBR(d.ajudaCusto),
-    encostaRemovida: d.encostaRemovida ? (MOTIVOS_REMOCAO_ENCOSTA_LABEL[d.motivoRemocaoEncosta] || 'Sim') : '—',
+    camposRemovidos: (d.camposRemovidos && d.camposRemovidos.length)
+      ? `${d.camposRemovidos.join(', ')} (${MOTIVOS_REMOCAO_CAMPO_LABEL[d.motivoRemocaoCampos] || 'Sim'})`
+      : '—',
     valor: reportUtil.fmtMoneyBR(d.valor), coopRecebe: reportUtil.fmtMoneyBR(d.coopRecebe),
     quantTotal: d.quantTotal || 0, observacao: d.observacao || '—',
   }));

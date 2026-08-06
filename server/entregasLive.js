@@ -26,7 +26,7 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function create({ unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, encostaRemovida, motivoRemocaoEncosta, etiquetaFile, criadoPorId, criadoPorEmail }) {
+async function create({ unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos, etiquetaFile, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
   if (!entregador || !String(entregador).trim()) throw new Error('Nome do entregador é obrigatório.');
@@ -36,23 +36,30 @@ async function create({ unidade, unidadeNome, data, entregador, campos, obsRetor
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
 
   // unidade com regra "fixo": o servidor calcula ajudaCusto/valor/coopRecebe
-  // a partir das contagens + da tabela de valores da unidade - nunca confia
-  // no que o cliente mandou pra esses 3 campos (evita loja "ajustar" o
-  // próprio pagamento). Unidade "plataforma" (sem valor fixo, ex: paga o que
-  // a GAMI/NEXT informar) mantém os valores digitados normalmente.
+  // a partir das contagens + da lista de campos de valor da unidade (ver
+  // entregasRegras.js) - nunca confia no que o cliente mandou pra esses
+  // campos (evita loja "ajustar" o próprio pagamento). Unidade "plataforma"
+  // (sem valor fixo, ex: paga o que a GAMI/NEXT informar) mantém os valores
+  // digitados normalmente.
   const regra = await entregasRegras.getPara(unidade);
-  registro.encostaRemovida = !!encostaRemovida;
-  registro.motivoRemocaoEncosta = registro.encostaRemovida
-    ? (entregasRegras.MOTIVOS_REMOCAO_ENCOSTA.includes(motivoRemocaoEncosta) ? motivoRemocaoEncosta : 'outro')
+  const camposValidosRemovidos = Array.isArray(camposRemovidos)
+    ? camposRemovidos.filter((c) => (regra.camposValor || []).some((r) => r.campo === c && r.removivelPelaLoja))
+    : [];
+  registro.camposRemovidos = camposValidosRemovidos;
+  registro.motivoRemocaoCampos = camposValidosRemovidos.length
+    ? (entregasRegras.MOTIVOS_REMOCAO_CAMPO.includes(motivoRemocaoCampos) ? motivoRemocaoCampos : 'outro')
     : null;
+  registro.detalhesValor = [];
   if (regra.modo === 'fixo') {
     const calculado = entregasRegras.calcular(regra, {
-      entrega: registro.entrega, retorno: registro.retorno, extra: registro.extra, foraDeArea: registro.foraDeArea,
-      encostaRemovida: registro.encostaRemovida,
+      data: registro.data, entrega: registro.entrega, retorno: registro.retorno, extra: registro.extra, foraDeArea: registro.foraDeArea,
+      camposRemovidos: camposValidosRemovidos,
     });
     registro.ajudaCusto = calculado.ajudaCusto;
     registro.valor = calculado.valor;
     registro.coopRecebe = calculado.coopRecebe;
+    registro.quantTotal = calculado.quantTotal;
+    registro.detalhesValor = calculado.detalhesValor;
     registro.bonus = 0; // Bônus (Gami/NEXT) só existe em unidade "plataforma" - ver abaixo
   }
 

@@ -183,22 +183,21 @@
         <input type="number" step="0.01" inputmode="decimal" id="f-coopRecebe" value="0">
       </div>
 
-      <!-- unidade "fixo" (tem tabela de valores configurada em Regras de
-           Entregas) - o servidor calcula tudo a partir das contagens acima;
-           aqui só mostramos a prévia e a opção de remover a Encosta -->
+      <!-- unidade "fixo" (tem sua propria lista de campos de valor,
+           configurada em Regras de Entregas) - o servidor calcula tudo a
+           partir das contagens acima; aqui só mostramos a prévia (por
+           campo) e a opção de remover algum campo específico daquele
+           entregador (ex: atrasou, saiu antes, gerou prejuízo) -->
       <div id="campos-calculados" class="hidden">
-        <div class="resumo">
-          <div class="linha"><span>Encosta/Ajuda de custo</span><b id="preview-ajudaCusto">R$ 0,00</b></div>
+        <div class="resumo" id="preview-detalhes"></div>
+        <div class="resumo" style="margin-top:8px;">
           <div class="linha"><span>Valor a pagar (calculado)</span><b id="preview-valor">R$ 0,00</b></div>
           <div class="linha"><span>COOP recebe (calculado)</span><b id="preview-coopRecebe">R$ 0,00</b></div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-family:var(--sans);font-size:12.5px;color:var(--text);">
-          <input type="checkbox" id="f-encostaRemovida" style="width:auto;">
-          Remover Encosta/Ajuda de custo desse entregador
-        </label>
-        <div id="wrap-motivo-encosta" class="hidden">
+        <div id="wrap-campos-removiveis"></div>
+        <div id="wrap-motivo-campos" class="hidden">
           <label>Motivo</label>
-          <select id="f-motivoRemocaoEncosta">
+          <select id="f-motivoRemocaoCampos">
             <option value="atraso">Atraso</option>
             <option value="saiu_antes">Saiu antes do fim do turno</option>
             <option value="prejuizo">Gerou prejuízo</option>
@@ -350,36 +349,76 @@ function regraAtual(){
   const unidade = document.getElementById('f-unidade').value;
   return REGRAS_POR_UNIDADE[unidade] || { modo:'plataforma' };
 }
+const DIAS_SEMANA_JS = ['dom','seg','ter','qua','qui','sex','sab']; // Date.getDay() ja retorna 0=dom
+function diaSemanaDe(dataIso){
+  if(!dataIso) return null;
+  return DIAS_SEMANA_JS[new Date(dataIso+'T00:00:00Z').getUTCDay()];
+}
 function atualizarModoUnidade(){
   const fixo = regraAtual().modo === 'fixo';
   document.getElementById('campos-manual').classList.toggle('hidden', fixo);
   document.getElementById('campos-calculados').classList.toggle('hidden', !fixo);
-  if(fixo) atualizarPreviewCalculado();
+  if(fixo){ renderCamposRemoviveis(); atualizarPreviewCalculado(); }
 }
+// checklist dinâmico - só os campos que o Master marcou como removíveis
+// pela loja aparecem aqui (varia por unidade, ver entregas-regras.html)
+function renderCamposRemoviveis(){
+  const regra = regraAtual();
+  const removiveis = (regra.camposValor||[]).filter(c=>c.removivelPelaLoja);
+  const wrap = document.getElementById('wrap-campos-removiveis');
+  wrap.innerHTML = removiveis.map(c=>`
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-family:var(--sans);font-size:12.5px;color:var(--text);">
+      <input type="checkbox" class="chk-campo-removido" data-campo="${escapeHtml(c.campo)}" style="width:auto;">
+      Remover ${escapeHtml(c.label)} desse entregador
+    </label>`).join('');
+  wrap.querySelectorAll('.chk-campo-removido').forEach(chk=>{
+    chk.addEventListener('change', ()=>{
+      const algum = [...wrap.querySelectorAll('.chk-campo-removido')].some(c=>c.checked);
+      document.getElementById('wrap-motivo-campos').classList.toggle('hidden', !algum);
+      atualizarPreviewCalculado();
+    });
+  });
+}
+function camposRemovidosMarcados(){
+  return [...document.querySelectorAll('.chk-campo-removido:checked')].map(c=>c.dataset.campo);
+}
+// mesma conta de entregasRegras.js (calcular) - Extra/Retorno/Fora de área
+// e "flat" usam a taxa de cada campo (com dia da semana e meta, se tiverem);
+// COOP so soma os campos com destino coopRecebe (normalmente so Entrega)
 function atualizarPreviewCalculado(){
   const regra = regraAtual();
   if(regra.modo !== 'fixo') return;
-  const entrega = num(document.getElementById('f-entrega').value);
-  const retorno = num(document.getElementById('f-retorno').value);
-  const extra = num(document.getElementById('f-extra').value);
-  const foraDeArea = num(document.getElementById('f-foraDeArea').value);
-  const encostaRemovida = document.getElementById('f-encostaRemovida').checked;
-  const ajudaCusto = encostaRemovida ? 0 : num(regra.valorEncosta);
-  // mesma conta de entregasRegras.js (calcular): Extra paga a mesma taxa da
-  // Entrega; COOP só recebe sobre a soma de Entregas (nao soma extra/retorno/FA)
-  const valor = (entrega+extra)*num(regra.valorEntrega) + retorno*num(regra.valorRetorno) + foraDeArea*num(regra.valorFA) + ajudaCusto;
-  const coopRecebe = entrega*num(regra.valorCooperativa);
-  document.getElementById('preview-ajudaCusto').textContent = fmtMoney(ajudaCusto);
+  const contagens = {
+    entrega: num(document.getElementById('f-entrega').value),
+    retorno: num(document.getElementById('f-retorno').value),
+    extra: num(document.getElementById('f-extra').value),
+    foraDeArea: num(document.getElementById('f-foraDeArea').value),
+  };
+  contagens.quantTotal = contagens.entrega + contagens.retorno + contagens.extra;
+  const dia = diaSemanaDe(document.getElementById('f-data').value);
+  const removidos = new Set(camposRemovidosMarcados());
+  let valor = 0, coopRecebe = 0;
+  const linhas = (regra.camposValor||[]).map(c=>{
+    if(removidos.has(c.campo)) return {label:c.label, valor:0, removido:true};
+    let taxa = (dia && c.valoresPorDiaSemana && c.valoresPorDiaSemana[dia]!=null) ? num(c.valoresPorDiaSemana[dia]) : num(c.valorPadrao);
+    if(c.meta){
+      const contagemMeta = contagens[c.meta.baseContagem] ?? 0;
+      if(contagemMeta < num(c.meta.minimo)) taxa = num(c.meta.valorParcial);
+    }
+    const valorCampo = c.base==='flat' ? taxa : (contagens[c.base]||0)*taxa;
+    if(c.destino==='coopRecebe') coopRecebe += valorCampo; else valor += valorCampo;
+    return {label:c.label, valor:valorCampo, removido:false};
+  });
+  document.getElementById('preview-detalhes').innerHTML = linhas.map(l=>
+    `<div class="linha"><span>${escapeHtml(l.label)}${l.removido?' (removido)':''}</span><b style="${l.removido?'color:var(--muted);text-decoration:line-through;':''}">${fmtMoney(l.valor)}</b></div>`
+  ).join('') || '<div class="linha"><span style="color:var(--muted);">nenhum campo configurado ainda</span></div>';
   document.getElementById('preview-valor').textContent = fmtMoney(valor);
   document.getElementById('preview-coopRecebe').textContent = fmtMoney(coopRecebe);
 }
 document.getElementById('f-unidade').addEventListener('change', atualizarModoUnidade);
+document.getElementById('f-data').addEventListener('change', atualizarPreviewCalculado);
 ['f-entrega','f-retorno','f-extra','f-foraDeArea'].forEach(id=>{
   document.getElementById(id).addEventListener('input', atualizarPreviewCalculado);
-});
-document.getElementById('f-encostaRemovida').addEventListener('change', (ev)=>{
-  document.getElementById('wrap-motivo-encosta').classList.toggle('hidden', !ev.target.checked);
-  atualizarPreviewCalculado();
 });
 
 async function carregar(){
@@ -411,7 +450,7 @@ function renderLista(){
         <span>${escapeHtml(f.entregador)} · ${escapeHtml(f.unidadeNome||f.unidade)} · ${fmtData(f.data)}</span>
         ${pendente?'<span class="badge PENDENTE">correção pendente</span>':''}
         ${decidida?`<span class="badge ${decidida.status}">${decidida.status==='APROVADO'?'correção aprovada':'correção rejeitada'}</span>`:''}
-        ${f.encostaRemovida?`<span class="badge REJEITADO" title="Encosta/Ajuda de custo removida">Sem Encosta · ${escapeHtml(MOTIVOS_REMOCAO_LABEL[f.motivoRemocaoEncosta]||'—')}</span>`:''}
+        ${(f.camposRemovidos&&f.camposRemovidos.length)?`<span class="badge REJEITADO" title="${escapeHtml(f.camposRemovidos.join(', '))}">Campo(s) removido(s) · ${escapeHtml(MOTIVOS_REMOCAO_LABEL[f.motivoRemocaoCampos]||'—')}</span>`:''}
       </div>
       <div class="sub">lançado em ${new Date(f.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}${f.etiquetaPath?' · <a href="/api/entregas/etiqueta/'+f.id+'?token='+encodeURIComponent(AUTH_TOKEN)+'" target="_blank" style="color:var(--accent);">📎 etiqueta</a>':''}</div>
       <div class="valores">
@@ -514,7 +553,7 @@ function resetarForm(){
   document.getElementById('form-lancar').reset();
   document.getElementById('f-data').value = hojeBrasilia();
   CAMPOS_NUMERICOS.forEach(c=>{ const el = document.getElementById('f-'+c); if(el) el.value = 0; });
-  document.getElementById('wrap-motivo-encosta').classList.add('hidden');
+  document.getElementById('wrap-motivo-campos').classList.add('hidden');
   atualizarSugestao();
   atualizarModoUnidade();
 }
@@ -542,7 +581,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       const el = document.getElementById('f-'+c);
       campos[c] = el ? el.value : 0;
     });
-    const encostaRemovida = document.getElementById('f-encostaRemovida').checked;
+    const camposRemovidos = camposRemovidosMarcados();
     const payload = {
       unidade,
       unidadeNome: UNIDADES_NOMES[unidade] || unidade,
@@ -552,8 +591,8 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       obsRetorno: document.getElementById('f-obsRetorno').value,
       obsExtra: document.getElementById('f-obsExtra').value,
       observacao: document.getElementById('f-observacao').value,
-      encostaRemovida,
-      motivoRemocaoEncosta: encostaRemovida ? document.getElementById('f-motivoRemocaoEncosta').value : null,
+      camposRemovidos,
+      motivoRemocaoCampos: camposRemovidos.length ? document.getElementById('f-motivoRemocaoCampos').value : null,
     };
     const form = new FormData();
     form.append('payload', JSON.stringify(payload));

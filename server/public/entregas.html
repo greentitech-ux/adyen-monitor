@@ -245,6 +245,12 @@ const SEL_UNIDADE = new Set();
 let IS_MASTER = false;
 
 function fmtMoney(v){ return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+// resumo (tooltip) do detalhamento por campo de valor, quando a unidade usa
+// regra "fixo" (ver entregasRegras.js) - registros manuais/históricos nao tem isso
+function detalhesValorTitle(d){
+  if(!d.detalhesValor || !d.detalhesValor.length) return '';
+  return d.detalhesValor.map(l=>`${l.label}: ${fmtMoney(l.valor)}${l.removido?' (removido)':''}`).join(' · ');
+}
 function fmtData(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 const FUSO_BR = 'America/Sao_Paulo';
@@ -623,7 +629,7 @@ function renderTabela(rows){
       <td class="valor">${d.pos00hs}</td>
       <td class="valor">${d.foraDeArea}</td>
       <td class="valor">${fmtMoney(d.bonus)}</td>
-      <td class="valor" title="${d.encostaRemovida?('Removida - '+escapeHtml(MOTIVOS_REMOCAO_LABEL[d.motivoRemocaoEncosta]||'')):''}">${fmtMoney(d.ajudaCusto)}${d.encostaRemovida?' <span style="color:var(--bad);">✕</span>':''}</td>
+      <td class="valor" title="${escapeHtml(detalhesValorTitle(d))}">${fmtMoney(d.ajudaCusto)}${(d.camposRemovidos&&d.camposRemovidos.length)?' <span style="color:var(--bad);" title="'+escapeHtml(d.camposRemovidos.join(', ')+' removido(s) - '+(MOTIVOS_REMOCAO_LABEL[d.motivoRemocaoCampos]||''))+'">✕</span>':''}</td>
       <td class="valor">${fmtMoney(d.valor)}</td>
       <td class="valor">${fmtMoney(d.coopRecebe)}</td>
       <td class="valor">${d.quantTotal}</td>

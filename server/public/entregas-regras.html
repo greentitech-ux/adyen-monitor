@@ -22,7 +22,7 @@
   @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:640px;}
+  .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:680px;}
   header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
@@ -51,18 +51,20 @@
   @media(max-width:640px){ .panel{padding:14px;} }
   .panel h2{font-size:13px;margin:0 0 14px;}
   .tablewrap{overflow-x:auto;}
-  table{width:100%;min-width:760px;border-collapse:collapse;font-size:12.5px;}
+  table{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px;}
   thead th{text-align:left;font-family:var(--mono);font-weight:500;color:var(--muted);text-transform:uppercase;font-size:9.5px;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--line);}
   tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
-  .valor{font-family:var(--mono);font-variant-numeric:tabular-nums;}
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
   .badge.fixo{background:var(--ok-dim);color:var(--ok);}
   .badge.plataforma{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:360px;}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);white-space:nowrap;}
+  .tag.removivel{border-color:var(--warn);color:var(--warn);}
   .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .rowacts button:hover{border-color:var(--accent);}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:20;}
   .overlay.show{display:flex;}
-  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:480px;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:100%;max-width:640px;}
   .modal h3{margin:0 0 4px;font-size:14px;}
   .modal .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
   .modal label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;}
@@ -71,8 +73,22 @@
   .modo-radios{display:flex;gap:14px;margin-top:6px;}
   .modo-radios label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text);margin:0;}
   .modo-radios input{width:auto;}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
   .campos-fixo{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;}
+  .campo-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px;}
+  .campo-card .linha-topo{display:flex;gap:8px;align-items:flex-start;}
+  .campo-card .linha-topo input[data-f=label]{flex:1;}
+  .campo-card .btn-remover-campo{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:34px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .campo-card .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin-top:8px;}
+  .campo-card .grid2 > div{margin-top:0;}
+  .campo-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:10px;}
+  .campo-toggle input{width:auto;}
+  .semana-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px;}
+  .semana-grid div{display:flex;flex-direction:column;gap:2px;}
+  .semana-grid label{font-size:9.5px;text-align:center;margin:0;text-transform:uppercase;}
+  .semana-grid input{padding:6px 4px;font-size:11px;text-align:center;}
+  .meta-wrap,.semana-wrap{display:none;border-top:1px dashed var(--line);margin-top:10px;padding-top:10px;}
+  .meta-wrap.show,.semana-wrap.show{display:block;}
+  .btn-add-campo{margin-top:10px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:9px 10px;font-size:12.5px;font-family:var(--sans);cursor:pointer;width:100%;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
   .modal-actions button{font-family:var(--sans);font-size:12.5px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
   .modal-actions button.primary{border:none;background:var(--accent);color:#06121a;font-weight:600;}
@@ -88,7 +104,7 @@
       <div>
         <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
         <h1>Regras de Entregas</h1>
-        <div class="sub-intro">Cada unidade tem sua própria tabela de valores (R$ por Entrega, Retorno, Fora de Área e Encosta/Ajuda de Custo, além de quanto a Cooperativa recebe por Entrega). Unidades sem valor fixo (ex: pagamento definido por uma plataforma como GAMI/NEXT) ficam no modo "Plataforma" - a loja continua digitando o valor à mão nesse caso.</div>
+        <div class="sub-intro">Cada unidade monta sua própria lista de campos de valor (Entrega, Retorno, Extra, Fora de Área, Encosta, Ajuda de Custo, Cooperativa, ou qualquer nome) - com taxa fixa ou variando por dia da semana, meta mínima com valor parcial, e opção de a loja remover aquele campo específico num lançamento (atraso, saiu antes, gerou prejuízo). Unidades sem regra ficam no modo "Plataforma" - a loja continua digitando o valor à mão (ex: pagamento definido pela GAMI/NEXT).</div>
       </div>
     </div>
   </div>
@@ -117,6 +133,7 @@
   <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
   <a class="back" href="/usuarios.html">👤 Usuários</a>
   <a class="back" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back" href="/estoque.html">📦 Estoque</a>
   <a class="back active" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
@@ -130,7 +147,7 @@
     <h2>Unidades</h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Unidade</th><th>Modo</th><th>Entrega</th><th>Retorno</th><th>Fora área</th><th>Encosta</th><th>Cooperativa</th><th>Atualizado</th><th></th></tr></thead>
+        <thead><tr><th>Unidade</th><th>Modo</th><th>Campos de valor</th><th>Atualizado</th><th></th></tr></thead>
         <tbody id="regras-body"></tbody>
       </table>
     </div>
@@ -145,7 +162,7 @@
     <label>Modo</label>
     <div class="modo-radios">
       <label><input type="radio" name="modo" value="plataforma" checked> Plataforma (sem valor fixo)</label>
-      <label><input type="radio" name="modo" value="fixo"> Valor fixo</label>
+      <label><input type="radio" name="modo" value="fixo"> Valor fixo (campos personalizados)</label>
     </div>
 
     <div id="campos-plataforma">
@@ -154,16 +171,8 @@
     </div>
 
     <div id="campos-fixo" class="campos-fixo hidden">
-      <div class="grid2">
-        <div><label>Valor por Entrega (R$)</label><input type="number" step="0.01" id="r-valorEntrega" value="0"></div>
-        <div><label>Valor por Retorno (R$)</label><input type="number" step="0.01" id="r-valorRetorno" value="0"></div>
-      </div>
-      <div class="grid2">
-        <div><label>Valor Fora de Área (R$)</label><input type="number" step="0.01" id="r-valorFA" value="0"></div>
-        <div><label>Valor Encosta/Ajuda de Custo (R$)</label><input type="number" step="0.01" id="r-valorEncosta" value="0"></div>
-      </div>
-      <label>Quanto a Cooperativa recebe por Entrega (R$)</label>
-      <input type="number" step="0.01" id="r-valorCooperativa" value="0">
+      <div id="lista-campos"></div>
+      <button type="button" class="btn-add-campo" onclick="adicionarCampo()">+ Adicionar campo de valor</button>
     </div>
 
     <p class="err hidden" id="regra-err"></p>
@@ -192,12 +201,16 @@ function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 const FUSO_BR = 'America/Sao_Paulo';
 
+const BASES = [ ['entrega','Entrega'], ['retorno','Retorno'], ['extra','Extra'], ['foraDeArea','Fora de Área'], ['flat','Valor fixo por lançamento'] ];
+const DESTINOS = [ ['valor','Soma no Valor a pagar'], ['coopRecebe','Soma no repasse da Cooperativa'] ];
+const DIAS_SEMANA = [ ['dom','Dom'], ['seg','Seg'], ['ter','Ter'], ['qua','Qua'], ['qui','Qui'], ['sex','Sex'], ['sab','Sáb'] ];
+
 let UNIDADES = [];
 let REGRAS = [];
 let EDITANDO_UNIDADE = null;
 
 function regraDaUnidade(codigo){
-  return REGRAS.find(r=>r.unidade===codigo) || { unidade: codigo, modo:'plataforma', plataformaNome:'', valorEntrega:0, valorRetorno:0, valorFA:0, valorEncosta:0, valorCooperativa:0, atualizadoEm:null };
+  return REGRAS.find(r=>r.unidade===codigo) || { unidade: codigo, modo:'plataforma', plataformaNome:'', camposValor:[], atualizadoEm:null };
 }
 
 function renderRegras(){
@@ -205,19 +218,18 @@ function renderRegras(){
   document.getElementById('regras-body').innerHTML = unidadesEntregas.length ? unidadesEntregas.map(u=>{
     const r = regraDaUnidade(u.codigo);
     const fixo = r.modo==='fixo';
+    const tags = fixo
+      ? (r.camposValor||[]).map(c=>`<span class="tag ${c.removivelPelaLoja?'removivel':''}" title="${c.destino==='coopRecebe'?'Cooperativa':'Valor a pagar'}${c.meta?' · tem meta':''}">${escapeHtml(c.label)}${c.base!=='flat'?' ('+escapeHtml(BASES.find(b=>b[0]===c.base)?.[1]||c.base)+')':''}</span>`).join('')
+      : `<span style="color:var(--muted);">${r.plataformaNome?escapeHtml(r.plataformaNome):'sem valor fixo'}</span>`;
     return `
     <tr>
       <td><b>${escapeHtml(u.nome)}</b></td>
-      <td><span class="badge ${r.modo}">${fixo?'Valor fixo':('Plataforma'+(r.plataformaNome?' · '+escapeHtml(r.plataformaNome):''))}</span></td>
-      <td class="valor">${fixo?fmtMoney(r.valorEntrega):'—'}</td>
-      <td class="valor">${fixo?fmtMoney(r.valorRetorno):'—'}</td>
-      <td class="valor">${fixo?fmtMoney(r.valorFA):'—'}</td>
-      <td class="valor">${fixo?fmtMoney(r.valorEncosta):'—'}</td>
-      <td class="valor">${fixo?fmtMoney(r.valorCooperativa):'—'}</td>
+      <td><span class="badge ${r.modo}">${fixo?'Valor fixo':'Plataforma'}</span></td>
+      <td><div class="tags">${tags || '<span style="color:var(--muted);">nenhum campo ainda</span>'}</div></td>
       <td>${r.atualizadoEm ? new Date(r.atualizadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR}) : '<span style="color:var(--muted);">nunca configurada</span>'}</td>
       <td class="rowacts"><button type="button" onclick="abrirEdicao('${u.codigo}')">Editar</button></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px;">Nenhuma unidade de Entregas encontrada ainda.</td></tr>`;
+  }).join('') : `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px;">Nenhuma unidade de Entregas encontrada ainda.</td></tr>`;
 }
 
 document.querySelectorAll('input[name=modo]').forEach(r=>{
@@ -227,6 +239,85 @@ document.querySelectorAll('input[name=modo]').forEach(r=>{
     document.getElementById('campos-plataforma').classList.toggle('hidden', fixo);
   });
 });
+
+// ---------- construtor de campos de valor (um "card" por campo) ----------
+function campoCardHtml(c){
+  c = c || { campo:'', label:'', base:'flat', destino:'valor', valorPadrao:0, valoresPorDiaSemana:null, meta:null, removivelPelaLoja:false };
+  const temSemana = !!c.valoresPorDiaSemana;
+  const temMeta = !!c.meta;
+  return `
+    <div class="campo-card" data-campo="${escapeHtml(c.campo||'')}">
+      <div class="linha-topo">
+        <input type="text" data-f="label" placeholder="Nome do campo (ex: Ajuda de Custo)" value="${escapeHtml(c.label||'')}" required>
+        <button type="button" class="btn-remover-campo" onclick="this.closest('.campo-card').remove()">✕</button>
+      </div>
+      <div class="grid2">
+        <div><label>Aplica sobre</label>
+          <select data-f="base">${BASES.map(b=>`<option value="${b[0]}" ${c.base===b[0]?'selected':''}>${b[1]}</option>`).join('')}</select>
+        </div>
+        <div><label>Destino</label>
+          <select data-f="destino">${DESTINOS.map(d=>`<option value="${d[0]}" ${c.destino===d[0]?'selected':''}>${d[1]}</option>`).join('')}</select>
+        </div>
+      </div>
+      <label>Valor padrão (R$)</label>
+      <input type="number" step="0.01" data-f="valorPadrao" value="${c.valorPadrao||0}">
+
+      <label class="campo-toggle"><input type="checkbox" data-f="temSemana" ${temSemana?'checked':''}> Varia por dia da semana</label>
+      <div class="semana-wrap ${temSemana?'show':''}" data-w="semana">
+        <div class="semana-grid">
+          ${DIAS_SEMANA.map(d=>`<div><label>${d[1]}</label><input type="number" step="0.01" data-dia="${d[0]}" value="${c.valoresPorDiaSemana&&c.valoresPorDiaSemana[d[0]]!=null?c.valoresPorDiaSemana[d[0]]:''}" placeholder="${c.valorPadrao||0}"></div>`).join('')}
+        </div>
+      </div>
+
+      <label class="campo-toggle"><input type="checkbox" data-f="temMeta" ${temMeta?'checked':''}> Tem meta mínima (senão usa valor parcial)</label>
+      <div class="meta-wrap ${temMeta?'show':''}" data-w="meta">
+        <div class="grid2">
+          <div><label>Meta mínima em</label>
+            <select data-f="metaBase">${BASES.filter(b=>b[0]!=='flat').concat([['quantTotal','Total (Entrega+Retorno+Extra)']]).map(b=>`<option value="${b[0]}" ${c.meta&&c.meta.baseContagem===b[0]?'selected':''}>${b[1]}</option>`).join('')}</select>
+          </div>
+          <div><label>Quantidade mínima</label>
+            <input type="number" step="1" data-f="metaMinimo" value="${c.meta?c.meta.minimo:0}">
+          </div>
+        </div>
+        <label>Valor parcial (se não bater a meta)</label>
+        <input type="number" step="0.01" data-f="metaValorParcial" value="${c.meta?c.meta.valorParcial:0}">
+      </div>
+
+      <label class="campo-toggle"><input type="checkbox" data-f="removivelPelaLoja" ${c.removivelPelaLoja?'checked':''}> Loja pode remover esse campo no lançamento (atraso, saiu antes, gerou prejuízo)</label>
+    </div>`;
+}
+function adicionarCampo(c){
+  document.getElementById('lista-campos').insertAdjacentHTML('beforeend', campoCardHtml(c));
+  const card = document.getElementById('lista-campos').lastElementChild;
+  card.querySelector('[data-f=temSemana]').addEventListener('change', (e)=>card.querySelector('[data-w=semana]').classList.toggle('show', e.target.checked));
+  card.querySelector('[data-f=temMeta]').addEventListener('change', (e)=>card.querySelector('[data-w=meta]').classList.toggle('show', e.target.checked));
+}
+function lerCamposValor(){
+  return [...document.querySelectorAll('#lista-campos .campo-card')].map(card=>{
+    const label = card.querySelector('[data-f=label]').value.trim();
+    if(!label) return null;
+    const base = card.querySelector('[data-f=base]').value;
+    const destino = card.querySelector('[data-f=destino]').value;
+    const valorPadrao = card.querySelector('[data-f=valorPadrao]').value;
+    const temSemana = card.querySelector('[data-f=temSemana]').checked;
+    let valoresPorDiaSemana = null;
+    if(temSemana){
+      valoresPorDiaSemana = {};
+      card.querySelectorAll('[data-dia]').forEach(inp=>{
+        if(inp.value !== '') valoresPorDiaSemana[inp.dataset.dia] = inp.value;
+      });
+    }
+    const temMeta = card.querySelector('[data-f=temMeta]').checked;
+    const meta = temMeta ? {
+      ativo: true,
+      baseContagem: card.querySelector('[data-f=metaBase]').value,
+      minimo: card.querySelector('[data-f=metaMinimo]').value,
+      valorParcial: card.querySelector('[data-f=metaValorParcial]').value,
+    } : null;
+    const removivelPelaLoja = card.querySelector('[data-f=removivelPelaLoja]').checked;
+    return { campo: card.dataset.campo || undefined, label, base, destino, valorPadrao, valoresPorDiaSemana, meta, removivelPelaLoja };
+  }).filter(Boolean);
+}
 
 const regraOverlay = document.getElementById('regra-overlay');
 function abrirEdicao(codigo){
@@ -239,11 +330,8 @@ function abrirEdicao(codigo){
   document.getElementById('campos-fixo').classList.toggle('hidden', r.modo!=='fixo');
   document.getElementById('campos-plataforma').classList.toggle('hidden', r.modo==='fixo');
   document.getElementById('r-plataformaNome').value = r.plataformaNome || '';
-  document.getElementById('r-valorEntrega').value = r.valorEntrega || 0;
-  document.getElementById('r-valorRetorno').value = r.valorRetorno || 0;
-  document.getElementById('r-valorFA').value = r.valorFA || 0;
-  document.getElementById('r-valorEncosta').value = r.valorEncosta || 0;
-  document.getElementById('r-valorCooperativa').value = r.valorCooperativa || 0;
+  document.getElementById('lista-campos').innerHTML = '';
+  (r.camposValor||[]).forEach(c=>adicionarCampo(c));
   document.getElementById('regra-err').classList.add('hidden');
   regraOverlay.classList.add('show');
 }
@@ -256,11 +344,7 @@ document.getElementById('regra-form').addEventListener('submit', async (e)=>{
   const payload = {
     modo: document.querySelector('input[name=modo]:checked').value,
     plataformaNome: document.getElementById('r-plataformaNome').value,
-    valorEntrega: document.getElementById('r-valorEntrega').value,
-    valorRetorno: document.getElementById('r-valorRetorno').value,
-    valorFA: document.getElementById('r-valorFA').value,
-    valorEncosta: document.getElementById('r-valorEncosta').value,
-    valorCooperativa: document.getElementById('r-valorCooperativa').value,
+    camposValor: lerCamposValor(),
   };
   try{
     const res = await fetch('/api/entregas/regras/'+encodeURIComponent(EDITANDO_UNIDADE), {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
