@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Nova solicitação · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:560px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  p.intro{font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.5;}
+  .hidden{display:none!important;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  .ajuda{font-size:11px;color:var(--muted);margin:-2px 0 6px;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .sucesso{text-align:center;padding:36px 10px;}
+  .sucesso .icone{font-size:40px;margin-bottom:10px;}
+  .sucesso h2{font-size:16px;margin:0 0 8px;}
+  .sucesso p{font-size:13px;color:var(--muted);line-height:1.6;margin:0;}
+  .lista-anexos{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+  .anexo-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .anexo-item .anexo-nome{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .anexo-item .anexo-tam{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex:none;}
+  .btn-remover-anexo{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:28px;height:28px;font-size:14px;line-height:1;cursor:pointer;flex:none;}
+  .tipos{display:flex;gap:6px;flex-wrap:wrap;}
+  .tipo-btn{font-family:var(--sans);font-size:12px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
+  .tipo-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .linha-item{display:grid;grid-template-columns:1fr 72px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .btn-remover-item{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-add:hover{border-color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+  <h1 id="titulo-pagina">Nova solicitação</h1>
+  <p class="intro" id="intro-texto">Preencha os dados abaixo. Nossa equipe recebe na hora e dá andamento.</p>
+</header>
+
+<div id="sucesso" class="panel sucesso hidden">
+  <div class="icone">✅</div>
+  <h2>Solicitação enviada!</h2>
+  <p>Recebemos sua solicitação. Nossa equipe já foi avisada e vai dar andamento.</p>
+</div>
+
+<form id="form-solicitacao" class="panel">
+  <div class="secao" id="secao-tipo">
+    <div class="secao-titulo">O que você precisa</div>
+    <div class="tipos" id="tipos-btns"></div>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Loja</div>
+    <label>Loja *</label>
+    <select id="unidade" required>
+      <option value="" disabled selected>Carregando lojas...</option>
+    </select>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo" id="secao-detalhe-titulo">Detalhes</div>
+    <label id="titulo-label">Título *</label>
+    <input type="text" id="titulo" required>
+
+    <div id="wrap-itens" class="hidden">
+      <label>Itens</label>
+      <div id="lista-itens"></div>
+      <button type="button" class="btn-add" onclick="adicionarItem()">+ Adicionar item</button>
+    </div>
+
+    <div id="wrap-fornecedor" class="hidden">
+      <label>Fornecedor / de quem é a cobrança</label>
+      <input type="text" id="fornecedor" placeholder="ex: Comgás, Martin Brower, contador...">
+    </div>
+    <div id="wrap-vencimento" class="hidden">
+      <label>Data de vencimento</label>
+      <input type="date" id="vencimento">
+    </div>
+
+    <label>Observação</label>
+    <textarea id="observacao" placeholder="detalhe o que precisa"></textarea>
+
+    <label id="valor-label">Valor estimado (opcional)</label>
+    <input type="number" step="0.01" min="0" inputmode="decimal" id="valorEstimado">
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Anexo (opcional)</div>
+    <div class="ajuda">Foto, print ou PDF que ajude a entender o pedido. Até 4 arquivos, 10 MB cada.</div>
+    <input type="file" id="anexosInput" accept="image/*,.pdf" multiple>
+    <div id="lista-anexos" class="lista-anexos hidden"></div>
+  </div>
+
+  <div class="secao">
+    <div class="secao-titulo">Quem está pedindo (opcional)</div>
+    <label>Seu nome</label>
+    <input type="text" id="solicitanteNome">
+    <label>Seu contato (telefone/WhatsApp)</label>
+    <input type="tel" id="solicitanteContato" placeholder="(11) 99999-9999">
+  </div>
+
+  <button type="submit" class="btn-primary" id="btn-enviar">Enviar solicitação</button>
+  <div id="msg" class="msg hidden"></div>
+</form>
+
+<script>
+const TIPOS_INFO = {
+  compra: { label:'Compra', icone:'🛒', tituloLabel:'Título', tituloPlaceholder:'ex: comprar papel térmico', valorLabel:'Valor estimado (opcional)' },
+  manutencao: { label:'Manutenção', icone:'🔧', tituloLabel:'Solicitação', tituloPlaceholder:'ex: ar-condicionado sem gelar', valorLabel:'Valor (opcional - orçamento de terceiro)' },
+  'suporte-ti': { label:'Suporte de TI', icone:'💻', tituloLabel:'Solicitação', tituloPlaceholder:'ex: impressora não liga', valorLabel:'Valor (opcional - orçamento de terceiro)' },
+  pagamento: { label:'Pagamento (despesa)', icone:'💸', tituloLabel:'O que é a cobrança', tituloPlaceholder:'ex: fatura de gás de julho, boleto do fornecedor...', valorLabel:'Valor da cobrança (R$)' },
+  nota: { label:'Solicitação de Nota', icone:'📄', tituloLabel:'Referente a quê', tituloPlaceholder:'ex: nota fiscal da compra de equipamentos', valorLabel:'Valor (opcional)' },
+};
+const TIPOS_ORDEM = ['compra','manutencao','suporte-ti','pagamento','nota'];
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const params = new URLSearchParams(location.search);
+let TIPO_FIXO = params.get('tipo');
+if(!TIPOS_INFO[TIPO_FIXO]) TIPO_FIXO = null;
+let TIPO_ATUAL = TIPO_FIXO || 'compra';
+
+function renderTiposBtns(){
+  const wrap = document.getElementById('tipos-btns');
+  if(TIPO_FIXO){
+    document.getElementById('secao-tipo').classList.add('hidden');
+    return;
+  }
+  wrap.innerHTML = TIPOS_ORDEM.map(t=>`<button type="button" class="tipo-btn${t===TIPO_ATUAL?' active':''}" data-tipo="${t}" onclick="selecionarTipo('${t}')">${TIPOS_INFO[t].icone} ${TIPOS_INFO[t].label}</button>`).join('');
+}
+
+function selecionarTipo(tipo){
+  TIPO_ATUAL = tipo;
+  document.querySelectorAll('#tipos-btns .tipo-btn').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
+  aplicarCamposTipo();
+}
+
+function aplicarCamposTipo(){
+  const info = TIPOS_INFO[TIPO_ATUAL];
+  document.getElementById('titulo-pagina').textContent = `Nova solicitação · ${info.label}`;
+  document.getElementById('intro-texto').textContent = `Preencha os dados de ${info.label.toLowerCase()}. Nossa equipe recebe na hora e dá andamento.`;
+  document.getElementById('titulo-label').textContent = info.tituloLabel + ' *';
+  document.getElementById('titulo').placeholder = info.tituloPlaceholder;
+  document.getElementById('valor-label').textContent = info.valorLabel;
+  document.getElementById('wrap-itens').classList.toggle('hidden', TIPO_ATUAL!=='compra');
+  document.getElementById('wrap-fornecedor').classList.toggle('hidden', !['pagamento','nota'].includes(TIPO_ATUAL));
+  document.getElementById('wrap-vencimento').classList.toggle('hidden', TIPO_ATUAL!=='pagamento');
+  if(TIPO_ATUAL==='compra') renderItens();
+}
+
+// ---------- lista dinamica de itens (so tipo "compra") ----------
+let ITENS = [];
+let SEQ_ITEM = 0;
+function adicionarItem(){ ITENS.push({ id:++SEQ_ITEM, descricao:'', quantidade:'' }); renderItens(); }
+function removerItem(id){ ITENS = ITENS.filter(i=>i.id!==id); renderItens(); }
+function renderItens(){
+  document.getElementById('lista-itens').innerHTML = ITENS.map(i=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(i.descricao)}" oninput="ITENS.find(x=>x.id===${i.id}).descricao=this.value" placeholder="nome do item">
+      <input type="number" step="1" min="0" value="${i.quantidade}" oninput="ITENS.find(x=>x.id===${i.id}).quantidade=this.value" placeholder="qtd.">
+      <button type="button" class="btn-remover-item" onclick="removerItem(${i.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;margin-top:6px;">Nenhum item adicionado.</div>';
+}
+
+// ---------- anexos (mesmo padrao acumulativo do estorno-cliente.html) ----------
+let ANEXOS = [];
+const MAX_ANEXOS = 4, MAX_TAM = 10 * 1024 * 1024;
+function tamanhoLegivel(bytes){
+  if(bytes >= 1024*1024) return (bytes/1024/1024).toFixed(1)+' MB';
+  return Math.max(1, Math.round(bytes/1024))+' KB';
+}
+function renderAnexos(){
+  const wrap = document.getElementById('lista-anexos');
+  wrap.classList.toggle('hidden', !ANEXOS.length);
+  wrap.innerHTML = ANEXOS.map((f,i)=>`
+    <div class="anexo-item">
+      <span class="anexo-nome">${escapeHtml(f.name)}</span>
+      <span class="anexo-tam">${tamanhoLegivel(f.size)}</span>
+      <button type="button" class="btn-remover-anexo" data-i="${i}" title="Remover anexo">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.btn-remover-anexo').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ ANEXOS.splice(Number(btn.dataset.i),1); renderAnexos(); });
+  });
+}
+document.getElementById('anexosInput').addEventListener('change', (e)=>{
+  const msg = document.getElementById('msg');
+  msg.classList.add('hidden');
+  for(const f of e.target.files){
+    if(ANEXOS.length >= MAX_ANEXOS){
+      msg.textContent = `Máximo de ${MAX_ANEXOS} arquivos.`; msg.className = 'msg err'; msg.classList.remove('hidden');
+      break;
+    }
+    if(f.size > MAX_TAM){
+      msg.textContent = `O arquivo "${f.name}" passa de 10 MB.`; msg.className = 'msg err'; msg.classList.remove('hidden');
+      continue;
+    }
+    const repetido = ANEXOS.some(a=>a.name===f.name && a.size===f.size);
+    if(!repetido) ANEXOS.push(f);
+  }
+  e.target.value = '';
+  renderAnexos();
+});
+
+async function boot(){
+  renderTiposBtns();
+  aplicarCamposTipo();
+  const unidadeFixa = params.get('unidade');
+  try{
+    const unidades = await fetch('/api/meta/unidades-publico').then(r=>r.json());
+    const sel = document.getElementById('unidade');
+    if(unidadeFixa && unidades.some(u=>u.codigo===unidadeFixa)){
+      const nome = unidades.find(u=>u.codigo===unidadeFixa).nome;
+      sel.innerHTML = `<option value="${escapeHtml(unidadeFixa)}" selected>${escapeHtml(nome)}</option>`;
+      sel.disabled = true;
+    } else {
+      sel.innerHTML = '<option value="" disabled selected>Escolher</option>' +
+        unidades.map(u=>`<option value="${u.codigo}">${escapeHtml(u.nome)}</option>`).join('');
+    }
+  }catch(e){
+    document.getElementById('unidade').innerHTML = '<option value="" disabled selected>Erro ao carregar lojas - recarregue a página</option>';
+  }
+}
+
+document.getElementById('form-solicitacao').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  msg.classList.add('hidden');
+  const btn = document.getElementById('btn-enviar');
+
+  const payload = {
+    tipo: TIPO_ATUAL,
+    unidade: document.getElementById('unidade').value,
+    titulo: document.getElementById('titulo').value,
+    valorEstimado: document.getElementById('valorEstimado').value,
+    observacao: document.getElementById('observacao').value,
+    itens: TIPO_ATUAL==='compra' ? ITENS.map(i=>({descricao:i.descricao, quantidade:i.quantidade})) : [],
+    fornecedor: ['pagamento','nota'].includes(TIPO_ATUAL) ? document.getElementById('fornecedor').value : null,
+    vencimento: TIPO_ATUAL==='pagamento' ? (document.getElementById('vencimento').value || null) : null,
+    solicitanteNome: document.getElementById('solicitanteNome').value,
+    solicitanteContato: document.getElementById('solicitanteContato').value,
+  };
+
+  const fd = new FormData();
+  fd.append('payload', JSON.stringify(payload));
+  for(const f of ANEXOS) fd.append('anexos', f);
+
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const resp = await fetch('/api/solicitacoes/publico', { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar a solicitação.');
+    document.getElementById('form-solicitacao').classList.add('hidden');
+    document.getElementById('sucesso').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Enviar solicitação';
+  }
+});
+
+boot();
+</script>
+</body>
+</html>

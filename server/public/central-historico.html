@@ -312,6 +312,12 @@
       <button type="button" class="link-btn" id="btn-editar-card" onclick="abrirEdicaoCard()">✏️ Editar</button>
       <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCard()">🗑️ Excluir</button>
     </div>
+    <div id="d-responsavel" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">👤 Agente responsável</div>
+      <div class="sub" style="margin:-2px 0 8px;">Quem vai resolver esse ticket - qualquer Master/Admin do grupo pode decidir, mas dá pra apontar uma pessoa específica.</div>
+      <select id="d-responsavel-select"></select>
+      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarResponsavel()">Salvar responsável</button>
+    </div>
     <div id="d-editar" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;"></div>
     <div id="d-master-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div id="d-tecnico-wrap" class="hidden">
@@ -562,6 +568,10 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-master-crud').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
 
+  const podeReatribuir = IS_MASTER || IS_ADMIN;
+  document.getElementById('d-responsavel').classList.toggle('hidden', !podeReatribuir);
+  if(podeReatribuir) carregarResponsavelSelect(c);
+
   renderComprada(c);
 
   document.getElementById('overlay-detalhe').classList.remove('hidden');
@@ -621,6 +631,47 @@ async function marcarComprada(){
     await carregarCentral();
   }catch(err){ alert(err.message); }
 }
+// ---------- reatribuir o agente responsavel de um ticket ja existente
+// (Master/Admin) - qualquer tipo de solicitacao, independente do status.
+// Reaproveita o mesmo endpoint de responsaveis do grupo ja usado no
+// formulario de nova solicitacao (central.html) ----------
+async function carregarResponsavelSelect(c){
+  const sel = document.getElementById('d-responsavel-select');
+  sel.innerHTML = '<option value="">Qualquer Master/Admin do grupo</option>';
+  try{
+    const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(c.unidade)).then(r=>r.json());
+    lista.forEach(u=>{
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.dataset.email = u.email;
+      opt.textContent = u.email + (u.papel==='master' ? ' (Master)' : ' (Admin)');
+      if(u.id === c.direcionadoParaId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }catch(e){ /* mantem so a opcao padrao */ }
+}
+
+function rotaDirecionar(c){
+  if(c.tipo==='estorno') return `/api/refund-requests/${c.id}/direcionar`;
+  if(c.tipo==='ajuste-fechamento') return `/api/fechamentos/edicoes/${c.id}/direcionar`;
+  return `/api/solicitacoes/${c.id}/direcionar`;
+}
+
+async function salvarResponsavel(){
+  const c = DETALHE_ATUAL;
+  if(!c) return;
+  const sel = document.getElementById('d-responsavel-select');
+  const direcionadoParaId = sel.value || null;
+  const direcionadoParaEmail = direcionadoParaId ? (sel.selectedOptions[0]?.dataset.email || null) : null;
+  try{
+    const resp = await fetch(rotaDirecionar(c), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ direcionadoParaId, direcionadoParaEmail }) });
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao salvar responsável.');
+    DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
+    document.getElementById('d-sub').textContent = `${DETALHE_ATUAL.unidadeNome||DETALHE_ATUAL.unidade||'—'} · ${DETALHE_ATUAL.criadoPorEmail||''} · ${fmtDataHora(DETALHE_ATUAL.criadoEm)}` + (DETALHE_ATUAL.direcionadoParaEmail ? ` · direcionado a ${DETALHE_ATUAL.direcionadoParaEmail}` : '');
+    await carregarCentral();
+  }catch(err){ alert(err.message); }
+}
+
 async function desmarcarComprada(){
   if(!DETALHE_ATUAL) return;
   if(!confirm('Desmarcar como comprada?')) return;
