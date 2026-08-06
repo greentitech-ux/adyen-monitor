@@ -79,4 +79,30 @@ async function resolverBucket() {
   return admin.storage().bucket(candidatos()[0]);
 }
 
-module.exports = { resolverBucket, comBucket };
+// testa um upload minusculo de verdade em cada bucket candidato e devolve o
+// resultado individual (ok ou o erro cru do GCS) - usado pela rota de
+// diagnostico do Master pra descobrir em producao POR QUE os anexos estao
+// falhando (bucket inexistente? permissao? plano do Firebase?) sem precisar
+// garimpar o log do Render
+async function diagnostico() {
+  const resultados = [];
+  for (const nome of candidatos()) {
+    const bucket = admin.storage().bucket(nome);
+    const caminhoTeste = `diagnostico/teste-${Date.now()}.txt`;
+    try {
+      await bucket.file(caminhoTeste).save('teste de upload do diagnóstico', { contentType: 'text/plain' });
+      await bucket.file(caminhoTeste).delete({ ignoreNotFound: true });
+      resultados.push({ bucket: nome, ok: true });
+    } catch (err) {
+      resultados.push({ bucket: nome, ok: false, codigo: err?.code || null, erro: err?.message || String(err) });
+    }
+  }
+  return {
+    projectId: process.env.FIREBASE_PROJECT_ID || null,
+    envBucket: process.env.FIREBASE_STORAGE_BUCKET || null,
+    bucketFixado: bucketFixado ? bucketFixado.name : null,
+    resultados,
+  };
+}
+
+module.exports = { resolverBucket, comBucket, diagnostico };
