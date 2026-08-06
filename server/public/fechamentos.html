@@ -164,6 +164,7 @@
   .fech-modal textarea{resize:vertical;min-height:52px;}
   .fech-msg{margin-top:10px;font-size:12.5px;padding:9px 11px;border-radius:8px;}
   .fech-msg.err{background:var(--bad-dim);color:var(--bad);}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
   .fech-msg.ok{background:var(--ok-dim);color:var(--ok);}
 </style>
 </head>
@@ -182,6 +183,7 @@
   </div>
   <div class="header-nav">
     <div class="nav-actions">
+      <a class="back" href="/lancamento.html">➕ Adicionar Fechamento</a>
       <button class="back hidden" id="btn-sincronizar-planilhas" onclick="sincronizarPlanilhas()" style="cursor:pointer;">🔄 Sincronizar agora</button>
       <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
       <div class="nav-divider"></div>
@@ -292,7 +294,7 @@
       <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentosUnidades('pdf')">📄 Relatório PDF</button>
     </div>
   </h2>
-  <div class="tablewrap" style="max-height:none;overflow:visible;">
+  <div class="tablewrap" style="max-height:none;overflow-x:auto;overflow-y:visible;">
     <table>
       <thead><tr><th>Unid.</th><th>Previsão (mês)</th><th>Fechamentos</th><th>Faturamento</th><th>Diferença</th><th>TC total</th><th>Cancelados</th></tr></thead>
       <tbody id="unidades-body"></tbody>
@@ -341,6 +343,7 @@
     <h3 id="fech-modal-titulo">Editar fechamento</h3>
     <div class="sub" id="fech-modal-sub"></div>
     <div class="fech-msg hidden" id="fech-aviso-sangria" style="background:var(--warn-dim);color:var(--warn);"></div>
+    <div id="fech-sangrias-dia-lista"></div>
 
     <div class="secao-titulo">Responsável</div>
     <label>Gerente</label>
@@ -385,6 +388,33 @@
       <button type="button" class="back" style="cursor:pointer;color:var(--bad);border-color:var(--bad);margin-left:auto;" onclick="excluirFechamento(FECHAMENTO_EDITANDO_ID)">🗑️ Remover fechamento</button>
     </div>
     <div class="fech-msg hidden" id="fech-msg"></div>
+  </div>
+</div>
+
+<div class="fech-overlay hidden" id="overlay-sangria-editar" style="z-index:3100;">
+  <div class="fech-modal" style="max-width:420px;">
+    <h3>Editar sangria/depósito</h3>
+    <div class="sub" id="sangria-editar-info"></div>
+    <form id="form-sangria-editar">
+      <label>Valor retirado (R$)</label>
+      <input type="number" step="0.01" inputmode="decimal" id="se-valor" required>
+      <label>Data</label>
+      <input type="date" id="se-data" required>
+      <div class="fech-grid">
+        <div><label>Período de</label><input type="date" id="se-periodo-inicio" required></div>
+        <div><label>Período até</label><input type="date" id="se-periodo-fim" required></div>
+      </div>
+      <label>Nome de quem depositou</label>
+      <input type="text" id="se-nome-depositante" required>
+      <label>Observação</label>
+      <input type="text" id="se-descricao">
+      <div class="fech-msg hidden" id="msg-sangria-editar"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+        <button type="submit" class="back" style="background:var(--accent);color:#06202b;border-color:var(--accent);cursor:pointer;">💾 Salvar</button>
+        <button type="button" class="back" style="cursor:pointer;" onclick="fecharEditarSangria()">Cancelar</button>
+        <button type="button" class="back" style="cursor:pointer;color:var(--bad);border-color:var(--bad);margin-left:auto;" onclick="excluirSangria()">🗑️ Excluir</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -1541,8 +1571,9 @@ async function abrirEdicaoFechamento(id){
   const linhaMesclada = DATA.find(x=>x.id===id);
   const avisoSangria = document.getElementById('fech-aviso-sangria');
   const diferencaSaida = linhaMesclada ? +(num(linhaMesclada.totalSaida) - num(d.totalSaida)).toFixed(2) : 0;
+  document.getElementById('fech-sangrias-dia-lista').innerHTML = '';
   if(diferencaSaida > 0){
-    avisoSangria.textContent = `⚠️ Esse dia também tem ${fmtMoney(diferencaSaida)} de sangria/depósito registrada à parte - some no total exibido na tabela, mas não é editável aqui. Gerencie em Lançamento de fechamento › Últimas sangrias/depósitos registrados.`;
+    avisoSangria.innerHTML = `⚠️ Esse dia também tem ${fmtMoney(diferencaSaida)} de sangria/depósito registrada à parte - some no total exibido na tabela, mas não é editável junto com os campos acima. <button type="button" class="link-btn" style="color:inherit;text-decoration:underline;" onclick="abrirGerenciarSangriasDia('${d.unidade}','${d.data}')">Gerenciar sangrias desse dia</button>`;
     avisoSangria.classList.remove('hidden');
   } else {
     avisoSangria.classList.add('hidden');
@@ -1550,6 +1581,94 @@ async function abrirEdicaoFechamento(id){
 
   document.getElementById('fech-msg').classList.add('hidden');
   document.getElementById('fech-overlay').classList.remove('hidden');
+}
+
+// ---------- gerenciar sangrias/depositos de um dia especifico, direto da
+// tela de Fechamentos (antes so dava pra editar em Lancamento de fechamento
+// - concentrado aqui agora, ver pedido do usuario) ----------
+let SANGRIAS_DIA_ATUAL = [];
+async function abrirGerenciarSangriasDia(unidade, data){
+  const lista = document.getElementById('fech-sangrias-dia-lista');
+  lista.innerHTML = '<div class="fech-msg" style="margin-top:10px;">carregando...</div>';
+  let todas;
+  try{
+    todas = await fetch('/api/sangrias/minhas').then(r=>r.json());
+  }catch(e){
+    lista.innerHTML = '<div class="fech-msg" style="margin-top:10px;color:var(--bad);">Não foi possível carregar as sangrias desse dia.</div>';
+    return;
+  }
+  SANGRIAS_DIA_ATUAL = (todas||[]).filter(s=>s.unidade===unidade && s.data===data);
+  renderSangriasDia();
+}
+function renderSangriasDia(){
+  const lista = document.getElementById('fech-sangrias-dia-lista');
+  if(!SANGRIAS_DIA_ATUAL.length){ lista.innerHTML = '<div class="fech-msg" style="margin-top:10px;">Nenhuma sangria/depósito encontrada pra esse dia.</div>'; return; }
+  lista.innerHTML = SANGRIAS_DIA_ATUAL.map(s=>`
+    <div class="fech-msg" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div>
+        <b>${fmtMoney(s.valor)}</b>
+        <span style="color:var(--muted);">${s.nomeDepositante?(' · '+escapeHtml(s.nomeDepositante)):''}${s.descricao?(' · '+escapeHtml(s.descricao)):''}</span>
+      </div>
+      <button type="button" class="link-btn" onclick="abrirEditarSangria('${s.id}')">✎ Editar/excluir</button>
+    </div>`).join('');
+}
+function abrirEditarSangria(id){
+  const s = SANGRIAS_DIA_ATUAL.find(x=>x.id===id);
+  if(!s) return;
+  EDITANDO_SANGRIA_ID = id;
+  document.getElementById('sangria-editar-info').textContent = `${UNIDADES_NOMES[s.unidade]||s.unidade} · registrada em ${new Date(s.criadoEm).toLocaleString('pt-BR')}`;
+  document.getElementById('se-valor').value = s.valor;
+  document.getElementById('se-data').value = s.data;
+  document.getElementById('se-periodo-inicio').value = s.periodoInicio || '';
+  document.getElementById('se-periodo-fim').value = s.periodoFim || '';
+  document.getElementById('se-nome-depositante').value = s.nomeDepositante || '';
+  document.getElementById('se-descricao').value = s.descricao || '';
+  document.getElementById('msg-sangria-editar').classList.add('hidden');
+  document.getElementById('overlay-sangria-editar').classList.remove('hidden');
+}
+let EDITANDO_SANGRIA_ID = null;
+function fecharEditarSangria(){ document.getElementById('overlay-sangria-editar').classList.add('hidden'); EDITANDO_SANGRIA_ID=null; }
+document.getElementById('form-sangria-editar').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-sangria-editar');
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch(`/api/sangrias/${EDITANDO_SANGRIA_ID}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        valor: document.getElementById('se-valor').value,
+        data: document.getElementById('se-data').value,
+        descricao: document.getElementById('se-descricao').value,
+        periodoInicio: document.getElementById('se-periodo-inicio').value,
+        periodoFim: document.getElementById('se-periodo-fim').value,
+        nomeDepositante: document.getElementById('se-nome-depositante').value,
+      }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharEditarSangria();
+    if(FECHAMENTO_EDITANDO_ID) abrirGerenciarSangriasDia(data.unidade, data.data);
+    carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'fech-msg'; msg.style.color='var(--bad)'; msg.classList.remove('hidden');
+  }
+});
+async function excluirSangria(){
+  if(!EDITANDO_SANGRIA_ID) return;
+  if(!confirm('Excluir essa sangria/depósito? Ela vai parar de somar no fechamento do dia. Essa ação não pode ser desfeita.')) return;
+  const msg = document.getElementById('msg-sangria-editar');
+  const idExcluida = EDITANDO_SANGRIA_ID;
+  const alvo = SANGRIAS_DIA_ATUAL.find(x=>x.id===idExcluida);
+  try{
+    const res = await fetch(`/api/sangrias/${idExcluida}`, { method:'DELETE' });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error||'erro ao excluir');
+    fecharEditarSangria();
+    if(alvo) abrirGerenciarSangriasDia(alvo.unidade, alvo.data);
+    carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'fech-msg'; msg.style.color='var(--bad)'; msg.classList.remove('hidden');
+  }
 }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function fecharEdicaoFechamento(){

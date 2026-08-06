@@ -82,8 +82,8 @@
   .truncate{max-width:160px;overflow:hidden;text-overflow:ellipsis;}
   .tablewrap{max-height:420px;overflow:auto;}
 
-  .ontem-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:14px 16px;}
-  .ontem-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  .ontem-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding:14px 16px;}
+  .ontem-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex:0 1 140px;min-width:120px;}
   .ontem-card .nome{font-size:11.5px;color:var(--muted);white-space:normal;}
   .ontem-card .qtd{font-family:var(--mono);font-size:20px;font-weight:600;margin-top:4px;color:var(--ok);}
   .ontem-card.falta{border-color:var(--bad-dim);}
@@ -102,6 +102,7 @@
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+    <a class="back" href="/entrega-lancamento.html">➕ Adicionar Entrega</a>
     <button class="back hidden" id="btn-sincronizar-planilha" onclick="sincronizarPlanilha()" style="cursor:pointer;">🔄 Sincronizar agora</button>
     <button class="back hidden" id="btn-recarregar" onclick="carregar()" style="cursor:pointer;">🔄 Atualizar</button>
     <button class="back" onclick="logout()" style="cursor:pointer;">🚪 Sair</button>
@@ -177,9 +178,9 @@
       <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('entregadores','pdf')">📄 PDF</button>
     </div>
   </h2>
-  <div class="tablewrap" style="max-height:none;overflow:visible;">
+  <div class="tablewrap" style="max-height:none;overflow-x:auto;overflow-y:visible;">
     <table>
-      <thead><tr><th>Unidade</th><th>Nome</th><th>Quant.</th><th>Valor</th><th>Ajuda de Custo</th><th>Entrega</th><th>Retorno</th><th>Extra</th><th>Valor Gami</th><th>Fora de Área</th><th>COOP recebe</th><th>TM</th></tr></thead>
+      <thead><tr><th>Unidade</th><th>Nome</th><th>Quant.</th><th>Valor</th><th>TM</th><th>A.C / Encosta</th><th>Entrega</th><th>Retorno</th><th>Extra</th><th>Fora de Área</th><th>Valor Gami</th><th>COOP recebe</th></tr></thead>
       <tbody id="entregadores-body"></tbody>
     </table>
   </div>
@@ -193,9 +194,9 @@
       <button type="button" class="preset-btn" onclick="baixarRelatorioEntregas('unidades','pdf')">📄 PDF</button>
     </div>
   </h2>
-  <div class="tablewrap" style="max-height:none;overflow:visible;">
+  <div class="tablewrap" style="max-height:none;overflow-x:auto;overflow-y:visible;">
     <table>
-      <thead><tr><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Fora área</th><th>Bônus</th><th>Ajuda custo</th><th>Valor pago</th><th>COOP recebe</th><th>TM</th></tr></thead>
+      <thead><tr><th>Unid.</th><th>Corridas</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Fora área</th><th>Bônus</th><th>Valor pago</th><th>TM</th><th>A.C / Encosta</th><th>COOP recebe</th></tr></thead>
       <tbody id="unidades-body"></tbody>
     </table>
   </div>
@@ -211,7 +212,7 @@
   </h2>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Data</th><th>Unid.</th><th>Entregador</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Pos 00hs</th><th>Fora área</th><th>Bônus</th><th>Ajuda custo</th><th>Valor</th><th>COOP</th><th>Qtd. total</th><th>Etiqueta</th><th>Observação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Unid.</th><th>Entregador</th><th>Entregas</th><th>Retorno</th><th>Extra</th><th>Pos 00hs</th><th>Fora área</th><th>Bônus</th><th>Valor</th><th>A.C / Encosta</th><th>COOP</th><th>Qtd. total</th><th>Etiqueta</th><th>Observação</th></tr></thead>
       <tbody id="lancamentos-body"></tbody>
     </table>
   </div>
@@ -521,7 +522,7 @@ function renderKpis(rows){
 function renderOntemPanel(){
   const ontem = agoraBrasilia(); ontem.setDate(ontem.getDate()-1);
   const ontemIso = isoLocal(ontem);
-  document.getElementById('ontem-titulo').textContent = `Lançamento de ontem (D-1) · ${fmtData(ontemIso)}`;
+  document.getElementById('ontem-titulo').textContent = `Lançamento de Ontem · ${fmtData(ontemIso)}`;
 
   const porUnidadeOntem = {};
   DATA.forEach(d=>{
@@ -533,7 +534,10 @@ function renderOntemPanel(){
 
   const roster = codigosDisponiveis().sort((a,b)=>(UNIDADES_NOMES[a]||a).localeCompare(UNIDADES_NOMES[b]||b,'pt-BR'));
   const lancaram = roster.filter(c=>porUnidadeOntem[c]);
-  document.getElementById('ontem-count').textContent = `${lancaram.length} de ${roster.length} unidades lançaram`;
+  const faltam = roster.length - lancaram.length;
+  document.getElementById('ontem-count').textContent = faltam === 0
+    ? `✅ Todas as ${roster.length} unidades lançaram`
+    : `⚠️ ${faltam} de ${roster.length} unidades faltando lançar`;
 
   document.getElementById('ontem-grid').innerHTML = roster.length ? roster.map(c=>{
     const dado = porUnidadeOntem[c];
@@ -572,14 +576,14 @@ function renderEntregadoresTable(rows){
       <td>${escapeHtml(c.entregador)}</td>
       <td class="valor">${c.quant}</td>
       <td class="valor">${fmtMoney(c.valor)}</td>
+      <td class="valor">${fmtMoney(c.entrega ? c.valor/c.entrega : 0)}</td>
       <td class="valor">${fmtMoney(c.ajudaCusto)}</td>
       <td class="valor">${c.entrega}</td>
       <td class="valor">${c.retorno}</td>
       <td class="valor">${c.extra}</td>
-      <td class="valor">${fmtMoney(c.bonus)}</td>
       <td class="valor">${c.foraDeArea}</td>
+      <td class="valor">${fmtMoney(c.bonus)}</td>
       <td class="valor">${fmtMoney(c.coopRecebe)}</td>
-      <td class="valor">${fmtMoney(c.entrega ? c.valor/c.entrega : 0)}</td>
     </tr>`).join('') : '<tr><td colspan="12" class="empty">Sem dados no período.</td></tr>';
 }
 
@@ -613,10 +617,10 @@ function renderUnidadesTable(rows){
       <td class="valor">${c.extra}</td>
       <td class="valor">${c.foraDeArea}</td>
       <td class="valor">${fmtMoney(c.bonus)}</td>
-      <td class="valor">${fmtMoney(c.ajudaCusto)}</td>
       <td class="valor">${fmtMoney(c.valor)}</td>
-      <td class="valor">${fmtMoney(c.coopRecebe)}</td>
       <td class="valor">${fmtMoney(c.entrega ? c.valor/c.entrega : 0)}</td>
+      <td class="valor">${fmtMoney(c.ajudaCusto)}</td>
+      <td class="valor">${fmtMoney(c.coopRecebe)}</td>
     </tr>`).join('') : '<tr><td colspan="11" class="empty">Nenhuma unidade liberada.</td></tr>';
 }
 
@@ -634,8 +638,8 @@ function renderTabela(rows){
       <td class="valor">${d.pos00hs}</td>
       <td class="valor">${d.foraDeArea}</td>
       <td class="valor">${fmtMoney(d.bonus)}</td>
-      <td class="valor" title="${escapeHtml(detalhesValorTitle(d))}">${fmtMoney(d.ajudaCusto)}${(d.camposRemovidos&&d.camposRemovidos.length)?' <span style="color:var(--bad);" title="'+escapeHtml(d.camposRemovidos.join(', ')+' removido(s) - '+(MOTIVOS_REMOCAO_LABEL[d.motivoRemocaoCampos]||''))+'">✕</span>':''}</td>
       <td class="valor">${fmtMoney(d.valor)}</td>
+      <td class="valor" title="${escapeHtml(detalhesValorTitle(d))}">${fmtMoney(d.ajudaCusto)}${(d.camposRemovidos&&d.camposRemovidos.length)?' <span style="color:var(--bad);" title="'+escapeHtml(d.camposRemovidos.join(', ')+' removido(s) - '+(MOTIVOS_REMOCAO_LABEL[d.motivoRemocaoCampos]||''))+'">✕</span>':''}</td>
       <td class="valor">${fmtMoney(d.coopRecebe)}</td>
       <td class="valor">${d.quantTotal}</td>
       <td>${d.etiquetaPath ? `<a href="/api/entregas/etiqueta/${d.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank" style="color:var(--accent);">📎 ver</a>` : (d.etiquetaOrigem ? `<span class="sub" title="Ainda não migrada pro app - referência original do AppSheet/Drive">📎 ${escapeHtml(d.etiquetaOrigem)}</span>` : '—')}</td>
