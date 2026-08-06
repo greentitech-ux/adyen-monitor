@@ -1170,6 +1170,25 @@ function subgruposPermitidos(req) {
   return req.isMaster ? null : new Set(req.permissions.vaultSubgroups || []);
 }
 
+// tipos de card da Central (estorno/ajuste-fechamento/compra/manutencao/
+// suporte-ti/pagamento/nota) que o usuario pode ver - Master sempre ve tudo;
+// pra quem nao e Master, uma lista VAZIA significa SEM restricao (ve todos os
+// tipos, mesmo comportamento de antes dessa permissao existir) - so quando o
+// Master marca tipos especificos e que a Central passa a mostrar so esses
+// (ex: um Admin que so cuida de Suporte de TI nao precisa ver Estorno/Compra)
+function tiposSolicitacaoPermitidos(req) {
+  if (req.isMaster) return null;
+  const tipos = (req.permissions.tiposSolicitacao || []);
+  return tipos.length ? new Set(tipos) : null;
+}
+// true = bloqueado (tem restricao de tipo ativa e esse tipo nao esta nela) -
+// usado nas rotas de decisao/acao (aprovar, direcionar, trocar tipo,
+// converter), nao so na listagem, mesmo criterio do subgruposPermitidos do cofre
+function tipoBloqueado(req, tipo) {
+  const permitidos = tiposSolicitacaoPermitidos(req);
+  return !!(permitidos && !permitidos.has(tipo));
+}
+
 app.get('/api/vault/groups', requireSection('cofre'), async (req, res) => {
   res.json(await vaultGroups.list());
 });
@@ -1384,6 +1403,7 @@ app.get('/api/refund-requests', requireSection('monitor'), async (req, res) => {
 
 app.patch('/api/refund-requests/:id/status', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    if (tipoBloqueado(req, 'estorno')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const registro = await refunds.updateStatus(req.params.id, req.body.status, {
       motivoDecisao: req.body.motivoDecisao,
       decidedByEmail: req.user.email,
@@ -1399,6 +1419,7 @@ app.patch('/api/refund-requests/:id/status', auth.requireMasterOrAdmin, async (r
 // resolve esse", independente de quem foi direcionado na hora da criacao
 app.patch('/api/refund-requests/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    if (tipoBloqueado(req, 'estorno')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const registro = await refunds.redirecionar(req.params.id, req.body);
     broadcast('refund-request-changed', registro, 'monitor');
     res.json(registro);
@@ -1413,6 +1434,9 @@ app.patch('/api/refund-requests/:id/direcionar', auth.requireMasterOrAdmin, asyn
 app.post('/api/refund-requests/:id/converter', auth.requireMasterOrAdmin, async (req, res) => {
   try {
     const { novoTipo, dados } = req.body;
+    if (tipoBloqueado(req, 'estorno') || tipoBloqueado(req, novoTipo)) {
+      return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
+    }
     const novo = await refunds.converterParaSolicitacao(req.params.id, novoTipo, dados, req.user.email);
     broadcast('refund-request-changed', await refunds.getOne(req.params.id), 'monitor');
     broadcast('solicitacao-criada', novo, 'solicitacoes');
@@ -2609,6 +2633,7 @@ app.get('/api/fechamentos/edicoes', requireSection('lancamento'), async (req, re
 
 app.patch('/api/fechamentos/edicoes/:id', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    if (tipoBloqueado(req, 'ajuste-fechamento')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const pedido = await fechamentosLive.decidirEdicao(req.params.id, req.body.status, {
       decididoPorEmail: req.user.email,
       motivoDecisao: req.body.motivoDecisao,
@@ -2624,6 +2649,7 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMasterOrAdmin, async (req,
 
 app.patch('/api/fechamentos/edicoes/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    if (tipoBloqueado(req, 'ajuste-fechamento')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const pedido = await fechamentosLive.redirecionarEdicao(req.params.id, req.body);
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
@@ -2658,6 +2684,10 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
     const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, fornecedor, vencimento, direcionadoParaId, direcionadoParaEmail } = payload;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const tiposPerm = tiposSolicitacaoPermitidos(req);
+    if (tiposPerm && !tiposPerm.has(tipo)) {
+      return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     }
     const anexos = [];
     for (const file of req.files || []) {
@@ -2704,6 +2734,7 @@ app.patch('/api/solicitacoes/:id/comprada', auth.requireMasterOrAdmin, upload.si
     const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
     const atual = await solicitacoes.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     let comprovante = null;
     if (req.file) {
       const path = await storage.salvarArquivo(atual.unidade || 'geral', req.file, 'solicitacoes');
@@ -2738,6 +2769,7 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
     const { status, motivoDecisao, tecnicoId, tecnicoEmail } = req.body;
     const atual = await solicitacoes.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     if (status === 'APROVADO' && atual.tipo === 'suporte-ti' && !tecnicoId) {
       return res.status(400).json({ error: 'Escolha o técnico responsável pelo chamado.' });
     }
@@ -2767,6 +2799,9 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
 
 app.patch('/api/solicitacoes/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const registro = await solicitacoes.redirecionar(req.params.id, req.body);
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json(registro);
@@ -2780,6 +2815,11 @@ app.patch('/api/solicitacoes/:id/direcionar', auth.requireMasterOrAdmin, async (
 // servico de Manutencao. Mesmo registro, so o tipo muda (ver solicitacoes.mudarTipo)
 app.patch('/api/solicitacoes/:id/tipo', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo) || tipoBloqueado(req, req.body.novoTipo)) {
+      return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
+    }
     const registro = await solicitacoes.mudarTipo(req.params.id, req.body.novoTipo, req.user.email);
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json(registro);
@@ -2793,6 +2833,11 @@ app.patch('/api/solicitacoes/:id/tipo', auth.requireMasterOrAdmin, async (req, r
 // em refunds.js (ver solicitacoes.converterParaEstorno)
 app.post('/api/solicitacoes/:id/converter-estorno', auth.requireMasterOrAdmin, async (req, res) => {
   try {
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo) || tipoBloqueado(req, 'estorno')) {
+      return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
+    }
     const novo = await solicitacoes.converterParaEstorno(req.params.id, req.body, req.user.email);
     broadcast('solicitacao-decidida', await solicitacoes.getOne(req.params.id), 'solicitacoes');
     broadcast('refund-requested', novo, 'monitor');
@@ -2898,6 +2943,8 @@ async function todosCardsCentral(req) {
     ...gerais.map((r) => normalizarCard(r.tipo, r)),
   ];
   if (!req.isMaster && !req.isAdmin) cards = cards.filter((c) => c.criadoPorId === req.user.id);
+  const tiposPerm = tiposSolicitacaoPermitidos(req);
+  if (tiposPerm) cards = cards.filter((c) => tiposPerm.has(c.tipo));
   cards.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
   return cards;
 }
@@ -2928,7 +2975,10 @@ app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (re
   try {
     const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
     if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
-    if (!req.isMaster && !req.isAdmin && criadoPorId !== req.user.id) return res.sendStatus(404);
+    if (criadoPorId !== req.user.id) {
+      if (!req.isMaster && !req.isAdmin) return res.sendStatus(404);
+      if (req.isAdmin && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
+    }
     res.json(await centralChat.listByCard(req.params.tipo, req.params.id));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2939,7 +2989,10 @@ app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (r
   try {
     const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
     if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
-    if (!req.isMaster && !req.isAdmin && criadoPorId !== req.user.id) return res.sendStatus(404);
+    if (criadoPorId !== req.user.id) {
+      if (!req.isMaster && !req.isAdmin) return res.sendStatus(404);
+      if (req.isAdmin && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
+    }
     const mensagem = await centralChat.addMessage({
       tipo: req.params.tipo,
       cardId: req.params.id,

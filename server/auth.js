@@ -44,7 +44,7 @@ function criarChamadoBloqueio(email, userId, unidadesUsuario) {
 
 // permissoes vazias por padrao - o Master preenche na hora de criar o acesso
 function emptyPermissions() {
-  return { sections: [], unidades: [], vaultSubgroups: [] };
+  return { sections: [], unidades: [], vaultSubgroups: [], tiposSolicitacao: [] };
 }
 
 const MAX_TENTATIVAS = 3;

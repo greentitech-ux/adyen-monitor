@@ -12,12 +12,21 @@ const usersRef = db.collection('users');
 
 const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'inventario', 'parque', 'parque-checkin', 'festas'];
 
+// os 7 tipos de card que aparecem na Central - mesma lista de TIPOS_INFO em
+// central.html/central-historico.html. Igual ao cofre (vaultSubgroups) e
+// unidades: em branco significa SEM restrição (vê todos) - diferente do
+// cofre, aqui em branco = "sem restrição" pra não quebrar o acesso de quem
+// já usava a Central antes dessa permissão existir; o Master so restringe
+// quem precisa ver só alguns tipos (ex: Admin que só cuida de Suporte de TI)
+const TIPOS_SOLICITACAO = ['estorno', 'ajuste-fechamento', 'compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
+
 function sanitizePermissions(input) {
   const p = input || {};
   return {
     sections: Array.isArray(p.sections) ? p.sections.filter((s) => VALID_SECTIONS.includes(s)) : [],
     unidades: Array.isArray(p.unidades) ? p.unidades.map(String) : [],
     vaultSubgroups: Array.isArray(p.vaultSubgroups) ? p.vaultSubgroups.map(String) : [],
+    tiposSolicitacao: Array.isArray(p.tiposSolicitacao) ? p.tiposSolicitacao.filter((t) => TIPOS_SOLICITACAO.includes(t)) : [],
   };
 }
 
@@ -272,6 +281,7 @@ function toPublic(doc) {
 
 module.exports = {
   VALID_SECTIONS,
+  TIPOS_SOLICITACAO,
   list,
   create,
   updatePermissions,
