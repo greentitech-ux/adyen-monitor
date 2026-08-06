@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Chamados de TI · Zenith Ops</title>
+<title>Manutenção · Zenith Ops</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -63,6 +63,8 @@
   .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
   .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
   .btn-primary:disabled{opacity:.5;cursor:default;}
+  .btn-secundario-full{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:10px;}
+  .btn-perigo-full{width:100%;background:var(--bad-dim);color:var(--bad);border:1px solid var(--bad);border-radius:8px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:10px;}
   .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
   .msg.ok{background:var(--ok-dim);color:var(--ok);}
   .msg.err{background:var(--bad-dim);color:var(--bad);}
@@ -72,7 +74,10 @@
   .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
   .badge.ABERTO{background:var(--warn-dim);color:var(--warn);}
+  .badge.RECUSADO{background:var(--bad-dim);color:var(--bad);}
+  .badge.ACEITO{background:rgba(92,200,255,.15);color:var(--accent);}
   .badge.INICIADO{background:rgba(92,200,255,.15);color:var(--accent);}
+  .badge.EM_ESPERA{background:var(--warn-dim);color:var(--warn);}
   .badge.CONCLUIDO{background:var(--ok-dim);color:var(--ok);}
   .badge.CANCELADO{background:var(--bad-dim);color:var(--bad);}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
@@ -86,6 +91,9 @@
   .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
   .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;}
   .fotos-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+  .checkbox-linha{display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;}
+  .checkbox-linha input{width:auto;}
+  .bloco-sep{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
 </style>
 </head>
 <body>
@@ -96,7 +104,7 @@
       <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
       <div>
         <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
-        <h1>Chamados de TI</h1>
+        <h1>Manutenção</h1>
       </div>
     </div>
   </div>
@@ -129,8 +137,8 @@
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
-  <a class="back active" id="nav-tecnico-self" href="/tecnico.html">🔧 Chamados TI</a>
-  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back active" id="nav-manutencao-self" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -144,7 +152,7 @@
   <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
-<div id="sem-acesso" class="empty hidden">Você não tem acesso aos Chamados de TI. Fale com o administrador (Master).</div>
+<div id="sem-acesso" class="empty hidden">Você não tem acesso à Manutenção. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
 <div class="panel">
@@ -160,25 +168,55 @@
     <h3 id="d-titulo"></h3>
     <div class="sub" id="d-sub"></div>
     <div id="d-descricao" style="font-size:13px;white-space:pre-wrap;margin-bottom:10px;"></div>
+    <div id="d-responsaveis" class="sub" style="margin-bottom:6px;"></div>
 
-    <!-- ABERTO: fazer check-in -->
-    <div id="bloco-iniciar" class="hidden">
-      <label>Foto de como está antes de mexer</label>
-      <input type="file" id="i-fotos" multiple accept="image/*" capture="environment">
-      <button type="button" class="btn-primary" id="btn-iniciar" onclick="iniciarChamado()">📍 Fazer check-in / Iniciar chamado</button>
+    <!-- ABERTO: aceitar (com data de execucao) ou recusar -->
+    <div id="bloco-aceitar" class="hidden">
+      <label>Data da execução</label>
+      <input type="date" id="a-data-execucao">
+      <button type="button" class="btn-primary" id="btn-aceitar" onclick="aceitarChamado()">✓ Aceitar o serviço</button>
+      <label>Motivo da recusa (opcional)</label>
+      <textarea id="a-motivo-recusa" placeholder="por que não vai poder atender"></textarea>
+      <button type="button" class="btn-perigo-full" id="btn-recusar" onclick="recusarChamado()">✕ Recusar</button>
     </div>
 
-    <!-- INICIADO: concluir -->
-    <div id="bloco-concluir" class="hidden">
-      <div class="sub" id="c-iniciado-em"></div>
-      <label>Peças compradas (se precisou)</label>
-      <div id="lista-pecas"></div>
-      <button type="button" class="btn-add" onclick="adicionarPeca()">+ Adicionar peça</button>
-      <label>Observação (o que foi feito)</label>
-      <textarea id="c-observacao" placeholder="descreva o serviço realizado"></textarea>
-      <label>Foto de como ficou depois</label>
-      <input type="file" id="c-fotos" multiple accept="image/*" capture="environment">
-      <button type="button" class="btn-primary" id="btn-concluir" onclick="concluirChamado()">✓ Concluir chamado</button>
+    <!-- RECUSADO: so leitura -->
+    <div id="bloco-recusado" class="hidden">
+      <div class="msg err"><b>Recusado</b><span id="v-motivo-recusa"></span></div>
+    </div>
+
+    <!-- ACEITO: mostra data prevista + fazer check-in -->
+    <div id="bloco-aceito" class="hidden">
+      <div class="sub" id="v-data-execucao" style="font-size:13px;color:var(--text);"></div>
+      <label>Foto de como está antes de mexer</label>
+      <input type="file" id="i-fotos" multiple accept="image/*" capture="environment">
+      <button type="button" class="btn-primary" id="btn-iniciar" onclick="iniciarChamado()">📍 Fazer check-in</button>
+    </div>
+
+    <!-- INICIADO / EM_ESPERA: em espera ou concluir -->
+    <div id="bloco-execucao" class="hidden">
+      <div class="sub" id="e-iniciado-em"></div>
+      <div id="bloco-em-espera-info" class="hidden msg" style="background:var(--warn-dim);color:var(--warn);"></div>
+
+      <div id="bloco-marcar-espera">
+        <label>Colocar em espera (ex: falta de peça)</label>
+        <textarea id="e-motivo-espera" placeholder="motivo da espera"></textarea>
+        <button type="button" class="btn-secundario-full" onclick="marcarEmEspera()">⏸ Em espera</button>
+      </div>
+      <div id="bloco-retomar" class="hidden">
+        <button type="button" class="btn-secundario-full" onclick="retomarChamado()">▶ Retomar execução</button>
+      </div>
+
+      <div class="bloco-sep">
+        <label>Peças compradas (se precisou)</label>
+        <div id="lista-pecas"></div>
+        <button type="button" class="btn-add" onclick="adicionarPeca()">+ Adicionar peça</button>
+        <label>Observação (o que foi feito)</label>
+        <textarea id="c-observacao" placeholder="descreva o serviço realizado"></textarea>
+        <label>Foto de como ficou depois</label>
+        <input type="file" id="c-fotos" multiple accept="image/*" capture="environment">
+        <button type="button" class="btn-primary" id="btn-concluir" onclick="concluirChamado()">✓ Finalizar</button>
+      </div>
     </div>
 
     <!-- CONCLUIDO: so leitura -->
@@ -189,6 +227,23 @@
       <div class="fotos-grid" id="v-fotos-antes"></div>
       <div class="sub" style="margin-top:10px;">Fotos depois</div>
       <div class="fotos-grid" id="v-fotos-depois"></div>
+    </div>
+
+    <!-- Master: autonomia total (editar/excluir), qualquer status -->
+    <div id="bloco-master" class="hidden bloco-sep">
+      <button type="button" class="link-btn" onclick="abrirEditar()">✎ Editar chamado</button>
+      <button type="button" class="link-btn" style="color:var(--bad);margin-left:16px;" onclick="excluirChamado()">🗑 Excluir chamado</button>
+      <div id="bloco-editar" class="hidden" style="margin-top:10px;">
+        <label>Título</label>
+        <input type="text" id="ed-titulo">
+        <label>Descrição</label>
+        <textarea id="ed-descricao"></textarea>
+        <label>Data de execução</label>
+        <input type="date" id="ed-data-execucao">
+        <label>Responsável(is)</label>
+        <div id="ed-responsaveis"></div>
+        <button type="button" class="btn-primary" onclick="salvarEdicao()">Salvar alterações</button>
+      </div>
     </div>
 
     <div class="msg hidden" id="msg-detalhe"></div>
@@ -211,10 +266,10 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
-// grupos do menu (Operacao diaria/Monitoramento/Solicitacoes/Administracao)
-// viram dropdown: clicar no titulo do grupo expande/recolhe os itens dele.
-// O grupo que contem a pagina atual comeca aberto; os outros comecam
-// fechados (lembra a preferencia de cada grupo entre paginas via
+// grupos do menu (Operacao diaria/Monitoramento/Saltiverso/Solicitacoes/
+// Administracao) viram dropdown: clicar no titulo do grupo expande/recolhe
+// os itens dele. O grupo que contem a pagina atual comeca aberto; os outros
+// comecam fechados (lembra a preferencia de cada grupo entre paginas via
 // localStorage, pelo nome do grupo - mesmo criterio em todo o app)
 function initNavDrawerAccordion(){
   const nav = document.getElementById('nav-drawer');
@@ -256,10 +311,14 @@ let CHAMADOS = [];
 let DETALHE_ATUAL = null;
 let PECAS = [];
 let SEQ = 0;
+let PESSOAS_MANUTENCAO = [];
+
+const STATUS_LABEL = { ABERTO:'Aguardando aceite', RECUSADO:'Recusado', ACEITO:'Aceito', INICIADO:'Em execução', EM_ESPERA:'Em espera', CONCLUIDO:'Finalizado', CANCELADO:'Cancelado' };
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 const FUSO_BR = 'America/Sao_Paulo';
 function fmtDataHora(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('pt-BR',{timeZone:FUSO_BR}); }
+function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
@@ -269,14 +328,14 @@ function renderLista(){
     <div class="card" onclick="abrirDetalhe('${c.id}')">
       <div class="linha1">
         <span>${escapeHtml(c.titulo)}</span>
-        <span class="badge ${c.status}">${c.status}</span>
+        <span class="badge ${c.status}">${STATUS_LABEL[c.status]||c.status}</span>
       </div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtDataHora(c.criadoEm)}</div>
-    </div>`).join('') : '<div class="empty">Nenhum chamado atribuído a você ainda.</div>';
+    </div>`).join('') : '<div class="empty">Nenhum chamado de manutenção atribuído a você ainda.</div>';
 }
 
 async function carregarChamados(){
-  CHAMADOS = await fetch('/api/chamados').then(r=>r.json());
+  CHAMADOS = await fetch('/api/chamados-manutencao').then(r=>r.json());
   CHAMADOS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
   renderLista();
 }
@@ -295,6 +354,8 @@ function renderPecas(){
     </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma peça adicionada.</div>';
 }
 
+function souResponsavel(c){ return (c.responsaveis||[]).some(r=>r.id===ME.id); }
+
 function abrirDetalhe(id){
   const c = CHAMADOS.find(x=>x.id===id);
   if(!c) return;
@@ -302,29 +363,95 @@ function abrirDetalhe(id){
   document.getElementById('d-titulo').textContent = c.titulo;
   document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade} · ${fmtDataHora(c.criadoEm)}`;
   document.getElementById('d-descricao').textContent = c.descricao || '';
+  document.getElementById('d-responsaveis').textContent = 'Responsável(is): ' + (c.responsaveis||[]).map(r=>r.email).join(', ');
 
-  document.getElementById('bloco-iniciar').classList.toggle('hidden', c.status!=='ABERTO');
-  document.getElementById('bloco-concluir').classList.toggle('hidden', c.status!=='INICIADO');
+  const podeAgir = souResponsavel(c) || IS_MASTER;
+  document.getElementById('bloco-aceitar').classList.toggle('hidden', !(c.status==='ABERTO' && podeAgir));
+  document.getElementById('bloco-recusado').classList.toggle('hidden', c.status!=='RECUSADO');
+  document.getElementById('bloco-aceito').classList.toggle('hidden', !(c.status==='ACEITO' && podeAgir));
+  document.getElementById('bloco-execucao').classList.toggle('hidden', !(['INICIADO','EM_ESPERA'].includes(c.status) && podeAgir));
   document.getElementById('bloco-concluido').classList.toggle('hidden', c.status!=='CONCLUIDO');
 
-  if(c.status==='INICIADO'){
-    document.getElementById('c-iniciado-em').textContent = `Check-in feito em ${fmtDataHora(c.iniciadoEm)}`;
+  if(c.status==='ABERTO'){
+    document.getElementById('a-data-execucao').value = '';
+    document.getElementById('a-motivo-recusa').value = '';
+  }
+  if(c.status==='RECUSADO'){
+    document.getElementById('v-motivo-recusa').textContent = c.motivoRecusa ? (' — ' + c.motivoRecusa) : '';
+  }
+  if(c.status==='ACEITO'){
+    document.getElementById('v-data-execucao').textContent = `Execução prevista: ${fmtData(c.dataExecucao)}`;
+    document.getElementById('i-fotos').value = '';
+  }
+  if(c.status==='INICIADO' || c.status==='EM_ESPERA'){
+    document.getElementById('e-iniciado-em').textContent = `Check-in feito em ${fmtDataHora(c.iniciadoEm)}`;
+    const emEspera = c.status==='EM_ESPERA';
+    document.getElementById('bloco-em-espera-info').classList.toggle('hidden', !emEspera);
+    if(emEspera) document.getElementById('bloco-em-espera-info').textContent = `⏸ Em espera${c.motivoEspera ? (' — '+c.motivoEspera) : ''}`;
+    document.getElementById('bloco-marcar-espera').classList.toggle('hidden', emEspera);
+    document.getElementById('bloco-retomar').classList.toggle('hidden', !emEspera);
+    document.getElementById('e-motivo-espera').value = '';
     PECAS = []; renderPecas();
     document.getElementById('c-observacao').value = '';
+    document.getElementById('c-fotos').value = '';
   }
   if(c.status==='CONCLUIDO'){
-    document.getElementById('v-observacao').textContent = c.observacaoTecnico || '—';
+    document.getElementById('v-observacao').textContent = c.observacaoResponsavel || '—';
     document.getElementById('v-pecas').innerHTML = (c.pecas||[]).length
       ? '<b>Peças:</b>' + c.pecas.map(p=>`<div>${escapeHtml(p.descricao)} - ${fmtMoney(p.valor)}${p.observacao?(' · '+escapeHtml(p.observacao)):''}</div>`).join('')
       : '';
-    document.getElementById('v-fotos-antes').innerHTML = (c.fotosAntes||[]).map((f,i)=>`<a href="/api/chamados/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
-    document.getElementById('v-fotos-depois').innerHTML = (c.fotosDepois||[]).map((f,i)=>`<a href="/api/chamados/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
+    document.getElementById('v-fotos-antes').innerHTML = (c.fotosAntes||[]).map((f,i)=>`<a href="/api/chamados-manutencao/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados-manutencao/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
+    document.getElementById('v-fotos-depois').innerHTML = (c.fotosDepois||[]).map((f,i)=>`<a href="/api/chamados-manutencao/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados-manutencao/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
   }
 
+  document.getElementById('bloco-master').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('bloco-editar').classList.add('hidden');
   document.getElementById('msg-detalhe').classList.add('hidden');
   document.getElementById('overlay-detalhe').classList.remove('hidden');
 }
 function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
+
+async function aceitarChamado(){
+  if(!DETALHE_ATUAL) return;
+  const msg = document.getElementById('msg-detalhe');
+  const btn = document.getElementById('btn-aceitar');
+  msg.classList.add('hidden');
+  const dataExecucao = document.getElementById('a-data-execucao').value;
+  if(!dataExecucao){ msg.textContent = 'Escolha a data de execução.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/aceitar`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dataExecucao }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao aceitar chamado.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = '✓ Aceitar o serviço';
+  }
+}
+
+async function recusarChamado(){
+  if(!DETALHE_ATUAL) return;
+  if(!confirm('Tem certeza que deseja recusar esse chamado?')) return;
+  const msg = document.getElementById('msg-detalhe');
+  const btn = document.getElementById('btn-recusar');
+  msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    const motivo = document.getElementById('a-motivo-recusa').value;
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/recusar`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ motivo }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao recusar chamado.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = '✕ Recusar';
+  }
+}
 
 async function iniciarChamado(){
   if(!DETALHE_ATUAL) return;
@@ -335,21 +462,52 @@ async function iniciarChamado(){
   try{
     const fd = new FormData();
     for(const file of document.getElementById('i-fotos').files) fd.append('fotosAntes', file);
-    const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/iniciar`, { method:'POST', body: fd });
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/iniciar`, { method:'POST', body: fd });
     const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao iniciar chamado.');
+    if(!resp.ok) throw new Error(data.error || 'Erro ao fazer check-in.');
     fecharDetalhe();
     await carregarChamados();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }finally{
-    btn.disabled = false; btn.textContent = '📍 Fazer check-in / Iniciar chamado';
+    btn.disabled = false; btn.textContent = '📍 Fazer check-in';
+  }
+}
+
+async function marcarEmEspera(){
+  if(!DETALHE_ATUAL) return;
+  const msg = document.getElementById('msg-detalhe');
+  msg.classList.add('hidden');
+  try{
+    const motivo = document.getElementById('e-motivo-espera').value;
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/em-espera`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ motivo }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao colocar em espera.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
+
+async function retomarChamado(){
+  if(!DETALHE_ATUAL) return;
+  const msg = document.getElementById('msg-detalhe');
+  msg.classList.add('hidden');
+  try{
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/retomar`, { method:'POST' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao retomar chamado.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }
 }
 
 async function concluirChamado(){
   if(!DETALHE_ATUAL) return;
-  if(!confirm('Tem certeza que deseja concluir esse chamado? Confira as fotos/observações antes de continuar.')) return;
+  if(!confirm('Tem certeza que deseja finalizar esse chamado? Confira as fotos/observações antes de continuar.')) return;
   const msg = document.getElementById('msg-detalhe');
   const btn = document.getElementById('btn-concluir');
   msg.classList.add('hidden');
@@ -357,19 +515,70 @@ async function concluirChamado(){
   try{
     const fd = new FormData();
     fd.append('payload', JSON.stringify({
-      observacaoTecnico: document.getElementById('c-observacao').value,
+      observacaoResponsavel: document.getElementById('c-observacao').value,
       pecas: PECAS.map(p=>({ descricao:p.descricao, valor:p.valor, observacao:p.observacao })),
     }));
     for(const file of document.getElementById('c-fotos').files) fd.append('fotosDepois', file);
-    const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/concluir`, { method:'POST', body: fd });
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/concluir`, { method:'POST', body: fd });
     const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao concluir chamado.');
+    if(!resp.ok) throw new Error(data.error || 'Erro ao finalizar chamado.');
     fecharDetalhe();
     await carregarChamados();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }finally{
-    btn.disabled = false; btn.textContent = '✓ Concluir chamado';
+    btn.disabled = false; btn.textContent = '✓ Finalizar';
+  }
+}
+
+function abrirEditar(){
+  if(!DETALHE_ATUAL) return;
+  const c = DETALHE_ATUAL;
+  document.getElementById('ed-titulo').value = c.titulo || '';
+  document.getElementById('ed-descricao').value = c.descricao || '';
+  document.getElementById('ed-data-execucao').value = c.dataExecucao || '';
+  document.getElementById('ed-responsaveis').innerHTML = PESSOAS_MANUTENCAO.map(p=>`
+    <label class="checkbox-linha"><input type="checkbox" value="${p.id}" data-email="${escapeHtml(p.email)}" ${(c.responsaveis||[]).some(r=>r.id===p.id)?'checked':''}> ${escapeHtml(p.email)}</label>
+  `).join('') || '<div class="sub">nenhuma pessoa com acesso de manutenção cadastrada</div>';
+  document.getElementById('bloco-editar').classList.remove('hidden');
+}
+
+async function salvarEdicao(){
+  if(!DETALHE_ATUAL) return;
+  const msg = document.getElementById('msg-detalhe');
+  msg.classList.add('hidden');
+  try{
+    const responsaveis = [...document.querySelectorAll('#ed-responsaveis input:checked')].map(cb=>({ id: cb.value, email: cb.dataset.email }));
+    if(!responsaveis.length) throw new Error('Escolha quem vai fazer a manutenção.');
+    const body = {
+      titulo: document.getElementById('ed-titulo').value,
+      descricao: document.getElementById('ed-descricao').value,
+      dataExecucao: document.getElementById('ed-data-execucao').value || null,
+      responsaveis,
+    };
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
+
+async function excluirChamado(){
+  if(!DETALHE_ATUAL) return;
+  if(!confirm('Excluir esse chamado de manutenção? Essa ação não pode ser desfeita.')) return;
+  const msg = document.getElementById('msg-detalhe');
+  msg.classList.add('hidden');
+  try{
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
+    fecharDetalhe();
+    await carregarChamados();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }
 }
 
@@ -378,7 +587,7 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   IS_MASTER = ME.role==='master';
-  const secoes = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
+  const secoes = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','manutencao','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
@@ -394,7 +603,7 @@ async function boot(){
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
-  document.getElementById('nav-manutencao').classList.toggle('hidden', !secoes.includes('manutencao'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
@@ -402,10 +611,18 @@ async function boot(){
   document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
   document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
 
-  if(!secoes.includes('tecnico')){
+  if(!secoes.includes('manutencao')){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
+
+  if(IS_MASTER){
+    try{
+      const todos = await fetch('/api/users').then(r=>r.json());
+      PESSOAS_MANUTENCAO = todos.filter(u=>u.permissions && (u.permissions.sections||[]).includes('manutencao'));
+    }catch(e){ PESSOAS_MANUTENCAO = []; }
+  }
+
   document.getElementById('root').classList.remove('hidden');
   await carregarChamados();
 }

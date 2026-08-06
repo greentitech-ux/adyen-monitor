@@ -178,6 +178,7 @@
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back" href="/central.html">📋 Central</a>
   <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back active" href="/usuarios.html">👤 Usuários</a>
   <a class="back" href="/grupos.html">🏷️ Grupos</a>
@@ -219,7 +220,7 @@
 
       <fieldset>
         <legend>Unidades <span class="legend-actions"><button type="button" onclick="marcarTodos('c-unidades',true)">Marcar todos</button><button type="button" onclick="marcarTodos('c-unidades',false)">Desmarcar todos</button></span></legend>
-        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria/depósito e entregas. Chamados de TI não depende de unidade (marca todas automaticamente - o técnico vê os chamados atribuídos a ele em qualquer loja).</div>
+        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">vale pra monitor, disputas, fechamentos, lançamento, sangria/depósito e entregas. Chamados de TI e Manutenção não dependem de unidade (marca todas automaticamente - a pessoa vê os chamados atribuídos a ela em qualquer loja).</div>
         <div id="c-unidades"></div>
       </fieldset>
 
@@ -429,7 +430,7 @@ function initNavDrawerAccordion(){
 }
 initNavDrawerAccordion();
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
 // os 7 tipos de card que aparecem na Central - mesma lista/rotulo de
 // TIPOS_INFO em central.html/central-historico.html
 const TIPOS_SOLICITACAO = [ ['estorno','💳 Estorno'], ['ajuste-fechamento','🧾 Ajuste de fechamento'], ['compra','🛒 Compra'], ['manutencao','🔧 Manutenção'], ['suporte-ti','💻 Suporte de TI'], ['pagamento','💸 Pagamento (despesa)'], ['nota','📄 Solicitação de Nota'] ];
@@ -1026,7 +1027,7 @@ async function excluirUsuario(id, email){
 // os chamados dele sao filtrados por quem esta atribuido, nao por unidade,
 // entao marcar essa secao ja marca todas as unidades pra deixar isso claro
 document.addEventListener('change', (e)=>{
-  if(!e.target.matches('input[name=sections][value=tecnico]') || !e.target.checked) return;
+  if(!e.target.matches('input[name=sections][value=tecnico], input[name=sections][value=manutencao]') || !e.target.checked) return;
   const unidadesContainer = e.target.closest('#c-sections') ? document.getElementById('c-unidades') : document.getElementById('p-unidades');
   unidadesContainer.querySelectorAll('input[name=unidades]').forEach(cb=>{ cb.checked = true; });
 });

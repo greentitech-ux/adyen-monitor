@@ -183,6 +183,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back active" id="nav-historico-self" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
   <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
@@ -337,6 +338,11 @@
         <label>Técnico responsável</label>
         <select id="d-tecnico"></select>
       </div>
+      <div id="d-manutencao-wrap" class="hidden">
+        <label>Quem vai fazer a manutenção</label>
+        <div class="sub" style="margin:-2px 0 8px;">Escolha 1 ou mais - só quem for escolhido enxerga o chamado.</div>
+        <div id="d-manutencao-pessoas"></div>
+      </div>
       <label>Observação da decisão (opcional)</label>
       <textarea id="d-motivo-decisao"></textarea>
       <div style="display:flex;gap:8px;margin-top:10px;">
@@ -458,6 +464,7 @@ let IS_MASTER = false;
 let IS_ADMIN = false;
 let SECOES = [];
 let TECNICOS = [];
+let PESSOAS_MANUTENCAO = [];
 let CARDS = [];
 let FILTRO_UNIDADE = '';
 let FILTRO_GRUPO = '';
@@ -629,7 +636,7 @@ function abrirDetalhe(tipo, id){
     corpo += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;">
       <div><b>Decisão:</b> <span class="badge ${c.status}">${c.status}</span> · ${escapeHtml(c.decididoPorEmail||'')} · ${fmtDataHora(c.decididoEm)}</div>
       ${c.motivoDecisao ? `<div style="white-space:pre-wrap;margin-top:4px;">${escapeHtml(c.motivoDecisao)}</div>` : ''}
-      ${c.chamadoId ? '<div style="margin-top:4px;color:var(--ok);">🔧 Chamado de TI criado</div>' : ''}
+      ${c.chamadoId ? `<div style="margin-top:4px;color:var(--ok);">🔧 Chamado de ${c.tipo==='manutencao'?'Manutenção':'TI'} criado</div>` : ''}
     </div>`;
   }
   document.getElementById('d-corpo').innerHTML = corpo;
@@ -641,6 +648,12 @@ function abrirDetalhe(tipo, id){
     document.getElementById('d-tecnico').innerHTML = TECNICOS.length
       ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}">${escapeHtml(t.email)}</option>`).join('')
       : '<option value="" disabled selected>nenhum técnico cadastrado</option>';
+  }
+  document.getElementById('d-manutencao-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='manutencao'));
+  if(podeDecidir && c.tipo==='manutencao'){
+    document.getElementById('d-manutencao-pessoas').innerHTML = PESSOAS_MANUTENCAO.length
+      ? PESSOAS_MANUTENCAO.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${p.id}" data-email="${escapeHtml(p.email)}" style="width:auto;"> ${escapeHtml(p.email)}</label>`).join('')
+      : '<div class="sub">nenhuma pessoa com acesso de manutenção cadastrada</div>';
   }
   document.getElementById('d-motivo-decisao').value = '';
   document.getElementById('msg-detalhe').classList.add('hidden');
@@ -1172,6 +1185,11 @@ async function decidir(status){
         body.tecnicoId = sel.value;
         body.tecnicoEmail = sel.options[sel.selectedIndex].dataset.email;
       }
+      if(c.tipo==='manutencao' && status==='APROVADO'){
+        const marcados = [...document.querySelectorAll('#d-manutencao-pessoas input:checked')];
+        if(!marcados.length) throw new Error('Escolha quem vai fazer a manutenção.');
+        body.responsaveis = marcados.map(cb=>({ id: cb.value, email: cb.dataset.email }));
+      }
       resp = await fetch(`/api/solicitacoes/${c.id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     }
     const data = await resp.json();
@@ -1456,6 +1474,7 @@ async function boot(){
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
+  document.getElementById('nav-manutencao').classList.toggle('hidden', !SECOES.includes('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
@@ -1479,7 +1498,8 @@ async function boot(){
     try{
       const todos = await fetch('/api/users').then(r=>r.json());
       TECNICOS = todos.filter(u=>u.permissions && (u.permissions.sections||[]).includes('tecnico'));
-    }catch(e){ TECNICOS = []; }
+      PESSOAS_MANUTENCAO = todos.filter(u=>u.permissions && (u.permissions.sections||[]).includes('manutencao'));
+    }catch(e){ TECNICOS = []; PESSOAS_MANUTENCAO = []; }
   }
 
   await carregarCentral();
