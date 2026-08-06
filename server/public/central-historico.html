@@ -322,9 +322,9 @@
       <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCard()">🗑️ Excluir</button>
     </div>
     <div id="d-responsavel" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-      <div class="secao-titulo">👤 Agente responsável</div>
-      <div class="sub" style="margin:-2px 0 8px;">Quem vai resolver esse ticket - qualquer Master/Admin do grupo pode decidir, mas dá pra apontar uma pessoa específica.</div>
-      <select id="d-responsavel-select"></select>
+      <div class="secao-titulo">👤 Atribuir responsável</div>
+      <div class="sub" style="margin:-2px 0 8px;">Só Master vê tudo por padrão - os demais só enxergam esse card depois de marcados aqui. Escolha 1 ou mais.</div>
+      <div id="d-responsavel-pessoas"></div>
       <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarResponsavel()">Salvar responsável</button>
     </div>
     <div id="d-editar" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;"></div>
@@ -538,7 +538,7 @@ function kcardHtml(c){
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
-      ${c.direcionadoParaEmail ? `<div class="sub" style="color:var(--accent);">👤 direcionado a ${escapeHtml(c.direcionadoParaEmail)}</div>` : ''}
+      ${(c.atribuidosEmails && c.atribuidosEmails.length) ? `<div class="sub" style="color:var(--accent);">👤 atribuído a ${escapeHtml(c.atribuidosEmails.join(', '))}</div>` : (c.direcionadoParaEmail ? `<div class="sub" style="color:var(--accent);">👤 direcionado a ${escapeHtml(c.direcionadoParaEmail)}</div>` : '')}
     </div>`;
 }
 
@@ -604,7 +604,8 @@ function abrirDetalhe(tipo, id){
   if(!c) return;
   DETALHE_ATUAL = c;
   document.getElementById('d-titulo').textContent = `${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo} · Ticket #${c.numeroTicket ?? '—'}`;
-  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}` + (c.direcionadoParaEmail ? ` · direcionado a ${c.direcionadoParaEmail}` : '');
+  const atribuidosTxt = (c.atribuidosEmails && c.atribuidosEmails.length) ? c.atribuidosEmails.join(', ') : (c.direcionadoParaEmail || '');
+  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}` + (atribuidosTxt ? ` · atribuído a ${atribuidosTxt}` : '');
 
   let corpo = c.ehOrcamento ? `<div style="color:#e0b84c;font-weight:600;">💰 É um orçamento — precisa de aprovação de um Admin ou Master.</div>` : '';
   if(ehBloqueioLogin(c) && c.status==='PENDENTE'){
@@ -663,11 +664,13 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-master-crud').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('btn-editar-card').classList.toggle('hidden', c.tipo==='ajuste-fechamento');
 
-  const podeReatribuir = IS_MASTER || IS_ADMIN;
-  document.getElementById('btn-atribuir-responsavel').classList.toggle('hidden', !podeReatribuir);
+  // atribuir responsavel decide quem ENXERGA o card (ver todosCardsCentral em
+  // index.js) - por isso so o Master pode mexer, igual ele pediu
+  document.getElementById('btn-atribuir-responsavel').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('d-responsavel').classList.add('hidden'); // sempre comeca fechado, abre so no clique do botao ao lado do nome
-  if(podeReatribuir) carregarResponsavelSelect(c);
+  if(IS_MASTER) carregarResponsavelSelect(c);
 
+  const podeReatribuir = IS_MASTER || IS_ADMIN;
   const podeMudarTipo = podeReatribuir && c.status !== 'CONVERTIDO' && (TIPOS_GERAIS.includes(c.tipo) || c.tipo === 'estorno');
   document.getElementById('d-tipo-acoes').classList.toggle('hidden', !podeMudarTipo);
   if(podeMudarTipo) renderTipoAcoes(c);
@@ -785,18 +788,15 @@ function toggleResponsavel(){
 // Reaproveita o mesmo endpoint de responsaveis do grupo ja usado no
 // formulario de nova solicitacao (central.html) ----------
 async function carregarResponsavelSelect(c){
-  const sel = document.getElementById('d-responsavel-select');
-  sel.innerHTML = '<option value="">Qualquer Master/Admin do grupo</option>';
+  const wrap = document.getElementById('d-responsavel-pessoas');
+  wrap.innerHTML = '<div class="sub">carregando...</div>';
+  const atribuidos = new Set(c.atribuidosIds && c.atribuidosIds.length ? c.atribuidosIds : (c.direcionadoParaId ? [c.direcionadoParaId] : []));
   try{
     const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(c.unidade)).then(r=>r.json());
-    lista.forEach(u=>{
-      const opt = document.createElement('option');
-      opt.value = u.id; opt.dataset.email = u.email;
-      opt.textContent = u.email + (u.papel==='master' ? ' (Master)' : ' (Admin)');
-      if(u.id === c.direcionadoParaId) opt.selected = true;
-      sel.appendChild(opt);
-    });
-  }catch(e){ /* mantem so a opcao padrao */ }
+    wrap.innerHTML = lista.length
+      ? lista.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${u.id}" data-email="${escapeHtml(u.email)}" style="width:auto;" ${atribuidos.has(u.id)?'checked':''}> ${escapeHtml(u.email)} ${u.papel==='master'?'(Master)':'(Admin)'}</label>`).join('')
+      : '<div class="sub">nenhum Master/Admin disponível pra esse grupo</div>';
+  }catch(e){ wrap.innerHTML = '<div class="sub">erro ao carregar</div>'; }
 }
 
 function rotaDirecionar(c){
@@ -808,15 +808,17 @@ function rotaDirecionar(c){
 async function salvarResponsavel(){
   const c = DETALHE_ATUAL;
   if(!c) return;
-  const sel = document.getElementById('d-responsavel-select');
-  const direcionadoParaId = sel.value || null;
-  const direcionadoParaEmail = direcionadoParaId ? (sel.selectedOptions[0]?.dataset.email || null) : null;
+  const marcados = Array.from(document.querySelectorAll('#d-responsavel-pessoas input[type=checkbox]:checked'));
+  const atribuidosIds = marcados.map(i=>i.value);
+  const atribuidosEmails = marcados.map(i=>i.dataset.email);
+  const direcionadoParaId = atribuidosIds[0] || null;
+  const direcionadoParaEmail = atribuidosEmails[0] || null;
   try{
-    const resp = await fetch(rotaDirecionar(c), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ direcionadoParaId, direcionadoParaEmail }) });
+    const resp = await fetch(rotaDirecionar(c), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ direcionadoParaId, direcionadoParaEmail, atribuidosIds, atribuidosEmails }) });
     const atualizado = await resp.json();
     if(!resp.ok) throw new Error(atualizado.error || 'Erro ao salvar responsável.');
     DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
-    document.getElementById('d-sub').textContent = `${DETALHE_ATUAL.unidadeNome||DETALHE_ATUAL.unidade||'—'} · ${DETALHE_ATUAL.criadoPorEmail||''} · ${fmtDataHora(DETALHE_ATUAL.criadoEm)}` + (DETALHE_ATUAL.direcionadoParaEmail ? ` · direcionado a ${DETALHE_ATUAL.direcionadoParaEmail}` : '');
+    document.getElementById('d-sub').textContent = `${DETALHE_ATUAL.unidadeNome||DETALHE_ATUAL.unidade||'—'} · ${DETALHE_ATUAL.criadoPorEmail||''} · ${fmtDataHora(DETALHE_ATUAL.criadoEm)}` + (atribuidosEmails.length ? ` · atribuído a ${atribuidosEmails.join(', ')}` : '');
     await carregarCentral();
   }catch(err){ alert(err.message); }
 }
@@ -1489,7 +1491,7 @@ async function boot(){
     return;
   }
   document.getElementById('root').classList.remove('hidden');
-  document.getElementById('titulo-lista').textContent = (IS_MASTER || IS_ADMIN) ? 'Solicitações recebidas' : 'Minhas solicitações';
+  document.getElementById('titulo-lista').textContent = IS_MASTER ? 'Solicitações recebidas' : 'Minhas solicitações e atribuídas';
 
   const unidades = (IS_MASTER || IS_ADMIN) ? Object.keys(UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>UNIDADES_NOMES[u]);
   const unidadesOrdenadas = [...unidades].sort((a,b)=>(UNIDADES_NOMES[a]||a).localeCompare(UNIDADES_NOMES[b]||b,'pt-BR'));
@@ -1577,7 +1579,7 @@ function mostrarNotificacaoSolicitacao(card){
   el.innerHTML = `
     <div class="ns-titulo">🔔 Nova solicitação</div>
     <div class="ns-corpo">${iconeTipo(card.tipo)} ${escapeHtml(TIPOS_INFO[card.tipo]?.label||card.tipo)} · ${escapeHtml(card.unidadeNome||card.unidade||'—')}<br>${escapeHtml(card.titulo||'')}</div>
-    ${card.direcionadoParaEmail ? `<div class="ns-direcionado">👤 direcionado a ${escapeHtml(card.direcionadoParaEmail)}</div>` : ''}
+    ${(card.atribuidosEmails && card.atribuidosEmails.length) ? `<div class="ns-direcionado">👤 atribuído a ${escapeHtml(card.atribuidosEmails.join(', '))}</div>` : (card.direcionadoParaEmail ? `<div class="ns-direcionado">👤 direcionado a ${escapeHtml(card.direcionadoParaEmail)}</div>` : '')}
     <button type="button" class="ns-ok">✓ Sinalizar (já vi)</button>
   `;
   el.querySelector('.ns-ok').addEventListener('click', ()=>marcarVistoNotificacao(card.tipo, card.id));

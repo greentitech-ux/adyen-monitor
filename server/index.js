@@ -1416,9 +1416,9 @@ app.patch('/api/refund-requests/:id/status', auth.requireMasterOrAdmin, async (r
   }
 });
 
-// troca o Master/Admin responsavel pelo pedido - Master/Admin decidem "quem
-// resolve esse", independente de quem foi direcionado na hora da criacao
-app.patch('/api/refund-requests/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
+// so o Master atribui quem enxerga/resolve o pedido (1 ou mais pessoas) -
+// independente de quem foi direcionado na hora da criacao
+app.patch('/api/refund-requests/:id/direcionar', auth.requireMaster, async (req, res) => {
   try {
     if (tipoBloqueado(req, 'estorno')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const registro = await refunds.redirecionar(req.params.id, req.body);
@@ -2664,7 +2664,7 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMasterOrAdmin, async (req,
   }
 });
 
-app.patch('/api/fechamentos/edicoes/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
+app.patch('/api/fechamentos/edicoes/:id/direcionar', auth.requireMaster, async (req, res) => {
   try {
     if (tipoBloqueado(req, 'ajuste-fechamento')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const pedido = await fechamentosLive.redirecionarEdicao(req.params.id, req.body);
@@ -2729,7 +2729,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
 app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), async (req, res) => {
   const registro = await solicitacoes.getOne(req.params.id);
   if (!registro) return res.sendStatus(404);
-  if (!req.isMaster && !req.isAdmin && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
+  if (!podeVerCard(req, registro)) return res.sendStatus(404);
   const anexo = registro.anexos && registro.anexos[Number(req.params.index)];
   if (!anexo) return res.sendStatus(404);
   storage.streamArquivo(anexo.path, anexo.tipo, res);
@@ -2738,7 +2738,7 @@ app.get('/api/solicitacoes/anexo/:id/:index', requireSection('solicitacoes'), as
 app.get('/api/solicitacoes/:id/comprovante', requireSection('solicitacoes'), async (req, res) => {
   const registro = await solicitacoes.getOne(req.params.id);
   if (!registro) return res.sendStatus(404);
-  if (!req.isMaster && !req.isAdmin && registro.criadoPorId !== req.user.id) return res.sendStatus(404);
+  if (!podeVerCard(req, registro)) return res.sendStatus(404);
   if (!registro.comprovante) return res.sendStatus(404);
   storage.streamArquivo(registro.comprovante.path, registro.comprovante.tipo, res);
 });
@@ -2845,7 +2845,7 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
   }
 });
 
-app.patch('/api/solicitacoes/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
+app.patch('/api/solicitacoes/:id/direcionar', auth.requireMaster, async (req, res) => {
   try {
     const atual = await solicitacoes.getOne(req.params.id);
     if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
@@ -3006,7 +3006,16 @@ async function todosCardsCentral(req) {
     ...ajustes.map((r) => normalizarCard('ajuste-fechamento', r)),
     ...gerais.map((r) => normalizarCard(r.tipo, r)),
   ];
-  if (!req.isMaster && !req.isAdmin) cards = cards.filter((c) => c.criadoPorId === req.user.id);
+  // so o Master enxerga tudo. Admin/qualquer outro usuario so ve o que
+  // criou ou o que foi explicitamente atribuido a ele (👤 Atribuir
+  // responsável, agora multi-pessoa) - Admin perdeu o bypass automatico
+  if (!req.isMaster) {
+    cards = cards.filter((c) =>
+      c.criadoPorId === req.user.id ||
+      c.direcionadoParaId === req.user.id ||
+      (Array.isArray(c.atribuidosIds) && c.atribuidosIds.includes(req.user.id))
+    );
+  }
   const tiposPerm = tiposSolicitacaoPermitidos(req);
   if (tiposPerm) cards = cards.filter((c) => tiposPerm.has(c.tipo));
   cards.sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''));
@@ -3017,32 +3026,41 @@ app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
   res.json(await todosCardsCentral(req));
 });
 
-// busca o card cru (de qualquer um dos 3 modulos) so pra achar quem criou -
-// usado no gate de acesso do chat (dono do pedido, Master ou Admin)
-async function buscarCriadorCard(tipo, id) {
+// busca o card cru (de qualquer um dos 3 modulos) - usado no gate de acesso
+// do chat/anexos (dono do pedido, atribuido, ou Master)
+async function buscarCardCru(tipo, id) {
   if (tipo === 'estorno') {
     const r = await refunds.getOne(id);
-    return r && r.requestedById;
+    return r && { criadoPorId: r.requestedById, direcionadoParaId: r.direcionadoParaId, atribuidosIds: r.atribuidosIds };
   }
   if (tipo === 'ajuste-fechamento') {
     const r = await fechamentosLive.getEdicao(id);
-    return r && r.solicitadoPorId;
+    return r && { criadoPorId: r.solicitadoPorId, direcionadoParaId: r.direcionadoParaId, atribuidosIds: r.atribuidosIds };
   }
   const r = await solicitacoes.getOne(id);
-  return r && r.criadoPorId;
+  return r && { criadoPorId: r.criadoPorId, direcionadoParaId: r.direcionadoParaId, atribuidosIds: r.atribuidosIds };
 }
 
-// chat de uma solicitacao da Central - quem criou o pedido, Master ou Admin
-// podem ver/participar (pra Master/Admin questionar antes de aprovar, e pra
-// quem pediu poder responder)
+// so o Master ve tudo; os demais (inclusive Admin) so o que criaram ou o
+// que foi explicitamente atribuido a eles - mesmo criterio de
+// todosCardsCentral(), usado tambem pro chat e pelos anexos/comprovante
+function podeVerCard(req, card) {
+  if (req.isMaster) return true;
+  if (card.criadoPorId === req.user.id) return true;
+  if (card.direcionadoParaId === req.user.id) return true;
+  if (Array.isArray(card.atribuidosIds) && card.atribuidosIds.includes(req.user.id)) return true;
+  return false;
+}
+
+// chat de uma solicitacao da Central - quem criou o pedido, quem foi
+// atribuido, ou o Master podem ver/participar (pra questionar antes de
+// decidir, e pra quem pediu poder responder)
 app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
   try {
-    const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
-    if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
-    if (criadoPorId !== req.user.id) {
-      if (!req.isMaster && !req.isAdmin) return res.sendStatus(404);
-      if (req.isAdmin && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
-    }
+    const card = await buscarCardCru(req.params.tipo, req.params.id);
+    if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (!podeVerCard(req, card)) return res.sendStatus(404);
+    if (card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
     res.json(await centralChat.listByCard(req.params.tipo, req.params.id));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3051,12 +3069,10 @@ app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (re
 
 app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
   try {
-    const criadoPorId = await buscarCriadorCard(req.params.tipo, req.params.id);
-    if (!criadoPorId) return res.status(404).json({ error: 'Solicitação não encontrada.' });
-    if (criadoPorId !== req.user.id) {
-      if (!req.isMaster && !req.isAdmin) return res.sendStatus(404);
-      if (req.isAdmin && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
-    }
+    const card = await buscarCardCru(req.params.tipo, req.params.id);
+    if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (!podeVerCard(req, card)) return res.sendStatus(404);
+    if (card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
     const mensagem = await centralChat.addMessage({
       tipo: req.params.tipo,
       cardId: req.params.id,
