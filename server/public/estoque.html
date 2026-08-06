@@ -96,6 +96,9 @@
   .item-linha input{padding:7px 8px;font-size:13px;}
   .linha-contagem{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #1a1f26;flex-wrap:wrap;}
   .linha-contagem:last-child{border-bottom:none;}
+  .linha-contagem.arrastando{opacity:.55;background:var(--panel2);border-radius:6px;}
+  .drag-handle{flex:none;cursor:grab;color:var(--muted);font-size:17px;line-height:1;padding:4px 6px;touch-action:none;user-select:none;-webkit-user-select:none;}
+  .drag-handle:active{cursor:grabbing;}
   .linha-contagem .nome{flex:1 1 200px;min-width:0;font-size:13px;}
   .linha-contagem .nome .un{color:var(--muted);font-weight:400;font-size:11px;margin-left:4px;}
   .linha-contagem .ref{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;flex:none;}
@@ -245,13 +248,15 @@
     <div id="r-modo-simples">
       <label>Quantidade</label>
       <input type="number" step="0.001" id="r-quantidade">
+      <div class="hidden" id="r-link-usar-embalagem"><span class="tx-comentario" style="cursor:pointer;" onclick="forcarModoRecebimento('embalagem')">Veio em embalagens/pacotes? Calcular o peso automaticamente</span></div>
     </div>
     <div class="hidden" id="r-modo-embalagem">
       <div class="grid2">
         <div><label>Quantidade de embalagens</label><input type="number" step="1" min="0" id="r-qtd-embalagens"></div>
-        <div><label>Peso da embalagem (g)</label><input type="number" step="1" min="0" id="r-peso-embalagem"></div>
+        <div><label>Peso de cada embalagem (g)</label><input type="number" step="1" min="0" id="r-peso-embalagem" placeholder="ex: 2500 = 2,5kg"></div>
       </div>
       <div class="sub" id="r-peso-calculado" style="margin:-4px 0 8px;"></div>
+      <div><span class="tx-comentario" style="cursor:pointer;" onclick="forcarModoRecebimento('simples')">Prefiro digitar o peso total direto</span></div>
     </div>
     <div class="grid2">
       <div><label>Valor unitário (R$)</label><input type="number" step="0.01" id="r-valor"></div>
@@ -350,6 +355,7 @@
       <button type="button" class="btn-add" id="btn-catalogo-seed" onclick="carregarCatalogoPadrao()">⬇️ Carregar catálogo padrão (Domino's)</button>
     </div>
   </h2>
+  <div class="sub" style="margin:-6px 0 10px;">Catálogo da loja selecionada acima - cada loja tem o seu (posição, setor e itens ativos são independentes entre lojas).</div>
   <div class="msg hidden" id="msg-catalogo-seed"></div>
   <button type="button" class="btn-add" onclick="abrirNovoItem()">+ Novo item</button>
   <div class="tablewrap" style="margin-top:12px;">
@@ -465,7 +471,7 @@ let ABA_ATUAL = 'contagem';
 
 function unidadeAtual(){ return document.getElementById('sel-unidade').value; }
 
-function mudarAba(aba){
+async function mudarAba(aba){
   ABA_ATUAL = aba;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===aba));
   document.getElementById('tab-contagem').classList.toggle('hidden', aba!=='contagem');
@@ -479,21 +485,37 @@ function mudarAba(aba){
   if(aba==='recebimento') renderRecebimentos();
   if(aba==='saida') renderSaidas();
   if(aba==='diferencas') carregarDiferencas();
-  if(aba==='catalogo') renderCatalogo();
+  if(aba==='catalogo'){ await carregarCatalogo(); renderCatalogo(); }
 }
 
-function trocarUnidade(){
+// catalogo e por loja - trocar a loja no seletor do topo exige buscar o
+// catalogo de novo (e repopular os selects de item de Recebimento/Saida,
+// que dependem dele) antes de re-renderizar a aba atual
+async function trocarUnidade(){
+  await carregarCatalogo();
+  popularSelectsItem();
   if(ABA_ATUAL==='contagem') reiniciarContagem();
   else if(ABA_ATUAL==='recebimento') renderRecebimentos();
   else if(ABA_ATUAL==='saida') renderSaidas();
   else if(ABA_ATUAL==='diferencas') carregarDiferencas();
+  else if(ABA_ATUAL==='catalogo') renderCatalogo();
 }
 
-// ---------- selects de item, agrupados por setor (usados em Recebimento/Saída) ----------
+// ordem manual do item dentro do setor (drag-and-drop, ver
+// ativarDragReordenar) - item sem `ordem` (catalogo antigo, ainda nao
+// reorganizado) cai no fim, ordenado por nome entre si
+function compararOrdemItem(a,b){
+  const oa = a.ordem==null ? Infinity : a.ordem;
+  const ob = b.ordem==null ? Infinity : b.ordem;
+  if(oa!==ob) return oa-ob;
+  return a.nome.localeCompare(b.nome,'pt-BR');
+}
+
+// ---------- selects de item, agrupados por setor (usados em Recebimento/Saída) - CATALOGO ja vem so da loja atual (ver carregarCatalogo) ----------
 function opcoesItensAgrupadas(){
   const ativos = CATALOGO.filter(i=>i.ativo!==false);
   return ORDEM_SETORES.map(setor=>{
-    const itens = ativos.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    const itens = ativos.filter(i=>i.setor===setor).sort(compararOrdemItem);
     if(!itens.length) return '';
     return `<optgroup label="${escapeHtml(SETORES[setor])}">` +
       itens.map(i=>`<option value="${i.id}">${escapeHtml(i.nome)} (${escapeHtml(i.unidadeMedida)})</option>`).join('') +
@@ -554,17 +576,80 @@ function renderContagemSetor(){
   const setor = setorAtualContagem();
   const container = document.getElementById('c-itens');
   if(!setor){ container.innerHTML = '<div class="empty">Nenhum item no catálogo ainda - adicione um item abaixo.</div>'; atualizarProgressoContagem(); return; }
-  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort(compararOrdemItem);
+  // reordenar (arrastar) muda a ordem do catalogo da loja atual - fica
+  // restrito a quem tem a mesma permissao das outras acoes de "reorganizar
+  // catalogo" (editar/excluir item) - ver index.js
+  const podeArrastar = IS_MASTER || !!ME.podeCatalogoEstoque;
   container.innerHTML = itens.length ? itens.map(i=>{
     const valorAtual = CONTAGEM_VALORES[i.id];
     const valorOntem = CONTAGEM_ONTEM[i.id];
-    return `<div class="linha-contagem">
+    return `<div class="linha-contagem" data-item-id="${i.id}">
+      ${podeArrastar ? '<span class="drag-handle" title="Arraste para reordenar">⠿</span>' : ''}
       <div class="nome">${escapeHtml(i.nome)} <span class="un">${escapeHtml(i.unidadeMedida)}</span></div>
       <div class="ref">Ontem: ${valorOntem!=null ? valorOntem : '—'}</div>
       <input type="number" step="0.001" data-item-id="${i.id}" class="input-contagem" value="${valorAtual!=null?valorAtual:''}" placeholder="qtd" oninput="CONTAGEM_VALORES[this.dataset.itemId]=this.value; atualizarProgressoContagem();">
     </div>`;
   }).join('') : '<div class="empty">Nenhum item nesse setor ainda - adicione um abaixo.</div>';
   atualizarProgressoContagem();
+  if(podeArrastar && itens.length>1) ativarDragReordenar(container, setor);
+}
+
+// arrastar (mouse ou touch, via Pointer Events) pra reordenar os itens desse
+// setor - a cada movimento, reposiciona a linha arrastada no DOM conforme o
+// ponteiro cruza o meio de uma vizinha; ao soltar, manda a ordem final pro
+// servidor (grava 0,1,2... em `ordem`, ver reordenarItens em inventario.js)
+function ativarDragReordenar(container, setor){
+  container.querySelectorAll('.drag-handle').forEach(handle=>{
+    handle.addEventListener('pointerdown', (ev)=>{
+      ev.preventDefault();
+      const dragEl = handle.closest('.linha-contagem');
+      if(!dragEl) return;
+      handle.setPointerCapture(ev.pointerId);
+      dragEl.classList.add('arrastando');
+
+      const mover = (e)=>{
+        const irmaos = [...container.querySelectorAll('.linha-contagem')].filter(el=>el!==dragEl);
+        const y = e.clientY;
+        let alvo = null;
+        for(const el of irmaos){
+          const r = el.getBoundingClientRect();
+          if(y < r.top + r.height/2){ alvo = el; break; }
+        }
+        if(alvo){ if(alvo.previousElementSibling!==dragEl) container.insertBefore(dragEl, alvo); }
+        else if(container.lastElementChild!==dragEl) container.appendChild(dragEl);
+      };
+      const soltar = ()=>{
+        handle.removeEventListener('pointermove', mover);
+        handle.removeEventListener('pointerup', soltar);
+        handle.removeEventListener('pointercancel', soltar);
+        dragEl.classList.remove('arrastando');
+        const idsNaOrdem = [...container.querySelectorAll('.linha-contagem')].map(el=>el.dataset.itemId);
+        salvarOrdemSetor(setor, idsNaOrdem);
+      };
+      handle.addEventListener('pointermove', mover);
+      handle.addEventListener('pointerup', soltar);
+      handle.addEventListener('pointercancel', soltar);
+    });
+  });
+}
+
+async function salvarOrdemSetor(setor, ids){
+  try{
+    const res = await fetch('/api/inventario/catalogo/ordem', {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ unidade: unidadeAtual(), setor, ids }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível salvar a nova ordem.');
+    data.forEach(atualizado=>{
+      const idx = CATALOGO.findIndex(i=>i.id===atualizado.id);
+      if(idx>-1) CATALOGO[idx] = atualizado;
+    });
+  }catch(err){
+    alert(err.message || 'Não foi possível salvar a nova ordem.');
+    renderContagemSetor();
+  }
 }
 
 function atualizarProgressoContagem(){
@@ -643,11 +728,27 @@ async function carregarRecebimentos(){ RECEBIMENTOS = await fetch('/api/inventar
 function itemSelecionadoRecebimento(){
   return CATALOGO.find(i=>i.id===document.getElementById('r-item').value);
 }
+// pra item medido em KG/G, o modo "por embalagem" (quantidade de pacotes ×
+// peso de cada um) é o padrão - é raríssimo a loja pesar o total direto numa
+// balança, quase sempre a nota traz "9 pacotes de 2,5kg" e é isso que
+// precisa virar peso total sozinho. Ainda dá pra forçar o modo simples (link
+// abaixo do campo), útil pra item recebido a granel/pesado na hora.
+let R_MODO_FORCADO = null; // null = automatico (embalagem se item usa peso); 'simples' | 'embalagem' = travado pelo usuario
+function forcarModoRecebimento(modo){
+  R_MODO_FORCADO = modo;
+  aplicarModoRecebimento();
+}
 function atualizarModoRecebimento(){
+  R_MODO_FORCADO = null;
+  aplicarModoRecebimento();
+}
+function aplicarModoRecebimento(){
   const item = itemSelecionadoRecebimento();
-  const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+  const usaPeso = !!(item && unidadeUsaPeso(item.unidadeMedida));
+  const modoEmbalagem = R_MODO_FORCADO ? R_MODO_FORCADO==='embalagem' : usaPeso;
   document.getElementById('r-modo-simples').classList.toggle('hidden', modoEmbalagem);
   document.getElementById('r-modo-embalagem').classList.toggle('hidden', !modoEmbalagem);
+  document.getElementById('r-link-usar-embalagem').classList.toggle('hidden', !usaPeso || modoEmbalagem);
   if(modoEmbalagem){
     document.getElementById('r-qtd-embalagens').value = item.quantidadePadrao || '';
     document.getElementById('r-peso-embalagem').value = item.pesoEmbalagemG || '';
@@ -662,7 +763,8 @@ function atualizarModoRecebimento(){
 // ou calculada a partir de embalagens×peso (convertendo g->kg quando for o caso)
 function quantidadeEfetivaRecebimento(){
   const item = itemSelecionadoRecebimento();
-  if(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG){
+  const modoEmbalagem = !document.getElementById('r-modo-embalagem').classList.contains('hidden');
+  if(item && unidadeUsaPeso(item.unidadeMedida) && modoEmbalagem){
     const embalagens = num(document.getElementById('r-qtd-embalagens').value);
     const pesoG = num(document.getElementById('r-peso-embalagem').value);
     const totalG = embalagens*pesoG;
@@ -722,8 +824,7 @@ document.getElementById('form-recebimento').addEventListener('submit', async (ev
   try{
     const unidade = unidadeAtual();
     const unidadeNome = UNIDADES.find(u=>u.codigo===unidade)?.nome || unidade;
-    const item = itemSelecionadoRecebimento();
-    const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+    const modoEmbalagem = !document.getElementById('r-modo-embalagem').classList.contains('hidden');
     const body = {
       unidade, unidadeNome,
       itemId: document.getElementById('r-item').value,
@@ -935,9 +1036,9 @@ function baixarRelatorioDiferencas(formato){
   window.location.href = `/api/inventario/relatorio.${formato}?${params.toString()}`;
 }
 
-// ---------- Catálogo (Master) ----------
+// ---------- Catálogo (por loja - CATALOGO ja vem so da loja selecionada no topo) ----------
 function renderCatalogo(){
-  const porSetor = ORDEM_SETORES.map(setor=>({ setor, itens: CATALOGO.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')) }));
+  const porSetor = ORDEM_SETORES.map(setor=>({ setor, itens: CATALOGO.filter(i=>i.setor===setor).sort(compararOrdemItem) }));
   document.getElementById('catalogo-body').innerHTML = porSetor.flatMap(({setor,itens})=>
     itens.map(i=>`
       <tr>
@@ -952,18 +1053,19 @@ function renderCatalogo(){
           <button type="button" class="acao-btn excluir" onclick="excluirItem('${i.id}')">🗑️</button>
         </td>
       </tr>`)
-  ).join('') || '<tr><td colspan="7" class="empty">Nenhum item cadastrado ainda.</td></tr>';
+  ).join('') || '<tr><td colspan="7" class="empty">Nenhum item cadastrado ainda nesta loja.</td></tr>';
 }
 
 async function carregarCatalogoPadrao(){
-  if(!confirm('Carregar o catálogo padrão da rede Domino\'s? Só adiciona os itens que ainda não existem (não duplica nem apaga nada que já foi cadastrado).')) return;
+  if(!confirm('Carregar o catálogo padrão da rede em TODAS as lojas? Cada loja só recebe os itens que ainda não tem (por nome) - não duplica nem mexe no que a loja já customizou (posição, setor, itens removidos).')) return;
   const msg = document.getElementById('msg-catalogo-seed');
   msg.classList.add('hidden');
   try{
-    const res = await fetch('/api/inventario/catalogo/seed', { method:'POST' });
+    const res = await fetch('/api/inventario/catalogo/seed', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao carregar catálogo');
-    msg.textContent = `${data.adicionados} item(ns) adicionado(s) (${data.jaExistiam} já existiam).`; msg.className = 'msg ok';
+    const lojasComNovos = (data.porLoja||[]).filter(l=>l.adicionados>0).length;
+    msg.textContent = `${data.adicionados} item(ns) adicionado(s) no total, em ${lojasComNovos} loja(s).`; msg.className = 'msg ok';
     await carregarCatalogo();
     renderCatalogo();
     popularSelectsItem();
@@ -988,6 +1090,7 @@ function atualizarCampoPesoItem(){
   document.getElementById('i-peso-wrap').classList.toggle('hidden', !usa);
   if(!usa) document.getElementById('i-peso-embalagem').value = '';
 }
+
 function abrirNovoItem(){
   ITEM_EDITANDO_ID = null;
   ITEM_ORIGEM = 'catalogo';
@@ -1023,6 +1126,7 @@ document.getElementById('form-item').addEventListener('submit', async (ev)=>{
   msg.classList.add('hidden');
   try{
     const body = {
+      unidade: unidadeAtual(),
       nome: document.getElementById('i-nome').value,
       setor: document.getElementById('i-setor').value,
       tipo: document.getElementById('i-tipo').value,
@@ -1058,7 +1162,10 @@ async function excluirItem(id){
   popularSelectsItem();
 }
 
-async function carregarCatalogo(){ CATALOGO = await fetch('/api/inventario/catalogo').then(r=>r.json()); }
+async function carregarCatalogo(){
+  const unidade = unidadeAtual();
+  CATALOGO = unidade ? await fetch('/api/inventario/catalogo?unidade='+encodeURIComponent(unidade)).then(r=>r.json()) : [];
+}
 
 // ---------- setores/tipos (Master pode adicionar novos, ver inventario.js) ----------
 async function carregarSetoresTipos(){
@@ -1135,16 +1242,17 @@ async function boot(){
 
   renderPresetsDif();
 
-  const [unidadesResp] = await Promise.all([
-    fetch('/api/inventario/unidades').then(r=>r.json()),
-    carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas(),
-  ]);
-  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
-  document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
-  UNIDADES = unidadesResp;
+  // unidades primeiro e sozinho - o catalogo agora e por loja (ver
+  // carregarCatalogo/unidadeAtual), entao o <select> de loja precisa estar
+  // populado ANTES de buscar o catalogo, senao a primeira busca vai sem loja
+  UNIDADES = await fetch('/api/inventario/unidades').then(r=>r.json());
   document.getElementById('sel-unidade').innerHTML = UNIDADES.length
     ? UNIDADES.map(u=>`<option value="${escapeHtml(u.codigo)}">${escapeHtml(u.nome)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+
+  await Promise.all([carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas()]);
+  document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
+  document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
 
   popularSelectsItem();
   aplicarPresetDif('semana');

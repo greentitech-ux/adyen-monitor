@@ -26,13 +26,20 @@ function createCache(fnOriginal, ttlMs = 20 * 1000) {
     if (cache.valor && agora < cache.expiraEm) return cache.valor;
     if (cache.emAndamento) return cache.emAndamento;
 
+    // guarda a referencia do objeto atual - se invalidar() rodar enquanto
+    // fnOriginal() ainda esta em voo (ex: um update no meio de uma leitura
+    // lenta), `cache` passa a apontar pra um objeto NOVO. Sem esse check, o
+    // resultado desta leitura (ja desatualizado) sobrescrevia o cache
+    // "ressuscitando" dado velho por cima do invalidar() que rodou depois -
+    // exatamente o tipo de bug que faz uma sessao revogada continuar valendo.
+    const minhaEntrada = cache;
     const promessa = fnOriginal(...args)
       .then((valor) => {
-        cache = { valor, expiraEm: Date.now() + ttlMs, emAndamento: null };
+        if (cache === minhaEntrada) cache = { valor, expiraEm: Date.now() + ttlMs, emAndamento: null };
         return valor;
       })
       .catch((err) => {
-        cache.emAndamento = null;
+        if (cache === minhaEntrada) cache.emAndamento = null;
         throw err;
       });
     cache.emAndamento = promessa;
@@ -59,16 +66,22 @@ function createKeyedCache(fnOriginal, ttlMs = 20 * 1000) {
     if (entry && entry.valor !== undefined && agora < entry.expiraEm) return entry.valor;
     if (entry && entry.emAndamento) return entry.emAndamento;
 
+    // mesma protecao contra corrida do createCache (ver comentario la) -
+    // registra a proria entrada antes de comecar, e so escreve o resultado
+    // se essa key ainda apontar pra essa MESMA entrada quando a leitura
+    // terminar (senao um invalidar(key) no meio da leitura seria desfeito)
+    const minhaEntrada = { valor: undefined, expiraEm: 0, emAndamento: null };
     const promessa = fnOriginal(key, ...restArgs)
       .then((valor) => {
-        cache.set(key, { valor, expiraEm: Date.now() + ttlMs, emAndamento: null });
+        if (cache.get(key) === minhaEntrada) cache.set(key, { valor, expiraEm: Date.now() + ttlMs, emAndamento: null });
         return valor;
       })
       .catch((err) => {
-        cache.delete(key);
+        if (cache.get(key) === minhaEntrada) cache.delete(key);
         throw err;
       });
-    cache.set(key, { valor: undefined, expiraEm: 0, emAndamento: promessa });
+    minhaEntrada.emAndamento = promessa;
+    cache.set(key, minhaEntrada);
     return promessa;
   }
 

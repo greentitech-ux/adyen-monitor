@@ -87,6 +87,9 @@
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
   .overlay.hidden{display:none!important;}
+  .sheet-wrap{position:relative;width:100%;max-width:640px;}
+  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
   .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
   .sheet h3{margin:0 0 4px;font-size:14px;}
   .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
@@ -270,7 +273,9 @@
 </div>
 
 <div class="overlay hidden" id="overlay-sangria-editar">
-  <div class="sheet">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharEditarSangria()">✕</span>
+    <div class="sheet">
     <h3>Editar sangria/depósito (Master)</h3>
     <div class="sub" id="sangria-editar-info"></div>
     <form id="form-sangria-editar">
@@ -293,7 +298,7 @@
         <button type="button" class="link-btn" style="color:var(--bad);white-space:nowrap;" onclick="excluirSangria()">🗑️ Excluir</button>
       </div>
     </form>
-    <button class="link-btn" style="margin-top:12px;" onclick="fecharEditarSangria()">Cancelar</button>
+    </div>
   </div>
 </div>
 

@@ -19,6 +19,7 @@ const fraudIdentity = require('./fraudIdentity');
 const storage = require('./storage');
 const auth = require('./auth');
 const users = require('./users');
+const sessions = require('./sessions');
 const vaultGroups = require('./vaultGroups');
 const vaultSubgroups = require('./vaultSubgroups');
 const vaultEntries = require('./vaultEntries');
@@ -154,7 +155,10 @@ const LEGACY_HMAC_KEY = process.env.ADYEN_HMAC_KEY || '';
 // ---------- login (sem token ainda) e portao de autenticacao pro resto da API ----------
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const result = await auth.login(req.body.email, req.body.password);
+    const result = await auth.login(req.body.email, req.body.password, {
+      userAgent: req.headers['user-agent'],
+      ip: req.headers['x-forwarded-for'] || req.ip,
+    });
     res.json(result);
   } catch (err) {
     res.status(401).json({ error: err.message });
@@ -1343,7 +1347,26 @@ app.delete('/api/refund-requests/:id', auth.requireMaster, async (req, res) => {
 // leitura tambem libera pro Admin, que precisa da lista de tecnicos pra
 // decidir solicitacoes de Suporte de TI; escrita continua so-Master
 app.get('/api/users', auth.requireMasterOrAdmin, async (req, res) => {
-  res.json(await users.list());
+  const [lista, resumoSessoes] = await Promise.all([users.list(), sessions.resumoPorUsuario()]);
+  res.json(lista.map((u) => {
+    const resumo = resumoSessoes[u.id];
+    return { ...u, sessoesAtivas: resumo?.locais || 0, online: !!resumo?.online, ultimaAtividadeEm: resumo?.ultimaAtividadeEm || null };
+  }));
+});
+
+// locais logados com um usuario especifico (device/IP/ultima atividade) -
+// pra alem da contagem que ja vem na listagem acima
+app.get('/api/users/:id/sessoes', auth.requireMasterOrAdmin, async (req, res) => {
+  res.json(await sessions.listarDoUsuario(req.params.id));
+});
+
+// encerra um local especifico sem precisar trocar a senha (o que derrubaria
+// TODOS os locais de uma vez) - util quando alguem esqueceu logado em
+// computador compartilhado, ou pra tirar um dispositivo que nao deveria
+// estar usando aquele login
+app.delete('/api/users/:id/sessoes/:sessionId', auth.requireMaster, async (req, res) => {
+  await sessions.encerrar(req.params.sessionId);
+  res.json({ ok: true });
 });
 
 // relatorio (CSV/PDF) da tabela "Acessos cadastrados" de usuarios.html -
@@ -1839,8 +1862,13 @@ app.post('/api/inventario/tipos', auth.requireMasterOuCatalogoEstoque, async (re
   }
 });
 
+// catalogo e por loja (cada uma organiza o proprio, ver inventario.js) -
+// toda rota abaixo exige `unidade` e confere acesso a ela, mesmo padrao das
+// rotas de contagem/recebimento/saida
 app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
-  res.json(await inventario.listCatalogo());
+  const unidade = req.query.unidade;
+  if (!podeUnidadeInventario(req, unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+  res.json(await inventario.listCatalogo(unidade));
 });
 // cadastrar item novo fica aberto pra qualquer um com acesso a Inventario -
 // e uma necessidade do dia a dia da loja (contar um item que ainda nao
@@ -1849,6 +1877,7 @@ app.get('/api/inventario/catalogo', requireSection('inventario'), async (req, re
 // excluir), que ai sim fica restrito a quem tem a permissao de Catalogo
 app.post('/api/inventario/catalogo', requireSection('inventario'), async (req, res) => {
   try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     res.json(await inventario.criarItem(req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1856,6 +1885,10 @@ app.post('/api/inventario/catalogo', requireSection('inventario'), async (req, r
 });
 app.put('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
+    if (!req.isMaster) {
+      const unidadeDoItem = await inventario.obterItemUnidade(req.params.id);
+      if (unidadeDoItem && !podeUnidadeInventario(req, unidadeDoItem)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
     res.json(await inventario.atualizarItem(req.params.id, req.body));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1863,18 +1896,36 @@ app.put('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, asy
 });
 app.delete('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
   try {
+    if (!req.isMaster) {
+      const unidadeDoItem = await inventario.obterItemUnidade(req.params.id);
+      if (unidadeDoItem && !podeUnidadeInventario(req, unidadeDoItem)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
     await inventario.removerItem(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
+// reordenar itens de um setor NUMA loja (drag-and-drop no Contagem/
+// Catalogo) - mesma permissao de "reorganizar catalogo" das rotas acima
+app.put('/api/inventario/catalogo/ordem', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
+  try {
+    if (!podeUnidadeInventario(req, req.body.unidade)) return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    res.json(await inventario.reordenarItens(req.body.unidade, req.body.setor, req.body.ids));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 // carrega o catalogo padrao extraido das planilhas do Domino's - idempotente
-// (so adiciona o que ainda nao existe pelo nome), pode ser chamado de novo
-// sem duplicar
+// POR LOJA (so adiciona, em cada loja, o que ainda nao existe la pelo nome -
+// nao mexe no que a loja ja customizou). Sem `unidades` no corpo, aplica em
+// TODAS as lojas de uma vez (uso tipico: popular a rede inteira de uma vez).
 app.post('/api/inventario/catalogo/seed', auth.requireMaster, async (req, res) => {
   try {
-    res.json(await inventario.seedCatalogoPadrao());
+    const unidadesAlvo = Array.isArray(req.body.unidades) && req.body.unidades.length
+      ? req.body.unidades
+      : Object.keys(INVENTARIO_UNIDADES_NOMES);
+    res.json(await inventario.seedCatalogoPadrao(unidadesAlvo));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

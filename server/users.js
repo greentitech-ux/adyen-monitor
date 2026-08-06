@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const db = require('./firestore');
 const { emptyPermissions, invalidarUsuario } = require('./auth');
 const { createCache } = require('./liveCache');
+const sessions = require('./sessions');
 
 const usersRef = db.collection('users');
 
@@ -84,6 +85,9 @@ async function setActive(id, active) {
   await ref.update({ active: !!active });
   invalidarUsuario(id);
   usersCache.invalidar();
+  // desativar derruba os locais logados na hora - senao um token emitido
+  // antes continuaria valido ate as 8h expirarem sozinhas
+  if (!active) await sessions.encerrarTodasDoUsuario(id);
   return toPublic(await ref.get());
 }
 
@@ -150,6 +154,9 @@ async function resetPassword(id, password) {
   await ref.update({ passwordHash, locked: false, failedAttempts: 0 });
   invalidarUsuario(id);
   usersCache.invalidar();
+  // senha nova invalida os locais logados com a antiga - sem isso os tokens
+  // ja emitidos continuariam valendo ate as 8h expirarem sozinhas
+  await sessions.encerrarTodasDoUsuario(id);
   return { ok: true };
 }
 

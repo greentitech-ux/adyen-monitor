@@ -11,7 +11,7 @@
 // negativa = FALTA (sumiu mais do que o registrado); diferença positiva =
 // SOBRA (ex: chegou mercadoria e a nota não foi lançada no sistema).
 const db = require('./firestore');
-const { createCache } = require('./liveCache');
+const { createCache, createKeyedCache } = require('./liveCache');
 const CATALOGO_SEED = require('./inventarioCatalogoSeed.json');
 
 const CATALOGO = db.collection('inventarioCatalogo');
@@ -102,24 +102,46 @@ async function criarTipo(nome) {
   return { nome };
 }
 
-// ---------- catálogo (Master gerencia; leitura liberada pra quem tem a
-// seção "inventario", ver index.js) ----------
-async function listCatalogoUncached() {
-  const snap = await CATALOGO.orderBy('nome', 'asc').get();
-  return snap.docs.map((d) => d.data());
+// ---------- catálogo: CADA LOJA TEM O SEU (nao e mais compartilhado entre
+// unidades) - cada item pertence a uma unica loja (campo `unidade`), que
+// escolhe livremente a posicao (ver reordenarItens), o setor e quais itens
+// manter ativos, sem afetar as demais lojas. "Carregar catalogo padrao" (ver
+// seedCatalogoPadrao) e o jeito de popular/completar o catalogo de uma loja
+// a partir do modelo da rede (CATALOGO_SEED) - so preenche o que ainda nao
+// existe NAQUELA loja, entao cada uma pode divergir livremente depois ----------
+async function listCatalogoUncached(unidade) {
+  if (!unidade) throw new Error('Unidade é obrigatória.');
+  const snap = await CATALOGO.where('unidade', '==', unidade).get();
+  return snap.docs.map((d) => d.data()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
-const catalogoCache = createCache(listCatalogoUncached, 20 * 1000);
+const catalogoCache = createKeyedCache(listCatalogoUncached, 20 * 1000);
 const listCatalogo = catalogoCache.cached;
 
-async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, quantidadePadrao, pesoEmbalagemG }) {
+// pra checar de qual loja e um item antes de autorizar editar/excluir/
+// reordenar (ver index.js) - le direto (sem cache), e uma unica leitura
+async function obterItemUnidade(id) {
+  const snap = await CATALOGO.doc(id).get();
+  return snap.exists ? snap.data().unidade : null;
+}
+
+async function criarItem({ unidade, nome, setor, tipo, unidadeMedida, custoReferencia, quantidadePadrao, pesoEmbalagemG }) {
+  if (!unidade) throw new Error('Unidade é obrigatória.');
   nome = String(nome || '').trim();
   if (!nome) throw new Error('Nome do item é obrigatório.');
   const setores = await listSetores();
   if (!setores.some((s) => s.codigo === setor)) throw new Error('Setor inválido.');
   const tipos = await listTipos();
   const ref = CATALOGO.doc();
+  // item novo sempre entra no fim da ordem manual do setor NESSA loja (ver
+  // reordenarItens) - assim quem organiza a lista com drag-and-drop nao tem
+  // itens novos pulando pro meio sem querer
+  const itensDoSetor = (await listCatalogo(unidade)).filter((i) => i.setor === setor);
+  const proximaOrdem = itensDoSetor.length
+    ? Math.max(...itensDoSetor.map((i) => num(i.ordem))) + 1
+    : 0;
   const registro = {
     id: ref.id,
+    unidade,
     nome: nome.slice(0, 120),
     setor,
     tipo: tipos.includes(tipo) ? tipo : (tipos[0] || 'COMIDA'),
@@ -131,18 +153,42 @@ async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, qu
     // embalagem/pacote, usado pra converter embalagens recebidas em peso
     quantidadePadrao: quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null,
     pesoEmbalagemG: pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null,
+    ordem: proximaOrdem,
     ativo: true,
     createdAt: new Date().toISOString(),
   };
   await ref.set(registro);
-  catalogoCache.invalidar();
+  catalogoCache.invalidar(unidade);
   return registro;
+}
+
+// reordenacao manual dos itens de um setor NUMA loja (drag-and-drop no
+// Contagem/Catalogo, ver estoque.html) - recebe os ids do setor JA na ordem
+// desejada e grava 0,1,2... em `ordem`; itens de outras lojas/setores nao
+// sao tocados (cada loja reordena so o proprio catalogo)
+async function reordenarItens(unidade, setor, ids) {
+  if (!unidade) throw new Error('Unidade é obrigatória.');
+  if (!Array.isArray(ids) || !ids.length) throw new Error('Lista de itens inválida.');
+  const setores = await listSetores();
+  if (!setores.some((s) => s.codigo === setor)) throw new Error('Setor inválido.');
+  const catalogo = await listCatalogo(unidade);
+  const doSetor = new Set(catalogo.filter((i) => i.setor === setor).map((i) => i.id));
+  const idsValidos = ids.filter((id) => doSetor.has(id));
+  if (!idsValidos.length) throw new Error('Nenhum item válido para reordenar.');
+  const batch = db.batch();
+  idsValidos.forEach((id, index) => {
+    batch.update(CATALOGO.doc(id), { ordem: index });
+  });
+  await batch.commit();
+  catalogoCache.invalidar(unidade);
+  return (await listCatalogo(unidade)).filter((i) => i.setor === setor);
 }
 
 async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoReferencia, ativo, quantidadePadrao, pesoEmbalagemG }) {
   const ref = CATALOGO.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Item não encontrado.');
+  const atual = snap.data();
   const patch = {};
   if (nome != null) {
     const n = String(nome).trim();
@@ -164,7 +210,7 @@ async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoRefere
   if (quantidadePadrao !== undefined) patch.quantidadePadrao = quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null;
   if (pesoEmbalagemG !== undefined) patch.pesoEmbalagemG = pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null;
   await ref.update(patch);
-  catalogoCache.invalidar();
+  catalogoCache.invalidar(atual.unidade);
   return (await ref.get()).data();
 }
 
@@ -173,27 +219,41 @@ async function removerItem(id) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Item não encontrado.');
   await ref.delete();
-  catalogoCache.invalidar();
+  catalogoCache.invalidar(snap.data().unidade);
 }
 
-// idempotente - so insere itens cujo NOME normalizado ainda nao existe no
-// catalogo, entao pode ser chamado de novo sem duplicar (ex: se o Master
-// clicar 2x, ou apos adicionar itens manuais que ja cobrem parte da lista)
-async function seedCatalogoPadrao() {
-  const existentes = await listCatalogo();
-  const nomesExistentes = new Set(existentes.map((i) => normalizarNome(i.nome)));
-  const novos = CATALOGO_SEED.filter((i) => !nomesExistentes.has(normalizarNome(i.nome)));
+// idempotente por loja - so insere, NA loja informada, os itens do catalogo
+// padrao (CATALOGO_SEED) cujo NOME normalizado ainda nao existe no catalogo
+// DELA (nao olha as outras lojas), entao pode ser chamado de novo (ou pra
+// uma loja que ja foi customizada) sem duplicar nem desfazer o que ela
+// mudou. `unidadesAlvo` e a lista de codigos de loja a preencher.
+async function seedCatalogoPadrao(unidadesAlvo) {
+  if (!Array.isArray(unidadesAlvo) || !unidadesAlvo.length) throw new Error('Nenhuma loja informada.');
   const agora = new Date().toISOString();
-  await Promise.all(novos.map((i) => {
-    const ref = CATALOGO.doc();
-    return ref.set({
-      id: ref.id, nome: i.nome, setor: i.setor, tipo: i.tipo,
-      unidadeMedida: i.unidadeMedida, custoReferencia: i.custoReferencia || 0,
-      ativo: true, createdAt: agora,
-    });
+  const porLoja = await Promise.all(unidadesAlvo.map(async (unidade) => {
+    const existentes = await listCatalogo(unidade);
+    const nomesExistentes = new Set(existentes.map((i) => normalizarNome(i.nome)));
+    const novos = CATALOGO_SEED.filter((i) => !nomesExistentes.has(normalizarNome(i.nome)));
+    const porSetor = new Map();
+    existentes.forEach((i) => { porSetor.set(i.setor, Math.max(porSetor.get(i.setor) || -1, num(i.ordem))); });
+    await Promise.all(novos.map((i) => {
+      const ref = CATALOGO.doc();
+      const ordem = (porSetor.get(i.setor) ?? -1) + 1;
+      porSetor.set(i.setor, ordem);
+      return ref.set({
+        id: ref.id, unidade, nome: i.nome, setor: i.setor, tipo: i.tipo,
+        unidadeMedida: i.unidadeMedida, custoReferencia: i.custoReferencia || 0,
+        quantidadePadrao: null, pesoEmbalagemG: null, ordem,
+        ativo: true, createdAt: agora,
+      });
+    }));
+    if (novos.length) catalogoCache.invalidar(unidade);
+    return { unidade, adicionados: novos.length, jaExistiam: existentes.length };
   }));
-  if (novos.length) catalogoCache.invalidar();
-  return { adicionados: novos.length, jaExistiam: existentes.length };
+  return {
+    adicionados: porLoja.reduce((s, l) => s + l.adicionados, 0),
+    porLoja,
+  };
 }
 
 // ---------- recebimento de mercadoria (entrada) - guarda o valor unitario
@@ -216,7 +276,7 @@ async function criarRecebimento({ unidade, unidadeNome, itemId, fornecedor, quan
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!itemId) throw new Error('Selecione o item.');
   const dataValida = validarData(data);
-  const item = (await listCatalogo()).find((i) => i.id === itemId);
+  const item = (await listCatalogo(unidade)).find((i) => i.id === itemId);
   if (!item) throw new Error('Item não encontrado no catálogo.');
 
   const porEmbalagem = ['KG', 'G'].includes(item.unidadeMedida) && num(quantidadeEmbalagens) > 0 && num(pesoEmbalagem) > 0;
@@ -274,7 +334,7 @@ async function criarSaida({ unidade, unidadeNome, itemId, tipo, quantidade, moti
   const dataValida = validarData(data);
   const qtd = num(quantidade);
   if (qtd <= 0) throw new Error('Informe a quantidade.');
-  const item = (await listCatalogo()).find((i) => i.id === itemId);
+  const item = (await listCatalogo(unidade)).find((i) => i.id === itemId);
   if (!item) throw new Error('Item não encontrado no catálogo.');
 
   const ref = SAIDAS.doc();
@@ -389,7 +449,7 @@ async function calcularDiferencas(unidade, dataInicio, dataFim) {
   const diaBase = diaAnterior(dataInicio);
 
   const [todasContagens, todosRecebimentos, todasSaidas, catalogo] = await Promise.all([
-    listContagens(), listRecebimentos(), listSaidas(), listCatalogo(),
+    listContagens(), listRecebimentos(), listSaidas(), listCatalogo(unidade),
   ]);
   const catalogoPorId = new Map(catalogo.map((i) => [i.id, i]));
 
@@ -487,7 +547,7 @@ async function calcularDiferencas(unidade, dataInicio, dataFim) {
 module.exports = {
   SETORES, TIPOS_ITEM, TIPOS_SAIDA,
   listSetores, criarSetor, listTipos, criarTipo,
-  listCatalogo, criarItem, atualizarItem, removerItem, seedCatalogoPadrao,
+  listCatalogo, criarItem, atualizarItem, removerItem, seedCatalogoPadrao, reordenarItens, obterItemUnidade,
   listRecebimentos, criarRecebimento, removerRecebimento,
   listSaidas, criarSaida, removerSaida,
   upsertContagem, getContagem, listContagens,
