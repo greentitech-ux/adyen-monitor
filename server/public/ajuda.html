@@ -273,6 +273,8 @@ const TOPICOS = [
       <li><b>Converter a partir de Estorno:</b> um Estorno também pode virar um dos 5 tipos gerais (ex: virou uma Manutenção em vez de reembolso).</li>
     </ul>
     <p>Ao converter, o ticket original fica marcado como <b>convertido</b> e some das colunas do Kanban - quem continuar a história é o novo registro, com o <b>mesmo número de ticket</b> e um link de volta pro ticket de origem (e vice-versa). O <b>Ajuste de fechamento</b> fica de fora desse fluxo de troca/conversão, porque está sempre amarrado a um fechamento específico.</p>
+    <h3>🔓 Login bloqueado</h3>
+    <p>Quando um acesso é bloqueado automaticamente (3 tentativas de senha erradas seguidas), o Zenith cria sozinho um ticket de <b>Suporte de TI</b> chamado "Login bloqueado: &lt;email&gt;" na Central, e Master/Admin recebem a notificação normalmente. Esse ticket é diferente dos outros de Suporte de TI: ao <b>aprovar</b>, não precisa escolher técnico - o acesso é desbloqueado e a senha é redefinida direto para <b>"inicial1"</b>, já obrigando a pessoa a trocar por uma senha própria no próximo login. É só avisar pra ela entrar com essa senha padrão.</p>
     <h3>👤 Trocar o agente responsável</h3>
     <p>Master e Admin podem abrir qualquer solicitação (de qualquer tipo, em qualquer status) e, na seção <b>"Agente responsável"</b> do detalhe, escolher outra pessoa pra cuidar do ticket - útil quando o pedido foi direcionado a alguém de folga ou outro Admin precisa assumir.</p>
     <h3>🛍️ Status Comprada (pedidos de Compra)</h3>
