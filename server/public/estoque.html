@@ -96,6 +96,9 @@
   .item-linha input{padding:7px 8px;font-size:13px;}
   .linha-contagem{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #1a1f26;flex-wrap:wrap;}
   .linha-contagem:last-child{border-bottom:none;}
+  .linha-contagem.arrastando{opacity:.55;background:var(--panel2);border-radius:6px;}
+  .drag-handle{flex:none;cursor:grab;color:var(--muted);font-size:17px;line-height:1;padding:4px 6px;touch-action:none;user-select:none;-webkit-user-select:none;}
+  .drag-handle:active{cursor:grabbing;}
   .linha-contagem .nome{flex:1 1 200px;min-width:0;font-size:13px;}
   .linha-contagem .nome .un{color:var(--muted);font-weight:400;font-size:11px;margin-left:4px;}
   .linha-contagem .ref{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;flex:none;}
@@ -489,11 +492,21 @@ function trocarUnidade(){
   else if(ABA_ATUAL==='diferencas') carregarDiferencas();
 }
 
+// ordem manual do item dentro do setor (drag-and-drop, ver
+// ativarDragReordenar) - item sem `ordem` (catalogo antigo, ainda nao
+// reorganizado) cai no fim, ordenado por nome entre si
+function compararOrdemItem(a,b){
+  const oa = a.ordem==null ? Infinity : a.ordem;
+  const ob = b.ordem==null ? Infinity : b.ordem;
+  if(oa!==ob) return oa-ob;
+  return a.nome.localeCompare(b.nome,'pt-BR');
+}
+
 // ---------- selects de item, agrupados por setor (usados em Recebimento/Saída) ----------
 function opcoesItensAgrupadas(){
   const ativos = CATALOGO.filter(i=>i.ativo!==false);
   return ORDEM_SETORES.map(setor=>{
-    const itens = ativos.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    const itens = ativos.filter(i=>i.setor===setor).sort(compararOrdemItem);
     if(!itens.length) return '';
     return `<optgroup label="${escapeHtml(SETORES[setor])}">` +
       itens.map(i=>`<option value="${i.id}">${escapeHtml(i.nome)} (${escapeHtml(i.unidadeMedida)})</option>`).join('') +
@@ -554,17 +567,80 @@ function renderContagemSetor(){
   const setor = setorAtualContagem();
   const container = document.getElementById('c-itens');
   if(!setor){ container.innerHTML = '<div class="empty">Nenhum item no catálogo ainda - adicione um item abaixo.</div>'; atualizarProgressoContagem(); return; }
-  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  const itens = CATALOGO.filter(i=>i.setor===setor && i.ativo!==false).sort(compararOrdemItem);
+  // reordenar (arrastar) muda a ordem do catalogo inteiro (todo mundo ve),
+  // entao fica restrito a quem tem a mesma permissao das outras acoes de
+  // "reorganizar catalogo" (editar/excluir item) - ver index.js
+  const podeArrastar = IS_MASTER || !!ME.podeCatalogoEstoque;
   container.innerHTML = itens.length ? itens.map(i=>{
     const valorAtual = CONTAGEM_VALORES[i.id];
     const valorOntem = CONTAGEM_ONTEM[i.id];
-    return `<div class="linha-contagem">
+    return `<div class="linha-contagem" data-item-id="${i.id}">
+      ${podeArrastar ? '<span class="drag-handle" title="Arraste para reordenar">⠿</span>' : ''}
       <div class="nome">${escapeHtml(i.nome)} <span class="un">${escapeHtml(i.unidadeMedida)}</span></div>
       <div class="ref">Ontem: ${valorOntem!=null ? valorOntem : '—'}</div>
       <input type="number" step="0.001" data-item-id="${i.id}" class="input-contagem" value="${valorAtual!=null?valorAtual:''}" placeholder="qtd" oninput="CONTAGEM_VALORES[this.dataset.itemId]=this.value; atualizarProgressoContagem();">
     </div>`;
   }).join('') : '<div class="empty">Nenhum item nesse setor ainda - adicione um abaixo.</div>';
   atualizarProgressoContagem();
+  if(podeArrastar && itens.length>1) ativarDragReordenar(container, setor);
+}
+
+// arrastar (mouse ou touch, via Pointer Events) pra reordenar os itens desse
+// setor - a cada movimento, reposiciona a linha arrastada no DOM conforme o
+// ponteiro cruza o meio de uma vizinha; ao soltar, manda a ordem final pro
+// servidor (grava 0,1,2... em `ordem`, ver reordenarItens em inventario.js)
+function ativarDragReordenar(container, setor){
+  container.querySelectorAll('.drag-handle').forEach(handle=>{
+    handle.addEventListener('pointerdown', (ev)=>{
+      ev.preventDefault();
+      const dragEl = handle.closest('.linha-contagem');
+      if(!dragEl) return;
+      handle.setPointerCapture(ev.pointerId);
+      dragEl.classList.add('arrastando');
+
+      const mover = (e)=>{
+        const irmaos = [...container.querySelectorAll('.linha-contagem')].filter(el=>el!==dragEl);
+        const y = e.clientY;
+        let alvo = null;
+        for(const el of irmaos){
+          const r = el.getBoundingClientRect();
+          if(y < r.top + r.height/2){ alvo = el; break; }
+        }
+        if(alvo){ if(alvo.previousElementSibling!==dragEl) container.insertBefore(dragEl, alvo); }
+        else if(container.lastElementChild!==dragEl) container.appendChild(dragEl);
+      };
+      const soltar = ()=>{
+        handle.removeEventListener('pointermove', mover);
+        handle.removeEventListener('pointerup', soltar);
+        handle.removeEventListener('pointercancel', soltar);
+        dragEl.classList.remove('arrastando');
+        const idsNaOrdem = [...container.querySelectorAll('.linha-contagem')].map(el=>el.dataset.itemId);
+        salvarOrdemSetor(setor, idsNaOrdem);
+      };
+      handle.addEventListener('pointermove', mover);
+      handle.addEventListener('pointerup', soltar);
+      handle.addEventListener('pointercancel', soltar);
+    });
+  });
+}
+
+async function salvarOrdemSetor(setor, ids){
+  try{
+    const res = await fetch('/api/inventario/catalogo/ordem', {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ setor, ids }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Não foi possível salvar a nova ordem.');
+    data.forEach(atualizado=>{
+      const idx = CATALOGO.findIndex(i=>i.id===atualizado.id);
+      if(idx>-1) CATALOGO[idx] = atualizado;
+    });
+  }catch(err){
+    alert(err.message || 'Não foi possível salvar a nova ordem.');
+    renderContagemSetor();
+  }
 }
 
 function atualizarProgressoContagem(){
@@ -937,7 +1013,7 @@ function baixarRelatorioDiferencas(formato){
 
 // ---------- Catálogo (Master) ----------
 function renderCatalogo(){
-  const porSetor = ORDEM_SETORES.map(setor=>({ setor, itens: CATALOGO.filter(i=>i.setor===setor).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')) }));
+  const porSetor = ORDEM_SETORES.map(setor=>({ setor, itens: CATALOGO.filter(i=>i.setor===setor).sort(compararOrdemItem) }));
   document.getElementById('catalogo-body').innerHTML = porSetor.flatMap(({setor,itens})=>
     itens.map(i=>`
       <tr>

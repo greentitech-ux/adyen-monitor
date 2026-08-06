@@ -118,6 +118,13 @@ async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, qu
   if (!setores.some((s) => s.codigo === setor)) throw new Error('Setor inválido.');
   const tipos = await listTipos();
   const ref = CATALOGO.doc();
+  // item novo sempre entra no fim da ordem manual do setor (ver
+  // reordenarItens) - assim quem organiza a lista com drag-and-drop nao tem
+  // itens novos pulando pro meio sem querer
+  const itensDoSetor = (await listCatalogo()).filter((i) => i.setor === setor);
+  const proximaOrdem = itensDoSetor.length
+    ? Math.max(...itensDoSetor.map((i) => num(i.ordem))) + 1
+    : 0;
   const registro = {
     id: ref.id,
     nome: nome.slice(0, 120),
@@ -131,12 +138,33 @@ async function criarItem({ nome, setor, tipo, unidadeMedida, custoReferencia, qu
     // embalagem/pacote, usado pra converter embalagens recebidas em peso
     quantidadePadrao: quantidadePadrao != null && quantidadePadrao !== '' ? num(quantidadePadrao) : null,
     pesoEmbalagemG: pesoEmbalagemG != null && pesoEmbalagemG !== '' ? num(pesoEmbalagemG) : null,
+    ordem: proximaOrdem,
     ativo: true,
     createdAt: new Date().toISOString(),
   };
   await ref.set(registro);
   catalogoCache.invalidar();
   return registro;
+}
+
+// reordenacao manual dos itens de um setor (drag-and-drop no Contagem/
+// Catalogo, ver estoque.html) - recebe os ids do setor JA na ordem desejada
+// e grava 0,1,2... em `ordem`; itens de outros setores nao sao tocados
+async function reordenarItens(setor, ids) {
+  if (!Array.isArray(ids) || !ids.length) throw new Error('Lista de itens inválida.');
+  const setores = await listSetores();
+  if (!setores.some((s) => s.codigo === setor)) throw new Error('Setor inválido.');
+  const catalogo = await listCatalogo();
+  const doSetor = new Set(catalogo.filter((i) => i.setor === setor).map((i) => i.id));
+  const idsValidos = ids.filter((id) => doSetor.has(id));
+  if (!idsValidos.length) throw new Error('Nenhum item válido para reordenar.');
+  const batch = db.batch();
+  idsValidos.forEach((id, index) => {
+    batch.update(CATALOGO.doc(id), { ordem: index });
+  });
+  await batch.commit();
+  catalogoCache.invalidar();
+  return (await listCatalogo()).filter((i) => i.setor === setor);
 }
 
 async function atualizarItem(id, { nome, setor, tipo, unidadeMedida, custoReferencia, ativo, quantidadePadrao, pesoEmbalagemG }) {
@@ -487,7 +515,7 @@ async function calcularDiferencas(unidade, dataInicio, dataFim) {
 module.exports = {
   SETORES, TIPOS_ITEM, TIPOS_SAIDA,
   listSetores, criarSetor, listTipos, criarTipo,
-  listCatalogo, criarItem, atualizarItem, removerItem, seedCatalogoPadrao,
+  listCatalogo, criarItem, atualizarItem, removerItem, seedCatalogoPadrao, reordenarItens,
   listRecebimentos, criarRecebimento, removerRecebimento,
   listSaidas, criarSaida, removerSaida,
   upsertContagem, getContagem, listContagens,

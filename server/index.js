@@ -1891,6 +1891,15 @@ app.delete('/api/inventario/catalogo/:id', auth.requireMasterOuCatalogoEstoque, 
     res.status(400).json({ error: err.message });
   }
 });
+// reordenar itens de um setor (drag-and-drop no Contagem/Catalogo) - mesma
+// permissao de "reorganizar catalogo" das rotas de editar/excluir acima
+app.put('/api/inventario/catalogo/ordem', auth.requireMasterOuCatalogoEstoque, async (req, res) => {
+  try {
+    res.json(await inventario.reordenarItens(req.body.setor, req.body.ids));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 // carrega o catalogo padrao extraido das planilhas do Domino's - idempotente
 // (so adiciona o que ainda nao existe pelo nome), pode ser chamado de novo
 // sem duplicar
