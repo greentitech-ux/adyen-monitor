@@ -2124,6 +2124,25 @@ app.patch('/api/parque/checkins/:id', requireAnySection('parque', 'parque-checki
   }
 });
 
+// aciona o relogio: o horario que conta pra pulseira/tempo contratado e o
+// do check-in fisico, nao o do cadastro/pagamento (que pode ter acontecido
+// minutos ou horas antes)
+app.post('/api/parque/checkins/:id/checkin', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
+  try {
+    const atual = await parque.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Check-in não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await parque.checkin(req.params.id);
+    broadcast('parque-checkin-atualizado', registro, 'parque');
+    broadcast('parque-checkin-atualizado', registro, 'parque-checkin');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.delete('/api/parque/checkins/:id', auth.requireMaster, async (req, res) => {
   try {
     await parque.remover(req.params.id);
@@ -2140,16 +2159,17 @@ app.get('/api/parque/relatorio.:formato(csv|pdf)', requireSection('parque'), asy
   const colunas = [
     { key: 'unidade', label: 'Unidade' }, { key: 'responsavel', label: 'Responsável' }, { key: 'contato', label: 'Contato' },
     { key: 'data', label: 'Data' }, { key: 'horario', label: 'Horário' }, { key: 'criancas', label: 'Crianças' },
-    { key: 'ac', label: 'A.C.' }, { key: 'termo', label: 'Termo assinado' },
+    { key: 'ac', label: 'A.C.' }, { key: 'checkin', label: 'Check-in' }, { key: 'termo', label: 'Termo assinado' },
   ];
   const linhas = lista.map((c) => ({
     unidade: c.unidadeNome || c.unidade,
     responsavel: c.responsavel?.nome,
     contato: c.responsavel?.contato,
     data: reportUtil.fmtDataBR(c.dataUtilizacao),
-    horario: `${(c.timeInicial || '').slice(0, 5)} às ${(c.timeFinal || '').slice(0, 5)}`,
+    horario: c.iniciado ? `${(c.timeInicial || '').slice(0, 5)} às ${(c.timeFinal || '').slice(0, 5)}` : '—',
     criancas: (c.criancas || []).map((cr) => cr.nome).join(', '),
     ac: c.adultoCortesia ? `Sim (${c.quantAC})` : 'Não',
+    checkin: c.iniciado ? 'Feito' : 'Aguardando',
     termo: c.termoAssinado ? 'Sim' : 'Não',
   }));
   const nomeArquivo = reportUtil.slugify('parque-checkins');

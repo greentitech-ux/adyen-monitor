@@ -54,7 +54,7 @@
   .btn-secundario:hover{border-color:var(--accent);}
   .btn-primary{background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);}
   .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
-  @media(min-width:520px){ .kpi-grid{grid-template-columns:repeat(4,1fr);} }
+  @media(min-width:520px){ .kpi-grid{grid-template-columns:repeat(5,1fr);} }
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
   .kpi .val{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;}
   .kpi .lbl{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;margin-top:2px;}
@@ -68,6 +68,7 @@
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
   .badge.aguardando{background:var(--warn-dim);color:var(--warn);}
   .badge.liberado{background:var(--ok-dim);color:var(--ok);}
+  .badge.pendente-checkin{background:rgba(92,200,255,.12);color:var(--accent);}
   .badge.dentro{background:var(--ok-dim);color:var(--ok);}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);margin-right:12px;margin-top:8px;}
   .agora-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;}
@@ -176,6 +177,7 @@
     <div class="kpi"><div class="val" id="kpi-checkins">0</div><div class="lbl">check-ins no período</div></div>
     <div class="kpi"><div class="val" id="kpi-criancas">0</div><div class="lbl">crianças</div></div>
     <div class="kpi"><div class="val" id="kpi-ac">0</div><div class="lbl">adultos cortesia</div></div>
+    <div class="kpi"><div class="val" id="kpi-aguardando-checkin">0</div><div class="lbl">aguardando check-in</div></div>
     <div class="kpi"><div class="val" id="kpi-aguardando">0</div><div class="lbl">aguardando termo</div></div>
   </div>
 </div>
@@ -237,7 +239,7 @@
         <div><label>Data</label><input type="date" id="m-data"></div>
       </div>
       <div class="grid2">
-        <div><label>Horário inicial</label><input type="time" id="m-hora"></div>
+        <div><label>Horário inicial (deixe vazio se ainda não fez check-in)</label><input type="time" id="m-hora"></div>
         <div><label>Tempo (min)</label><input type="number" step="1" id="m-tempo"></div>
       </div>
       <label>Observação</label>
@@ -406,13 +408,13 @@ function checkinsFiltrados(){
     if(de && c.dataUtilizacao < de) return false;
     if(ate && c.dataUtilizacao > ate) return false;
     return true;
-  }).sort((a,b)=> (b.dataUtilizacao+b.timeInicial).localeCompare(a.dataUtilizacao+a.timeInicial));
+  }).sort((a,b)=> (b.dataUtilizacao+(b.timeInicial||'')).localeCompare(a.dataUtilizacao+(a.timeInicial||'')));
 }
 
 function renderAgora(){
   const hoje = hojeBrasilia();
   const agora = horaBrasilia(agoraBrasilia());
-  const dentro = TODOS.filter(c=>c.dataUtilizacao===hoje && c.timeInicial<=agora && c.timeFinal>=agora && c.termoAssinado);
+  const dentro = TODOS.filter(c=>c.iniciado && c.dataUtilizacao===hoje && c.timeInicial<=agora && c.timeFinal>=agora && c.termoAssinado);
   const el = document.getElementById('lista-agora');
   if(!dentro.length){ el.innerHTML = '<div class="empty">Ninguém no parque agora.</div>'; return; }
   el.innerHTML = dentro.map(c=>{
@@ -427,12 +429,16 @@ function renderAgora(){
   }).join('');
 }
 
+function statusCheckin(c){
+  if(!c.iniciado) return { classe:'pendente-checkin', texto:'aguardando check-in' };
+  if(!c.termoAssinado) return { classe:'aguardando', texto:'aguardando assinatura' };
+  return { classe:'liberado', texto:'liberado' };
+}
+
 function renderLista(lista){
   const el = document.getElementById('lista-checkins');
   if(!lista.length){ el.innerHTML = '<div class="empty">Nenhum check-in no período.</div>'; return; }
   let html = '';
-  let dataAtual = null;
-  let contDia = 0;
   const porData = {};
   lista.forEach(c=>{ (porData[c.dataUtilizacao] = porData[c.dataUtilizacao]||[]).push(c); });
   Object.keys(porData).sort().reverse().forEach(data=>{
@@ -440,16 +446,20 @@ function renderLista(lista){
     html += `<div class="grupo-data">${fmtData(data)} · ${grupo.length} check-in(s)</div>`;
     html += grupo.map(c=>{
       const criancas = (c.criancas||[]).map(cr=>cr.nome).join(', ');
+      const status = statusCheckin(c);
+      const horario = c.iniciado ? `${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)}` : `${c.tempoMinutos}min · horário definido no check-in`;
       return `
       <div class="card">
         <div class="linha1">
           <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)}</span>
-          <span class="badge ${c.termoAssinado?'liberado':'aguardando'}">${c.termoAssinado?'liberado':'aguardando assinatura'}</span>
+          <span class="badge ${status.classe}">${status.texto}</span>
         </div>
-        <div class="sub">${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}</div>
+        <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}</div>
         <div class="criancas">${escapeHtml(criancas)}</div>
         <div>
           <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
+          ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
+          ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
           ${IS_MASTER?`<button type="button" class="link-btn" onclick="abrirMaster('${c.id}')">✎ Editar</button>`:''}
           ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">✕ Excluir</button>`:''}
         </div>
@@ -459,10 +469,27 @@ function renderLista(lista){
   el.innerHTML = html;
 }
 
+async function marcarAssinadoId(id){
+  await fetch(`/api/parque/checkins/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ termoAssinado:true }) });
+  await carregar();
+}
+
+async function fazerCheckin(id){
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/checkin`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao fazer check-in');
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+
 function renderKpis(lista){
   document.getElementById('kpi-checkins').textContent = lista.length;
   document.getElementById('kpi-criancas').textContent = lista.reduce((s,c)=>s+(c.criancas?.length||0),0);
   document.getElementById('kpi-ac').textContent = lista.reduce((s,c)=>s+(c.adultoCortesia?(c.quantAC||0):0),0);
+  document.getElementById('kpi-aguardando-checkin').textContent = lista.filter(c=>!c.iniciado).length;
   document.getElementById('kpi-aguardando').textContent = lista.filter(c=>!c.termoAssinado).length;
 }
 
@@ -539,11 +566,15 @@ document.getElementById('form-master').addEventListener('submit', async (ev)=>{
     const patch = {
       responsavel: { nome: document.getElementById('m-nome').value, contato: document.getElementById('m-contato').value },
       dataUtilizacao: document.getElementById('m-data').value,
-      timeInicial: document.getElementById('m-hora').value,
       tempoMinutos: Number(document.getElementById('m-tempo').value),
       observacao: document.getElementById('m-observacao').value,
       termoAssinado: document.getElementById('m-termo').checked,
     };
+    // so manda timeInicial se o Master realmente preencheu - vazio nao e um
+    // horario valido, e deixar de fora o campo evita bloquear a edicao dos
+    // outros campos de um check-in que ainda nao teve o check-in feito
+    const horaDigitada = document.getElementById('m-hora').value;
+    if(horaDigitada) patch.timeInicial = horaDigitada;
     const res = await fetch(`/api/parque/checkins/${EDITANDO_ID}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao salvar');
