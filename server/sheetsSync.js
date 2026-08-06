@@ -99,13 +99,48 @@ async function getAccessToken() {
   return cachedToken.token;
 }
 
-async function buscarAba(spreadsheetId, aba) {
-  const token = await getAccessToken();
+async function buscarValoresAba(spreadsheetId, aba, token) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(aba)}?valueRenderOption=FORMATTED_VALUE`;
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   const data = await resp.json();
-  if (!resp.ok) {
-    throw new Error(`Erro ao ler a planilha ${spreadsheetId} (confira se ela foi compartilhada com ${process.env.FIREBASE_CLIENT_EMAIL}): ${data.error?.message || resp.status}`);
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+// lista os nomes reais das abas da planilha (metadados, nao os valores) -
+// usado quando a busca pelo nome esperado falha, pra tentar achar a aba
+// certa mesmo se o nome real tiver maiuscula/espaco/acento diferente, e pra
+// dar um erro claro (com os nomes de verdade) se mesmo assim nao achar
+async function listarAbas(spreadsheetId, token) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await resp.json();
+  if (!resp.ok) return [];
+  return (data.sheets || []).map((s) => s.properties.title);
+}
+
+function normalizarNomeAba(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+async function buscarAba(spreadsheetId, aba) {
+  const token = await getAccessToken();
+  let { ok, data } = await buscarValoresAba(spreadsheetId, aba, token);
+  if (!ok) {
+    // "Unable to parse range" e o mesmo erro generico que o Sheets devolve
+    // tanto pra sintaxe invalida quanto pra aba que nao existe com ESSE nome
+    // exato - antes de desistir, procura entre as abas de verdade da
+    // planilha uma que bata ignorando maiuscula/espaco/acento (bem comum
+    // quando a aba foi renomeada ou copiada com uma diferenca sutil)
+    const abas = await listarAbas(spreadsheetId, token);
+    const alvo = normalizarNomeAba(aba);
+    const encontrada = abas.find((t) => normalizarNomeAba(t) === alvo);
+    if (encontrada && encontrada !== aba) {
+      ({ ok, data } = await buscarValoresAba(spreadsheetId, encontrada, token));
+    }
+    if (!ok) {
+      const listaAbas = abas.length ? ` Abas encontradas na planilha: ${abas.join(', ')}.` : '';
+      throw new Error(`Erro ao ler a aba "${aba}" da planilha ${spreadsheetId} (confira se ela foi compartilhada com ${process.env.FIREBASE_CLIENT_EMAIL}): ${data.error?.message || data.status || 'erro desconhecido'}.${listaAbas}`);
+    }
   }
   return data.values || [];
 }
