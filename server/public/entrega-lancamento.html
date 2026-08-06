@@ -690,7 +690,7 @@ async function boot(){
   document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
   document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
   document.getElementById('nav-mensalistas').classList.toggle('hidden', !secoes.includes('parque'));
-  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || IS_ADMIN_GLOBAL));
+  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || ME.isAdmin));
 
   if(!secoes.includes('entregas-lancamento')){
     document.getElementById('sem-acesso').classList.remove('hidden');
