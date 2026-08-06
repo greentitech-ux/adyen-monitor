@@ -71,10 +71,12 @@
   .toggle-grupo{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
   .toggle-btn{flex:1;min-width:56px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 6px;font-size:12.5px;font-family:var(--sans);cursor:pointer;text-align:center;}
   .toggle-btn.ativo{background:var(--accent);color:#06202b;border-color:var(--accent);font-weight:700;}
-  .crianca-linha{display:grid;grid-template-columns:1fr;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;}
-  @media(min-width:440px){ .crianca-linha{grid-template-columns:1fr 130px 30px;align-items:end;} }
+  .crianca-linha{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;}
+  .crianca-linha-nasc{display:flex;gap:6px;align-items:end;}
+  .crianca-linha-nasc>div{flex:1;min-width:0;}
+  @media(min-width:440px){ .crianca-linha{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end;} .crianca-linha-nasc{grid-column:2;} }
   .crianca-linha input{margin:0;}
-  .btn-remover-crianca{background:none;border:1px solid var(--line);color:var(--bad);border-radius:8px;height:38px;cursor:pointer;font-size:14px;}
+  .btn-remover-crianca{background:none;border:1px solid var(--line);color:var(--bad);border-radius:8px;height:44px;width:38px;flex:none;cursor:pointer;font-size:14px;}
   .resumo{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:12.5px;display:flex;flex-direction:column;gap:4px;}
   .resumo .linha{display:flex;justify-content:space-between;gap:8px;}
 </style>
@@ -295,8 +297,10 @@ function adicionarCrianca(){
   div.id = id;
   div.innerHTML = `
     <div><label style="margin-top:0;">Nome da criança</label><input type="text" class="crianca-nome" required></div>
-    <div><label style="margin-top:0;">Nascimento</label><input type="date" class="crianca-nasc"></div>
-    <button type="button" class="btn-remover-crianca" onclick="document.getElementById('${id}').remove(); atualizarPreviewPulseiras();" title="Remover">✕</button>
+    <div class="crianca-linha-nasc">
+      <div><label style="margin-top:0;">Nascimento</label><input type="date" class="crianca-nasc"></div>
+      <button type="button" class="btn-remover-crianca" onclick="document.getElementById('${id}').remove(); atualizarPreviewPulseiras();" title="Remover">✕</button>
+    </div>
   `;
   document.getElementById('lista-criancas').appendChild(div);
   div.querySelector('.crianca-nome').addEventListener('input', atualizarPreviewPulseiras);
