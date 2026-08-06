@@ -148,4 +148,20 @@ async function remove(id) {
   refundsCache.invalidar();
 }
 
-module.exports = { STATUSES, create, listAll, getOne, updateStatus, update, remove, marcarNotificacaoVista };
+// troca o Master/Admin responsavel por um pedido de estorno ja existente -
+// mesmo criterio do redirecionar() de solicitacoes.js
+async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail }) {
+  const ref = refundsRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  await ref.update({
+    direcionadoParaId: direcionadoParaId || null,
+    direcionadoParaEmail: direcionadoParaEmail || null,
+  });
+  refundsCache.invalidar();
+  return getOne(id);
+}
+
+module.exports = {
+  STATUSES, create, listAll, getOne, updateStatus, update, remove, marcarNotificacaoVista, redirecionar,
+};

@@ -198,4 +198,22 @@ async function remove(id) {
   solicitacoesCache.invalidar();
 }
 
-module.exports = { TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove, marcarNotificacaoVista, marcarComprada, desmarcarComprada };
+// troca o Master/Admin responsavel por um pedido ja existente, seja qual for
+// o status - ex: pedido foi direcionado a alguem que esta de folga, outro
+// Admin assume. null limpa (volta a ser "qualquer Master/Admin do grupo")
+async function redirecionar(id, { direcionadoParaId, direcionadoParaEmail }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  await ref.update({
+    direcionadoParaId: direcionadoParaId || null,
+    direcionadoParaEmail: direcionadoParaEmail || null,
+  });
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+module.exports = {
+  TIPOS, STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove,
+  marcarNotificacaoVista, marcarComprada, desmarcarComprada, redirecionar,
+};

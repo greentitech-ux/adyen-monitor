@@ -230,8 +230,14 @@
         <textarea id="a-motivo" placeholder="explique o que aconteceu"></textarea>
       </div>
 
-      <!-- COMPRA / MANUTENCAO / SUPORTE TI -->
+      <!-- COMPRA / MANUTENCAO / SUPORTE TI / PAGAMENTO / NOTA -->
       <div id="campos-gerais" class="hidden">
+        <div class="link-cliente-box">
+          <div class="link-cliente-titulo">📱 Prefere mandar um link pra outra pessoa preencher?</div>
+          <div class="link-cliente-sub">Gera um link (com a loja e o tipo já pré-preenchidos) - útil pra passar pro Beniboy mandar num atendimento, ou pra alguém preencher sem precisar de acesso ao Zenith.</div>
+          <button type="button" class="btn-link-cliente" onclick="copiarLinkSolicitacaoPublica()">🔗 Copiar link</button>
+          <div id="link-solicitacao-msg" class="hidden"></div>
+        </div>
         <label id="g-titulo-label">Título</label>
         <input type="text" id="g-titulo" placeholder="ex: comprar papel térmico">
         <div id="compra-itens" class="secao hidden" style="border-top:none;margin-top:10px;padding-top:0;">
@@ -370,6 +376,26 @@ async function copiarLinkCliente(){
   try{
     await navigator.clipboard.writeText(url);
     msg.textContent = (unidade ? '✅ Link copiado (loja já vem selecionada): ' : '✅ Link copiado (cliente escolhe a loja): ') + url;
+  }catch(e){
+    msg.textContent = 'Não deu pra copiar automático, mas aqui está o link: ' + url;
+  }
+  msg.classList.remove('hidden');
+}
+
+// mesma ideia do link de estorno pro cliente, so que pro formulario
+// generico (compra/manutencao/suporte-ti/pagamento/nota, ver
+// server/public/solicitacao-publica.html) - com o tipo selecionado ja
+// travado no link, alem da loja
+async function copiarLinkSolicitacaoPublica(){
+  const unidade = document.getElementById('f-unidade').value;
+  const params = new URLSearchParams();
+  params.set('tipo', TIPO_SELECIONADO);
+  if(unidade) params.set('unidade', unidade);
+  const url = location.origin + '/solicitacao-publica.html?' + params.toString();
+  const msg = document.getElementById('link-solicitacao-msg');
+  try{
+    await navigator.clipboard.writeText(url);
+    msg.textContent = '✅ Link copiado: ' + url;
   }catch(e){
     msg.textContent = 'Não deu pra copiar automático, mas aqui está o link: ' + url;
   }

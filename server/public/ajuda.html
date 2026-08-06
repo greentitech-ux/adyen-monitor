@@ -166,11 +166,15 @@ const TOPICOS = [
     <h3>Passo a passo</h3>
     <ol>
       <li>Acesse o endereço do Zenith Ops no navegador.</li>
-      <li>Informe o e-mail e a senha cadastrados pelo Master.</li>
+      <li>Informe o <b>usuário</b> (se o Master cadastrou um pra você) <b>ou o e-mail</b>, e a senha.</li>
       <li>Clique em <b>Entrar</b>.</li>
     </ol>
-    <div class="dica"><b>Esqueceu a senha?</b> Só o Master pode trocar - peça pra ele usar "Nova senha" na página Usuários.</div>
+    <div class="dica"><b>Esqueceu a senha?</b> Peça pro Master usar "Nova senha" na página Usuários - ele te passa uma senha temporária por fora do sistema (telefone/WhatsApp).</div>
     <div class="dica"><b>Conta bloqueada?</b> Depois de 3 senhas erradas o acesso trava sozinho. O Master destrava trocando a senha.</div>
+    <h3>Troca de senha obrigatória no primeiro acesso</h3>
+    <p>Toda vez que o Master cria um acesso novo ou reseta sua senha, no login seguinte o sistema pede pra você definir uma senha nova antes de liberar o resto do app - a senha temporária só serve pra esse primeiro login.</p>
+    <h3>Trocar a senha quando quiser</h3>
+    <p>A qualquer momento, abra o menu (☰) no Painel e clique em <b>🔑 Alterar senha</b>. Você continua logado no seu aparelho; só os outros locais logados com a senha antiga são desconectados.</p>
   `},
   { id:'painel', icone:'🏠', secoes:null, titulo:'Painel (visão geral)', corpo:`
     <p>É a primeira tela depois do login: mostra um resumo rápido de cada área que você tem acesso (Monitor do dia, Fechamentos de ontem, Entregas de ontem, Central de Solicitações pendentes, Chamados de TI, iFood).</p>
@@ -178,6 +182,22 @@ const TOPICOS = [
       <li>Cada cartão mostra os números principais daquela área.</li>
       <li>Clique em <b>Abrir →</b> no canto do cartão pra ir direto pra tela completa.</li>
     </ol>
+  `},
+  { id:'notificacoes-push', icone:'🔔', secoes:null, titulo:'Notificações no celular', corpo:`
+    <p>Além do aviso na tela quando o app está aberto, dá pra receber notificação de verdade no celular - com vibração e som, mesmo com a tela bloqueada ou o app fechado.</p>
+    <h3>Como ativar</h3>
+    <ol>
+      <li>Abra o <b>Painel</b> (ou o <b>Monitor</b>) e toque no sino 🔔 no topo da tela.</li>
+      <li>O navegador vai pedir permissão de notificação - toque em <b>Permitir</b>.</li>
+      <li>O sino fica verde quando está ativo.</li>
+    </ol>
+    <div class="dica">Pra receber mesmo com o celular bloqueado, use o Chrome (Android) ou Safari (iPhone, a partir do iOS 16.4) e deixe o app aberto pelo menos uma vez depois de ativar - o navegador precisa "lembrar" da inscrição.</div>
+    <h3>O que gera notificação</h3>
+    <ul>
+      <li>Alertas de fraude suspeita, estorno e chargeback no Monitor.</li>
+      <li>Solicitações novas na Central (estorno, ajuste de fechamento, compra, manutenção, suporte de TI, pagamento, nota) - só pra Master e <span class="tagpill admin">⭐ Admin</span>.</li>
+    </ul>
+    <p>Se o sino avisar que "ainda não foi configurado", é porque o Master precisa configurar as chaves do servidor - fale com ele.</p>
   `},
   { id:'monitor', icone:'📈', secoes:['monitor'], titulo:'Monitor (transações Adyen)', corpo:`
     <p>Mostra em tempo real as transações processadas pela Adyen: aprovadas, recusadas, chargebacks e alertas de possível fraude.</p>
@@ -224,16 +244,18 @@ const TOPICOS = [
     </ul>
   `},
   { id:'central', icone:'📋', secoes:['solicitacoes'], titulo:'Central de Solicitações', corpo:`
-    <p>É onde qualquer loja pede Estorno, Ajuste de Fechamento, Compra, Manutenção ou Suporte de TI - e onde Master/Admin aprovam ou rejeitam esses pedidos.</p>
+    <p>É onde qualquer loja pede Estorno, Ajuste de Fechamento, Compra, Manutenção, Suporte de TI, Pagamento (despesa) ou Solicitação de Nota - e onde Master/Admin aprovam ou rejeitam esses pedidos.</p>
     <h3>Lançar uma solicitação</h3>
     <ol>
       <li>Abra <b>Central</b> e clique em <b>+ Nova solicitação</b>.</li>
-      <li>Escolha o tipo (Estorno, Ajuste de Fechamento, Compra, Manutenção ou Suporte de TI).</li>
+      <li>Escolha o tipo.</li>
       <li>Preencha os campos pedidos e anexe foto/orçamento se tiver.</li>
       <li>Em Compra, Manutenção e Suporte de TI, marque <b>"É um orçamento"</b> se o pedido precisa de uma análise mais cuidadosa antes de aprovar.</li>
       <li>Se quiser, escolha em <b>Direcionar para</b> qual Master/Admin deve olhar esse pedido primeiro (não impede outros de decidirem também, é só um atalho).</li>
       <li>Envie - a solicitação cai na fila de aprovação.</li>
     </ol>
+    <h3>🔗 Link público (pra quem não tem acesso ao Zenith)</h3>
+    <p>No formulário de Estorno, Compra, Manutenção, Suporte de TI, Pagamento ou Nota tem um botão <b>"🔗 Copiar link"</b> - gera um link (já com a loja e o tipo selecionados) que qualquer pessoa consegue preencher sem precisar de login. Útil pra mandar pro cliente preencher o pedido de estorno sozinho, ou pro Beniboy (ou outro atendimento) mandar quando o assunto precisar virar um ticket de verdade, sem ter que ensinar a pessoa a usar o sistema inteiro. A solicitação cai na Central normalmente, marcada como vinda do formulário público.</p>
     <h3>Acompanhar (página Histórico)</h3>
     <ul>
       <li>Quadro Kanban com 3 colunas: Pendente, Aprovado, Rejeitado.</li>
@@ -241,6 +263,8 @@ const TOPICOS = [
       <li>Filtros de loja, grupo e período de data, lado a lado no topo.</li>
       <li>Clique num cartão pra ver todos os detalhes, anexos e o chat da solicitação.</li>
     </ul>
+    <h3>👤 Trocar o agente responsável</h3>
+    <p>Master e Admin podem abrir qualquer solicitação (de qualquer tipo, em qualquer status) e, na seção <b>"Agente responsável"</b> do detalhe, escolher outra pessoa pra cuidar do ticket - útil quando o pedido foi direcionado a alguém de folga ou outro Admin precisa assumir.</p>
     <h3>🛍️ Status Comprada (pedidos de Compra)</h3>
     <p>Depois que um pedido de <b>Compra</b> é aprovado, o Master ou Admin pode marcar ele como <b>Comprada</b> - informando a data de entrega prevista e/ou anexando o print/comprovante da compra (os dois são opcionais, dá pra marcar só com um deles). O cartão ganha um selo "✅ comprada" no quadro, e dá pra desmarcar se precisar corrigir.</p>
     <h3>💬 Chat da solicitação</h3>
@@ -276,20 +300,24 @@ const TOPICOS = [
     <p>Tela exclusiva do Master pra criar e administrar todos os acessos do sistema.</p>
     <h3>Criar um acesso novo</h3>
     <ol>
-      <li>Preencha e-mail e senha temporária no formulário do topo.</li>
+      <li>Preencha e-mail, senha temporária e, se quiser, um <b>usuário</b> (login curto, tipo "jn") no formulário do topo.</li>
       <li>Marque as seções, lojas e subgrupos do Cofre que a pessoa vai poder usar.</li>
       <li>Clique em <b>Criar acesso</b>.</li>
     </ol>
+    <div class="dica">A senha que você digitou é só a temporária - no primeiro login a pessoa é obrigada a trocar por uma nova antes de usar o resto do app.</div>
     <h3>Gerenciar um acesso existente</h3>
     <ul>
       <li><b>Permissões</b>: muda seções/lojas/subgrupos liberados.</li>
       <li><b>Horário</b>: restringe o login a um intervalo do dia.</li>
       <li><b>Tornar admin / Remover admin</b>: dá ou tira o poder de aprovar solicitações da Central.</li>
       <li><b>Liberar Catálogo do Estoque</b>: deixa a pessoa organizar setor/tipo, ajustar custo de referência e ativar/desativar item no Catálogo do Estoque, sem precisar virar Master nem Admin - útil pra um gerente que cuida disso no dia a dia da loja dele.</li>
-      <li><b>Nova senha</b>: troca a senha (e destrava a conta, se estiver bloqueada).</li>
+      <li><b>Definir/Editar usuário</b>: define o login curto (usuário) da pessoa, alternativa ao e-mail na tela de login.</li>
+      <li><b>Nova senha</b>: troca a senha (e destrava a conta, se estiver bloqueada) - a pessoa é obrigada a trocar de novo no próximo login.</li>
       <li><b>Ativar/Desativar</b>: liga ou desliga o acesso sem excluir.</li>
       <li><b>Excluir</b>: remove o acesso de vez.</li>
     </ul>
+    <h3>Definir o "usuário" em massa</h3>
+    <p>No painel <b>"Atualizar usuários em massa"</b>, mais abaixo na mesma tela, cole uma lista no formato <code>email,usuário</code> (uma linha por acesso, pode copiar de uma planilha) e clique em <b>Aplicar</b> - o sistema processa linha por linha e mostra o resultado de cada uma, sem parar se alguma der erro.</p>
   `},
   { id:'grupos', icone:'🏷️', secoes:'master', titulo:'Grupos (Master)', corpo:`
     <p>Organiza as lojas em franquias/grupos e permite configurar, por grupo, tudo que muda de loja pra loja: seções do Fechamento, campos extras e quem recebe as notificações da Central.</p>

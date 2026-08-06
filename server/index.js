@@ -113,8 +113,10 @@ function senhasIguais(a, b) {
 const ROTAS_PUBLICAS_SEM_DASHBOARD = new Set([
   '/webhooks/adyen',
   '/estorno-cliente.html',
+  '/solicitacao-publica.html',
   '/api/meta/unidades-publico',
   '/api/refund-requests/publico',
+  '/api/solicitacoes/publico',
   '/api/bot/solicitacoes',
 ]);
 if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
@@ -214,6 +216,52 @@ app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, 
     });
     broadcast('refund-requested', registro, 'monitor');
     push.notifySolicitacao('Pedido de estorno (cliente)', `${unidadeNome} · R$ ${(Number(valorEstornar) || 0).toFixed(2)}`, registro.id);
+    res.json({ ok: true, id: registro.id });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- solicitacao generica (compra/manutencao/suporte-ti/pagamento/
+// nota) preenchida por QUEM NAO TEM login no Zenith - pensado pro Beniboy
+// (agente de suporte) mandar esse link quando o atendimento chegar num ponto
+// que precisa de outra acao, sem precisar ensinar a pessoa a usar o sistema
+// inteiro. Vira uma solicitacao normal na Central, so que sem criadoPorId
+// (fica registrado como "Formulário público", com nome/contato de quem
+// preencheu se informados). Estorno e ajuste de fechamento ficam de fora:
+// estorno ja tem seu proprio formulario (estorno-cliente.html) e ajuste de
+// fechamento depende de escolher "meu fechamento", que exige login. ----------
+app.post('/api/solicitacoes/publico', upload.array('anexos', 4), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const {
+      tipo, unidade, titulo, valorEstimado, observacao, itens, fornecedor, vencimento,
+      solicitanteNome, solicitanteContato,
+    } = payload;
+
+    const TIPOS_PUBLICOS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
+    if (!TIPOS_PUBLICOS.includes(tipo)) return res.status(400).json({ error: 'Tipo de solicitação inválido.' });
+
+    const mapa = await construirUnidadesMapa();
+    const unidadeNome = mapa[unidade] || unidade;
+
+    const anexos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(unidade || 'geral', file, 'solicitacoes');
+      anexos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+
+    const quemPediu = [String(solicitanteNome || '').trim(), String(solicitanteContato || '').trim()].filter(Boolean).join(' · ');
+    const registro = await solicitacoes.create({
+      tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos,
+      ehOrcamento: false, fornecedor, vencimento,
+      criadoPorId: null,
+      criadoPorEmail: `Formulário público${quemPediu ? ' — ' + quemPediu : ''}`,
+      direcionadoParaId: null,
+      direcionadoParaEmail: null,
+    });
+    broadcast('solicitacao-criada', registro, 'solicitacoes');
+    push.notifySolicitacao('Nova solicitação (formulário público)', `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
     res.json({ ok: true, id: registro.id });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1340,6 +1388,18 @@ app.patch('/api/refund-requests/:id/status', auth.requireMasterOrAdmin, async (r
       motivoDecisao: req.body.motivoDecisao,
       decidedByEmail: req.user.email,
     });
+    broadcast('refund-request-changed', registro, 'monitor');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// troca o Master/Admin responsavel pelo pedido - Master/Admin decidem "quem
+// resolve esse", independente de quem foi direcionado na hora da criacao
+app.patch('/api/refund-requests/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const registro = await refunds.redirecionar(req.params.id, req.body);
     broadcast('refund-request-changed', registro, 'monitor');
     res.json(registro);
   } catch (err) {
@@ -2538,6 +2598,18 @@ app.patch('/api/fechamentos/edicoes/:id', auth.requireMasterOrAdmin, async (req,
       decididoPorEmail: req.user.email,
       motivoDecisao: req.body.motivoDecisao,
     });
+    broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
+    broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
+    broadcast('fechamento-edicao-decidida', pedido, 'solicitacoes');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/fechamentos/edicoes/:id/direcionar', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const pedido = await fechamentosLive.redirecionarEdicao(req.params.id, req.body);
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
     broadcast('fechamento-edicao-decidida', pedido, 'solicitacoes');

@@ -410,6 +410,20 @@ async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail }) {
   return getEdicao(id);
 }
 
+// troca o Master/Admin responsavel por um pedido de ajuste ja existente -
+// mesmo criterio do redirecionar() de solicitacoes.js
+async function redirecionarEdicao(id, { direcionadoParaId, direcionadoParaEmail }) {
+  const ref = EDITS.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Pedido não encontrado.');
+  await ref.update({
+    direcionadoParaId: direcionadoParaId || null,
+    direcionadoParaEmail: direcionadoParaEmail || null,
+  });
+  edicoesCache.invalidar();
+  return getEdicao(id);
+}
+
 // exclui so o PEDIDO de ajuste (o registro na fila de solicitacoes) - poder
 // do Master de limpar a fila. Se o pedido ja tinha sido aprovado, o
 // fechamento em si (ja alterado por decidirEdicao) nao e desfeito; pra
@@ -526,4 +540,7 @@ function invalidarCache() {
   fechamentosCache.invalidar();
 }
 
-module.exports = { CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao, decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache, marcarNotificacaoVistaEdicao };
+module.exports = {
+  CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao,
+  decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache, marcarNotificacaoVistaEdicao, redirecionarEdicao,
+};
