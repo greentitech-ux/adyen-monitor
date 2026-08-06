@@ -114,13 +114,15 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
-  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
-  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back active" id="nav-ifood-self" href="/ifood.html">🍔 iFood</a>
+  <div class="nav-drawer-grupo">Saltiverso</div>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
   <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <a class="back hidden" id="nav-mensalistas" href="/mensalistas.html">📅 Mensalistas</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
@@ -131,6 +133,7 @@
   <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <a class="back hidden" id="nav-reset-senha" href="/painel.html?resetSenha=1">🔑 Reset senha</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
   <div class="nav-drawer-sep"></div>
@@ -546,6 +549,8 @@ async function boot(){
   document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
   document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
   document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-mensalistas').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || IS_ADMIN_GLOBAL));
   document.getElementById('btn-recarregar').classList.toggle('hidden', false);
   document.getElementById('btn-sincronizar').classList.toggle('hidden', !isMaster);
 

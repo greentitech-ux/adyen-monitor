@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Festas · Zenith Ops</title>
+<title>Mensalistas · Zenith Ops</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -22,7 +22,7 @@
   }
   *{box-sizing:border-box;min-width:0;}
   html{overflow-x:hidden;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:720px;margin-inline:auto;overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:760px;margin-inline:auto;overflow-x:hidden;}
   h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
   h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
   .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
@@ -45,43 +45,33 @@
   .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
-  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
-  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
-  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
   label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
   label:first-child{margin-top:0;}
   input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
-  textarea{resize:vertical;min-height:56px;}
-  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
-  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
-  .grid3{display:grid;grid-template-columns:1fr;gap:0 10px;}
-  @media(min-width:560px){ .grid3{grid-template-columns:1fr 1fr 1fr;} }
-  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
-  .btn-secundario{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;gap:4px;}
-  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
-  .msg.ok{background:var(--ok-dim);color:var(--ok);}
-  .msg.err{background:var(--bad-dim);color:var(--bad);}
-  .filtros-acoes{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;}
+  .btn-primary{background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);}
   .card{border-top:1px solid var(--line);padding:12px 0;}
   .card:first-child{border-top:none;padding-top:0;}
   .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
   .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
-  .card .valores{display:flex;gap:12px;margin-top:8px;font-size:12px;flex-wrap:wrap;}
-  .card .valores b{color:var(--text);}
+  .card .criancas{font-size:12px;color:var(--muted);margin-top:6px;}
   .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
-  .badge.pendente{background:var(--warn-dim);color:var(--warn);}
-  .badge.pago{background:var(--ok-dim);color:var(--ok);}
-  .badge.cancelado{background:var(--bad-dim);color:var(--bad);}
+  .badge.aguardando{background:var(--warn-dim);color:var(--warn);}
+  .badge.liberado{background:var(--ok-dim);color:var(--ok);}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);margin-right:12px;margin-top:8px;}
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
-  .overlay.hidden{display:none!important;}
-  .sheet-wrap{position:relative;width:100%;max-width:640px;}
-  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
-  .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
-  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
-  .sheet h3{margin:0 0 4px;font-size:14px;}
-  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;}
+  .btn-secundario-full{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+  .crianca-linha{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;}
+  .crianca-linha-nasc{display:flex;gap:6px;align-items:end;}
+  .crianca-linha-nasc>div{flex:1;min-width:0;}
+  @media(min-width:440px){ .crianca-linha{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end;} .crianca-linha-nasc{grid-column:2;} }
+  .crianca-linha input{margin:0;}
+  .btn-remover-crianca{background:none;border:1px solid var(--line);color:var(--bad);border-radius:8px;height:44px;width:38px;flex:none;cursor:pointer;font-size:14px;}
 </style>
 </head>
 <body>
@@ -91,7 +81,7 @@
     <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
     <div>
       <div class="eyebrow">Zenith Ops · Saltiverso Patteo</div>
-      <h1>Festas</h1>
+      <h1>Mensalistas</h1>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;">
@@ -116,8 +106,8 @@
   <div class="nav-drawer-grupo">Saltiverso</div>
   <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
   <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
-  <a class="back active" id="nav-festas-self" href="/festas.html">🎉 Festas</a>
-  <a class="back hidden" id="nav-mensalistas" href="/mensalistas.html">📅 Mensalistas</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <a class="back active" id="nav-mensalistas-self" href="/mensalistas.html">📅 Mensalistas</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
@@ -135,97 +125,45 @@
   <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
 </nav>
 
-<div id="sem-acesso" class="empty hidden">Você não tem acesso a Festas. Fale com o administrador (Master).</div>
+<div id="sem-acesso" class="empty hidden">Você não tem acesso aos Mensalistas do Parque. Fale com o administrador (Master).</div>
 
 <div id="root" class="hidden">
 
 <div class="panel">
-  <h2>Nova reserva de festa</h2>
-  <form id="form-festa">
-    <div class="secao">
-      <label>Unidade</label>
-      <select id="f-unidade" required></select>
-      <label>Nome do cliente</label>
-      <input type="text" id="f-cliente-nome" required>
-      <div class="grid2">
-        <div><label>Contato</label><input type="text" id="f-cliente-contato"></div>
-        <div><label>Email</label><input type="email" id="f-cliente-email"></div>
-      </div>
+  <h2>Mensalistas (passaporte mensal)</h2>
+  <form id="form-mensalista">
+    <div class="grid2">
+      <div><label>Unidade</label><select id="ms-unidade" required></select></div>
+      <div><label>Nome do responsável</label><input type="text" id="ms-nome" required></div>
     </div>
-    <div class="secao">
-      <div class="secao-titulo">Data do evento</div>
-      <div class="grid3">
-        <div><label>Data de uso</label><input type="date" id="f-dataDeUso" required></div>
-        <div><label>Hora início</label><input type="time" id="f-horaInicio"></div>
-        <div><label>Hora fim</label><input type="time" id="f-horaFim"></div>
-      </div>
+    <div class="grid2">
+      <div><label>CPF</label><input type="text" id="ms-cpf"></div>
+      <div><label>Contato</label><input type="text" id="ms-contato"></div>
     </div>
-    <div class="secao">
-      <div class="secao-titulo">Valores</div>
-      <label>Valor total</label>
-      <input type="number" step="0.01" id="f-valorTotal" value="0" required>
-      <div class="grid3">
-        <div><label>Sinal (valor)</label><input type="number" step="0.01" id="f-sinalValor"></div>
-        <div><label>Sinal (forma)</label><input type="text" id="f-sinalForma" placeholder="pix, cartão..."></div>
-        <div><label>Sinal (data)</label><input type="date" id="f-sinalData"></div>
-      </div>
-      <div class="grid3">
-        <div><label>Restante (valor)</label><input type="number" step="0.01" id="f-restanteValor"></div>
-        <div><label>Restante (forma)</label><input type="text" id="f-restanteForma"></div>
-        <div><label>Restante (data)</label><input type="date" id="f-restanteData"></div>
-      </div>
+    <div class="grid2">
+      <div><label>Data de início</label><input type="date" id="ms-data-inicial" required></div>
+      <div><label>Validade (calculada)</label><input type="text" id="ms-validade-preview" disabled></div>
     </div>
-    <div class="secao">
-      <label>Acréscimo de pulantes ao lançamento anterior (código, opcional)</label>
-      <input type="text" id="f-referencia" placeholder="ex: CA6063F">
-      <label>Observação (opcional)</label>
-      <textarea id="f-observacao"></textarea>
+    <label>Valor do plano</label>
+    <input type="number" step="0.01" min="0" id="ms-valor" placeholder="0,00">
+
+    <div class="secao-titulo">Crianças que vão utilizar o plano</div>
+    <div class="sub" style="font-family:var(--sans);color:var(--muted);font-size:12px;margin-top:-4px;margin-bottom:6px;">
+      O responsável geralmente só assina pelo plano - quem brinca são as crianças cadastradas aqui.
     </div>
-    <div class="msg hidden" id="msg"></div>
-    <button class="btn-primary" type="submit" id="btn-enviar">Registrar reserva</button>
+    <div id="ms-lista-criancas"></div>
+    <button type="button" class="btn-secundario-full" onclick="adicionarCriancaMensalista()">+ Adicionar criança</button>
+
+    <div class="msg hidden" id="msg-mensalista"></div>
+    <button class="btn-primary" type="submit" style="width:100%;margin-top:10px;">Cadastrar mensalista</button>
   </form>
 </div>
 
 <div class="panel">
-  <h2>Reservas</h2>
-  <div class="filtros-acoes">
-    <select id="f-status-filtro" style="max-width:180px;">
-      <option value="">Todos os status</option>
-      <option value="pendente">Pendente</option>
-      <option value="pago">Pago</option>
-      <option value="cancelado">Cancelado</option>
-    </select>
-    <a class="btn-secundario" id="link-csv" href="#">⬇️ CSV</a>
-    <a class="btn-secundario" id="link-pdf" href="#">⬇️ PDF</a>
-  </div>
-  <div id="lista-festas" style="margin-top:12px;"><div class="empty">carregando...</div></div>
+  <h2>Mensalistas cadastrados</h2>
+  <div id="lista-mensalistas"><div class="empty">carregando...</div></div>
 </div>
 
-</div>
-
-<div class="overlay hidden" id="overlay-editar">
-  <div class="sheet-wrap">
-    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharEditar()">✕</span>
-    <div class="sheet">
-    <h3>Editar reserva</h3>
-    <div class="sub" id="editar-info"></div>
-    <form id="form-editar">
-      <label>Status</label>
-      <select id="e-status">
-        <option value="pendente">Pendente</option>
-        <option value="pago">Pago</option>
-        <option value="cancelado">Cancelado</option>
-      </select>
-      <label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);margin-top:12px;">
-        <input type="checkbox" id="e-utilizado" style="width:auto;"> Festa já utilizada
-      </label>
-      <label>Observação</label>
-      <textarea id="e-observacao"></textarea>
-      <div class="msg hidden" id="msg-editar"></div>
-      <button class="btn-primary" type="submit">Salvar alterações</button>
-    </form>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -243,10 +181,10 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
-// grupos do menu (Operacao diaria/Monitoramento/Solicitacoes/Administracao)
-// viram dropdown: clicar no titulo do grupo expande/recolhe os itens dele.
-// O grupo que contem a pagina atual comeca aberto; os outros comecam
-// fechados (lembra a preferencia de cada grupo entre paginas via
+// grupos do menu (Operacao diaria/Monitoramento/Saltiverso/Solicitacoes/
+// Administracao) viram dropdown: clicar no titulo do grupo expande/recolhe
+// os itens dele. O grupo que contem a pagina atual comeca aberto; os outros
+// comecam fechados (lembra a preferencia de cada grupo entre paginas via
 // localStorage, pelo nome do grupo - mesmo criterio em todo o app)
 function initNavDrawerAccordion(){
   const nav = document.getElementById('nav-drawer');
@@ -286,143 +224,124 @@ const PARQUE_UNIDADES_NOMES = { 'Saltiverso Patteo': 'Saltiverso Patteo' };
 
 let ME = null;
 let IS_MASTER = false;
+let IS_ADMIN_GLOBAL = false;
 let UNIDADES_NOMES = { ...PARQUE_UNIDADES_NOMES };
-let TODAS = [];
-let EDITANDO_ID = null;
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 const FUSO_BR = 'America/Sao_Paulo';
-function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-function hojeBrasilia(){
-  const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
   const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
-  return `${o.year}-${o.month}-${o.day}`;
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
 }
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
+
+let MENSALISTAS = [];
 
 async function carregar(){
-  TODAS = await fetch('/api/festas').then(r=>r.json()).catch(()=>[]);
-  renderLista();
-  atualizarLinksExport();
+  MENSALISTAS = await fetch('/api/mensalistas').then(r=>r.json()).catch(()=>[]);
+  renderMensalistas();
 }
 
-function renderLista(){
-  const statusFiltro = document.getElementById('f-status-filtro').value;
-  const lista = TODAS.filter(f=>!statusFiltro || f.status===statusFiltro)
-    .sort((a,b)=>(b.dataDeUso||'').localeCompare(a.dataDeUso||''));
-  const el = document.getElementById('lista-festas');
-  if(!lista.length){ el.innerHTML = '<div class="empty">Nenhuma reserva encontrada.</div>'; return; }
-  el.innerHTML = lista.map(f=>`
+function renderMensalistas(){
+  const hoje = hojeBrasilia();
+  const el = document.getElementById('lista-mensalistas');
+  if(!MENSALISTAS.length){ el.innerHTML = '<div class="empty">Nenhum mensalista cadastrado.</div>'; return; }
+  const ordenados = [...MENSALISTAS].sort((a,b)=>(b.dataInicial||'').localeCompare(a.dataInicial||''));
+  el.innerHTML = ordenados.map(m=>{
+    const ativo = m.dataInicial<=hoje && hoje<=m.dataFinal;
+    const criancas = (m.usuarios||[]).map(u=>u.nome).join(', ');
+    return `
     <div class="card">
       <div class="linha1">
-        <span>${escapeHtml(f.cliente?.nome||'')} · ${escapeHtml(f.codigo)} · ${fmtData(f.dataDeUso)}</span>
-        <span class="badge ${f.status}">${f.status}</span>
+        <span>${escapeHtml(m.nome)} · ${escapeHtml(m.unidadeNome||m.unidade)}</span>
+        <span class="badge ${ativo?'liberado':'aguardando'}">${ativo?'ativo':'expirado'}</span>
       </div>
-      <div class="sub">${escapeHtml(f.unidade)}${f.horaInicio?' · '+f.horaInicio+' às '+(f.horaFim||''):''}${f.utilizado?' · utilizada':''}${f.referenciaVendaOriginal?' · acréscimo do cód. '+escapeHtml(f.referenciaVendaOriginal):''}</div>
-      <div class="valores">
-        <span>Total <b>${fmtMoney(f.valorTotal)}</b></span>
-        ${f.sinal?`<span>Sinal <b>${fmtMoney(f.sinal.valor)}</b> (${escapeHtml(f.sinal.forma||'—')})</span>`:''}
-        ${f.restante?`<span>Restante <b>${fmtMoney(f.restante.valor)}</b> (${escapeHtml(f.restante.forma||'—')})</span>`:''}
-      </div>
-      ${f.observacao?`<div class="sub" style="margin-top:6px;">${escapeHtml(f.observacao)}</div>`:''}
-      <div>
-        <button type="button" class="link-btn" onclick="abrirEditar('${f.id}')">✎ Editar status</button>
-        ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirFesta('${f.id}')">✕ Excluir</button>`:''}
-      </div>
-    </div>`).join('');
+      <div class="sub">válido de ${fmtData(m.dataInicial)} até ${fmtData(m.dataFinal)}${m.contato?' · '+escapeHtml(m.contato):''}${m.valorPlano?' · '+fmtMoney(m.valorPlano):''}</div>
+      ${criancas?`<div class="criancas">${escapeHtml(criancas)}</div>`:''}
+      ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirMensalista('${m.id}')">✕ Excluir</button>`:''}
+    </div>`;
+  }).join('');
 }
 
-function atualizarLinksExport(){
-  const params = new URLSearchParams({ token: AUTH_TOKEN });
-  document.getElementById('link-csv').href = '/api/festas/relatorio.csv?'+params.toString();
-  document.getElementById('link-pdf').href = '/api/festas/relatorio.pdf?'+params.toString();
+let MS_CRIANCA_SEQ = 0;
+function adicionarCriancaMensalista(){
+  if(document.querySelectorAll('#ms-lista-criancas .crianca-linha').length >= 4){
+    alert('O passaporte mensal aceita no máximo 4 usuários.');
+    return;
+  }
+  MS_CRIANCA_SEQ++;
+  const id = 'ms-crianca-' + MS_CRIANCA_SEQ;
+  const div = document.createElement('div');
+  div.className = 'crianca-linha';
+  div.id = id;
+  div.innerHTML = `
+    <div><label style="margin-top:0;">Nome da criança</label><input type="text" class="ms-crianca-nome"></div>
+    <div class="crianca-linha-nasc">
+      <div><label style="margin-top:0;">Nascimento</label><input type="date" class="ms-crianca-nasc"></div>
+      <button type="button" class="btn-remover-crianca" onclick="document.getElementById('${id}').remove();" title="Remover">✕</button>
+    </div>
+  `;
+  document.getElementById('ms-lista-criancas').appendChild(div);
+}
+function coletarCriancasMensalista(){
+  return [...document.querySelectorAll('#ms-lista-criancas .crianca-linha')].map(div=>({
+    nome: div.querySelector('.ms-crianca-nome').value.trim(),
+    dataNascimento: div.querySelector('.ms-crianca-nasc').value || null,
+  })).filter(c=>c.nome);
 }
 
-document.getElementById('f-status-filtro').addEventListener('change', renderLista);
-
-async function excluirFesta(id){
-  if(!confirm('Excluir essa reserva?')) return;
-  await fetch(`/api/festas/${id}`, { method:'DELETE' });
+async function excluirMensalista(id){
+  if(!confirm('Excluir esse mensalista?')) return;
+  await fetch(`/api/mensalistas/${id}`, { method:'DELETE' });
   await carregar();
 }
 
-function abrirEditar(id){
-  EDITANDO_ID = id;
-  const f = TODAS.find(x=>x.id===id);
-  document.getElementById('editar-info').textContent = `${f.cliente?.nome||''} · ${f.codigo} · ${fmtData(f.dataDeUso)}`;
-  document.getElementById('e-status').value = f.status;
-  document.getElementById('e-utilizado').checked = !!f.utilizado;
-  document.getElementById('e-observacao').value = f.observacao || '';
-  document.getElementById('msg-editar').classList.add('hidden');
-  document.getElementById('overlay-editar').classList.remove('hidden');
+function atualizarValidadePreview(){
+  const inicio = document.getElementById('ms-data-inicial').value;
+  const preview = document.getElementById('ms-validade-preview');
+  if(!inicio){ preview.value = ''; return; }
+  const d = new Date(inicio+'T00:00:00'); d.setDate(d.getDate()+30);
+  preview.value = fmtData(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`) + ' (30 dias)';
 }
-function fecharEditar(){ document.getElementById('overlay-editar').classList.add('hidden'); EDITANDO_ID=null; }
+document.getElementById('ms-data-inicial').addEventListener('input', atualizarValidadePreview);
 
-document.getElementById('form-editar').addEventListener('submit', async (ev)=>{
+document.getElementById('form-mensalista').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
-  const msg = document.getElementById('msg-editar');
+  const msg = document.getElementById('msg-mensalista');
   msg.classList.add('hidden');
   try{
-    const patch = {
-      status: document.getElementById('e-status').value,
-      utilizado: document.getElementById('e-utilizado').checked,
-      observacao: document.getElementById('e-observacao').value,
-    };
-    const res = await fetch(`/api/festas/${EDITANDO_ID}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao salvar');
-    fecharEditar();
-    await carregar();
-  }catch(err){
-    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
-  }
-});
-
-document.getElementById('form-festa').addEventListener('keydown', (ev)=>{
-  if(ev.key !== 'Enter') return;
-  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
-  ev.preventDefault();
-});
-
-document.getElementById('form-festa').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const btn = document.getElementById('btn-enviar');
-  const msg = document.getElementById('msg');
-  msg.classList.add('hidden');
-  btn.disabled = true;
-  try{
-    const unidade = document.getElementById('f-unidade').value;
-    const sinalValor = document.getElementById('f-sinalValor').value;
-    const restanteValor = document.getElementById('f-restanteValor').value;
+    const unidade = document.getElementById('ms-unidade').value;
     const payload = {
       unidade,
-      cliente: {
-        nome: document.getElementById('f-cliente-nome').value,
-        contato: document.getElementById('f-cliente-contato').value,
-        email: document.getElementById('f-cliente-email').value,
-      },
-      dataDeUso: document.getElementById('f-dataDeUso').value,
-      horaInicio: document.getElementById('f-horaInicio').value,
-      horaFim: document.getElementById('f-horaFim').value,
-      valorTotal: document.getElementById('f-valorTotal').value,
-      sinal: sinalValor ? { valor: sinalValor, forma: document.getElementById('f-sinalForma').value, data: document.getElementById('f-sinalData').value } : null,
-      restante: restanteValor ? { valor: restanteValor, forma: document.getElementById('f-restanteForma').value, data: document.getElementById('f-restanteData').value } : null,
-      observacao: document.getElementById('f-observacao').value,
-      referenciaVendaOriginal: document.getElementById('f-referencia').value,
+      unidadeNome: UNIDADES_NOMES[unidade] || unidade,
+      nome: document.getElementById('ms-nome').value,
+      cpf: document.getElementById('ms-cpf').value,
+      contato: document.getElementById('ms-contato').value,
+      dataInicial: document.getElementById('ms-data-inicial').value,
+      valorPlano: document.getElementById('ms-valor').value,
+      usuarios: coletarCriancasMensalista(),
     };
-    const res = await fetch('/api/festas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const res = await fetch('/api/mensalistas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'erro ao registrar reserva');
-    msg.textContent = `Reserva registrada. Código: ${data.codigo}`; msg.className = 'msg ok';
-    document.getElementById('form-festa').reset();
-    document.getElementById('f-valorTotal').value = 0;
+    if(!res.ok) throw new Error(data.error||'erro ao cadastrar mensalista');
+    msg.textContent = 'Mensalista cadastrado.'; msg.className = 'msg ok';
+    document.getElementById('form-mensalista').reset();
+    document.getElementById('ms-validade-preview').value = '';
+    document.getElementById('ms-lista-criancas').innerHTML = '';
+    adicionarCriancaMensalista();
     await carregar();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
   }finally{
     msg.classList.remove('hidden');
-    btn.disabled = false;
   }
 });
 
@@ -432,6 +351,7 @@ async function boot(){
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
+  IS_ADMIN_GLOBAL = !!ME.isAdmin;
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
@@ -450,21 +370,22 @@ async function boot(){
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
   document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
   document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
-  document.getElementById('nav-mensalistas').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || IS_ADMIN_GLOBAL));
 
-  if(!secoes.includes('festas')){
+  if(!secoes.includes('parque')){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
 
   const unidades = isMaster ? Object.keys(PARQUE_UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>PARQUE_UNIDADES_NOMES[u]);
-  const selUnidade = document.getElementById('f-unidade');
-  selUnidade.innerHTML = unidades.length
+  document.getElementById('ms-unidade').innerHTML = unidades.length
     ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
-  document.getElementById('f-dataDeUso').value = hojeBrasilia();
-  document.getElementById('f-dataDeUso').min = hojeBrasilia();
+
+  document.getElementById('ms-data-inicial').value = hojeBrasilia();
+  atualizarValidadePreview();
+  adicionarCriancaMensalista();
 
   document.getElementById('root').classList.remove('hidden');
   await carregar();

@@ -111,13 +111,15 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
-  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
-  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <div class="nav-drawer-grupo">Saltiverso</div>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
   <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <a class="back hidden" id="nav-mensalistas" href="/mensalistas.html">📅 Mensalistas</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
@@ -128,6 +130,7 @@
   <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
   <a class="back active" id="nav-ajuda-self" href="/ajuda.html">❓ Ajuda</a>
+  <a class="back hidden" id="nav-reset-senha" href="/painel.html?resetSenha=1">🔑 Reset senha</a>
   <div class="nav-drawer-sep"></div>
   <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
   <div class="nav-drawer-sep"></div>
@@ -465,8 +468,15 @@ const TOPICOS = [
       <li>Clique em <b>🖨️ Termo</b> pra reimprimir o termo de responsabilidade de qualquer check-in.</li>
       <li>O Master pode editar ou excluir qualquer check-in.</li>
     </ul>
-    <h3>Mensalistas (passaporte mensal)</h3>
-    <p>No fim da página, cadastre um mensalista com nome, CPF, contato e data de início - a validade de 30 dias é calculada automaticamente. O painel principal do Zenith Ops mostra a quantidade de mensalistas ativos no card do Saltiverso.</p>
+  `},
+  { id:'mensalistas', icone:'📅', secoes:['parque'], titulo:'Mensalistas (Saltiverso)', corpo:`
+    <p>Página própria (menu <b>Saltiverso → Mensalistas</b>) pra cadastrar e listar passaportes mensais.</p>
+    <ul>
+      <li>Cadastre um mensalista com nome, CPF, contato e data de início - a validade de 30 dias é calculada automaticamente.</li>
+      <li>Adicione até 4 crianças que vão usar o plano.</li>
+      <li>O painel principal do Zenith Ops mostra a quantidade de mensalistas ativos no card do Saltiverso.</li>
+      <li>O Master pode excluir um mensalista.</li>
+    </ul>
   `},
   { id:'festas', icone:'🎉', secoes:['festas'], titulo:'Festas (Saltiverso)', corpo:`
     <h3>Registrar uma reserva</h3>
@@ -539,6 +549,8 @@ async function boot(){
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
   document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-mensalistas').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || IS_ADMIN_GLOBAL));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
