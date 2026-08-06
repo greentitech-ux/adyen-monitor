@@ -178,6 +178,13 @@
     <div id="campos-fixo" class="campos-fixo hidden">
       <div id="lista-campos"></div>
       <button type="button" class="btn-add-campo" onclick="adicionarCampo()">+ Adicionar campo de valor</button>
+
+      <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:12px;">
+        <label style="margin:0 0 4px;">Nomes especiais (empresas de entrega / acordos próprios)</label>
+        <div class="sub" style="margin:0 0 8px;">Quando o Nome do entregador digitado no lançamento bater com um desses, o cálculo padrão acima é substituído.</div>
+        <div id="lista-nomes-especiais"></div>
+        <button type="button" class="btn-add-campo" onclick="adicionarNomeEspecial()">+ Adicionar nome especial</button>
+      </div>
     </div>
 
     <p class="err hidden" id="regra-err"></p>
@@ -206,7 +213,7 @@ function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 const FUSO_BR = 'America/Sao_Paulo';
 
-const BASES = [ ['entrega','Entrega'], ['retorno','Retorno'], ['extra','Extra'], ['foraDeArea','Fora de Área'], ['flat','Valor fixo por lançamento'] ];
+const BASES = [ ['entrega','Entrega'], ['retorno','Retorno'], ['extra','Extra'], ['foraDeArea','Fora de Área'], ['pos00hs','Pos 00hs'], ['flat','Valor fixo por lançamento'] ];
 const DESTINOS = [ ['valor','Soma no Valor a pagar'], ['coopRecebe','Soma no repasse da Cooperativa'] ];
 const DIAS_SEMANA = [ ['dom','Dom'], ['seg','Seg'], ['ter','Ter'], ['qua','Qua'], ['qui','Qui'], ['sex','Sex'], ['sab','Sáb'] ];
 
@@ -224,7 +231,8 @@ function renderRegras(){
     const r = regraDaUnidade(u.codigo);
     const fixo = r.modo==='fixo';
     const tags = fixo
-      ? (r.camposValor||[]).map(c=>`<span class="tag ${c.removivelPelaLoja?'removivel':''}" title="${c.destino==='coopRecebe'?'Cooperativa':'Valor a pagar'}${c.meta?' · tem meta':''}">${escapeHtml(c.label)}${c.base!=='flat'?' ('+escapeHtml(BASES.find(b=>b[0]===c.base)?.[1]||c.base)+')':''}</span>`).join('')
+      ? (r.camposValor||[]).map(c=>`<span class="tag ${c.removivelPelaLoja?'removivel':''}" title="${c.destino==='coopRecebe'?'Cooperativa':'Valor a pagar'}${c.meta?' · tem meta':''}${c.entradaManual?' · entrada manual':''}">${escapeHtml(c.label)}${c.base!=='flat'?' ('+escapeHtml(BASES.find(b=>b[0]===c.base)?.[1]||c.base)+')':(c.entradaManual?' (manual)':'')}</span>`).join('')
+        + (r.nomesEspeciais||[]).map(n=>`<span class="tag removivel" title="${n.modoValor==='taxaUnica'?'Taxa única R$'+n.taxaUnica+'/entrega':'Valor manual'}">👤 ${escapeHtml(n.nomes.join(', '))}</span>`).join('')
       : `<span style="color:var(--muted);">${r.plataformaNome?escapeHtml(r.plataformaNome):'sem valor fixo'}</span>`;
     return `
     <tr>
@@ -247,9 +255,10 @@ document.querySelectorAll('input[name=modo]').forEach(r=>{
 
 // ---------- construtor de campos de valor (um "card" por campo) ----------
 function campoCardHtml(c){
-  c = c || { campo:'', label:'', base:'flat', destino:'valor', valorPadrao:0, valoresPorDiaSemana:null, meta:null, removivelPelaLoja:false };
+  c = c || { campo:'', label:'', base:'flat', destino:'valor', entradaManual:false, valorPadrao:0, valoresPorDiaSemana:null, meta:null, removivelPelaLoja:false };
   const temSemana = !!c.valoresPorDiaSemana;
   const temMeta = !!c.meta;
+  const manual = !!c.entradaManual;
   return `
     <div class="campo-card" data-campo="${escapeHtml(c.campo||'')}">
       <div class="linha-topo">
@@ -264,28 +273,33 @@ function campoCardHtml(c){
           <select data-f="destino">${DESTINOS.map(d=>`<option value="${d[0]}" ${c.destino===d[0]?'selected':''}>${d[1]}</option>`).join('')}</select>
         </div>
       </div>
-      <label>Valor padrão (R$)</label>
-      <input type="number" step="0.01" data-f="valorPadrao" value="${c.valorPadrao||0}">
 
-      <label class="campo-toggle"><input type="checkbox" data-f="temSemana" ${temSemana?'checked':''}> Varia por dia da semana</label>
-      <div class="semana-wrap ${temSemana?'show':''}" data-w="semana">
-        <div class="semana-grid">
-          ${DIAS_SEMANA.map(d=>`<div><label>${d[1]}</label><input type="number" step="0.01" data-dia="${d[0]}" value="${c.valoresPorDiaSemana&&c.valoresPorDiaSemana[d[0]]!=null?c.valoresPorDiaSemana[d[0]]:''}" placeholder="${c.valorPadrao||0}"></div>`).join('')}
-        </div>
-      </div>
+      <label class="campo-toggle"><input type="checkbox" data-f="entradaManual" ${manual?'checked':''}> Entrada manual - a loja digita o R$ desse campo a cada lançamento (não segue tabela fixa, ex: Encosta que varia)</label>
 
-      <label class="campo-toggle"><input type="checkbox" data-f="temMeta" ${temMeta?'checked':''}> Tem meta mínima (senão usa valor parcial)</label>
-      <div class="meta-wrap ${temMeta?'show':''}" data-w="meta">
-        <div class="grid2">
-          <div><label>Meta mínima em</label>
-            <select data-f="metaBase">${BASES.filter(b=>b[0]!=='flat').concat([['quantTotal','Total (Entrega+Retorno+Extra)']]).map(b=>`<option value="${b[0]}" ${c.meta&&c.meta.baseContagem===b[0]?'selected':''}>${b[1]}</option>`).join('')}</select>
-          </div>
-          <div><label>Quantidade mínima</label>
-            <input type="number" step="1" data-f="metaMinimo" value="${c.meta?c.meta.minimo:0}">
+      <div data-w="taxa" class="${manual?'hidden':''}">
+        <label>Valor padrão (R$)</label>
+        <input type="number" step="0.01" data-f="valorPadrao" value="${c.valorPadrao||0}">
+
+        <label class="campo-toggle"><input type="checkbox" data-f="temSemana" ${temSemana?'checked':''}> Varia por dia da semana</label>
+        <div class="semana-wrap ${temSemana?'show':''}" data-w="semana">
+          <div class="semana-grid">
+            ${DIAS_SEMANA.map(d=>`<div><label>${d[1]}</label><input type="number" step="0.01" data-dia="${d[0]}" value="${c.valoresPorDiaSemana&&c.valoresPorDiaSemana[d[0]]!=null?c.valoresPorDiaSemana[d[0]]:''}" placeholder="${c.valorPadrao||0}"></div>`).join('')}
           </div>
         </div>
-        <label>Valor parcial (se não bater a meta)</label>
-        <input type="number" step="0.01" data-f="metaValorParcial" value="${c.meta?c.meta.valorParcial:0}">
+
+        <label class="campo-toggle"><input type="checkbox" data-f="temMeta" ${temMeta?'checked':''}> Tem meta mínima (senão usa valor parcial)</label>
+        <div class="meta-wrap ${temMeta?'show':''}" data-w="meta">
+          <div class="grid2">
+            <div><label>Meta mínima em</label>
+              <select data-f="metaBase">${BASES.filter(b=>b[0]!=='flat').concat([['quantTotal','Total (Entrega+Retorno+Extra)']]).map(b=>`<option value="${b[0]}" ${c.meta&&c.meta.baseContagem===b[0]?'selected':''}>${b[1]}</option>`).join('')}</select>
+            </div>
+            <div><label>Quantidade mínima</label>
+              <input type="number" step="1" data-f="metaMinimo" value="${c.meta?c.meta.minimo:0}">
+            </div>
+          </div>
+          <label>Valor parcial (se não bater a meta)</label>
+          <input type="number" step="0.01" data-f="metaValorParcial" value="${c.meta?c.meta.valorParcial:0}">
+        </div>
       </div>
 
       <label class="campo-toggle"><input type="checkbox" data-f="removivelPelaLoja" ${c.removivelPelaLoja?'checked':''}> Loja pode remover esse campo no lançamento (atraso, saiu antes, gerou prejuízo)</label>
@@ -296,6 +310,7 @@ function adicionarCampo(c){
   const card = document.getElementById('lista-campos').lastElementChild;
   card.querySelector('[data-f=temSemana]').addEventListener('change', (e)=>card.querySelector('[data-w=semana]').classList.toggle('show', e.target.checked));
   card.querySelector('[data-f=temMeta]').addEventListener('change', (e)=>card.querySelector('[data-w=meta]').classList.toggle('show', e.target.checked));
+  card.querySelector('[data-f=entradaManual]').addEventListener('change', (e)=>card.querySelector('[data-w=taxa]').classList.toggle('hidden', e.target.checked));
 }
 function lerCamposValor(){
   return [...document.querySelectorAll('#lista-campos .campo-card')].map(card=>{
@@ -303,24 +318,62 @@ function lerCamposValor(){
     if(!label) return null;
     const base = card.querySelector('[data-f=base]').value;
     const destino = card.querySelector('[data-f=destino]').value;
+    const entradaManual = card.querySelector('[data-f=entradaManual]').checked;
     const valorPadrao = card.querySelector('[data-f=valorPadrao]').value;
     const temSemana = card.querySelector('[data-f=temSemana]').checked;
     let valoresPorDiaSemana = null;
-    if(temSemana){
+    if(temSemana && !entradaManual){
       valoresPorDiaSemana = {};
       card.querySelectorAll('[data-dia]').forEach(inp=>{
         if(inp.value !== '') valoresPorDiaSemana[inp.dataset.dia] = inp.value;
       });
     }
     const temMeta = card.querySelector('[data-f=temMeta]').checked;
-    const meta = temMeta ? {
+    const meta = (temMeta && !entradaManual) ? {
       ativo: true,
       baseContagem: card.querySelector('[data-f=metaBase]').value,
       minimo: card.querySelector('[data-f=metaMinimo]').value,
       valorParcial: card.querySelector('[data-f=metaValorParcial]').value,
     } : null;
     const removivelPelaLoja = card.querySelector('[data-f=removivelPelaLoja]').checked;
-    return { campo: card.dataset.campo || undefined, label, base, destino, valorPadrao, valoresPorDiaSemana, meta, removivelPelaLoja };
+    return { campo: card.dataset.campo || undefined, label, base, destino, entradaManual, valorPadrao, valoresPorDiaSemana, meta, removivelPelaLoja };
+  }).filter(Boolean);
+}
+
+// ---------- construtor de "nomes especiais" (empresas de entrega / acordos
+// próprios que substituem o cálculo padrão pelo Nome do entregador) ----------
+function nomeEspecialCardHtml(n){
+  n = n || { nomes:[], modoValor:'manual', taxaUnica:0 };
+  const taxaUnica = n.modoValor==='taxaUnica';
+  return `
+    <div class="campo-card" data-tipo="nomeEspecial">
+      <div class="linha-topo">
+        <input type="text" data-f="nomes" placeholder="Nome(s) do entregador que ativam essa regra (separe por vírgula, ex: GAMI, MOOVERY)" value="${escapeHtml((n.nomes||[]).join(', '))}" required>
+        <button type="button" class="btn-remover-campo" onclick="this.closest('.campo-card').remove()">✕</button>
+      </div>
+      <label>Quando o nome bater</label>
+      <select data-f="modoValor">
+        <option value="manual" ${!taxaUnica?'selected':''}>Valor/COOP/Quantidade ficam abertos pra digitar (empresa define o próprio preço)</option>
+        <option value="taxaUnica" ${taxaUnica?'selected':''}>Usa uma taxa única por (Entrega+Retorno+Extra), substituindo os campos de Valor</option>
+      </select>
+      <div data-w="taxaUnica" class="${taxaUnica?'':'hidden'}">
+        <label>Taxa única (R$ por Entrega/Retorno/Extra)</label>
+        <input type="number" step="0.01" data-f="taxaUnica" value="${n.taxaUnica||0}">
+      </div>
+    </div>`;
+}
+function adicionarNomeEspecial(n){
+  document.getElementById('lista-nomes-especiais').insertAdjacentHTML('beforeend', nomeEspecialCardHtml(n));
+  const card = document.getElementById('lista-nomes-especiais').lastElementChild;
+  card.querySelector('[data-f=modoValor]').addEventListener('change', (e)=>card.querySelector('[data-w=taxaUnica]').classList.toggle('hidden', e.target.value!=='taxaUnica'));
+}
+function lerNomesEspeciais(){
+  return [...document.querySelectorAll('#lista-nomes-especiais .campo-card')].map(card=>{
+    const nomes = card.querySelector('[data-f=nomes]').value.split(',').map(s=>s.trim()).filter(Boolean);
+    if(!nomes.length) return null;
+    const modoValor = card.querySelector('[data-f=modoValor]').value;
+    const taxaUnica = card.querySelector('[data-f=taxaUnica]').value;
+    return { nomes, modoValor, taxaUnica };
   }).filter(Boolean);
 }
 
@@ -337,6 +390,8 @@ function abrirEdicao(codigo){
   document.getElementById('r-plataformaNome').value = r.plataformaNome || '';
   document.getElementById('lista-campos').innerHTML = '';
   (r.camposValor||[]).forEach(c=>adicionarCampo(c));
+  document.getElementById('lista-nomes-especiais').innerHTML = '';
+  (r.nomesEspeciais||[]).forEach(n=>adicionarNomeEspecial(n));
   document.getElementById('regra-err').classList.add('hidden');
   regraOverlay.classList.add('show');
 }
@@ -350,6 +405,7 @@ document.getElementById('regra-form').addEventListener('submit', async (e)=>{
     modo: document.querySelector('input[name=modo]:checked').value,
     plataformaNome: document.getElementById('r-plataformaNome').value,
     camposValor: lerCamposValor(),
+    nomesEspeciais: lerNomesEspeciais(),
   };
   try{
     const res = await fetch('/api/entregas/regras/'+encodeURIComponent(EDITANDO_UNIDADE), {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});

@@ -26,13 +26,14 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function create({ unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos, etiquetaFile, criadoPorId, criadoPorEmail }) {
+async function create({ unidade, unidadeNome, data, entregador, campos, obsRetorno, obsExtra, observacao, camposRemovidos, motivoRemocaoCampos, valoresManuaisCampos, etiquetaFile, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
   if (!entregador || !String(entregador).trim()) throw new Error('Nome do entregador é obrigatório.');
 
   const ref = COLLECTION.doc();
-  const registro = { id: ref.id, unidade, unidadeNome: unidadeNome || unidade, data, entregador: String(entregador).trim() };
+  const entregadorLimpo = String(entregador).trim();
+  const registro = { id: ref.id, unidade, unidadeNome: unidadeNome || unidade, data, entregador: entregadorLimpo };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
 
   // unidade com regra "fixo": o servidor calcula ajudaCusto/valor/coopRecebe
@@ -40,8 +41,12 @@ async function create({ unidade, unidadeNome, data, entregador, campos, obsRetor
   // entregasRegras.js) - nunca confia no que o cliente mandou pra esses
   // campos (evita loja "ajustar" o próprio pagamento). Unidade "plataforma"
   // (sem valor fixo, ex: paga o que a GAMI/NEXT informar) mantém os valores
-  // digitados normalmente.
+  // digitados normalmente - e o mesmo vale quando o Nome do entregador bate
+  // com um "nome especial" cadastrado como modoValor "manual" (ex: uma
+  // empresa de entrega terceirizada tipo GAMI/Moovery, que define o próprio
+  // preço) mesmo dentro de uma unidade "fixo".
   const regra = await entregasRegras.getPara(unidade);
+  const nomeEspecial = regra.modo === 'fixo' ? entregasRegras.encontrarNomeEspecial(regra, entregadorLimpo) : null;
   const camposValidosRemovidos = Array.isArray(camposRemovidos)
     ? camposRemovidos.filter((c) => (regra.camposValor || []).some((r) => r.campo === c && r.removivelPelaLoja))
     : [];
@@ -50,10 +55,11 @@ async function create({ unidade, unidadeNome, data, entregador, campos, obsRetor
     ? (entregasRegras.MOTIVOS_REMOCAO_CAMPO.includes(motivoRemocaoCampos) ? motivoRemocaoCampos : 'outro')
     : null;
   registro.detalhesValor = [];
-  if (regra.modo === 'fixo') {
+  if (regra.modo === 'fixo' && !(nomeEspecial && nomeEspecial.modoValor === 'manual')) {
     const calculado = entregasRegras.calcular(regra, {
-      data: registro.data, entrega: registro.entrega, retorno: registro.retorno, extra: registro.extra, foraDeArea: registro.foraDeArea,
-      camposRemovidos: camposValidosRemovidos,
+      data: registro.data, entrega: registro.entrega, retorno: registro.retorno, extra: registro.extra,
+      foraDeArea: registro.foraDeArea, pos00hs: registro.pos00hs,
+      camposRemovidos: camposValidosRemovidos, entregador: entregadorLimpo, valoresManuaisCampos,
     });
     registro.ajudaCusto = calculado.ajudaCusto;
     registro.valor = calculado.valor;
