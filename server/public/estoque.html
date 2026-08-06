@@ -248,13 +248,15 @@
     <div id="r-modo-simples">
       <label>Quantidade</label>
       <input type="number" step="0.001" id="r-quantidade">
+      <div class="hidden" id="r-link-usar-embalagem"><span class="tx-comentario" style="cursor:pointer;" onclick="forcarModoRecebimento('embalagem')">Veio em embalagens/pacotes? Calcular o peso automaticamente</span></div>
     </div>
     <div class="hidden" id="r-modo-embalagem">
       <div class="grid2">
         <div><label>Quantidade de embalagens</label><input type="number" step="1" min="0" id="r-qtd-embalagens"></div>
-        <div><label>Peso da embalagem (g)</label><input type="number" step="1" min="0" id="r-peso-embalagem"></div>
+        <div><label>Peso de cada embalagem (g)</label><input type="number" step="1" min="0" id="r-peso-embalagem" placeholder="ex: 2500 = 2,5kg"></div>
       </div>
       <div class="sub" id="r-peso-calculado" style="margin:-4px 0 8px;"></div>
+      <div><span class="tx-comentario" style="cursor:pointer;" onclick="forcarModoRecebimento('simples')">Prefiro digitar o peso total direto</span></div>
     </div>
     <div class="grid2">
       <div><label>Valor unitário (R$)</label><input type="number" step="0.01" id="r-valor"></div>
@@ -726,11 +728,27 @@ async function carregarRecebimentos(){ RECEBIMENTOS = await fetch('/api/inventar
 function itemSelecionadoRecebimento(){
   return CATALOGO.find(i=>i.id===document.getElementById('r-item').value);
 }
+// pra item medido em KG/G, o modo "por embalagem" (quantidade de pacotes ×
+// peso de cada um) é o padrão - é raríssimo a loja pesar o total direto numa
+// balança, quase sempre a nota traz "9 pacotes de 2,5kg" e é isso que
+// precisa virar peso total sozinho. Ainda dá pra forçar o modo simples (link
+// abaixo do campo), útil pra item recebido a granel/pesado na hora.
+let R_MODO_FORCADO = null; // null = automatico (embalagem se item usa peso); 'simples' | 'embalagem' = travado pelo usuario
+function forcarModoRecebimento(modo){
+  R_MODO_FORCADO = modo;
+  aplicarModoRecebimento();
+}
 function atualizarModoRecebimento(){
+  R_MODO_FORCADO = null;
+  aplicarModoRecebimento();
+}
+function aplicarModoRecebimento(){
   const item = itemSelecionadoRecebimento();
-  const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+  const usaPeso = !!(item && unidadeUsaPeso(item.unidadeMedida));
+  const modoEmbalagem = R_MODO_FORCADO ? R_MODO_FORCADO==='embalagem' : usaPeso;
   document.getElementById('r-modo-simples').classList.toggle('hidden', modoEmbalagem);
   document.getElementById('r-modo-embalagem').classList.toggle('hidden', !modoEmbalagem);
+  document.getElementById('r-link-usar-embalagem').classList.toggle('hidden', !usaPeso || modoEmbalagem);
   if(modoEmbalagem){
     document.getElementById('r-qtd-embalagens').value = item.quantidadePadrao || '';
     document.getElementById('r-peso-embalagem').value = item.pesoEmbalagemG || '';
@@ -745,7 +763,8 @@ function atualizarModoRecebimento(){
 // ou calculada a partir de embalagens×peso (convertendo g->kg quando for o caso)
 function quantidadeEfetivaRecebimento(){
   const item = itemSelecionadoRecebimento();
-  if(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG){
+  const modoEmbalagem = !document.getElementById('r-modo-embalagem').classList.contains('hidden');
+  if(item && unidadeUsaPeso(item.unidadeMedida) && modoEmbalagem){
     const embalagens = num(document.getElementById('r-qtd-embalagens').value);
     const pesoG = num(document.getElementById('r-peso-embalagem').value);
     const totalG = embalagens*pesoG;
@@ -805,8 +824,7 @@ document.getElementById('form-recebimento').addEventListener('submit', async (ev
   try{
     const unidade = unidadeAtual();
     const unidadeNome = UNIDADES.find(u=>u.codigo===unidade)?.nome || unidade;
-    const item = itemSelecionadoRecebimento();
-    const modoEmbalagem = !!(item && unidadeUsaPeso(item.unidadeMedida) && item.pesoEmbalagemG);
+    const modoEmbalagem = !document.getElementById('r-modo-embalagem').classList.contains('hidden');
     const body = {
       unidade, unidadeNome,
       itemId: document.getElementById('r-item').value,
