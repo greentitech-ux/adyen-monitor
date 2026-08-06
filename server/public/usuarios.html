@@ -115,6 +115,22 @@
   .legend-actions{display:inline-flex;gap:6px;margin-left:8px;text-transform:none;}
   .legend-actions button{font-family:var(--sans);font-size:10.5px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .legend-actions button:hover{border-color:var(--accent);color:var(--text);}
+
+  .users-list{display:flex;flex-direction:column;}
+  .user-row{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid #1a1f26;}
+  .users-list .user-row:last-child{border-bottom:none;}
+  .user-status-dot{width:11px;height:11px;border-radius:50%;flex:none;}
+  .user-status-dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--ok-dim);}
+  .user-status-dot.off{background:var(--muted);box-shadow:0 0 0 3px var(--panel2);}
+  .user-status-dot.bad{background:var(--bad);box-shadow:0 0 0 3px var(--bad-dim);}
+  .user-info{flex:1;min-width:0;}
+  .user-nome{font-size:13.5px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .user-nome:hover{color:var(--accent);}
+  .user-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .user-username{font-family:var(--mono);font-size:11px;color:var(--muted);flex:none;}
+  .user-sub .tags{max-width:none;}
+  .user-detail{padding:4px 2px 16px 23px;border-bottom:1px solid #1a1f26;display:flex;flex-direction:column;gap:7px;font-size:12px;}
+  .user-detail-linha b{color:var(--muted);font-weight:500;margin-right:4px;}
 </style>
 </head>
 <body>
@@ -181,12 +197,7 @@
         <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('pdf')">📄 PDF</button>
       </span>
     </h2>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Email</th><th>Usuário</th><th>Papel</th><th>Status</th><th>Seções</th><th>Unidades</th><th>Cofre (subgrupos)</th><th>Tipos (Central)</th><th></th></tr></thead>
-        <tbody id="users-body"></tbody>
-      </table>
-    </div>
+    <div class="users-list" id="users-list"></div>
   </div>
 
   <div class="panel">
@@ -676,33 +687,49 @@ function tagList(items, labelFn, limite = 2){
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function renderUsers(){
-  const tbody = document.getElementById('users-body');
-  tbody.innerHTML = USERS.map(u=>{
-    const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[]};
+  const container = document.getElementById('users-list');
+  const ordenados = [...USERS].sort((a,b)=>a.email.localeCompare(b.email,'pt-BR',{sensitivity:'base'}));
+  container.innerHTML = ordenados.map(u=>{
+    const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[],tiposSolicitacao:[]};
     const subgroupNames = (perms.vaultSubgroups||[]).map(caminhoSubgrupo);
     const isMaster = u.role==='master';
     const horario = u.horarioPermitido;
-    const statusBadges = (u.locked
-      ? `<span class="badge locked" title="Bloqueado após 3 tentativas de senha erradas - use \"Nova senha\" pra destravar">bloqueado</span>`
-      : `<span class="badge ${u.active?'on':'off'}">${u.active?'ativo':'desativado'}</span>`)
-      + ` <span class="badge ${u.online?'on':'off'}" style="cursor:pointer;" onclick="abrirSessoes('${u.id}')" title="${u.ultimaAtividadeEm ? 'Última atividade: '+formatarRelativo(u.ultimaAtividadeEm) : 'Nunca fez login'} - clique pra ver os locais">${u.online?'🟢':'⚪'} ${u.sessoesAtivas} ${u.sessoesAtivas===1?'local':'locais'}</span>`
-      + (horario && horario.ativo ? ` <span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>` : '')
-      + (u.isAdmin ? ` <span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>` : '')
-      + (u.podeCatalogoEstoque ? ` <span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque (setor/tipo/custo/ativar-desativar)">📦 catálogo</span>` : '');
-    const cargoBadge = u.cargo ? ` <span class="badge ${u.cargo}" title="Tag de cargo (só organização, não muda permissão)">${u.cargo==='loja'?'🏬 loja':'👔 gerente'}</span>` : '';
+    // bolinha de status no lugar do avatar - cor = ativo/desativado/bloqueado;
+    // online/sessões, admin, catálogo etc. viram tags ao lado do usuário
+    const status = u.locked
+      ? { cor:'bad', texto:'bloqueado' }
+      : (u.active ? { cor:'ok', texto:'ativo' } : { cor:'off', texto:'desativado' });
+    const tags = [`<span class="badge ${u.role}">${u.role}</span>`];
+    if (u.cargo) tags.push(`<span class="badge ${u.cargo}" title="Tag de cargo (só organização, não muda permissão)">${u.cargo==='loja'?'🏬 loja':'👔 gerente'}</span>`);
+    if (u.isAdmin) tags.push(`<span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>`);
+    if (u.podeCatalogoEstoque) tags.push(`<span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque">📦 catálogo</span>`);
+    if (horario && horario.ativo) tags.push(`<span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>`);
+    tags.push(`<span class="badge ${u.online?'on':'off'}" style="cursor:pointer;" onclick="abrirSessoes('${u.id}')" title="${u.ultimaAtividadeEm ? 'Última atividade: '+formatarRelativo(u.ultimaAtividadeEm) : 'Nunca fez login'} - clique pra ver os locais">${u.online?'🟢':'⚪'} ${u.sessoesAtivas} ${u.sessoesAtivas===1?'local':'locais'}</span>`);
+    const detalhe = isMaster
+      ? `<div class="user-detail-linha">Master - acesso total, sem restrições.</div>`
+      : `<div class="user-detail-linha"><b>Status:</b> ${status.texto}${u.locked ? ' (após 3 tentativas de senha erradas - use "Nova senha" pra destravar)' : ''}</div>
+         <div class="user-detail-linha"><b>Seções:</b> ${tagList(perms.sections)}</div>
+         <div class="user-detail-linha"><b>Unidades:</b> ${tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</div>
+         <div class="user-detail-linha"><b>Cofre (subgrupos):</b> ${tagList(subgroupNames)}</div>
+         <div class="user-detail-linha"><b>Tipos (Central):</b> ${(perms.tiposSolicitacao||[]).length ? tagList(perms.tiposSolicitacao, t=>(TIPOS_SOLICITACAO.find(o=>o[0]===t)||[t,t])[1]) : '<span style="color:var(--muted);">todos</span>'}</div>`;
     return `
-    <tr>
-      <td>${escapeHtml(u.email)}</td>
-      <td>${u.username ? escapeHtml(u.username) : '<span style="color:var(--muted);">—</span>'}</td>
-      <td><span class="badge ${u.role}">${u.role}</span>${cargoBadge}</td>
-      <td>${statusBadges}</td>
-      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.sections)}</td>
-      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(perms.unidades, c=>UNIDADES_NOMES[c]||c)}</td>
-      <td>${isMaster ? '<span style="color:var(--muted);">tudo</span>' : tagList(subgroupNames)}</td>
-      <td>${isMaster || !(perms.tiposSolicitacao||[]).length ? '<span style="color:var(--muted);">todos</span>' : tagList(perms.tiposSolicitacao, t=>(TIPOS_SOLICITACAO.find(o=>o[0]===t)||[t,t])[1])}</td>
-      <td>${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</td></tr>`;
+    <div class="user-row">
+      <span class="user-status-dot ${status.cor}" title="${status.texto}"></span>
+      <div class="user-info">
+        <div class="user-nome" onclick="toggleDetalheUsuario('${u.id}')" title="Clique pra ver os detalhes">${escapeHtml(u.email)}</div>
+        <div class="user-sub">
+          <span class="user-username">${u.username ? escapeHtml(u.username) : '—'}</span>
+          <span class="tags">${tags.join('')}</span>
+        </div>
+      </div>
+      ${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}
+    </div>
+    <div class="user-detail hidden" id="detalhe-${u.id}">${detalhe}</div>`;
+  }).join('') || `<div style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</div>`;
+}
+function toggleDetalheUsuario(id){
+  const el = document.getElementById('detalhe-'+id);
+  if (el) el.classList.toggle('hidden');
 }
 
 // ---------- modal de acoes por usuario - substitui a fileira de 6 botoes
