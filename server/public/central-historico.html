@@ -318,6 +318,11 @@
       <select id="d-responsavel-select"></select>
       <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarResponsavel()">Salvar responsável</button>
     </div>
+    <div id="d-tipo-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">🔀 Tipo do ticket</div>
+      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de tipo ou virar Estorno conforme o atendimento evolui.</div>
+      <div id="d-tipo-corpo"></div>
+    </div>
     <div id="d-editar" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;"></div>
     <div id="d-master-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div id="d-tecnico-wrap" class="hidden">
@@ -390,6 +395,11 @@ const TIPOS_INFO = {
   'pagamento': { label:'Pagamento', secaoNecessaria:null },
   'nota': { label:'Nota', secaoNecessaria:null },
 };
+// os 5 tipos gerais que trocam de tipo entre si (mudarTipo) ou viram Estorno
+// (converterParaEstorno) - Estorno tambem pode virar um desses 5 (converter,
+// do lado de refunds.js), mas Ajuste de fechamento fica de fora dos dois
+// fluxos (preso a um fechamentoId especifico, nao generaliza como ticket solto)
+const TIPOS_GERAIS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
 
 let ME = null;
 let IS_MASTER = false;
@@ -451,7 +461,9 @@ function kcardHtml(c){
   return `
     <div class="kcard" onclick="abrirDetalhe('${c.tipo}','${c.id}')">
       <div class="linha1">
+        <span class="tipo-badge" style="background:#1a2230;color:var(--muted);">#${c.numeroTicket ?? '—'}</span>
         <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
+        ${c.status==='CONVERTIDO' ? '<span class="tipo-badge" style="background:#12303a;color:var(--accent);">🔀 convertido</span>' : ''}
         ${c.ehOrcamento ? '<span class="tipo-badge" style="background:#3d2f0f;color:#e0b84c;">💰 orçamento</span>' : ''}
         ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
         ${badgeVencimento(c)}
@@ -523,7 +535,7 @@ function abrirDetalhe(tipo, id){
   const c = CARDS.find(x=>x.tipo===tipo && x.id===id);
   if(!c) return;
   DETALHE_ATUAL = c;
-  document.getElementById('d-titulo').textContent = `${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}`;
+  document.getElementById('d-titulo').textContent = `${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo} · Ticket #${c.numeroTicket ?? '—'}`;
   document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade||'—'} · ${c.criadoPorEmail||''} · ${fmtDataHora(c.criadoEm)}` + (c.direcionadoParaEmail ? ` · direcionado a ${c.direcionadoParaEmail}` : '');
 
   let corpo = c.ehOrcamento ? `<div style="color:#e0b84c;font-weight:600;">💰 É um orçamento — precisa de aprovação de um Admin ou Master.</div>` : '';
@@ -543,7 +555,13 @@ function abrirDetalhe(tipo, id){
       : `/api/solicitacoes/anexo/${c.id}`;
     corpo += c.anexos.map((a,i)=>`<div class="anexo-item">📎 <a href="${rota}/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(a.nome)}</a></div>`).join('');
   }
-  if(c.status!=='PENDENTE'){
+  if(c.convertidoDeTipo){
+    corpo += `<div class="sub">↩️ Convertido de <a href="#" style="color:var(--accent);" onclick="event.preventDefault();abrirDetalhe('${c.convertidoDeTipo}','${c.convertidoDeId}')">${iconeTipo(c.convertidoDeTipo)} ${escapeHtml(TIPOS_INFO[c.convertidoDeTipo]?.label||c.convertidoDeTipo)}</a></div>`;
+  }
+  if(c.status==='CONVERTIDO' && c.convertidoParaTipo){
+    corpo += `<div style="color:var(--accent);font-weight:600;">🔀 Convertido em <a href="#" style="color:inherit;" onclick="event.preventDefault();abrirDetalhe('${c.convertidoParaTipo}','${c.convertidoParaId}')">${iconeTipo(c.convertidoParaTipo)} ${escapeHtml(TIPOS_INFO[c.convertidoParaTipo]?.label||c.convertidoParaTipo)}</a></div>`;
+  }
+  if(c.status!=='PENDENTE' && c.status!=='CONVERTIDO'){
     corpo += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;">
       <div><b>Decisão:</b> <span class="badge ${c.status}">${c.status}</span> · ${escapeHtml(c.decididoPorEmail||'')} · ${fmtDataHora(c.decididoEm)}</div>
       ${c.motivoDecisao ? `<div style="white-space:pre-wrap;margin-top:4px;">${escapeHtml(c.motivoDecisao)}</div>` : ''}
@@ -571,6 +589,10 @@ function abrirDetalhe(tipo, id){
   const podeReatribuir = IS_MASTER || IS_ADMIN;
   document.getElementById('d-responsavel').classList.toggle('hidden', !podeReatribuir);
   if(podeReatribuir) carregarResponsavelSelect(c);
+
+  const podeMudarTipo = podeReatribuir && c.status !== 'CONVERTIDO' && (TIPOS_GERAIS.includes(c.tipo) || c.tipo === 'estorno');
+  document.getElementById('d-tipo-acoes').classList.toggle('hidden', !podeMudarTipo);
+  if(podeMudarTipo) renderTipoAcoes(c);
 
   renderComprada(c);
 
@@ -669,6 +691,91 @@ async function salvarResponsavel(){
     DETALHE_ATUAL = { ...DETALHE_ATUAL, ...atualizado };
     document.getElementById('d-sub').textContent = `${DETALHE_ATUAL.unidadeNome||DETALHE_ATUAL.unidade||'—'} · ${DETALHE_ATUAL.criadoPorEmail||''} · ${fmtDataHora(DETALHE_ATUAL.criadoEm)}` + (DETALHE_ATUAL.direcionadoParaEmail ? ` · direcionado a ${DETALHE_ATUAL.direcionadoParaEmail}` : '');
     await carregarCentral();
+  }catch(err){ alert(err.message); }
+}
+
+// monta o bloco de acoes de tipo (Mudar tipo / Converter em Estorno / Converter
+// a partir de Estorno) - so aparece pra Master/Admin, e so pros tipos que
+// participam desse fluxo (os 5 gerais + estorno; ajuste-fechamento fica de fora)
+function renderTipoAcoes(c){
+  const corpo = document.getElementById('d-tipo-corpo');
+  if(TIPOS_GERAIS.includes(c.tipo)){
+    const opcoes = TIPOS_GERAIS.filter(t=>t!==c.tipo).map(t=>`<option value="${t}">${iconeTipo(t)} ${TIPOS_INFO[t].label}</option>`).join('');
+    corpo.innerHTML = `
+      <label>Mudar para outro tipo</label>
+      <select id="tipo-novo-select">${opcoes}</select>
+      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarMudarTipo()">Salvar novo tipo</button>
+      <button type="button" class="link-btn" style="margin-top:12px;display:block;" onclick="toggleConverterEstorno()">🔁 Converter este ticket em Estorno</button>
+      <div id="converter-estorno-form" class="hidden" style="margin-top:8px;">
+        <label>Valor a estornar</label>
+        <input type="number" step="0.01" id="ce-valor" value="${c.valorEstimado!=null?c.valorEstimado:''}">
+        <label>Observação do estorno</label>
+        <textarea id="ce-observacao">${escapeHtml(c.observacao||c.titulo||'')}</textarea>
+        <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarConverterEstorno()">Confirmar conversão em Estorno</button>
+      </div>
+    `;
+  } else if(c.tipo==='estorno'){
+    const opcoes = TIPOS_GERAIS.map(t=>`<option value="${t}">${iconeTipo(t)} ${TIPOS_INFO[t].label}</option>`).join('');
+    corpo.innerHTML = `
+      <label>Converter este ticket em outro tipo</label>
+      <select id="tipo-conv-select">${opcoes}</select>
+      <label>Unidade (código - obrigatório se não veio preenchida)</label>
+      <input type="text" id="cv-unidade" value="${escapeHtml(c.unidade||'')}">
+      <label>Título/descrição</label>
+      <input type="text" id="cv-titulo" value="${escapeHtml(c.observacao||'')}">
+      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarConverterTipo()">Confirmar conversão</button>
+    `;
+  } else {
+    document.getElementById('d-tipo-acoes').classList.add('hidden');
+  }
+}
+
+function toggleConverterEstorno(){
+  document.getElementById('converter-estorno-form').classList.toggle('hidden');
+}
+
+async function salvarMudarTipo(){
+  const c = DETALHE_ATUAL;
+  if(!c) return;
+  const novoTipo = document.getElementById('tipo-novo-select').value;
+  if(!confirm(`Mudar Ticket #${c.numeroTicket} de ${TIPOS_INFO[c.tipo].label} para ${TIPOS_INFO[novoTipo].label}?`)) return;
+  try{
+    const resp = await fetch(`/api/solicitacoes/${c.id}/tipo`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ novoTipo }) });
+    const atualizado = await resp.json();
+    if(!resp.ok) throw new Error(atualizado.error || 'Erro ao mudar tipo.');
+    await carregarCentral();
+    fecharDetalhe();
+  }catch(err){ alert(err.message); }
+}
+
+async function salvarConverterEstorno(){
+  const c = DETALHE_ATUAL;
+  if(!c) return;
+  const valorEstornar = document.getElementById('ce-valor').value;
+  const observacao = document.getElementById('ce-observacao').value;
+  if(!confirm(`Converter Ticket #${c.numeroTicket} em Estorno?`)) return;
+  try{
+    const resp = await fetch(`/api/solicitacoes/${c.id}/converter-estorno`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ valorEstornar, valorVenda: valorEstornar, observacao }) });
+    const novo = await resp.json();
+    if(!resp.ok) throw new Error(novo.error || 'Erro ao converter.');
+    await carregarCentral();
+    fecharDetalhe();
+  }catch(err){ alert(err.message); }
+}
+
+async function salvarConverterTipo(){
+  const c = DETALHE_ATUAL;
+  if(!c) return;
+  const novoTipo = document.getElementById('tipo-conv-select').value;
+  const unidade = document.getElementById('cv-unidade').value.trim();
+  const titulo = document.getElementById('cv-titulo').value;
+  if(!confirm(`Converter Ticket #${c.numeroTicket} em ${TIPOS_INFO[novoTipo].label}?`)) return;
+  try{
+    const resp = await fetch(`/api/refund-requests/${c.id}/converter`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ novoTipo, dados: { titulo, unidade: unidade || undefined, unidadeNome: unidade || undefined } }) });
+    const novo = await resp.json();
+    if(!resp.ok) throw new Error(novo.error || 'Erro ao converter.');
+    await carregarCentral();
+    fecharDetalhe();
   }catch(err){ alert(err.message); }
 }
 
