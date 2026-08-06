@@ -60,6 +60,15 @@
   tbody td{padding:9px 10px;border-bottom:1px solid #1a1f26;vertical-align:top;}
   .tags{display:flex;flex-wrap:wrap;gap:4px;max-width:320px;}
   .tag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);}
+  .grupos-lista{display:flex;flex-direction:column;gap:12px;}
+  .grupo-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .grupo-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .grupo-card-top .nome{font-size:15px;font-weight:700;}
+  .grupo-secao{margin-top:12px;}
+  .grupo-secao:first-of-type{margin-top:0;}
+  .grupo-secao-titulo{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;}
+  .grupo-extras-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+  .grupo-extras-grid .tags{max-width:none;}
   .tag.kpi{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.08);}
   .rowacts{display:flex;gap:6px;flex-wrap:wrap;}
   .rowacts button{font-family:var(--sans);font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;}
@@ -157,12 +166,7 @@
         <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioGrupos('pdf')">📄 PDF</button>
       </span>
     </h2>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Nome</th><th>Lojas</th><th>Canais extras</th><th>Formas extras</th><th>KPI's extras</th><th>Responsáveis</th><th></th></tr></thead>
-        <tbody id="grupos-body"></tbody>
-      </table>
-    </div>
+    <div class="grupos-lista" id="grupos-body"></div>
   </div>
 
   <div class="panel">
@@ -462,20 +466,37 @@ function nomeResponsavel(id){
 }
 function renderGrupos(){
   document.getElementById('grupos-body').innerHTML = GRUPOS.map(g=>`
-    <tr>
-      <td><b>${escapeHtml(g.nome)}</b></td>
-      <td><div class="tags">${(g.unidades||[]).map(u=>`<span class="tag">${escapeHtml(nomeUnidade(u))}</span>`).join('') || '<span style="color:var(--muted);">nenhuma</span>'}</div></td>
-      <td>${tagsExtras(g.canaisVendaExtras)}</td>
-      <td>${tagsExtras(g.formasPagamentoExtras)}</td>
-      <td>${tagsExtras(g.kpisExtras)}</td>
-      <td><div class="tags">${(g.responsaveis||[]).map(id=>`<span class="tag">${escapeHtml(nomeResponsavel(id))}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div></td>
-      <td>
+    <div class="grupo-card">
+      <div class="grupo-card-top">
+        <span class="nome">${escapeHtml(g.nome)}</span>
         <div class="rowacts">
           <button type="button" onclick="abrirEdicaoGrupo('${g.id}')">Editar</button>
           <button type="button" onclick="excluirGrupo('${g.id}','${escapeHtml(g.nome)}')">Excluir</button>
         </div>
-      </td>
-    </tr>`).join('') || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</td></tr>`;
+      </div>
+      <div class="grupo-secao">
+        <div class="grupo-secao-titulo">Lojas</div>
+        <div class="tags">${(g.unidades||[]).map(u=>`<span class="tag">${escapeHtml(nomeUnidade(u))}</span>`).join('') || '<span style="color:var(--muted);">nenhuma</span>'}</div>
+      </div>
+      <div class="grupo-secao grupo-extras-grid">
+        <div>
+          <div class="grupo-secao-titulo">Canais extras</div>
+          ${tagsExtras(g.canaisVendaExtras)}
+        </div>
+        <div>
+          <div class="grupo-secao-titulo">Formas extras</div>
+          ${tagsExtras(g.formasPagamentoExtras)}
+        </div>
+        <div>
+          <div class="grupo-secao-titulo">KPI's extras</div>
+          ${tagsExtras(g.kpisExtras)}
+        </div>
+      </div>
+      <div class="grupo-secao">
+        <div class="grupo-secao-titulo">Responsáveis</div>
+        <div class="tags">${(g.responsaveis||[]).map(id=>`<span class="tag">${escapeHtml(nomeResponsavel(id))}</span>`).join('') || '<span style="color:var(--muted);">nenhum</span>'}</div>
+      </div>
+    </div>`).join('') || `<div style="color:var(--muted);text-align:center;padding:20px;">Nenhum grupo criado ainda.</div>`;
 }
 
 document.getElementById('create-form').addEventListener('submit', async (e)=>{
