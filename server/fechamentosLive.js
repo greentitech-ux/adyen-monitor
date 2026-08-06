@@ -17,11 +17,19 @@ function docId(unidade, data) {
   return `${unidade}__${data}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
+// dia anterior (string AAAA-MM-DD) - usado so pra achar o fechamento de
+// ontem da mesma unidade (ver ajustePosDoDiaAnterior)
+function diaAnterior(data) {
+  const d = new Date(data + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const CAMPOS_NUMERICOS = [
   'caixaInicial', 'caixaFinal', 'delivery', 'carryout', 'pickup', 'loja',
   'adyen', 'ifood', 'food99', 'pix', 'pixCnpj', 'outros', 'totalSaida',
   'faturamento', 'totalDeclarado', 'quebra', 'tc', 'cancelados',
-  'entradaDinheiro', 'deposito',
+  'entradaDinheiro', 'deposito', 'adyenPos',
 ];
 
 function num(v) {
@@ -56,6 +64,19 @@ async function defsExtrasDaUnidade(unidade) {
   return { canais: grupo?.canaisVendaExtras || [], formas: grupo?.formasPagamentoExtras || [] };
 }
 
+// loja que vende depois da meia-noite na maquininha: esse valor (adyenPos,
+// lançado no dia D) já é contado no Total Declarado de D, mas o PRÓPRIO
+// terminal só vai bater esse lote no fechamento de D+1 (é o ciclo dele, não
+// o calendário) - sem desconto, D+1 contaria essa venda de novo e sobraria
+// caixa. Calculado uma vez, na CRIAÇÃO do fechamento de D+1, a partir do
+// adyenPos que D já tinha lançado até então (ver diaAnterior acima); fica
+// guardado (não recalculado depois) - se D for corrigido mais tarde, a
+// correção de D+1 é manual (mesmo fluxo de qualquer outra correção do app).
+async function ajustePosDoDiaAnterior(unidade, data) {
+  const ontem = await getOne(docId(unidade, diaAnterior(data)));
+  return ontem ? -num(ontem.adyenPos) : 0;
+}
+
 // Faturamento = canais de venda; Total Declarado = formas de pagamento
 // (maquininhas + iFood + 99Food + Pix + Pix CNPJ + Outros) + dinheiro -
 // sempre recalculado a partir dos campos que realmente compoem cada um,
@@ -84,7 +105,8 @@ function recomputarTotais(r, explicitos, defsExtras) {
   }
   if (!explicitos || !Object.prototype.hasOwnProperty.call(explicitos, 'totalDeclarado')) {
     r.totalDeclarado = +(
-      num(r.adyen) + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro)
+      num(r.adyen) + num(r.adyenPos) + num(r.ajustePosAnterior)
+      + num(r.ifood) + num(r.food99) + num(r.pix) + num(r.pixCnpj) + num(r.outros) + num(r.entradaDinheiro)
       + somaMapaComSinal(r.formasPagamentoExtras, formasDefs)
       + somaMapaComSinal(r.canaisVendaExtras, canaisDefs, { soDestinoCruzado: true })
     ).toFixed(2);
@@ -135,7 +157,7 @@ async function tiposKpiDaUnidade(unidade) {
   return out;
 }
 
-async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesSaidas, criadoPorId, criadoPorEmail }) {
+async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpisExtras, canaisVendaExtras, formasPagamentoExtras, observacao, detalhesMaquinas, detalhesMaquinasPos, detalhesSaidas, criadoPorId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Data inválida.');
 
@@ -148,6 +170,10 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
 
   const registro = { id, unidade, unidadeNome: unidadeNome || unidade, grupo: grupo || 'MANUAL', data, gerente: gerente || '' };
   CAMPOS_NUMERICOS.forEach((c) => { registro[c] = num(campos?.[c]); });
+  // desconto automatico da venda pos-meia-noite que ONTEM ja lançou na
+  // Maquininha POS (ver ajustePosDoDiaAnterior) - calculado uma vez aqui, na
+  // criação, e guardado (nao e recalculado se ontem for corrigido depois)
+  registro.ajustePosAnterior = await ajustePosDoDiaAnterior(unidade, data);
   const tiposKpi = await tiposKpiDaUnidade(unidade);
   registro.kpisExtras = sanitizarMapaExtras(kpisExtras, tiposKpi);
   registro.canaisVendaExtras = sanitizarMapaExtras(canaisVendaExtras);
@@ -155,6 +181,7 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
   recomputarTotais(registro, null, await defsExtrasDaUnidade(unidade));
   registro.observacao = observacao || null;
   registro.detalhesMaquinas = sanitizarItens(detalhesMaquinas);
+  registro.detalhesMaquinasPos = sanitizarItens(detalhesMaquinasPos);
   registro.detalhesSaidas = sanitizarItens(detalhesSaidas);
 
   const agora = new Date().toISOString();
@@ -194,8 +221,11 @@ async function getOne(id) {
 // tipo 'campo': corrige o valor de um campo já lançado (mudancas: {campo:valor}).
 // tipo 'item': adiciona um item novo que faltou lançar (ex: esqueceu uma
 // maquininha, ou uma saída que não passou pela Sangria) - soma em cima do
-// que já existe, não substitui
-const TIPOS_ITEM_NOVO = ['maquininha', 'saida'];
+// que já existe, não substitui. 'maquininhaPos' segue o mesmo esquema, mas
+// pro fechamento SEGUINTE (se já existir) o desconto automático não é
+// refeito - foi calculado uma vez na criação dele (ver ajustePosAnterior);
+// se precisar, o Master corrige o dia seguinte manualmente também.
+const TIPOS_ITEM_NOVO = ['maquininha', 'maquininhaPos', 'saida'];
 
 async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo, novaData, motivo, anexos, solicitadoPorId, solicitadoPorEmail, direcionadoParaId, direcionadoParaEmail }) {
   const atual = await getOne(fechamentoId);
@@ -233,7 +263,7 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
   };
 
   if (pedido.tipoCorrecao === 'item') {
-    if (!itemNovo || !TIPOS_ITEM_NOVO.includes(itemNovo.tipo)) throw new Error('Escolha o tipo do item (maquininha ou saída).');
+    if (!itemNovo || !TIPOS_ITEM_NOVO.includes(itemNovo.tipo)) throw new Error('Escolha o tipo do item (maquininha, maquininha POS ou saída).');
     const valor = num(itemNovo.valor);
     if (valor <= 0) throw new Error('Informe o valor do item.');
     pedido.itemNovo = { tipo: itemNovo.tipo, descricao: String(itemNovo.descricao || '').slice(0, 200), valor };
@@ -451,6 +481,12 @@ async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
             adyen: +(num(atual.adyen) + valor).toFixed(2),
           };
           camposMudados = { adyen: novosValores.adyen };
+        } else if (tipo === 'maquininhaPos') {
+          novosValores = {
+            detalhesMaquinasPos: [...(atual.detalhesMaquinasPos || []), { descricao, valor }],
+            adyenPos: +(num(atual.adyenPos) + valor).toFixed(2),
+          };
+          camposMudados = { adyenPos: novosValores.adyenPos };
         } else {
           novosValores = {
             detalhesSaidas: [...(atual.detalhesSaidas || []), { descricao, valor }],

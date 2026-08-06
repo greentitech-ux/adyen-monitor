@@ -233,6 +233,13 @@
       <button type="button" class="btn-add" onclick="adicionarMaquina()">+ Adicionar maquininha</button>
     </div>
 
+    <div class="secao hidden" id="secao-maquininhas-pos">
+      <div class="secao-titulo">Maquininha POS 01 (vendas após meia-noite) <span id="maq-pos-total" style="color:var(--text);"></span></div>
+      <div class="sub" style="margin:-2px 0 8px;">Só o que foi vendido DEPOIS da meia-noite nessa maquininha. Esse valor soma no fechamento de hoje e é descontado automaticamente no fechamento de amanhã - assim a venda não conta duas vezes quando o lote da maquininha bater amanhã.</div>
+      <div id="lista-maquinas-pos"></div>
+      <button type="button" class="btn-add" onclick="adicionarMaquinaPos()">+ Adicionar maquininha POS</button>
+    </div>
+
     <div class="secao">
       <div class="secao-titulo">Saída de dinheiro (sangria/depósito) <span id="sangria-dia-total" style="color:var(--text);"></span></div>
       <div id="sangria-dia-info"><div style="color:var(--muted);font-size:12px;">Selecione unidade e data acima.</div></div>
@@ -251,6 +258,7 @@
       <div class="sub hidden" id="kpis-vazio">Nenhum campo configurado pra essa loja - peça pro Master configurar em Grupos.</div>
       <div class="resumo">
         <div class="linha"><span>Soma maquininhas</span><b id="resumo-maquinas">R$ 0,00</b></div>
+        <div class="linha hidden" id="resumo-maquinas-pos-linha"><span>Soma Maquininha POS 01</span><b id="resumo-maquinas-pos">R$ 0,00</b></div>
         <div class="linha"><span>Sangria/Depósito do dia (automática)</span><b id="resumo-sangria">R$ 0,00</b></div>
         <div class="linha"><span>Soma outras saídas</span><b id="resumo-saidas">R$ 0,00</b></div>
         <div class="linha"><span>Faturamento total</span><b id="resumo-faturamento">R$ 0,00</b></div>
@@ -341,11 +349,12 @@ const BRAVO_UNIDADES = Object.keys(BRAVO_UNIDADES_NOMES);
 const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'BRAVO'; }
 
-const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
+const CAMPOS_NUMERICOS = ['caixaInicial','caixaFinal','delivery','carryout','pickup','loja','adyen','adyenPos','ifood','food99','pix','pixCnpj','outros','totalSaida','faturamento','totalDeclarado','quebra','tc','cancelados','entradaDinheiro','deposito'];
 
 let ME = null;
 let IS_MASTER = false;
 let MAQUINAS = [];
+let MAQUINAS_POS = [];
 let SAIDAS = [];
 let SEQ = 0;
 let SANGRIA_DO_DIA = [];
@@ -406,6 +415,35 @@ function renderMaquinas(){
   atualizarResumo();
 }
 
+// ---------- linhas repetíveis: Maquininha POS (vendas depois da meia-noite,
+// ver secao-maquininhas-pos) - mesmo esquema de MAQUINAS acima, so muda o
+// prefixo (configuravel por grupo, maquininhaPosPrefixo) ----------
+function maquininhaPosPrefixoDaUnidade(){
+  const unidade = document.getElementById('f-unidade').value;
+  const grupo = grupoKpiDaUnidade(unidade);
+  return (grupo && grupo.maquininhaPosPrefixo) || 'Maquininha POS';
+}
+function adicionarMaquinaPos(valor){
+  MAQUINAS_POS.push({ id: ++SEQ, descricao: `${maquininhaPosPrefixoDaUnidade()} ${String(MAQUINAS_POS.length+1).padStart(2,'0')}`, valor: valor||'', autoNomeado: true });
+  renderMaquinasPos();
+}
+function removerMaquinaPos(id){ MAQUINAS_POS = MAQUINAS_POS.filter(m=>m.id!==id); renderMaquinasPos(); }
+function renomearMaquinasPosAutomaticas(){
+  const prefixo = maquininhaPosPrefixoDaUnidade();
+  let n = 0;
+  MAQUINAS_POS.forEach(m=>{ n += 1; if(m.autoNomeado) m.descricao = `${prefixo} ${String(n).padStart(2,'0')}`; });
+  renderMaquinasPos();
+}
+function renderMaquinasPos(){
+  document.getElementById('lista-maquinas-pos').innerHTML = MAQUINAS_POS.map(m=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(m.descricao)}" oninput="const mq=MAQUINAS_POS.find(x=>x.id===${m.id}); mq.descricao=this.value; mq.autoNomeado=false;" placeholder="nome/identificação">
+      <input type="number" step="0.01" inputmode="decimal" value="${m.valor}" oninput="MAQUINAS_POS.find(x=>x.id===${m.id}).valor=this.value; atualizarResumo();" placeholder="R$">
+      <button type="button" class="btn-remover" onclick="removerMaquinaPos(${m.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma maquininha POS adicionada.</div>';
+  atualizarResumo();
+}
+
 // ---------- linhas repetíveis: outras saídas de caixa (nao vem da Sangria) ----------
 function adicionarSaida(valor, descricao){
   SAIDAS.push({ id: ++SEQ, descricao: descricao||'', valor: valor||'' });
@@ -445,19 +483,26 @@ async function carregarSangriaDoDia(){
 
 function atualizarResumo(){
   const somaMaquinas = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
+  const somaMaquinasPos = MAQUINAS_POS.reduce((s,m)=>s+num(m.valor),0);
   const somaSangria = SANGRIA_DO_DIA.reduce((s,x)=>s+num(x.valor),0);
   const somaOutrasSaidas = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
   document.getElementById('maq-total').textContent = somaMaquinas ? fmtMoney(somaMaquinas) : '';
+  document.getElementById('maq-pos-total').textContent = somaMaquinasPos ? fmtMoney(somaMaquinasPos) : '';
   document.getElementById('sangria-dia-total').textContent = somaSangria ? fmtMoney(somaSangria) : '';
   document.getElementById('saida-total').textContent = somaOutrasSaidas ? fmtMoney(somaOutrasSaidas) : '';
   document.getElementById('resumo-maquinas').textContent = fmtMoney(somaMaquinas);
+  document.getElementById('resumo-maquinas-pos-linha').classList.toggle('hidden', document.getElementById('secao-maquininhas-pos').classList.contains('hidden'));
+  document.getElementById('resumo-maquinas-pos').textContent = fmtMoney(somaMaquinasPos);
   document.getElementById('resumo-sangria').textContent = fmtMoney(somaSangria);
   document.getElementById('resumo-saidas').textContent = fmtMoney(somaOutrasSaidas);
 
   // Faturamento = soma dos canais de venda; Total declarado = soma das
-  // formas de pagamento (maquininhas + iFood + 99Food + Pix + Pix CNPJ +
-  // Outros) + entrada em dinheiro - sempre calculado, nunca digitado direto
-  // (o servidor recalcula os dois de novo no lançar, ver fechamentosLive.js)
+  // formas de pagamento (maquininhas + Maquininha POS + iFood + 99Food +
+  // Pix + Pix CNPJ + Outros) + entrada em dinheiro - sempre calculado, nunca
+  // digitado direto (o servidor recalcula os dois de novo no lançar, ver
+  // fechamentosLive.js - la tambem entra o desconto automatico da Maquininha
+  // POS do dia anterior, que essa tela nao mostra por ser so na hora de
+  // lançar o fechamento SEGUINTE)
   const g = (id)=>num(document.getElementById(id).value);
   const canaisDefs = defsExtrasAtual('canaisVendaExtras');
   const formasDefs = defsExtrasAtual('formasPagamentoExtras');
@@ -466,7 +511,7 @@ function atualizarResumo(){
     + somaExtrasComSinal('forma-extra-input', formasDefs, {soCruzado:true})
   ).toFixed(2);
   const totalDeclarado = +(
-    somaMaquinas + g('f-entradaDinheiro')
+    somaMaquinas + somaMaquinasPos + g('f-entradaDinheiro')
     + somaExtrasComSinal('forma-extra-input', formasDefs)
     + somaExtrasComSinal('canal-extra-input', canaisDefs, {soCruzado:true})
   ).toFixed(2);
@@ -592,6 +637,15 @@ function aplicarSecoesGrupo(unidade){
   if(!maquininhasOk && MAQUINAS.length){ MAQUINAS = []; renderMaquinas(); }
   else if(maquininhasOk && !MAQUINAS.length){ adicionarMaquina(); }
   else if(maquininhasOk){ renomearMaquinasAutomaticas(); }
+
+  // Maquininha POS: ao contrario das outras secoes, so aparece se o grupo
+  // marcar explicitamente (poucas lojas vendem depois da meia-noite)
+  const maquininhaPosOk = !!(grupo && grupo.maquininhaPosHabilitado === true);
+  document.getElementById('secao-maquininhas-pos').classList.toggle('hidden', !maquininhaPosOk);
+  if(!maquininhaPosOk && MAQUINAS_POS.length){ MAQUINAS_POS = []; renderMaquinasPos(); }
+  else if(maquininhaPosOk && !MAQUINAS_POS.length){ adicionarMaquinaPos(); }
+  else if(maquininhaPosOk){ renomearMaquinasPosAutomaticas(); }
+  document.getElementById('resumo-maquinas-pos-linha').classList.toggle('hidden', !maquininhaPosOk);
 
   document.getElementById('secao-saidas').classList.toggle('hidden', !saidasOk);
   if(!saidasOk && SAIDAS.length){ SAIDAS = []; renderSaidas(); }
@@ -772,14 +826,16 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       campos[c] = el ? el.value : 0;
     });
     campos.adyen = MAQUINAS.reduce((s,m)=>s+num(m.valor),0);
+    campos.adyenPos = MAQUINAS_POS.reduce((s,m)=>s+num(m.valor),0);
     campos.totalSaida = SAIDAS.reduce((s,x)=>s+num(x.valor),0);
     // Faturamento/Total declarado sao sempre recalculados no servidor (ver
-    // fechamentosLive.js) - manda o mesmo valor mostrado na tela so por
-    // completude do payload, nao por confiança nesse numero
+    // fechamentosLive.js, que tambem aplica o desconto automatico da
+    // Maquininha POS do dia anterior) - manda o mesmo valor mostrado na
+    // tela so por completude do payload, nao por confiança nesse numero
     const canaisDefsSubmit = defsExtrasAtual('canaisVendaExtras');
     const formasDefsSubmit = defsExtrasAtual('formasPagamentoExtras');
     campos.faturamento = somaExtrasComSinal('canal-extra-input', canaisDefsSubmit) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit, {soCruzado:true});
-    campos.totalDeclarado = num(campos.adyen) + num(campos.entradaDinheiro) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit) + somaExtrasComSinal('canal-extra-input', canaisDefsSubmit, {soCruzado:true});
+    campos.totalDeclarado = num(campos.adyen) + num(campos.adyenPos) + num(campos.entradaDinheiro) + somaExtrasComSinal('forma-extra-input', formasDefsSubmit) + somaExtrasComSinal('canal-extra-input', canaisDefsSubmit, {soCruzado:true});
 
     const body = {
       unidade,
@@ -793,6 +849,7 @@ document.getElementById('form-lancar').addEventListener('submit', async (ev)=>{
       formasPagamentoExtras: lerFormasExtras(),
       observacao: document.getElementById('f-observacao').value,
       detalhesMaquinas: MAQUINAS.map(m=>({ descricao:m.descricao, valor:m.valor })),
+      detalhesMaquinasPos: MAQUINAS_POS.map(m=>({ descricao:m.descricao, valor:m.valor })),
       detalhesSaidas: SAIDAS.map(s=>({ descricao:s.descricao, valor:s.valor })),
     };
     const arquivosKpi = arquivosKpiSelecionados();
