@@ -28,7 +28,7 @@
   h2{font-size:14px;font-weight:700;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;}
-  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-32px;margin-right:-32px;margin-top:-28px;padding-left:32px;padding-right:32px;padding-top:28px;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
@@ -37,7 +37,7 @@
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
   a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
-  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn{position:sticky;top:14px;z-index:997;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
   .hamburger-btn:hover{border-color:var(--accent);}
   .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
   .nav-drawer-overlay.hidden{display:none!important;}
@@ -74,6 +74,16 @@
   .ptipos .linha b{font-family:var(--mono);}
   .pcard-erro{color:var(--bad);font-size:12px;}
   .pcard-vazio{color:var(--muted);font-size:12px;}
+  .pweek-titulo{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .pweek-titulo b{font-family:var(--mono);color:var(--text);font-size:13px;}
+  .pweekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .pweekday{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;}
+  .pweekday.hoje{border-color:var(--accent);background:rgba(92,200,255,.08);}
+  .pweekday .dia{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;}
+  .pweekday.hoje .dia{color:var(--accent);}
+  .pweekday .qtd{font-size:16px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;color:var(--muted);}
+  .pweekday .qtd.tem{color:var(--text);}
+  .pweekday.hoje .qtd.tem{color:var(--accent);}
   .painel-loading{padding:60px 0;text-align:center;color:var(--muted);font-size:13px;}
   .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
   .notif-solicitacao{background:var(--panel);border:2px solid var(--warn);border-radius:12px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.55);animation:notif-in .18s ease,notif-pulse 1.6s ease-in-out infinite;}
@@ -119,16 +129,21 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
   <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
   <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
   <div class="nav-drawer-sep"></div>
@@ -455,7 +470,68 @@ async function cardIfood(){
   </div>`);
 }
 
+const DIAS_SEMANA_ABREV = ['seg','ter','qua','qui','sex','sáb','dom']; // segunda primeiro, igual ao pedido
+// as datas aqui vem de aritmetica local (setDate) em cima do "hoje" ja
+// ancorado em Brasilia - so precisa formatar de volta pra YYYY-MM-DD local,
+// sem reconverter fuso
+function isoLocal(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+async function cardParque(){
+  const hoje = hojeBrasilia();
+  const [checkins, festas, mensalistas] = await Promise.all([
+    fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]),
+    fetch('/api/festas').then(r=>r.json()).catch(()=>[]),
+    fetch('/api/mensalistas').then(r=>r.json()).catch(()=>[]),
+  ]);
+  const doDia = checkins.filter(c=>c.dataUtilizacao===hoje);
+  const criancas = doDia.reduce((s,c)=>s+(c.criancas?.length||0),0);
+  const aguardando = doDia.filter(c=>!c.termoAssinado).length;
+  const mensalistasAtivos = mensalistas.filter(m=>m.dataInicial<=hoje && hoje<=m.dataFinal).length;
+
+  // semana corrente (segunda a domingo) contendo "hoje", nao os proximos 7
+  // dias corridos - assim o card sempre mostra a semana inteira de uma vez,
+  // inclusive dias que ja passaram
+  const hojeDate = new Date(hoje+'T00:00:00');
+  const diaSemanaJs = hojeDate.getDay(); // 0=dom
+  const deltaSegunda = diaSemanaJs === 0 ? -6 : 1 - diaSemanaJs;
+  const segunda = new Date(hojeDate); segunda.setDate(segunda.getDate()+deltaSegunda);
+  const diasSemana = Array.from({length:7}, (_,i)=>{
+    const d = new Date(segunda); d.setDate(d.getDate()+i);
+    return isoLocal(d);
+  });
+  const festasPorDia = {};
+  festas.forEach(f=>{
+    if(f.status==='cancelado') return;
+    if(!diasSemana.includes(f.dataDeUso)) return;
+    festasPorDia[f.dataDeUso] = (festasPorDia[f.dataDeUso]||0) + 1;
+  });
+  const totalSemana = Object.values(festasPorDia).reduce((s,n)=>s+n,0);
+
+  const strip = diasSemana.map((data,i)=>{
+    const qtd = festasPorDia[data] || 0;
+    const ehHoje = data === hoje;
+    return `<div class="pweekday${ehHoje?' hoje':''}">
+      <div class="dia">${DIAS_SEMANA_ABREV[i]}</div>
+      <div class="qtd${qtd?' tem':''}">${qtd}</div>
+    </div>`;
+  }).join('');
+
+  return pcardWrap('🤸','Saltiverso (hoje)','/parque.html', `
+    <div class="pstats">
+      ${statRow('Check-ins hoje', doDia.length)}
+      ${statRow('Crianças', criancas)}
+      ${statRow('Aguardando termo', aguardando, aguardando ? 'warn' : '')}
+      ${statRow('Mensalistas ativos', mensalistasAtivos, mensalistasAtivos ? 'ok' : '')}
+    </div>
+    <div>
+      <div class="pweek-titulo">Festas confirmadas essa semana <b>${totalSemana}</b></div>
+      <div class="pweekstrip">${strip}</div>
+    </div>
+  `);
+}
+
 const CARDS_POR_SECAO = [
+  { secao:'parque', build:cardParque },
   { secao:'monitor', build:cardMonitor },
   { secao:'fechamentos', build:cardFechamentos },
   { secao:'entregas', build:cardEntregas },
@@ -472,7 +548,7 @@ async function boot(){
   ME_GLOBAL = ME;
   IS_MASTER_GLOBAL = isMaster;
   IS_ADMIN_GLOBAL = !!ME.isAdmin;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
   if(secoes.includes('solicitacoes')) iniciarNotificacoesCentral();
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
@@ -483,11 +559,16 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
+  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
 
   const aplicaveis = CARDS_POR_SECAO.filter(c=>secoes.includes(c.secao));
   document.getElementById('painel-loading').classList.add('hidden');

@@ -26,7 +26,7 @@
   @media(max-width:640px){ body{padding:16px 14px 40px;} header{margin-left:-14px;margin-right:-14px;margin-top:-16px;padding-left:14px;padding-right:14px;padding-top:16px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
-  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-32px;margin-right:-32px;margin-top:-28px;padding-left:32px;padding-right:32px;padding-top:28px;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
@@ -35,7 +35,7 @@
   .back:hover{color:var(--text);border-color:var(--accent);}
   .back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
-  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn{position:sticky;top:14px;z-index:997;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
   .hamburger-btn:hover{border-color:var(--accent);}
   .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
   .nav-drawer-overlay.hidden{display:none!important;}
@@ -148,10 +148,13 @@
   <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back" href="/entregas.html">🛵 Entregas</a>
   <a class="back" href="/estoque.html">📦 Estoque</a>
+  <a class="back" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back" href="/">📈 Monitor</a>
   <a class="back" href="/relatorios.html">📊 Relatórios</a>
   <a class="back" href="/ifood.html">🍔 iFood</a>
+  <a class="back" href="/parque.html">🤸 Parque (painel)</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back" href="/central.html">📋 Central</a>
   <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
@@ -344,7 +347,7 @@ function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
 function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
 function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['inventario','Inventário (estoque/CMV)'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
 const UNIDADES_NOMES = {}; // preenchido no boot() a partir de /api/meta/unidades
 let UNIDADES = [];
 let VAULT_GROUPS = [];

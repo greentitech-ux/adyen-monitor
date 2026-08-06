@@ -28,7 +28,7 @@
   h2{font-size:14px;font-weight:700;margin:0;}
   .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
   .sub-intro{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:640px;line-height:1.5;}
-  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-32px;margin-right:-32px;margin-top:-28px;padding-left:32px;padding-right:32px;padding-top:28px;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  header{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;}
   .nav-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
@@ -37,7 +37,7 @@
   a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
   a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
   .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
-  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn{position:sticky;top:14px;z-index:997;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
   .hamburger-btn:hover{border-color:var(--accent);}
   .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
   .nav-drawer-overlay.hidden{display:none!important;}
@@ -109,10 +109,13 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
@@ -359,6 +362,37 @@ const TOPICOS = [
       <li>Exporte as tabelas em CSV/PDF pelos botões no topo.</li>
     </ul>
   `},
+  { id:'parque-checkin', icone:'🤸', secoes:['parque-checkin'], titulo:'Check-in do Parque (Saltiverso)', corpo:`
+    <h3>Passo a passo</h3>
+    <ol>
+      <li>Preencha o nome, contato e endereço do responsável.</li>
+      <li>Escolha a data, o horário de início e o tempo contratado (30 a 240 min) - o horário final é calculado sozinho.</li>
+      <li>Marque <b>Adulto Cortesia (A.C.)</b> quando um adulto tem direito a entrar sem brincar (ex: acompanhante de criança autista, ou outro motivo justificado) e informe a quantidade.</li>
+      <li>Adicione cada criança que vai brincar (nome + data de nascimento) - o número de pulseiras é calculado pela quantidade de crianças.</li>
+      <li>Clique em <b>Registrar check-in</b>.</li>
+    </ol>
+    <div class="dica"><b>Termo de responsabilidade obrigatório:</b> depois de registrar, clique em <b>Imprimir termo de responsabilidade</b> e peça a assinatura do responsável. A entrada no parque só deve ser liberada depois de marcar <b>Confirmar termo assinado</b> - até lá o check-in aparece como "aguardando assinatura".</div>
+  `},
+  { id:'parque', icone:'🤸', secoes:['parque'], titulo:'Parque - painel (Saltiverso)', corpo:`
+    <p>Lista todos os check-ins do parque, com filtro por unidade e período, exportação em CSV/PDF e o painel <b>"Quem está no parque agora"</b> (atualiza sozinho a cada 30s).</p>
+    <ul>
+      <li>Cada check-in mostra o status: <b>aguardando assinatura</b> (termo ainda não confirmado) ou <b>liberado</b>.</li>
+      <li>Clique em <b>🖨️ Termo</b> pra reimprimir o termo de responsabilidade de qualquer check-in.</li>
+      <li>O Master pode editar ou excluir qualquer check-in.</li>
+    </ul>
+    <h3>Mensalistas (passaporte mensal)</h3>
+    <p>No fim da página, cadastre um mensalista com nome, CPF, contato e data de início - a validade de 30 dias é calculada automaticamente. O painel principal do Zenith Ops mostra a quantidade de mensalistas ativos no card do Saltiverso.</p>
+  `},
+  { id:'festas', icone:'🎉', secoes:['festas'], titulo:'Festas (Saltiverso)', corpo:`
+    <h3>Registrar uma reserva</h3>
+    <ol>
+      <li>Informe a unidade, o cliente e a data do evento.</li>
+      <li>Informe o valor total e, se houver, o sinal e o restante (valor/forma/data de cada um).</li>
+      <li>Se a reserva for um acréscimo de pulantes de uma festa anterior, informe o código da venda original.</li>
+      <li>Clique em <b>Registrar reserva</b> - um código único é gerado automaticamente.</li>
+    </ol>
+    <p>Na lista, clique em <b>✎ Editar status</b> pra marcar a reserva como paga, cancelada ou já utilizada.</p>
+  `},
 ];
 
 let SECOES_USUARIO = [];
@@ -407,7 +441,7 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   const me = await res.json();
   const isMaster = me.role==='master';
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (me.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (me.permissions?.sections||[]);
   SECOES_USUARIO = secoes;
   PODE_TUDO = isMaster || !!me.isAdmin;
 
@@ -419,6 +453,7 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
@@ -426,6 +461,8 @@ async function boot(){
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
+  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
 
   renderToc();
   renderSecoes('');

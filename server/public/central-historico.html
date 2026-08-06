@@ -27,7 +27,7 @@
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
   .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
-  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-32px;margin-right:-32px;margin-top:-28px;padding-left:32px;padding-right:32px;padding-top:28px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
   a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
@@ -39,7 +39,7 @@
   .btn-sair{color:var(--bad);}
   .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
-  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn{position:sticky;top:14px;z-index:997;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
   .hamburger-btn:hover{border-color:var(--accent);}
   .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
   .nav-drawer-overlay.hidden{display:none!important;}
@@ -168,10 +168,13 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back active" id="nav-historico-self" href="/central-historico.html">📜 Histórico</a>
@@ -1160,7 +1163,7 @@ async function boot(){
   ME = await res.json();
   IS_MASTER = ME.role==='master';
   IS_ADMIN = !!ME.isAdmin;
-  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+  SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
@@ -1170,12 +1173,15 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !SECOES.includes('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !SECOES.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !SECOES.includes('ifood'));
+  document.getElementById('nav-parque').classList.toggle('hidden', !SECOES.includes('parque'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-inventario').classList.toggle('hidden', !SECOES.includes('inventario'));
+  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !SECOES.includes('parque-checkin'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !SECOES.includes('festas'));
 
   if(!SECOES.includes('solicitacoes')){
     document.getElementById('sem-acesso').classList.remove('hidden');
