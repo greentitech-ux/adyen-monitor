@@ -23,12 +23,12 @@
   *{box-sizing:border-box;min-width:0;}
   html{overflow-x:hidden;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:28px 32px 60px;overflow-x:hidden;}
-  @media(max-width:640px){ body{padding:16px 14px 40px;} h1{font-size:17px;} }
+  @media(max-width:640px){ body{padding:16px 14px 40px;} header{margin-left:-14px;margin-right:-14px;margin-top:-16px;padding-left:14px;padding-right:14px;padding-top:16px;} h1{font-size:17px;} }
   h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0;}
   .form-wrap{max-width:640px;}
   h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
   .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
-  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-32px;margin-right:-32px;margin-top:-28px;padding-left:32px;padding-right:32px;padding-top:28px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
   .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
   .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
   a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;transition:border-color .15s ease,color .15s ease,background .15s ease;}
