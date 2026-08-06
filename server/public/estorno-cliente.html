@@ -52,6 +52,11 @@
   .sucesso .icone{font-size:40px;margin-bottom:10px;}
   .sucesso h2{font-size:16px;margin:0 0 8px;}
   .sucesso p{font-size:13px;color:var(--muted);line-height:1.6;margin:0;}
+  .lista-anexos{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+  .anexo-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .anexo-item .anexo-nome{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .anexo-item .anexo-tam{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex:none;}
+  .btn-remover-anexo{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:28px;height:28px;font-size:14px;line-height:1;cursor:pointer;flex:none;}
 </style>
 </head>
 <body>
@@ -138,7 +143,8 @@
     <div class="ajuda">Anexe a foto ou o PDF do comprovante da maquininha. Se a cobrança caiu em duplicidade, anexe os dois comprovantes.</div>
     <label>Comprovante da maquininha (foto ou PDF) *</label>
     <div class="ajuda">Até 5 arquivos, 10 MB cada.</div>
-    <input type="file" id="comprovantes" accept="image/*,.pdf" multiple required>
+    <input type="file" id="comprovantes" accept="image/*,.pdf" multiple>
+    <div id="lista-anexos" class="lista-anexos hidden"></div>
 
     <div class="grid2">
       <div>
@@ -187,6 +193,51 @@ async function boot(){
 }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// lista propria de anexos: <input type=file> nativo nao deixa tirar um
+// arquivo escolhido sem apagar todos - entao acumulamos os arquivos num
+// array, mostramos a lista com botao ✕ pra remover um por um, e no envio
+// usamos o array (nao o input). Escolher de novo ADICIONA aos ja anexados.
+let ANEXOS = [];
+const MAX_ANEXOS = 5, MAX_TAM = 10 * 1024 * 1024;
+
+function tamanhoLegivel(bytes){
+  if(bytes >= 1024*1024) return (bytes/1024/1024).toFixed(1)+' MB';
+  return Math.max(1, Math.round(bytes/1024))+' KB';
+}
+
+function renderAnexos(){
+  const wrap = document.getElementById('lista-anexos');
+  wrap.classList.toggle('hidden', !ANEXOS.length);
+  wrap.innerHTML = ANEXOS.map((f,i)=>`
+    <div class="anexo-item">
+      <span class="anexo-nome">${escapeHtml(f.name)}</span>
+      <span class="anexo-tam">${tamanhoLegivel(f.size)}</span>
+      <button type="button" class="btn-remover-anexo" data-i="${i}" title="Remover anexo">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.btn-remover-anexo').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ ANEXOS.splice(Number(btn.dataset.i),1); renderAnexos(); });
+  });
+}
+
+document.getElementById('comprovantes').addEventListener('change', (e)=>{
+  const msg = document.getElementById('msg');
+  msg.classList.add('hidden');
+  for(const f of e.target.files){
+    if(ANEXOS.length >= MAX_ANEXOS){
+      msg.textContent = `Máximo de ${MAX_ANEXOS} arquivos.`; msg.className = 'msg err'; msg.classList.remove('hidden');
+      break;
+    }
+    if(f.size > MAX_TAM){
+      msg.textContent = `O arquivo "${f.name}" passa de 10 MB.`; msg.className = 'msg err'; msg.classList.remove('hidden');
+      continue;
+    }
+    const repetido = ANEXOS.some(a=>a.name===f.name && a.size===f.size);
+    if(!repetido) ANEXOS.push(f);
+  }
+  e.target.value = ''; // permite escolher o mesmo arquivo de novo depois de remover
+  renderAnexos();
+});
+
 document.getElementById('motivoEstorno').addEventListener('change', (e)=>{
   const ehOutro = e.target.value === 'Outro';
   document.getElementById('wrap-motivo-outro').classList.toggle('hidden', !ehOutro);
@@ -199,16 +250,9 @@ document.getElementById('form-estorno').addEventListener('submit', async (e)=>{
   msg.classList.add('hidden');
   const btn = document.getElementById('btn-enviar');
 
-  const arquivos = document.getElementById('comprovantes').files;
-  if(!arquivos.length){
+  if(!ANEXOS.length){
     msg.textContent = 'Anexe pelo menos um comprovante da maquininha.'; msg.className = 'msg err'; msg.classList.remove('hidden');
     return;
-  }
-  for(const f of arquivos){
-    if(f.size > 10 * 1024 * 1024){
-      msg.textContent = `O arquivo "${f.name}" passa de 10 MB.`; msg.className = 'msg err'; msg.classList.remove('hidden');
-      return;
-    }
   }
 
   const formaPagamento = document.querySelector('input[name=formaPagamento]:checked');
@@ -234,7 +278,7 @@ document.getElementById('form-estorno').addEventListener('submit', async (e)=>{
 
   const fd = new FormData();
   fd.append('payload', JSON.stringify(payload));
-  for(const f of arquivos) fd.append('anexos', f);
+  for(const f of ANEXOS) fd.append('anexos', f);
 
   btn.disabled = true; btn.textContent = 'Enviando...';
   try{

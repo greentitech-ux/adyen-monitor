@@ -941,6 +941,18 @@ async function construirUnidadesMapa() {
   return mapa;
 }
 
+// diagnostico de anexos (Master): testa um upload real em cada bucket
+// candidato do Firebase Storage e devolve o erro cru de cada um - abrir no
+// navegador logado (ou com ?token=) quando os anexos estiverem falhando,
+// pra saber a causa exata sem depender do log do Render
+app.get('/api/admin/storage-diagnostico', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await require('./storageBucket').diagnostico());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/meta/unidades', auth.requireMaster, async (req, res) => {
   const mapa = await construirUnidadesMapa();
   const SECAO_ORDEM = ['Fechamento', 'Entregas', 'Monitor / Disputas (Adyen)', 'iFood'];

@@ -233,6 +233,13 @@
   </div>
 
   <div class="panel">
+    <h2>Diagnóstico de anexos (Storage)</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Se os anexos estiverem falhando com "Não foi possível enviar o arquivo agora", clique abaixo: o sistema testa um envio de verdade em cada bucket do Firebase Storage e mostra o erro exato de cada um.</p>
+    <button type="button" class="primary" id="btn-storage-diag" onclick="rodarDiagnosticoStorage()">Testar envio de anexos agora</button>
+    <div id="storage-diag-resultado" class="hidden" style="margin-top:12px;font-size:12.5px;line-height:1.6;"></div>
+  </div>
+
+  <div class="panel">
     <h2>Relatórios de transações</h2>
     <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">A cada 2 dias o sistema gera um PDF/CSV com tudo que aconteceu no período (aprovado, recusado, estornado, chargeback, fraude...) e depois apaga do banco o que não é chargeback nem fraude suspeita - esses dois ficam guardados pra sempre pra continuar gerando alerta. Use "Gerar agora" pra rodar fora do horário automático.</p>
     <button type="button" class="primary" id="btn-relatorio-run" onclick="rodarRelatorioAgora()">Gerar relatório agora</button>
@@ -539,6 +546,35 @@ async function restaurarFechamento(id){
     msg.textContent = `Fechamento de ${rotulo} restaurado com sucesso.`; msg.className = 'ok-msg'; msg.classList.remove('hidden');
   }catch(err){
     msg.textContent = err.message; msg.className = 'err'; msg.classList.remove('hidden');
+  }
+}
+
+async function rodarDiagnosticoStorage(){
+  const btn = document.getElementById('btn-storage-diag');
+  const out = document.getElementById('storage-diag-resultado');
+  btn.disabled = true; btn.textContent = 'Testando...';
+  out.classList.add('hidden');
+  try{
+    const res = await fetch('/api/admin/storage-diagnostico');
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.error||'erro ao rodar o diagnóstico');
+    const linhas = (d.resultados||[]).map(r=>{
+      if(r.ok) return `<div style="color:var(--ok);">✅ <b>${escapeHtml(r.bucket)}</b> — upload funcionou</div>`;
+      return `<div style="color:var(--bad);">❌ <b>${escapeHtml(r.bucket)}</b> — ${escapeHtml(r.erro||'')}${r.codigo?` (código ${escapeHtml(String(r.codigo))})`:''}</div>`;
+    });
+    const cab = `<div style="color:var(--muted);font-family:var(--mono);font-size:11px;margin-bottom:6px;">projeto: ${escapeHtml(d.projectId||'—')} · FIREBASE_STORAGE_BUCKET: ${escapeHtml(d.envBucket||'(não definida)')}</div>`;
+    let dica = '';
+    if((d.resultados||[]).every(r=>!r.ok)){
+      const msgs = (d.resultados||[]).map(r=>String(r.erro||'')).join(' ');
+      if(/does not exist|notfound|not found|404/i.test(msgs)) dica = '<div style="margin-top:8px;color:var(--warn);">💡 Nenhum bucket existe: o Cloud Storage nunca foi ativado nesse projeto. Abra o console do Firebase → Build → Storage → "Começar" (pode exigir o plano Blaze) e depois teste de novo.</div>';
+      else if(/permission|forbidden|403/i.test(msgs)) dica = '<div style="margin-top:8px;color:var(--warn);">💡 O bucket existe mas a conta de serviço não tem permissão de escrita. No Google Cloud → IAM, dê o papel "Storage Object Admin" pra conta de serviço do Firebase.</div>';
+    }
+    out.innerHTML = cab + linhas.join('') + dica;
+  }catch(err){
+    out.innerHTML = `<div style="color:var(--bad);">${escapeHtml(err.message)}</div>`;
+  }finally{
+    out.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Testar envio de anexos agora';
   }
 }
 
