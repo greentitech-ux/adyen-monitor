@@ -2222,12 +2222,12 @@ app.get('/api/festas/relatorio.:formato(csv|pdf)', requireSection('festas'), asy
 // de criar uma quarta secao de permissao so pra isso ----------
 app.post('/api/mensalistas', requireSection('parque'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento, dataInicial, usuarios } = req.body;
+    const { unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento, dataInicial, valorPlano, usuarios } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await mensalistas.criar({
-      unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento, dataInicial, usuarios,
+      unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento, dataInicial, valorPlano, usuarios,
       criadoPorId: req.user.id, criadoPorEmail: req.user.email,
     });
     broadcast('mensalista-criado', registro, 'parque');

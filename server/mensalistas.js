@@ -16,6 +16,11 @@ function somarDias(dataIso, dias) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function sanitizarUsuarios(lista) {
   if (!Array.isArray(lista)) return [];
   return lista
@@ -29,7 +34,7 @@ function sanitizarUsuarios(lista) {
 
 async function criar({
   unidade, unidadeNome, nome, cpf, contato, email, cep, numero, complemento,
-  dataInicial, usuarios, criadoPorId, criadoPorEmail,
+  dataInicial, valorPlano, usuarios, criadoPorId, criadoPorEmail,
 }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!nome || !String(nome).trim()) throw new Error('Informe o nome do responsável.');
@@ -49,6 +54,7 @@ async function criar({
     complemento: String(complemento || '').trim().slice(0, 100),
     dataInicial,
     dataFinal: somarDias(dataInicial, DIAS_VALIDADE_PADRAO),
+    valorPlano: Math.max(0, num(valorPlano)),
     usuarios: sanitizarUsuarios(usuarios),
     criadoPorId,
     criadoPorEmail,
@@ -99,6 +105,7 @@ async function atualizar(id, patch) {
     merge.dataFinal = patch.dataFinal; // permite renovar/estender manualmente
   }
   if (patch.usuarios !== undefined) merge.usuarios = sanitizarUsuarios(patch.usuarios);
+  if (patch.valorPlano !== undefined) merge.valorPlano = Math.max(0, num(patch.valorPlano));
 
   merge.atualizadoEm = new Date().toISOString();
   await ref.update(merge);
