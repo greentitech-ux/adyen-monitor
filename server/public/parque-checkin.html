@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Check-in Parque · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:640px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-12px;margin-right:-12px;margin-top:-16px;padding-left:12px;padding-right:12px;padding-top:16px;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer-grupo{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:12px 10px 4px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .secao{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .secao:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .secao-titulo{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .btn-secundario{width:100%;margin-top:8px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .card{border-top:1px solid var(--line);padding:12px 0;}
+  .card:first-child{border-top:none;padding-top:0;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .card .criancas{font-size:12px;color:var(--muted);margin-top:6px;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.aguardando{background:var(--warn-dim);color:var(--warn);}
+  .badge.liberado{background:var(--ok-dim);color:var(--ok);}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);margin-right:12px;}
+  .toggle-grupo{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+  .toggle-btn{flex:1;min-width:56px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 6px;font-size:12.5px;font-family:var(--sans);cursor:pointer;text-align:center;}
+  .toggle-btn.ativo{background:var(--accent);color:#06202b;border-color:var(--accent);font-weight:700;}
+  .crianca-linha{display:grid;grid-template-columns:1fr;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;}
+  @media(min-width:440px){ .crianca-linha{grid-template-columns:1fr 130px 30px;align-items:end;} }
+  .crianca-linha input{margin:0;}
+  .btn-remover-crianca{background:none;border:1px solid var(--line);color:var(--bad);border-radius:8px;height:38px;cursor:pointer;font-size:14px;}
+  .resumo{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:12.5px;display:flex;flex-direction:column;gap:4px;}
+  .resumo .linha{display:flex;justify-content:space-between;gap:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+    <div>
+      <div class="eyebrow">Zenith Ops · Saltiverso Patteo</div>
+      <h1>Check-in do Parque</h1>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <button class="back" onclick="logout()">🚪 Sair</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <div class="nav-drawer-grupo">Operação diária</div>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back active" id="nav-parque-checkin-self" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <div class="nav-drawer-grupo">Monitoramento</div>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
+  <div class="nav-drawer-grupo">Solicitações</div>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <div class="nav-drawer-grupo">Administração</div>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao check-in do Parque. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<div class="panel">
+  <h2>Nova entrada</h2>
+  <form id="form-checkin">
+
+    <div class="secao">
+      <div class="secao-titulo">Identificação</div>
+      <label>Unidade</label>
+      <select id="f-unidade" required></select>
+
+      <label>Nome do responsável</label>
+      <input type="text" id="f-nome" required>
+      <div class="grid2">
+        <div><label>CPF</label><input type="text" id="f-cpf" inputmode="numeric"></div>
+        <div><label>Contato (whatsapp)</label><input type="text" id="f-contato" required></div>
+      </div>
+      <label>Email (opcional)</label>
+      <input type="email" id="f-email">
+      <div class="grid2">
+        <div><label>CEP</label><input type="text" id="f-cep" inputmode="numeric"></div>
+        <div><label>Número</label><input type="text" id="f-numero"></div>
+      </div>
+      <label>Complemento (opcional)</label>
+      <input type="text" id="f-complemento">
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Data e tempo</div>
+      <div class="grid2">
+        <div><label>Data de utilização</label><input type="date" id="f-data" required></div>
+        <div><label>Horário inicial</label><input type="time" id="f-hora" required></div>
+      </div>
+      <label>Tempo contratado</label>
+      <div class="toggle-grupo" id="tempos"></div>
+      <div class="resumo">
+        <div class="linha"><span>Horário final (calculado)</span><b id="preview-fim">—</b></div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Adulto Cortesia (A.C.)</div>
+      <div class="sub" style="font-family:var(--sans);color:var(--muted);font-size:12px;margin-bottom:6px;">
+        Marque quando um adulto tem direito a entrar sem brincar (ex: acompanhante de criança autista, ou outro motivo justificado).
+      </div>
+      <div class="toggle-grupo">
+        <button type="button" class="toggle-btn ativo" id="ac-nao" onclick="setAC(false)">Não</button>
+        <button type="button" class="toggle-btn" id="ac-sim" onclick="setAC(true)">Sim</button>
+      </div>
+      <div id="wrap-quant-ac" class="hidden">
+        <label>Quantidade de adultos cortesia</label>
+        <input type="number" step="1" min="1" max="10" id="f-quantAC" value="1">
+      </div>
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">Crianças</div>
+      <div id="lista-criancas"></div>
+      <button type="button" class="btn-secundario" onclick="adicionarCrianca()">+ Adicionar criança</button>
+      <div class="resumo">
+        <div class="linha"><span>Pulseiras (calculado)</span><b id="preview-pulseiras">0</b></div>
+      </div>
+    </div>
+
+    <div class="secao">
+      <label>Observação (opcional)</label>
+      <textarea id="f-observacao"></textarea>
+    </div>
+
+    <div class="msg hidden" id="msg"></div>
+    <button class="btn-primary" type="submit" id="btn-enviar">Registrar check-in</button>
+  </form>
+</div>
+
+<div class="panel hidden" id="painel-termo">
+  <h2>Termo de responsabilidade</h2>
+  <div class="sub" style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+    Imprima e peça a assinatura do responsável. <b style="color:var(--warn);">A entrada no parque só é permitida após o termo assinado.</b>
+  </div>
+  <a class="btn-secundario" style="display:block;text-align:center;text-decoration:none;" id="link-termo" target="_blank">🖨️ Imprimir termo de responsabilidade</a>
+  <button type="button" class="btn-primary" id="btn-marcar-assinado" onclick="marcarAssinado()">Confirmar termo assinado (liberar entrada)</button>
+</div>
+
+<div class="panel">
+  <h2>Check-ins recentes</h2>
+  <div id="lista-checkins"><div class="empty">carregando...</div></div>
+</div>
+
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+const PARQUE_UNIDADES_NOMES = { 'Saltiverso Patteo': 'Saltiverso Patteo' };
+const TEMPOS_VALIDOS = [30,60,90,120,150,180,210,240];
+
+let ME = null;
+let IS_MASTER = false;
+let UNIDADES_NOMES = { ...PARQUE_UNIDADES_NOMES };
+let CHECKINS = [];
+let TEMPO_SELECIONADO = 60;
+let AC_ATIVO = false;
+let ULTIMO_CRIADO_ID = null;
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
+
+function renderTempos(){
+  document.getElementById('tempos').innerHTML = TEMPOS_VALIDOS.map(t=>
+    `<button type="button" class="toggle-btn ${t===TEMPO_SELECIONADO?'ativo':''}" data-tempo="${t}" onclick="selecionarTempo(${t})">${t}min</button>`
+  ).join('');
+}
+function selecionarTempo(t){ TEMPO_SELECIONADO = t; renderTempos(); atualizarPreviewFim(); }
+function atualizarPreviewFim(){
+  const hora = document.getElementById('f-hora').value;
+  const el = document.getElementById('preview-fim');
+  if(!hora){ el.textContent = '—'; return; }
+  const [h,m] = hora.split(':').map(Number);
+  const total = h*60 + m + TEMPO_SELECIONADO;
+  const hh = String(Math.floor((total%1440)/60)).padStart(2,'0');
+  const mm = String(total%60).padStart(2,'0');
+  el.textContent = `${hh}:${mm}`;
+}
+document.getElementById('f-hora').addEventListener('input', atualizarPreviewFim);
+
+function setAC(ativo){
+  AC_ATIVO = ativo;
+  document.getElementById('ac-nao').classList.toggle('ativo', !ativo);
+  document.getElementById('ac-sim').classList.toggle('ativo', ativo);
+  document.getElementById('wrap-quant-ac').classList.toggle('hidden', !ativo);
+}
+
+let CRIANCA_SEQ = 0;
+function adicionarCrianca(){
+  CRIANCA_SEQ++;
+  const id = 'crianca-' + CRIANCA_SEQ;
+  const div = document.createElement('div');
+  div.className = 'crianca-linha';
+  div.id = id;
+  div.innerHTML = `
+    <div><label style="margin-top:0;">Nome da criança</label><input type="text" class="crianca-nome" required></div>
+    <div><label style="margin-top:0;">Nascimento</label><input type="date" class="crianca-nasc"></div>
+    <button type="button" class="btn-remover-crianca" onclick="document.getElementById('${id}').remove(); atualizarPreviewPulseiras();" title="Remover">✕</button>
+  `;
+  document.getElementById('lista-criancas').appendChild(div);
+  div.querySelector('.crianca-nome').addEventListener('input', atualizarPreviewPulseiras);
+}
+function atualizarPreviewPulseiras(){
+  const n = document.querySelectorAll('.crianca-nome').length &&
+    [...document.querySelectorAll('.crianca-nome')].filter(i=>i.value.trim()).length;
+  document.getElementById('preview-pulseiras').textContent = n || 0;
+}
+function coletarCriancas(){
+  return [...document.querySelectorAll('.crianca-linha')].map(div=>({
+    nome: div.querySelector('.crianca-nome').value.trim(),
+    dataNascimento: div.querySelector('.crianca-nasc').value || null,
+  })).filter(c=>c.nome);
+}
+
+async function carregar(){
+  const lista = await fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]);
+  CHECKINS = lista.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||'')).slice(0,30);
+  renderLista();
+}
+
+function renderLista(){
+  const el = document.getElementById('lista-checkins');
+  if(!CHECKINS.length){ el.innerHTML = '<div class="empty">Nenhum check-in ainda.</div>'; return; }
+  el.innerHTML = CHECKINS.map(c=>{
+    const criancas = (c.criancas||[]).map(cr=>cr.nome).join(', ');
+    return `
+    <div class="card">
+      <div class="linha1">
+        <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtData(c.dataUtilizacao)}</span>
+        <span class="badge ${c.termoAssinado?'liberado':'aguardando'}">${c.termoAssinado?'liberado':'aguardando assinatura'}</span>
+      </div>
+      <div class="sub">${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}</div>
+      <div class="criancas">${escapeHtml(criancas)}</div>
+      <div style="margin-top:8px;">
+        <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
+        ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
+        ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">✕ Excluir</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function marcarAssinadoId(id){
+  await fetch(`/api/parque/checkins/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ termoAssinado:true }) });
+  await carregar();
+}
+async function marcarAssinado(){
+  if(!ULTIMO_CRIADO_ID) return;
+  await marcarAssinadoId(ULTIMO_CRIADO_ID);
+  document.getElementById('painel-termo').classList.add('hidden');
+}
+async function excluirCheckin(id){
+  if(!confirm('Excluir esse check-in?')) return;
+  await fetch(`/api/parque/checkins/${id}`, { method:'DELETE' });
+  await carregar();
+}
+
+function resetarForm(){
+  document.getElementById('form-checkin').reset();
+  document.getElementById('f-data').value = hojeBrasilia();
+  document.getElementById('lista-criancas').innerHTML = '';
+  TEMPO_SELECIONADO = 60;
+  renderTempos();
+  atualizarPreviewFim();
+  setAC(false);
+  atualizarPreviewPulseiras();
+}
+
+document.getElementById('form-checkin').addEventListener('keydown', (ev)=>{
+  if(ev.key !== 'Enter') return;
+  if((ev.target.tagName||'').toUpperCase() === 'TEXTAREA') return;
+  ev.preventDefault();
+});
+
+document.getElementById('form-checkin').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const criancas = coletarCriancas();
+  if(!criancas.length){ alert('Cadastre pelo menos uma criança.'); return; }
+  const btn = document.getElementById('btn-enviar');
+  const msg = document.getElementById('msg');
+  msg.classList.add('hidden');
+  btn.disabled = true;
+  try{
+    const unidade = document.getElementById('f-unidade').value;
+    const payload = {
+      unidade,
+      unidadeNome: UNIDADES_NOMES[unidade] || unidade,
+      responsavel: {
+        nome: document.getElementById('f-nome').value,
+        cpf: document.getElementById('f-cpf').value,
+        contato: document.getElementById('f-contato').value,
+        email: document.getElementById('f-email').value,
+        cep: document.getElementById('f-cep').value,
+        numero: document.getElementById('f-numero').value,
+        complemento: document.getElementById('f-complemento').value,
+      },
+      dataUtilizacao: document.getElementById('f-data').value,
+      tempoMinutos: TEMPO_SELECIONADO,
+      timeInicial: document.getElementById('f-hora').value,
+      observacao: document.getElementById('f-observacao').value,
+      adultoCortesia: AC_ATIVO,
+      quantAC: AC_ATIVO ? document.getElementById('f-quantAC').value : 0,
+      criancas,
+    };
+    const res = await fetch('/api/parque/checkins', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao registrar check-in');
+    msg.textContent = 'Check-in registrado. Imprima o termo de responsabilidade abaixo.'; msg.className = 'msg ok';
+    ULTIMO_CRIADO_ID = data.id;
+    document.getElementById('link-termo').href = `/api/parque/checkins/${data.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}`;
+    document.getElementById('painel-termo').classList.remove('hidden');
+    resetarForm();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
+});
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  const isMaster = ME.role==='master';
+  IS_MASTER = isMaster;
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
+  document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
+
+  if(!secoes.includes('parque-checkin')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+
+  const unidades = isMaster ? Object.keys(PARQUE_UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>PARQUE_UNIDADES_NOMES[u]);
+  const selUnidade = document.getElementById('f-unidade');
+  selUnidade.innerHTML = unidades.length
+    ? unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('')
+    : '<option value="" disabled selected>nenhuma unidade liberada</option>';
+
+  renderTempos();
+  setAC(false);
+  document.getElementById('f-data').value = hojeBrasilia();
+  document.getElementById('f-data').max = hojeBrasilia();
+  adicionarCrianca();
+
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+}
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Parque · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:760px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{position:sticky;top:0;z-index:40;background:var(--bg);margin-left:-12px;margin-right:-12px;margin-top:-16px;padding-left:12px;padding-right:12px;padding-top:16px;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .hidden{display:none!important;}
+  .hamburger-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer-grupo{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:12px 10px 4px;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  .filtros{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:560px){ .filtros{grid-template-columns:1fr 1fr 1fr;} }
+  .filtros-acoes{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .btn-secundario{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;gap:4px;}
+  .btn-secundario:hover{border-color:var(--accent);}
+  .btn-primary{background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+  @media(min-width:520px){ .kpi-grid{grid-template-columns:repeat(4,1fr);} }
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .kpi .val{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .kpi .lbl{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+  .grupo-data{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px;}
+  .grupo-data:first-child{margin-top:0;}
+  .card{border-top:1px solid var(--line);padding:12px 0;}
+  .card:first-child{border-top:none;padding-top:0;}
+  .card .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+  .card .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px;word-break:break-word;}
+  .card .criancas{font-size:12px;color:var(--muted);margin-top:6px;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.aguardando{background:var(--warn-dim);color:var(--warn);}
+  .badge.liberado{background:var(--ok-dim);color:var(--ok);}
+  .badge.dentro{background:var(--ok-dim);color:var(--ok);}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);margin-right:12px;margin-top:8px;}
+  .agora-linha{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;}
+  .agora-linha:first-child{border-top:none;}
+  .agora-linha .tempo-restante{font-family:var(--mono);color:var(--ok);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet-wrap{position:relative;width:100%;max-width:640px;}
+  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:0 10px;}
+  @media(min-width:440px){ .grid2{grid-template-columns:1fr 1fr;} }
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+    <div>
+      <div class="eyebrow">Zenith Ops · Saltiverso Patteo</div>
+      <h1>Parque</h1>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <button class="back" onclick="logout()">🚪 Sair</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <div class="nav-drawer-grupo">Operação diária</div>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <div class="nav-drawer-grupo">Monitoramento</div>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back active" id="nav-parque-self" href="/parque.html">🤸 Parque (painel)</a>
+  <div class="nav-drawer-grupo">Solicitações</div>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <div class="nav-drawer-grupo">Administração</div>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao painel do Parque. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<div class="panel">
+  <h2>Filtros</h2>
+  <div class="filtros">
+    <div><label>Unidade</label><select id="f-unidade"><option value="">Todas</option></select></div>
+    <div><label>De</label><input type="date" id="f-de"></div>
+    <div><label>Até</label><input type="date" id="f-ate"></div>
+  </div>
+  <div class="filtros-acoes">
+    <button type="button" class="btn-primary" onclick="renderTudo()">Aplicar</button>
+    <a class="btn-secundario" id="link-csv" href="#">⬇️ CSV</a>
+    <a class="btn-secundario" id="link-pdf" href="#">⬇️ PDF</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="val" id="kpi-checkins">0</div><div class="lbl">check-ins no período</div></div>
+    <div class="kpi"><div class="val" id="kpi-criancas">0</div><div class="lbl">crianças</div></div>
+    <div class="kpi"><div class="val" id="kpi-ac">0</div><div class="lbl">adultos cortesia</div></div>
+    <div class="kpi"><div class="val" id="kpi-aguardando">0</div><div class="lbl">aguardando termo</div></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Quem está no parque agora</h2>
+  <div id="lista-agora"><div class="empty">carregando...</div></div>
+</div>
+
+<div class="panel">
+  <h2>Check-ins</h2>
+  <div id="lista-checkins"><div class="empty">carregando...</div></div>
+</div>
+
+</div>
+
+<div class="overlay hidden" id="overlay-master">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharMaster()">✕</span>
+    <div class="sheet">
+    <h3>Editar check-in (Master)</h3>
+    <div class="sub" id="master-info"></div>
+    <form id="form-master">
+      <label>Nome do responsável</label>
+      <input type="text" id="m-nome">
+      <div class="grid2">
+        <div><label>Contato</label><input type="text" id="m-contato"></div>
+        <div><label>Data</label><input type="date" id="m-data"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Horário inicial</label><input type="time" id="m-hora"></div>
+        <div><label>Tempo (min)</label><input type="number" step="1" id="m-tempo"></div>
+      </div>
+      <label>Observação</label>
+      <textarea id="m-observacao"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);margin-top:12px;">
+        <input type="checkbox" id="m-termo" style="width:auto;"> Termo de responsabilidade assinado
+      </label>
+      <div class="msg hidden" id="msg-master"></div>
+      <button class="btn-primary" type="submit" style="width:100%;margin-top:14px;">Salvar alterações</button>
+    </form>
+    </div>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+const PARQUE_UNIDADES_NOMES = { 'Saltiverso Patteo': 'Saltiverso Patteo' };
+
+let ME = null;
+let IS_MASTER = false;
+let UNIDADES_NOMES = { ...PARQUE_UNIDADES_NOMES };
+let TODOS = [];
+let EDITANDO_ID = null;
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+const FUSO_BR = 'America/Sao_Paulo';
+function agoraBrasilia(){
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+  }).formatToParts(new Date());
+  const o = {}; partes.forEach(p=>{ if(p.type!=='literal') o[p.type]=p.value; });
+  const hora = o.hour==='24' ? '00' : o.hour;
+  return new Date(`${o.year}-${o.month}-${o.day}T${hora}:${o.minute}:${o.second}`);
+}
+function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
+function horaBrasilia(d){ return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`; }
+
+async function carregar(){
+  TODOS = await fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]);
+  renderTudo();
+}
+
+function checkinsFiltrados(){
+  const unidade = document.getElementById('f-unidade').value;
+  const de = document.getElementById('f-de').value;
+  const ate = document.getElementById('f-ate').value;
+  return TODOS.filter(c=>{
+    if(unidade && c.unidade !== unidade) return false;
+    if(de && c.dataUtilizacao < de) return false;
+    if(ate && c.dataUtilizacao > ate) return false;
+    return true;
+  }).sort((a,b)=> (b.dataUtilizacao+b.timeInicial).localeCompare(a.dataUtilizacao+a.timeInicial));
+}
+
+function renderAgora(){
+  const hoje = hojeBrasilia();
+  const agora = horaBrasilia(agoraBrasilia());
+  const dentro = TODOS.filter(c=>c.dataUtilizacao===hoje && c.timeInicial<=agora && c.timeFinal>=agora && c.termoAssinado);
+  const el = document.getElementById('lista-agora');
+  if(!dentro.length){ el.innerHTML = '<div class="empty">Ninguém no parque agora.</div>'; return; }
+  el.innerHTML = dentro.map(c=>{
+    const [hh,mm] = c.timeFinal.split(':').map(Number);
+    const fimMin = hh*60+mm;
+    const [ah,am] = agora.split(':').map(Number);
+    const restante = Math.max(0, fimMin - (ah*60+am));
+    return `<div class="agora-linha">
+      <span>${escapeHtml(c.responsavel?.nome||'')} · ${c.criancas?.length||0} criança(s)</span>
+      <span class="tempo-restante">${restante} min restantes</span>
+    </div>`;
+  }).join('');
+}
+
+function renderLista(lista){
+  const el = document.getElementById('lista-checkins');
+  if(!lista.length){ el.innerHTML = '<div class="empty">Nenhum check-in no período.</div>'; return; }
+  let html = '';
+  let dataAtual = null;
+  let contDia = 0;
+  const porData = {};
+  lista.forEach(c=>{ (porData[c.dataUtilizacao] = porData[c.dataUtilizacao]||[]).push(c); });
+  Object.keys(porData).sort().reverse().forEach(data=>{
+    const grupo = porData[data];
+    html += `<div class="grupo-data">${fmtData(data)} · ${grupo.length} check-in(s)</div>`;
+    html += grupo.map(c=>{
+      const criancas = (c.criancas||[]).map(cr=>cr.nome).join(', ');
+      return `
+      <div class="card">
+        <div class="linha1">
+          <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)}</span>
+          <span class="badge ${c.termoAssinado?'liberado':'aguardando'}">${c.termoAssinado?'liberado':'aguardando assinatura'}</span>
+        </div>
+        <div class="sub">${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}</div>
+        <div class="criancas">${escapeHtml(criancas)}</div>
+        <div>
+          <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
+          ${IS_MASTER?`<button type="button" class="link-btn" onclick="abrirMaster('${c.id}')">✎ Editar</button>`:''}
+          ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">✕ Excluir</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  });
+  el.innerHTML = html;
+}
+
+function renderKpis(lista){
+  document.getElementById('kpi-checkins').textContent = lista.length;
+  document.getElementById('kpi-criancas').textContent = lista.reduce((s,c)=>s+(c.criancas?.length||0),0);
+  document.getElementById('kpi-ac').textContent = lista.reduce((s,c)=>s+(c.adultoCortesia?(c.quantAC||0):0),0);
+  document.getElementById('kpi-aguardando').textContent = lista.filter(c=>!c.termoAssinado).length;
+}
+
+function atualizarLinksExport(){
+  const unidade = document.getElementById('f-unidade').value;
+  const de = document.getElementById('f-de').value;
+  const ate = document.getElementById('f-ate').value;
+  const params = new URLSearchParams({ token: AUTH_TOKEN });
+  if(unidade) params.set('unidade', unidade);
+  if(de) params.set('inicio', de);
+  if(ate) params.set('fim', ate);
+  document.getElementById('link-csv').href = '/api/parque/relatorio.csv?'+params.toString();
+  document.getElementById('link-pdf').href = '/api/parque/relatorio.pdf?'+params.toString();
+}
+
+function renderTudo(){
+  const lista = checkinsFiltrados();
+  renderKpis(lista);
+  renderLista(lista);
+  renderAgora();
+  atualizarLinksExport();
+}
+
+async function excluirCheckin(id){
+  if(!confirm('Excluir esse check-in?')) return;
+  await fetch(`/api/parque/checkins/${id}`, { method:'DELETE' });
+  await carregar();
+}
+
+function abrirMaster(id){
+  EDITANDO_ID = id;
+  const c = TODOS.find(x=>x.id===id);
+  document.getElementById('master-info').textContent = `${c.responsavel?.nome||''} · ${c.unidadeNome||c.unidade} · ${fmtData(c.dataUtilizacao)}`;
+  document.getElementById('m-nome').value = c.responsavel?.nome || '';
+  document.getElementById('m-contato').value = c.responsavel?.contato || '';
+  document.getElementById('m-data').value = c.dataUtilizacao || '';
+  document.getElementById('m-hora').value = (c.timeInicial||'').slice(0,5);
+  document.getElementById('m-tempo').value = c.tempoMinutos || 60;
+  document.getElementById('m-observacao').value = c.observacao || '';
+  document.getElementById('m-termo').checked = !!c.termoAssinado;
+  document.getElementById('msg-master').classList.add('hidden');
+  document.getElementById('overlay-master').classList.remove('hidden');
+}
+function fecharMaster(){ document.getElementById('overlay-master').classList.add('hidden'); EDITANDO_ID=null; }
+
+document.getElementById('form-master').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-master');
+  msg.classList.add('hidden');
+  try{
+    const patch = {
+      responsavel: { nome: document.getElementById('m-nome').value, contato: document.getElementById('m-contato').value },
+      dataUtilizacao: document.getElementById('m-data').value,
+      timeInicial: document.getElementById('m-hora').value,
+      tempoMinutos: Number(document.getElementById('m-tempo').value),
+      observacao: document.getElementById('m-observacao').value,
+      termoAssinado: document.getElementById('m-termo').checked,
+    };
+    const res = await fetch(`/api/parque/checkins/${EDITANDO_ID}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao salvar');
+    fecharMaster();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  const isMaster = ME.role==='master';
+  IS_MASTER = isMaster;
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
+  document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
+  document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
+  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !secoes.includes('entregas-lancamento'));
+  document.getElementById('nav-fechamentos').classList.toggle('hidden', !secoes.includes('fechamentos'));
+  document.getElementById('nav-entregas').classList.toggle('hidden', !secoes.includes('entregas'));
+  document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
+  document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
+  document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
+  document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
+  document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
+  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
+
+  if(!secoes.includes('parque')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+
+  const unidades = isMaster ? Object.keys(PARQUE_UNIDADES_NOMES) : (ME.permissions?.unidades||[]).filter(u=>PARQUE_UNIDADES_NOMES[u]);
+  const selUnidade = document.getElementById('f-unidade');
+  selUnidade.innerHTML = '<option value="">Todas</option>' + unidades.map(u=>`<option value="${escapeHtml(u)}">${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('');
+
+  const hoje = hojeBrasilia();
+  document.getElementById('f-de').value = hoje.slice(0,8)+'01';
+  document.getElementById('f-ate').value = hoje;
+
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+  setInterval(renderAgora, 30000);
+}
+
+boot();
+</script>
+</body>
+</html>

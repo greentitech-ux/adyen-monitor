@@ -119,10 +119,13 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
   <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
@@ -457,6 +460,29 @@ async function cardIfood(){
   </div>`);
 }
 
+async function cardParque(){
+  const hoje = hojeBrasilia();
+  const [checkins, festas] = await Promise.all([
+    fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]),
+    fetch('/api/festas').then(r=>r.json()).catch(()=>[]),
+  ]);
+  const doDia = checkins.filter(c=>c.dataUtilizacao===hoje);
+  const criancas = doDia.reduce((s,c)=>s+(c.criancas?.length||0),0);
+  const aguardando = doDia.filter(c=>!c.termoAssinado).length;
+  const inicioSemana = new Date(hoje+'T00:00:00');
+  const fimSemana = new Date(inicioSemana); fimSemana.setDate(fimSemana.getDate()+7);
+  const festasSemana = festas.filter(f=>{
+    const d = new Date((f.dataDeUso||'')+'T00:00:00');
+    return d >= inicioSemana && d <= fimSemana && f.status !== 'cancelado';
+  });
+  return pcardWrap('🤸','Saltiverso (hoje)','/parque.html', `<div class="pstats">
+    ${statRow('Check-ins hoje', doDia.length)}
+    ${statRow('Crianças', criancas)}
+    ${statRow('Aguardando termo', aguardando, aguardando ? 'warn' : '')}
+    ${statRow('Festas nos próx. 7 dias', festasSemana.length)}
+  </div>`);
+}
+
 const CARDS_POR_SECAO = [
   { secao:'monitor', build:cardMonitor },
   { secao:'fechamentos', build:cardFechamentos },
@@ -464,6 +490,7 @@ const CARDS_POR_SECAO = [
   { secao:'solicitacoes', build:cardCentral },
   { secao:'tecnico', build:cardChamados },
   { secao:'ifood', build:cardIfood },
+  { secao:'parque', build:cardParque },
 ];
 
 async function boot(){
@@ -474,7 +501,7 @@ async function boot(){
   ME_GLOBAL = ME;
   IS_MASTER_GLOBAL = isMaster;
   IS_ADMIN_GLOBAL = !!ME.isAdmin;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
   if(secoes.includes('solicitacoes')) iniciarNotificacoesCentral();
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
@@ -485,6 +512,7 @@ async function boot(){
   document.getElementById('nav-cofre').classList.toggle('hidden', !secoes.includes('cofre'));
   document.getElementById('nav-relatorios').classList.toggle('hidden', !secoes.includes('disputas'));
   document.getElementById('nav-ifood').classList.toggle('hidden', !secoes.includes('ifood'));
+  document.getElementById('nav-parque').classList.toggle('hidden', !secoes.includes('parque'));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-historico').classList.toggle('hidden', !secoes.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !secoes.includes('tecnico'));
@@ -492,6 +520,8 @@ async function boot(){
   document.getElementById('nav-grupos').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !isMaster);
   document.getElementById('nav-inventario').classList.toggle('hidden', !secoes.includes('inventario'));
+  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !secoes.includes('parque-checkin'));
+  document.getElementById('nav-festas').classList.toggle('hidden', !secoes.includes('festas'));
 
   const aplicaveis = CARDS_POR_SECAO.filter(c=>secoes.includes(c.secao));
   document.getElementById('painel-loading').classList.add('hidden');
