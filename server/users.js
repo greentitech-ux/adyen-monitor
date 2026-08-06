@@ -22,6 +22,20 @@ function sanitizePermissions(input) {
 }
 
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const USERNAME_RE = /^[a-z0-9._-]{2,30}$/;
+
+function sanitizeUsername(raw) {
+  const u = String(raw || '').trim().toLowerCase();
+  if (!u) return '';
+  if (!USERNAME_RE.test(u)) throw new Error('Usuário inválido. Use só letras minúsculas, números, ponto, hífen ou underline (2 a 30 caracteres).');
+  return u;
+}
+
+async function garantirUsernameLivre(username, idAtual) {
+  if (!username) return;
+  const existing = await usersRef.where('username', '==', username).limit(1).get();
+  if (!existing.empty && existing.docs[0].id !== idAtual) throw new Error('Já existe um acesso com esse usuário.');
+}
 
 function sanitizeHorarioPermitido(input) {
   const h = input || {};
@@ -45,7 +59,7 @@ async function listUncached() {
 const usersCache = createCache(listUncached, 20 * 1000);
 const list = usersCache.cached;
 
-async function create({ email, password, permissions }) {
+async function create({ email, password, permissions, username }) {
   email = String(email || '').trim().toLowerCase();
   if (!email || !password) throw new Error('Email e senha são obrigatórios.');
   if (password.length < 8) throw new Error('A senha deve ter pelo menos 8 caracteres.');
@@ -53,17 +67,57 @@ async function create({ email, password, permissions }) {
   const existing = await usersRef.where('email', '==', email).limit(1).get();
   if (!existing.empty) throw new Error('Já existe um acesso com esse email.');
 
+  const usernameOk = sanitizeUsername(username);
+  await garantirUsernameLivre(usernameOk, null);
+
   const passwordHash = await bcrypt.hash(password, 12);
   const doc = await usersRef.add({
     email,
+    username: usernameOk || null,
     passwordHash,
     role: 'user',
     active: true,
+    // senha definida pelo Master na hora de criar o acesso - pede pra
+    // trocar no primeiro login, ja que ele avisa a senha por fora do app
+    precisaTrocarSenha: true,
     permissions: sanitizePermissions(permissions),
     createdAt: new Date().toISOString(),
   });
   usersCache.invalidar();
   return toPublic(await doc.get());
+}
+
+async function updateUsername(id, username) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  const usernameOk = sanitizeUsername(username);
+  await garantirUsernameLivre(usernameOk, id);
+  await ref.update({ username: usernameOk || null });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
+// atualizacao em massa: recebe uma lista [{email, username}] (ex: colada
+// pelo Master a partir de uma planilha) e aplica uma a uma, sem parar no
+// primeiro erro - devolve o resultado de cada linha pra revisao
+async function updateUsernamesEmMassa(itens) {
+  const lista = Array.isArray(itens) ? itens : [];
+  const resultados = [];
+  for (const item of lista) {
+    const email = String((item && item.email) || '').trim().toLowerCase();
+    try {
+      if (!email) throw new Error('Email em branco.');
+      const snap = await usersRef.where('email', '==', email).limit(1).get();
+      if (snap.empty) throw new Error('Nenhum acesso com esse email.');
+      await updateUsername(snap.docs[0].id, item.username);
+      resultados.push({ email, username: sanitizeUsername(item.username), ok: true });
+    } catch (err) {
+      resultados.push({ email, ok: false, erro: err.message });
+    }
+  }
+  return resultados;
 }
 
 async function updatePermissions(id, permissions) {
@@ -150,13 +204,40 @@ async function resetPassword(id, password) {
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Acesso não encontrado.');
   const passwordHash = await bcrypt.hash(password, 12);
-  // o Master trocando a senha tambem desbloqueia o acesso (ex: apos 3 tentativas erradas)
-  await ref.update({ passwordHash, locked: false, failedAttempts: 0 });
+  // o Master trocando a senha tambem desbloqueia o acesso (ex: apos 3
+  // tentativas erradas) e pede pra trocar no proximo login, ja que essa
+  // senha nova foi avisada ao usuario por fora do app (telefone/whatsapp)
+  await ref.update({
+    passwordHash, locked: false, failedAttempts: 0, precisaTrocarSenha: true,
+  });
   invalidarUsuario(id);
   usersCache.invalidar();
   // senha nova invalida os locais logados com a antiga - sem isso os tokens
   // ja emitidos continuariam valendo ate as 8h expirarem sozinhas
   await sessions.encerrarTodasDoUsuario(id);
+  return { ok: true };
+}
+
+// self-service: o proprio usuario troca a senha (fluxo voluntario, ou
+// forcado no primeiro login apos um reset do Master) - exige a senha atual
+// pra confirmar que e realmente o dono do acesso
+async function alterarSenhaPropria(id, senhaAtual, novaSenha, sessionIdAtual) {
+  if (!novaSenha || novaSenha.length < 8) throw new Error('A nova senha deve ter pelo menos 8 caracteres.');
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  const atual = snap.data();
+  const ok = await bcrypt.compare(String(senhaAtual || ''), atual.passwordHash);
+  if (!ok) throw new Error('Senha atual incorreta.');
+
+  const passwordHash = await bcrypt.hash(novaSenha, 12);
+  await ref.update({ passwordHash, precisaTrocarSenha: false });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  // derruba os OUTROS locais logados com a senha antiga, mas preserva a
+  // sessao atual (o usuario acabou de trocar a propria senha, nao faz
+  // sentido deslogar ele mesmo do dispositivo em que esta agora)
+  await sessions.encerrarTodasDoUsuarioExceto(id, sessionIdAtual);
   return { ok: true };
 }
 
@@ -175,9 +256,11 @@ function toPublic(doc) {
   return {
     id: doc.id,
     email: data.email,
+    username: data.username || null,
     role: data.role,
     active: data.active !== false,
     locked: !!data.locked,
+    precisaTrocarSenha: !!data.precisaTrocarSenha,
     permissions: data.role === 'master' ? null : data.permissions || emptyPermissions(),
     horarioPermitido: data.role === 'master' ? null : data.horarioPermitido || { ativo: false, inicio: '', fim: '' },
     isAdmin: data.role === 'master' ? null : !!data.isAdmin,
@@ -187,4 +270,19 @@ function toPublic(doc) {
   };
 }
 
-module.exports = { VALID_SECTIONS, list, create, updatePermissions, setActive, updateHorarioPermitido, updateIsAdmin, updatePodeCatalogoEstoque, updateCargo, resetPassword, remove };
+module.exports = {
+  VALID_SECTIONS,
+  list,
+  create,
+  updatePermissions,
+  setActive,
+  updateHorarioPermitido,
+  updateIsAdmin,
+  updatePodeCatalogoEstoque,
+  updateCargo,
+  updateUsername,
+  updateUsernamesEmMassa,
+  resetPassword,
+  alterarSenhaPropria,
+  remove,
+};
