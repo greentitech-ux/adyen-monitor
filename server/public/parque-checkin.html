@@ -173,8 +173,10 @@
       <input type="date" id="f-data" required>
       <label>Tempo contratado</label>
       <div class="toggle-grupo" id="tempos"></div>
-      <div class="resumo">
-        <div class="linha"><span>Horário</span><b>Definido no momento do check-in</b></div>
+      <label>Horário previsto de entrada</label>
+      <input type="time" id="f-horario-previsto" required>
+      <div class="sub" style="font-family:var(--sans);color:var(--muted);font-size:12px;margin-top:-2px;">
+        Se a pessoa chegar antes, o check-in continua manual normalmente (botão <b>Fazer check-in</b>). Se ninguém fizer o check-in até esse horário, o sistema inicia sozinho e avisa a equipe.
       </div>
     </div>
 
@@ -309,6 +311,7 @@ function agoraBrasilia(){
 }
 function isoLocalBR(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
+function horaCurtaBrasilia(d){ return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
 function renderTempos(){
   document.getElementById('tempos').innerHTML = TEMPOS_VALIDOS.map(t=>
@@ -409,7 +412,9 @@ function renderLista(){
   el.innerHTML = CHECKINS.map(c=>{
     const criancas = (c.criancas||[]).map(cr=>cr.nome).join(', ');
     const status = statusCheckin(c);
-    const horario = c.iniciado ? `${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)}` : `${c.tempoMinutos}min · horário definido no check-in`;
+    const horario = c.iniciado
+      ? `${(c.timeInicial||'').slice(0,5)} às ${(c.timeFinal||'').slice(0,5)}${c.autoCheckin?' · 🤖 automático':''}`
+      : `${c.tempoMinutos}min · previsto ${(c.horarioPrevisto||'').slice(0,5) || '—'}`;
     return `
     <div class="card">
       <div class="linha1">
@@ -469,6 +474,7 @@ async function fazerCheckinUltimo(){
 function resetarForm(){
   document.getElementById('form-checkin').reset();
   document.getElementById('f-data').value = hojeBrasilia();
+  document.getElementById('f-horario-previsto').value = horaCurtaBrasilia(agoraBrasilia());
   document.getElementById('lista-criancas').innerHTML = '';
   TEMPO_SELECIONADO = 60;
   renderTempos();
@@ -508,6 +514,7 @@ document.getElementById('form-checkin').addEventListener('submit', async (ev)=>{
       },
       dataUtilizacao: document.getElementById('f-data').value,
       tempoMinutos: TEMPO_SELECIONADO,
+      horarioPrevisto: document.getElementById('f-horario-previsto').value,
       observacao: document.getElementById('f-observacao').value,
       adultoCortesia: AC_ATIVO,
       quantAC: AC_ATIVO ? document.getElementById('f-quantAC').value : 0,
@@ -572,10 +579,15 @@ async function boot(){
   setAC(false);
   document.getElementById('f-data').value = hojeBrasilia();
   document.getElementById('f-data').max = hojeBrasilia();
+  document.getElementById('f-horario-previsto').value = horaCurtaBrasilia(agoraBrasilia());
   adicionarCrianca();
 
   document.getElementById('root').classList.remove('hidden');
   await carregar();
+  // recarrega periodicamente pra refletir os check-ins automaticos que o
+  // servidor dispara sozinho quando o horario previsto vence (ver
+  // rodarAutoCheckins em parque.js) - essa tela nao tem SSE proprio
+  setInterval(carregar, 30000);
 }
 
 boot();

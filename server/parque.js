@@ -44,6 +44,17 @@ function horaAgoraBrasilia() {
   return `${hora}:${o.minute}:${o.second}`;
 }
 
+// data de hoje em Brasilia, no formato YYYY-MM-DD - usada pela varredura de
+// auto check-in pra so mexer em registros do dia
+function hojeBrasiliaISO() {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSO_BR, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const o = {};
+  partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
 function sanitizarCriancas(lista) {
   if (!Array.isArray(lista)) return [];
   return lista
@@ -73,7 +84,7 @@ function validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, cr
 
 async function criar({
   unidade, unidadeNome, colaboradorId, colaboradorNome,
-  responsavel, dataUtilizacao, tempoMinutos, timeInicial,
+  responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto,
   observacao, adultoCortesia, quantAC, criancas, usou,
   criadoPorId, criadoPorEmail,
 }) {
@@ -82,6 +93,12 @@ async function criar({
   // antiga, que ja tem o horario real de visitas que ja aconteceram) - no
   // fluxo normal do formulario isso fica em branco ate o check-in
   const inicio = timeInicial ? validarHora(timeInicial, 'o horário inicial') : null;
+  // horario previsto: definido na hora da venda ("a pessoa pretende entrar
+  // as X"). Se o check-in manual (botao "Fazer check-in") acontecer antes
+  // desse horario, tudo bem, o relogio comeca no horario real do check-in
+  // normalmente. Se ninguem fizer o check-in ate esse horario, o sistema
+  // inicia sozinho NESSE horario e avisa a equipe (ver rodarAutoCheckins)
+  const previsto = horarioPrevisto ? validarHora(horarioPrevisto, 'o horário previsto') : null;
   const ref = COLLECTION.doc();
   const registro = {
     id: ref.id,
@@ -104,6 +121,8 @@ async function criar({
     timeInicial: inicio,
     timeFinal: inicio ? somarMinutos(inicio, tempo) : null,
     iniciado: !!inicio,
+    horarioPrevisto: previsto,
+    autoCheckin: false, // vira true so se o check-in for disparado pela varredura (ver rodarAutoCheckins)
     observacao: String(observacao || '').slice(0, 300),
     adultoCortesia: adultoCortesia === true,
     quantAC: adultoCortesia === true ? Math.max(0, Math.min(10, num(quantAC) || 1)) : 0,
@@ -200,11 +219,43 @@ async function atualizar(id, patch) {
   }
   if (patch.usou !== undefined) merge.usou = patch.usou === true;
   if (patch.termoAssinado !== undefined) merge.termoAssinado = patch.termoAssinado === true;
+  if (patch.horarioPrevisto !== undefined) {
+    merge.horarioPrevisto = patch.horarioPrevisto ? validarHora(patch.horarioPrevisto, 'o horário previsto') : null;
+  }
 
   merge.atualizadoEm = new Date().toISOString();
   await ref.update(merge);
   parqueCache.invalidar();
   return getOne(id);
+}
+
+// varredura periodica (ver index.js): pra cada check-in do dia que ainda nao
+// foi feito manualmente e ja passou do horarioPrevisto, inicia o relogio
+// sozinha NESSE horario (nao no horario em que a varredura rodou, pra nao
+// prejudicar o tempo contratado por atraso do job) e marca autoCheckin=true
+// pra equipe saber que ninguem confirmou a entrada fisica
+async function rodarAutoCheckins() {
+  const hoje = hojeBrasiliaISO();
+  const agora = horaAgoraBrasilia();
+  const snap = await COLLECTION.where('iniciado', '==', false).get();
+  const feitos = [];
+  for (const doc of snap.docs) {
+    const c = doc.data();
+    if (!c.horarioPrevisto || c.dataUtilizacao !== hoje) continue;
+    if (c.horarioPrevisto > agora) continue;
+    const merge = {
+      timeInicial: c.horarioPrevisto,
+      timeFinal: somarMinutos(c.horarioPrevisto, c.tempoMinutos),
+      iniciado: true,
+      autoCheckin: true,
+      checkinEm: new Date().toISOString(),
+    };
+    // eslint-disable-next-line no-await-in-loop
+    await doc.ref.update(merge);
+    feitos.push({ ...c, ...merge });
+  }
+  if (feitos.length) parqueCache.invalidar();
+  return feitos;
 }
 
 async function remover(id) {
@@ -231,4 +282,4 @@ async function buscarPorCpf(cpf) {
   return encontrados[0];
 }
 
-module.exports = { TEMPOS_VALIDOS, criar, checkin, listAll, listByUnidades, getOne, atualizar, remover, buscarPorCpf, invalidar: () => parqueCache.invalidar() };
+module.exports = { TEMPOS_VALIDOS, criar, checkin, listAll, listByUnidades, getOne, atualizar, remover, buscarPorCpf, rodarAutoCheckins, invalidar: () => parqueCache.invalidar() };

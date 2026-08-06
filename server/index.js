@@ -2208,12 +2208,12 @@ app.get('/api/inventario/relatorio.:formato(csv|pdf)', requireSection('inventari
 // padrao entregas/entregas-lancamento) + uma secao de festas ----------
 app.post('/api/parque/checkins', requireSection('parque-checkin'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, observacao, adultoCortesia, quantAC, criancas, usou } = req.body;
+    const { unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto, observacao, adultoCortesia, quantAC, criancas, usou } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
     const registro = await parque.criar({
-      unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, observacao, adultoCortesia, quantAC, criancas, usou,
+      unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto, observacao, adultoCortesia, quantAC, criancas, usou,
       colaboradorId: req.user.id, colaboradorNome: req.user.email,
       criadoPorId: req.user.id, criadoPorEmail: req.user.email,
     });
@@ -3656,5 +3656,27 @@ app.use((err, req, res, next) => {
     setInterval(() => {
       ifoodSync.sincronizarVendasIfood().catch((err) => console.error('Erro ao sincronizar vendas do iFood:', err.message));
     }, intervaloIfood);
+
+    // varredura do check-in automatico do Saltiverso: pra cada check-in do
+    // dia com horarioPrevisto ja vencido e que ninguem confirmou na mao, o
+    // relogio comeca sozinho nesse horario e a equipe recebe um aviso (nao
+    // foi uma entrada fisica confirmada). Roda a cada 1 minuto.
+    const rodarAutoCheckinsParque = async () => {
+      const feitos = await parque.rodarAutoCheckins();
+      for (const c of feitos) {
+        broadcast('parque-checkin-automatico', c, 'parque');
+        broadcast('parque-checkin-automatico', c, 'parque-checkin');
+        push.notifyParqueAutoCheckin(
+          'Check-in automático',
+          `${c.responsavel?.nome || 'Cliente'} · ${c.unidadeNome || c.unidade} · ${(c.timeInicial || '').slice(0, 5)} - ninguém confirmou a entrada, verifique.`,
+          `parque-auto-${c.id}`,
+          c.unidade,
+        ).catch((err) => console.error('Erro ao notificar check-in automático:', err.message));
+      }
+    };
+    rodarAutoCheckinsParque().catch((err) => console.error('Erro na varredura de check-in automático:', err.message));
+    setInterval(() => {
+      rodarAutoCheckinsParque().catch((err) => console.error('Erro na varredura de check-in automático:', err.message));
+    }, 60 * 1000);
   });
 })();
