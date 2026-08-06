@@ -40,6 +40,14 @@ function podeReceber(sub, { unidade, section }) {
   return true;
 }
 
+// Master/Admin, independente de secao/unidade (mesma checagem que o Painel
+// ja usa pra decidir quem ve o toast+som de solicitacao nova - ver
+// mostrarNotificacaoSolicitacao em painel.html)
+function podeReceberSolicitacao(sub) {
+  const meta = sub.meta;
+  return !!meta && (meta.isMaster || meta.isAdmin);
+}
+
 async function removeSubscription(endpoint) {
   await COLLECTION.doc(subDocId(endpoint)).delete();
 }
@@ -106,4 +114,27 @@ async function notifyRaw(title, body, tag, unidade) {
   await sendToAll({ title, body, tag }, { unidade, section: 'monitor' });
 }
 
-module.exports = { addSubscription, removeSubscription, notify, notifyRaw, PUBLIC_KEY };
+// solicitacao nova na Central (estorno, ajuste de fechamento, pagamento,
+// suporte de TI etc.) - vai so pra Master/Admin, que sao quem decide essas
+// filas (mesmo publico do toast+som ja existente no Painel)
+async function notifySolicitacao(title, body, tag) {
+  if (!PUBLIC_KEY || !PRIVATE_KEY) return;
+  const payload = JSON.stringify({ title, body, tag });
+  const subs = await loadSubs();
+  for (const sub of subs) {
+    if (!podeReceberSolicitacao(sub)) continue;
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        await removeSubscription(sub.endpoint);
+      } else {
+        console.error('Erro ao enviar push (solicitação):', err.message);
+      }
+    }
+  }
+}
+
+module.exports = {
+  addSubscription, removeSubscription, notify, notifyRaw, notifySolicitacao, PUBLIC_KEY,
+};

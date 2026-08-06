@@ -213,6 +213,7 @@ app.post('/api/refund-requests/publico', upload.array('anexos', 5), async (req, 
       bandeira, ultimos4, dataVenda, horaVenda, valorEstornar, nomeCliente, telefoneCliente, anexos,
     });
     broadcast('refund-requested', registro, 'monitor');
+    push.notifySolicitacao('Pedido de estorno (cliente)', `${unidadeNome} · R$ ${(Number(valorEstornar) || 0).toFixed(2)}`, registro.id);
     res.json({ ok: true, id: registro.id });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -241,6 +242,7 @@ app.post('/api/bot/solicitacoes', async (req, res) => {
       direcionadoParaEmail: null,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
+    push.notifySolicitacao('Nova solicitação (robô de cobranças)', `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1097,6 +1099,7 @@ app.post('/api/push/subscribe', async (req, res) => {
   await push.addSubscription(req.body, {
     userId: req.user.id,
     isMaster: req.isMaster,
+    isAdmin: req.isAdmin,
     unidades: req.isMaster ? null : (req.permissions.unidades || []),
     sections: req.isMaster ? null : (req.permissions.sections || []),
   });
@@ -1318,6 +1321,7 @@ app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => 
     });
     broadcast('refund-requested', registro, 'monitor');
     broadcast('refund-requested', registro, 'solicitacoes');
+    push.notifySolicitacao('Pedido de estorno', `${req.user.email} · ${unidade || ''}`, registro.id);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2444,6 +2448,7 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
     });
     broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
     broadcast('fechamento-edicao-solicitada', pedido, 'solicitacoes');
+    push.notifySolicitacao('Correção de fechamento solicitada', `${req.user.email} · ${payload.tipoCorrecao || ''}`, pedido.id);
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2580,6 +2585,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       direcionadoParaEmail,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
+    push.notifySolicitacao('Nova solicitação', `${req.user.email} · ${registro.titulo || tipo || ''}`, registro.id);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });

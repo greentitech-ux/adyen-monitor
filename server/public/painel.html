@@ -49,6 +49,7 @@
   .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s ease,color .15s ease;}
   .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-notif.on{border-color:#234a3a;background:var(--ok-dim);color:var(--ok);}
   .btn-sair{color:var(--bad);}
   .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
   .hidden{display:none!important;}
@@ -112,6 +113,7 @@
   </div>
   <div class="header-nav">
     <div class="nav-actions">
+      <button class="btn-notif" id="btn-notif" onclick="toggleNotifications()" title="Ativar notificações push">🔔</button>
       <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
       <div class="nav-divider"></div>
       <button class="btn-notif btn-sair" onclick="logout()" title="Sair" style="cursor:pointer;">🚪</button>
@@ -237,6 +239,61 @@ document.getElementById('ts-form').addEventListener('submit', async (e)=>{
     btn.disabled = false; btn.textContent = 'Salvar';
   }
 });
+
+// ---------- notificacao push de verdade (vibra/som/pop-up mesmo com o
+// celular bloqueado no bolso) - reaproveita o service worker e as rotas
+// /api/push/* ja usados em monitor.html (fraude/estorno/chargeback), so que
+// aqui cobre os avisos de solicitacao nova da Central que o Painel ja mostra
+// como toast+som quando a aba esta aberta (ver iniciarNotificacoesCentral
+// acima) - a notificacao push e o mesmo aviso, so que chega mesmo com o
+// app fechado/celular bloqueado ----------
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+function updateNotifBtn(on){
+  const btn = document.getElementById('btn-notif');
+  btn.classList.toggle('on', on);
+  btn.title = on ? 'Notificações ativadas' : 'Ativar notificações push';
+}
+async function toggleNotifications(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Seu navegador não suporta notificações push.');
+    return;
+  }
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  const existing = await reg.pushManager.getSubscription();
+
+  if (existing) {
+    await fetch('/api/push/unsubscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: existing.endpoint }) });
+    await existing.unsubscribe();
+    updateNotifBtn(false);
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') { alert('Permissão de notificação negada.'); return; }
+
+  const { publicKey } = await fetch('/api/push/vapid-public-key').then(r=>r.json());
+  if (!publicKey) { alert('Notificações push ainda não foram configuradas neste servidor. Fale com o Master.'); return; }
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
+  await fetch('/api/push/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(sub) });
+  updateNotifBtn(true);
+}
+async function initNotifBtn(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    const sub = reg && await reg.pushManager.getSubscription();
+    updateNotifBtn(!!sub);
+  } catch(e) {}
+}
+initNotifBtn();
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
