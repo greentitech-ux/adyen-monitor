@@ -129,6 +129,50 @@ function montarHtml({ grupos, total }) {
   </div>`;
 }
 
+function montarHtmlCardUnico(card, titulo) {
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
+    <div style="background:#1a56db;color:#fff;padding:18px 22px;border-radius:8px 8px 0 0;">
+      <div style="font-size:17px;font-weight:bold;">${escapeHtml(titulo)}</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${fmtDataHora(card.criadoEm)}</div>
+    </div>
+    <div style="border:1px solid #e5e5e5;border-top:none;padding:18px 22px;border-radius:0 0 8px 8px;">
+      ${htmlCard(card)}
+    </div>
+    <div style="font-family:Arial,sans-serif;font-size:11px;color:#999;text-align:center;margin-top:14px;">
+      Zenith Ops · gerado automaticamente
+    </div>
+  </div>`;
+}
+
+// e-mail IMEDIATO de UM card assim que ele e direcionado ao MV (na criacao
+// ou num redirecionamento depois) - diferente do relatorio diario
+// (enviarRelatorio), que manda o resumo de todos de uma vez no horario
+// configurado. As duas coisas convivem: o card chega na hora aqui, e
+// aparece de novo (se ainda estiver pendente) no resumo do dia seguinte.
+// Quem chama decide o que fazer com erro - normalmente so loga, nunca
+// derruba a acao que criou/redirecionou o card (ver index.js)
+async function notificarCardMV(card) {
+  if (!card || card.direcionadoParaEmail !== MV_EMAIL) return;
+  const to = process.env.RELATORIO_EMAIL_TO;
+  if (!to) throw new Error('RELATORIO_EMAIL_TO não configurado.');
+
+  const cardParaEnviar = { ...card };
+  if (card.status === 'PENDENTE' && TIPOS_COM_ACAO_POR_EMAIL.has(card.tipo)) {
+    const { tokenAcao } = await solicitacoes.gerarTokenAcao(card.id);
+    cardParaEnviar.tokenAcao = tokenAcao;
+  }
+
+  const transporter = getTransporter();
+  const titulo = `Nova solicitação · MV`;
+  await transporter.sendMail({
+    from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
+    to,
+    subject: `${titulo} - #${cardParaEnviar.numeroTicket ?? '—'} - ${cardParaEnviar.titulo || ''}`,
+    html: montarHtmlCardUnico(cardParaEnviar, titulo),
+  });
+}
+
 let transporterCache = null;
 function getTransporter() {
   const user = process.env.RELATORIO_EMAIL_USER;
@@ -167,4 +211,4 @@ function iniciarAgendamento() {
   }, { timezone: FUSO_BR });
 }
 
-module.exports = { enviarRelatorio, iniciarAgendamento, montarDados, montarHtml, MV_EMAIL, TIPOS_COM_ACAO_POR_EMAIL };
+module.exports = { enviarRelatorio, iniciarAgendamento, montarDados, montarHtml, notificarCardMV, MV_EMAIL, TIPOS_COM_ACAO_POR_EMAIL };

@@ -1418,6 +1418,18 @@ app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
   }
 });
 
+// dispara (sem bloquear a resposta) o e-mail imediato pro MV quando um card
+// - de qualquer uma das 3 filas - nasce ou e redirecionado com
+// direcionadoParaEmail igual ao configurado em relatorioMV.MV_EMAIL. Usa
+// centralCards.normalizarCard() pra sempre montar o card no mesmo formato
+// que o e-mail espera, mesmo vindo de registros "crus" (refunds.js/
+// fechamentosLive.js tem nomes de campo diferentes de solicitacoes.js)
+function notificarSeDirecionadoAoMV(tipo, registroCru) {
+  const card = centralCards.normalizarCard(tipo, registroCru);
+  if (card.direcionadoParaEmail !== relatorioMV.MV_EMAIL) return;
+  relatorioMV.notificarCardMV(card).catch((err) => console.error('Erro ao notificar card pro MV por e-mail:', err.message));
+}
+
 // ---------- solicitacoes de estorno (usuario Leitor pede, Master aprova/rejeita) ----------
 app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => {
   try {
@@ -1440,6 +1452,7 @@ app.post('/api/refund-requests', requireSection('monitor'), async (req, res) => 
     broadcast('refund-requested', registro, 'monitor');
     broadcast('refund-requested', registro, 'solicitacoes');
     push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Pedido de estorno`, `${req.user.email} · ${unidade || ''}`, registro.id);
+    notificarSeDirecionadoAoMV('estorno', registro);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1473,6 +1486,7 @@ app.patch('/api/refund-requests/:id/direcionar', auth.requireMaster, async (req,
     if (tipoBloqueado(req, 'estorno')) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const registro = await refunds.redirecionar(req.params.id, req.body);
     broadcast('refund-request-changed', registro, 'monitor');
+    notificarSeDirecionadoAoMV('estorno', registro);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2030,6 +2044,7 @@ app.post('/api/fechamentos/lancar', requireSection('lancamento'), upload.any(), 
         `${registro.unidadeNome} · ${registro.cardQuebraCaixa.titulo}`,
         registro.cardQuebraCaixa.id,
       );
+      notificarSeDirecionadoAoMV('quebra-caixa', registro.cardQuebraCaixa);
     }
     res.json(registro);
   } catch (err) {
@@ -2731,6 +2746,7 @@ app.post('/api/fechamentos/:id/solicitar-edicao', requireSection('lancamento'), 
     broadcast('fechamento-edicao-solicitada', pedido, 'lancamento');
     broadcast('fechamento-edicao-solicitada', pedido, 'solicitacoes');
     push.notifySolicitacao(`Ticket #${pedido.numeroTicket} · Correção de fechamento solicitada`, `${req.user.email} · ${payload.tipoCorrecao || ''}`, pedido.id);
+    notificarSeDirecionadoAoMV('ajuste-fechamento', pedido);
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2837,6 +2853,7 @@ app.patch('/api/fechamentos/edicoes/:id/direcionar', auth.requireMaster, async (
     broadcast('fechamento-edicao-decidida', pedido, 'lancamento');
     broadcast('fechamento-edicao-decidida', pedido, 'fechamentos');
     broadcast('fechamento-edicao-decidida', pedido, 'solicitacoes');
+    notificarSeDirecionadoAoMV('ajuste-fechamento', pedido);
     res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2886,6 +2903,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
     push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Nova solicitação`, `${req.user.email} · ${registro.titulo || tipo || ''}`, registro.id);
+    notificarSeDirecionadoAoMV(registro.tipo, registro);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3018,6 +3036,7 @@ app.patch('/api/solicitacoes/:id/direcionar', auth.requireMaster, async (req, re
     if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
     const registro = await solicitacoes.redirecionar(req.params.id, req.body);
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    notificarSeDirecionadoAoMV(registro.tipo, registro);
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
