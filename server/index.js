@@ -3090,12 +3090,17 @@ app.get('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manute
   }
 });
 
-app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
+app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), upload.single('imagem'), async (req, res) => {
   try {
     const card = await buscarCardCru(req.params.tipo, req.params.id);
     if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
     if (!podeVerCard(req, card)) return res.sendStatus(404);
     if (card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
+    let imagem = null;
+    if (req.file) {
+      const path = await storage.salvarArquivo(req.params.id, req.file, 'central-chat');
+      imagem = { nome: req.file.originalname, path, tipo: req.file.mimetype || 'application/octet-stream' };
+    }
     const mensagem = await centralChat.addMessage({
       tipo: req.params.tipo,
       cardId: req.params.id,
@@ -3103,12 +3108,24 @@ app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manut
       autorEmail: req.user.email,
       autorUsername: req.user.username || null,
       texto: req.body.texto,
+      imagem,
     });
     broadcast('central-chat-nova', mensagem, 'solicitacoes');
     res.json(mensagem);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// foto anexada a uma mensagem do chat - mesmo gate de acesso do card (dono
+// do pedido, atribuido, ou Master), resolvido a partir do card que a
+// mensagem pertence
+app.get('/api/central/chat/foto/:messageId', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
+  const mensagem = await centralChat.getMessage(req.params.messageId);
+  if (!mensagem || !mensagem.imagem) return res.sendStatus(404);
+  const card = await buscarCardCru(mensagem.tipo, mensagem.cardId);
+  if (!card || !podeVerCard(req, card)) return res.sendStatus(404);
+  storage.streamArquivo(mensagem.imagem.path, mensagem.imagem.tipo, res);
 });
 
 // sinaliza que um Master/Admin ja viu a notificacao (popup com som) de uma
