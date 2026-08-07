@@ -455,9 +455,18 @@ function renderAgora(){
 
 function statusCheckin(c){
   if(!c.iniciado) return { classe:'pendente-checkin', texto:'aguardando check-in' };
-  if(c.checkoutEm) return { classe:'dentro', texto:'check-out feito' };
+  if(c.checkoutEm && c.checkoutAprovado) return { classe:'dentro', texto:'check-out aprovado' };
+  if(c.checkoutEm) return { classe:'aguardando', texto:'check-out pendente de aprovação' };
   if(!c.termoAssinado) return { classe:'aguardando', texto:'aguardando assinatura' };
   return { classe:'liberado', texto:'liberado' };
+}
+
+// so Master/Admin ou quem tem a tag de Gerente na unidade decide o
+// check-out (ver podeAprovarCheckoutParque no index.js) - a checagem real
+// e sempre no servidor, isso aqui e so pra nao mostrar o botao a toa
+function podeAprovarCheckout(unidade){
+  if(IS_MASTER || IS_ADMIN) return true;
+  return ME && ME.cargo==='gerente' && (ME.permissions?.unidades||[]).includes(unidade);
 }
 
 async function checkoutEmergencia(id){
@@ -467,7 +476,31 @@ async function checkoutEmergencia(id){
     const res = await fetch(`/api/parque/checkins/${id}/checkout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({motivo}) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao registrar check-out');
-    if(data.checkoutAntecipado) alert(`Check-out registrado. ${data.tempoRestanteMin} min guardados de crédito para esse CPF usar numa próxima visita.`);
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+
+async function aprovarCheckout(id){
+  if(!confirm('Aprovar esse check-out? O tempo que sobrou vira crédito pro CPF.')) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/aprovar-checkout`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao aprovar');
+    if(data.checkoutAntecipado) alert(`Check-out aprovado. ${data.tempoRestanteMin} min guardados de crédito para esse CPF usar numa próxima visita.`);
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+
+async function retomarCheckout(id){
+  if(!confirm('A criança voltou a brincar? Isso desfaz o check-out e retoma o tempo que sobrava.')) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/retomar-checkout`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao retomar');
     await carregar();
   }catch(err){
     alert(err.message);
@@ -495,13 +528,15 @@ function renderLista(lista){
           <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)}</span>
           <span class="badge ${status.classe}">${status.texto}</span>
         </div>
-        <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}${c.checkoutAntecipado?` · 🕐 ${c.tempoRestanteMin} min guardados`:''}</div>
+        <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}${c.checkoutAntecipado?` · 🕐 ${c.tempoRestanteMin} min ${c.checkoutAprovado?'guardados':'a confirmar'}`:''}</div>
         <div class="criancas">${escapeHtml(criancas)}</div>
         <div>
           <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
           ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
           ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
           ${(c.iniciado && !c.checkoutEm)?`<button type="button" class="link-btn" style="color:var(--warn);" onclick="checkoutEmergencia('${c.id}')">🚪 Check-out</button>`:''}
+          ${(c.checkoutEm && !c.checkoutAprovado)?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="retomarCheckout('${c.id}')">↩ Voltar (criança retornou)</button>`:''}
+          ${(c.checkoutEm && !c.checkoutAprovado && podeAprovarCheckout(c.unidade))?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="aprovarCheckout('${c.id}')">✓ Aprovar check-out</button>`:''}
           ${IS_MASTER?`<button type="button" class="link-btn" onclick="abrirMaster('${c.id}')">✎ Editar</button>`:''}
           ${edicaoPendentePara(c.id)?`<span class="sub" style="color:var(--accent);">correção pendente</span>`:`<button type="button" class="link-btn" style="color:var(--bad);" onclick="abrirCorrecao('${c.id}')">🗑️ Pedir correção</button>`}
         </div>
