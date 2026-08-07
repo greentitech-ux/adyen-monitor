@@ -77,6 +77,16 @@
   .ptipos .linha b{font-family:var(--mono);}
   .pcard-erro{color:var(--bad);font-size:12px;}
   .pcard-vazio{color:var(--muted);font-size:12px;}
+  .pestoque-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .pestoque-chip{font-family:var(--mono);font-size:11px;padding:5px 9px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;transition:border-color .15s ease,color .15s ease;}
+  .pestoque-chip:hover{border-color:var(--accent);color:var(--text);}
+  .pestoque-chip.ok{color:var(--ok);}
+  .pestoque-chip.ativo{border-color:var(--accent);color:var(--text);background:rgba(92,200,255,.1);}
+  .pestoque-tabela-wrap{max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;}
+  table.pestoque-tabela{width:100%;border-collapse:collapse;font-size:12px;}
+  table.pestoque-tabela th{position:sticky;top:0;background:var(--panel2);text-align:left;padding:6px 8px;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+  table.pestoque-tabela td{padding:5px 8px;border-top:1px solid var(--line);}
+  table.pestoque-tabela td:last-child{font-family:var(--mono);white-space:nowrap;}
   .pweek-titulo{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
   .pweek-titulo b{font-family:var(--mono);color:var(--text);font-size:13px;}
   .pweekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
@@ -648,6 +658,76 @@ async function cardIfood(){
   </div>`);
 }
 
+// card de Estoque: chip por unidade (✅ = ja contou hoje) - clicar num chip
+// expande a tabela Setor/Item/Quantidade daquela contagem (junta o mapa
+// itemId->valor da contagem com o catalogo da loja, que so busca na hora do
+// clique pra nao pesar o card com catalogos de unidades que ninguem abriu)
+let ESTOQUE_ROSTER_CACHE = [];
+let ESTOQUE_CONTAGENS_CACHE = {};
+let ESTOQUE_CATALOGO_CACHE = {};
+let ESTOQUE_ABERTA = null;
+
+function renderEstoqueChips(){
+  return ESTOQUE_ROSTER_CACHE.map(u=>{
+    const contou = !!ESTOQUE_CONTAGENS_CACHE[u.codigo];
+    const ativo = ESTOQUE_ABERTA===u.codigo;
+    return `<button type="button" class="pestoque-chip ${contou?'ok':''} ${ativo?'ativo':''}" onclick="toggleEstoqueUnidade('${u.codigo.replace(/'/g,"\\'")}')">${contou?'✅':'⬜'} ${escapeHtml(u.nome)}</button>`;
+  }).join('');
+}
+
+async function toggleEstoqueUnidade(codigo){
+  const chips = document.getElementById('estoque-chips');
+  const det = document.getElementById('estoque-detalhe');
+  if(!chips || !det) return;
+  if(ESTOQUE_ABERTA===codigo){
+    ESTOQUE_ABERTA = null;
+    chips.innerHTML = renderEstoqueChips();
+    det.innerHTML = '';
+    return;
+  }
+  ESTOQUE_ABERTA = codigo;
+  chips.innerHTML = renderEstoqueChips();
+  det.innerHTML = '<div class="pcard-vazio">Carregando...</div>';
+  const contagem = ESTOQUE_CONTAGENS_CACHE[codigo];
+  if(!contagem){ det.innerHTML = '<div class="pcard-vazio">Essa unidade ainda não fez a contagem hoje.</div>'; return; }
+  try{
+    if(!ESTOQUE_CATALOGO_CACHE[codigo]){
+      ESTOQUE_CATALOGO_CACHE[codigo] = await fetch(`/api/inventario/catalogo?unidade=${encodeURIComponent(codigo)}`).then(r=>r.json());
+    }
+  }catch(err){ det.innerHTML = '<div class="pcard-erro">Não foi possível carregar o catálogo dessa unidade.</div>'; return; }
+  if(ESTOQUE_ABERTA!==codigo) return; // usuario trocou de unidade enquanto carregava
+  const catalogoPorId = {};
+  ESTOQUE_CATALOGO_CACHE[codigo].forEach(i=>{ catalogoPorId[i.id]=i; });
+  const linhas = Object.entries(contagem.contagens||{})
+    .map(([itemId,qtd])=>({ item: catalogoPorId[itemId], qtd }))
+    .filter(l=>l.item)
+    .sort((a,b)=>(a.item.setor||'').localeCompare(b.item.setor||'','pt-BR') || a.item.nome.localeCompare(b.item.nome,'pt-BR'));
+  if(!linhas.length){ det.innerHTML = '<div class="pcard-vazio">Sem itens contados.</div>'; return; }
+  det.innerHTML = `<div class="pestoque-tabela-wrap"><table class="pestoque-tabela">
+    <thead><tr><th>Setor</th><th>Item</th><th>Quantidade</th></tr></thead>
+    <tbody>${linhas.map(l=>`<tr><td>${escapeHtml(l.item.setor||'')}</td><td>${escapeHtml(l.item.nome)}</td><td>${l.qtd} ${escapeHtml(l.item.unidadeMedida||'')}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function cardEstoque(){
+  const hoje = hojeBrasilia();
+  const [roster, contagensDoDia] = await Promise.all([
+    fetch('/api/inventario/unidades').then(r=>r.json()),
+    fetch(`/api/inventario/contagens-do-dia?data=${hoje}`).then(r=>r.json()),
+  ]);
+  ESTOQUE_ROSTER_CACHE = [...roster].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  ESTOQUE_CONTAGENS_CACHE = {};
+  contagensDoDia.forEach(c=>{ ESTOQUE_CONTAGENS_CACHE[c.unidade] = c; });
+  ESTOQUE_CATALOGO_CACHE = {};
+  ESTOQUE_ABERTA = null;
+  const contaram = ESTOQUE_ROSTER_CACHE.filter(u=>ESTOQUE_CONTAGENS_CACHE[u.codigo]);
+  return pcardWrap('📦','Estoque (hoje)','/estoque.html', `
+    <div class="pstats">${statRow('Unidades com contagem', `${contaram.length} de ${ESTOQUE_ROSTER_CACHE.length}`)}</div>
+    <div class="pestoque-chips" id="estoque-chips">${renderEstoqueChips()}</div>
+    <div id="estoque-detalhe"></div>
+  `);
+}
+
 const DIAS_SEMANA_ABREV = ['seg','ter','qua','qui','sex','sáb','dom']; // segunda primeiro, igual ao pedido
 // as datas aqui vem de aritmetica local (setDate) em cima do "hoje" ja
 // ancorado em Brasilia - so precisa formatar de volta pra YYYY-MM-DD local,
@@ -719,6 +799,7 @@ const CARDS_POR_SECAO = [
   { secoes:['solicitacoes','manutencao','tecnico'], build:cardCentral },
   { secao:'tecnico', build:cardChamados },
   { secao:'ifood', build:cardIfood },
+  { secao:'inventario', build:cardEstoque },
 ];
 
 async function boot(){
