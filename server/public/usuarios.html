@@ -272,6 +272,13 @@
   </div>
 
   <div class="panel">
+    <h2>Relatório diário do MV (e-mail)</h2>
+    <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">Todo dia (RELATORIO_HORA, padrão 8h) o sistema manda um e-mail com as solicitações direcionadas ao MV, com botões de Aprovar/Recusar direto no e-mail (sem precisar logar). Use "Enviar agora" pra testar sem esperar o horário - depende de RELATORIO_EMAIL_USER/PASS/TO configurados no Render.</p>
+    <button type="button" class="primary" id="btn-relatorio-mv-run" onclick="rodarRelatorioMvAgora()">Enviar agora</button>
+    <p class="ok-msg hidden" id="relatorio-mv-msg" style="margin-top:10px;"></p>
+  </div>
+
+  <div class="panel">
     <h2>Relatórios de transações</h2>
     <p style="font-size:12px;color:var(--muted);margin:-6px 0 12px;">A cada 2 dias o sistema gera um PDF/CSV com tudo que aconteceu no período (aprovado, recusado, estornado, chargeback, fraude...) e depois apaga do banco o que não é chargeback nem fraude suspeita - esses dois ficam guardados pra sempre pra continuar gerando alerta. Use "Gerar agora" pra rodar fora do horário automático.</p>
     <button type="button" class="primary" id="btn-relatorio-run" onclick="rodarRelatorioAgora()">Gerar relatório agora</button>
@@ -700,6 +707,25 @@ async function carregarRelatorios(){
       </td>
     </tr>
   `).join('') : '<tr><td colspan="3" style="color:var(--muted);">Nenhum relatório ainda - o primeiro roda automaticamente no próximo boot do servidor.</td></tr>';
+}
+
+async function rodarRelatorioMvAgora(){
+  const btn = document.getElementById('btn-relatorio-mv-run');
+  const msg = document.getElementById('relatorio-mv-msg');
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/relatorio-mv/testar');
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao enviar relatório');
+    msg.textContent = `E-mail enviado! ${data.total} solicitação(ões) no relatório (${data.pendentes} pendentes, ${data.aprovados} aprovadas, ${data.rejeitados} recusadas).`;
+    msg.className = 'ok-msg';
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'err';
+  }finally{
+    msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
 }
 
 async function rodarRelatorioAgora(){
