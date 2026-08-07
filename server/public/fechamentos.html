@@ -315,7 +315,6 @@
   <h2>
     <div class="title-group"><span>Fechamentos</span><span class="n" id="fechamentos-count"></span></div>
     <div style="display:flex;gap:8px;">
-      <button type="button" class="preset-btn hidden" id="btn-enviar-planilha-arcfood" onclick="enviarFechamentoArcfoodPlanilha()" title="Manda o fechamento de ontem das lojas ARCFOOD de volta pra planilha do Google Sheets">📤 Enviar ARCFOOD p/ planilha</button>
       <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('csv')">📄 Relatório CSV</button>
       <button type="button" class="preset-btn" onclick="baixarRelatorioFechamentos('pdf')">📄 Relatório PDF</button>
     </div>
@@ -1852,28 +1851,6 @@ function baixarRelatorioFechamentosUnidades(formato){
   window.location.href = `/api/fechamentos/relatorio-unidades.${formato}?${params.toString()}`;
 }
 
-// caminho inverso da sincronizacao automatica (que le a planilha pro app) -
-// manda o fechamento de ontem das 4 lojas ARCFOOD, lançado ao vivo no app,
-// de volta pra planilha do Google Sheets. So Master, sob demanda.
-async function enviarFechamentoArcfoodPlanilha(){
-  const btn = document.getElementById('btn-enviar-planilha-arcfood');
-  if(!confirm('Enviar o fechamento de ontem das lojas ARCFOOD pra planilha do Google Sheets?\n\nSe já existir uma linha daquela loja+data na planilha, ela é atualizada (não duplica).')) return;
-  btn.disabled = true;
-  const textoOriginal = btn.textContent;
-  btn.textContent = 'Enviando...';
-  try{
-    const resp = await fetch('/api/fechamentos/arcfood/enviar-planilha', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
-    const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar pra planilha.');
-    const partes = [];
-    if(data.enviados.length) partes.push(`Enviado (${data.enviados.map(e=>`${e.unidade}: ${e.acao}`).join(', ')})`);
-    if(data.semLancamento.length) partes.push(`Sem lançamento nesse dia: ${data.semLancamento.join(', ')}`);
-    if(data.erros.length) partes.push(`Erros: ${data.erros.map(e=>`${e.unidade} - ${e.erro}`).join('; ')}`);
-    alert(`Fechamento de ${data.data.split('-').reverse().join('/')} (ARCFOOD):\n\n${partes.join('\n\n') || 'Nada pra enviar.'}`);
-  }catch(err){ alert(err.message); }
-  finally{ btn.disabled = false; btn.textContent = textoOriginal; }
-}
-
 function baixarRelatorioFechamentos(formato){
   const {inicio, fim} = intervaloEfetivoTabela();
   const unidades = unidadesEfetivasParaRelatorio().join(',');
@@ -1899,7 +1876,6 @@ async function boot(){
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (me.permissions?.sections||[]);
   UNIDADES_PERMITIDAS = isMaster ? null : new Set(me.permissions?.unidades||[]);
   atualizarVisibilidadeGrupos();
-  document.getElementById('btn-enviar-planilha-arcfood').classList.toggle('hidden', !isMaster);
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));

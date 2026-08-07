@@ -1930,10 +1930,12 @@ async function fechamentosFiltrados(req) {
   );
 }
 
-// monta as mesmas linhas mostradas no painel "Fechamentos" da tela - usado
-// pelos dois formatos de relatorio abaixo
-async function montarLinhasRelatorioFechamentos(req) {
-  return fechamentosReport.prepararLinhas(await fechamentosFiltrados(req));
+// monta as mesmas colunas/linhas mostradas no painel "Fechamentos" da tela
+// (inclusive os Canais de venda/Formas de pagamento por grupo que foram de
+// fato preenchidos) - usado pelos dois formatos de relatorio abaixo
+async function montarRelatorioFechamentos(req) {
+  const [fechamentos, listaGrupos] = await Promise.all([fechamentosFiltrados(req), grupos.list()]);
+  return fechamentosReport.prepararRelatorio(fechamentos, listaGrupos);
 }
 
 // mesma agregacao por unidade do painel "Comparativo por unidade" da tela
@@ -1972,18 +1974,18 @@ app.get('/api/fechamentos/relatorio-unidades.:formato(csv|pdf)', requireSection(
 // mesma secao 'fechamentos' da tela (nao restrito ao Master), respeitando as
 // unidades que o usuario tem permissao de ver ----------
 app.get('/api/fechamentos/relatorio.csv', requireSection('fechamentos'), async (req, res) => {
-  const linhas = await montarLinhasRelatorioFechamentos(req);
+  const { colunas, linhas } = await montarRelatorioFechamentos(req);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${fechamentosReport.slugify('relatorio-fechamentos')}-${reportUtil.dataArquivo()}.csv"`);
-  res.send(fechamentosReport.toCSV(linhas));
+  res.send(fechamentosReport.toCSV(colunas, linhas));
 });
 
 app.get('/api/fechamentos/relatorio.pdf', requireSection('fechamentos'), async (req, res) => {
   const { inicio, fim } = req.query;
-  const linhas = await montarLinhasRelatorioFechamentos(req);
+  const { colunas, linhas } = await montarRelatorioFechamentos(req);
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
   const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} fechamento(s)`;
-  fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, linhas, nomeArquivo: `relatorio-fechamentos-${reportUtil.dataArquivo()}` });
+  fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, colunas, linhas, nomeArquivo: `relatorio-fechamentos-${reportUtil.dataArquivo()}` });
 });
 
 app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
