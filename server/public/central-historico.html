@@ -481,6 +481,7 @@ let FILTRO_GRUPO = '';
 let FILTRO_DATA_DE = '';
 let FILTRO_DATA_ATE = '';
 let FILTRO_TIPO = '';
+let TIPOS_DISPONIVEIS = Object.keys(TIPOS_INFO);
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
 let DETALHE_ATUAL = null;
 
@@ -567,7 +568,7 @@ function renderFiltroTipoRow(base){
     </button>`;
   document.getElementById('tipo-filtro-row').innerHTML =
     botaoHtml('', 'Todas', contagemStatus(base)) +
-    Object.keys(TIPOS_INFO).map(tipo=>botaoHtml(tipo, TIPOS_INFO[tipo].label, contagemStatus(base.filter(c=>c.tipo===tipo)))).join('');
+    TIPOS_DISPONIVEIS.map(tipo=>botaoHtml(tipo, TIPOS_INFO[tipo].label, contagemStatus(base.filter(c=>c.tipo===tipo)))).join('');
 }
 function selecionarFiltroTipo(tipo){
   FILTRO_TIPO = tipo;
@@ -1473,6 +1474,15 @@ async function boot(){
   IS_MASTER = ME.role==='master';
   IS_ADMIN = !!ME.isAdmin;
   SECOES = IS_MASTER ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
+
+  // tiposSolicitacao (mesma restricao usada em central.html pra criar) - se
+  // nao tem a secao necessaria OU nao esta na lista de tipos permitidos,
+  // a aba desse tipo nem aparece na Central (vazio = sem restricao de tipo)
+  const tiposPermitidos = IS_MASTER ? null : (ME.permissions?.tiposSolicitacao||[]);
+  TIPOS_DISPONIVEIS = Object.keys(TIPOS_INFO).filter(tipo =>
+    (!TIPOS_INFO[tipo].secaoNecessaria || SECOES.includes(TIPOS_INFO[tipo].secaoNecessaria)) &&
+    (!tiposPermitidos || !tiposPermitidos.length || tiposPermitidos.includes(tipo))
+  );
 
   document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
