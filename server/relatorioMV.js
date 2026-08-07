@@ -17,6 +17,7 @@
 // isso invalida sozinho o link de um e-mail de dias atras, sem precisar de
 // nenhuma limpeza a parte.
 const nodemailer = require('nodemailer');
+const dns = require('dns').promises;
 const cron = require('node-cron');
 const centralCards = require('./centralCards');
 const solicitacoes = require('./solicitacoes');
@@ -174,7 +175,7 @@ function montarHtmlCards(cards, titulo) {
 async function enviarCardsPorEmail(cards, destinatario) {
   if (!destinatario) throw new Error('Informe o e-mail de destino.');
   if (!cards || !cards.length) throw new Error('Nenhum ticket selecionado.');
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   const titulo = cards.length === 1
     ? `Ticket #${cards[0].numeroTicket ?? '—'} · ${cards[0].titulo || ''}`
     : `${cards.length} tickets · Zenith Ops`;
@@ -204,7 +205,7 @@ async function notificarCardMV(card) {
     cardParaEnviar.tokenAcao = tokenAcao;
   }
 
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   const titulo = `Nova solicitação · MV`;
   await transporter.sendMail({
     from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
@@ -215,20 +216,27 @@ async function notificarCardMV(card) {
 }
 
 let transporterCache = null;
-function getTransporter() {
+// o resolvedor de host do nodemailer (lib/shared/index.js) busca IPv4 E
+// IPv6 de smtp.gmail.com e sorteia um endereco qualquer dos dois pra
+// conectar - nao tem nenhuma opcao (nem "family") pra forcar so IPv4. Em
+// ambientes sem rota de saida IPv6 (Render incluso), cair num endereco
+// IPv6 da ECONNREFUSED/ENETUNREACH na hora, mesmo com usuario/senha certos.
+// Pra contornar, resolvemos o IPv4 nos mesmos com dns.resolve4 e passamos
+// o IP literal como host - "servername" garante que a validacao do
+// certificado TLS (SNI) continua batendo com smtp.gmail.com normalmente.
+async function getTransporter() {
   const user = process.env.RELATORIO_EMAIL_USER;
   const pass = process.env.RELATORIO_EMAIL_PASS;
   if (!user || !pass) throw new Error('RELATORIO_EMAIL_USER/RELATORIO_EMAIL_PASS não configurados.');
   if (!transporterCache) {
+    const enderecosIpv4 = await dns.resolve4('smtp.gmail.com');
+    const ip = enderecosIpv4[Math.floor(Math.random() * enderecosIpv4.length)];
     transporterCache = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
+      host: ip,
+      servername: 'smtp.gmail.com',
       port: 465,
       secure: true,
       auth: { user, pass },
-      // Render (e outros PaaS) as vezes resolvem smtp.gmail.com por IPv6
-      // e a rota trava sem completar a conexao (fica em "Connection
-      // timeout" em vez de erro de autenticacao). Forcar IPv4 evita isso.
-      family: 4,
       connectionTimeout: 15000,
       greetingTimeout: 15000,
       socketTimeout: 20000,
@@ -241,7 +249,7 @@ async function enviarRelatorio() {
   const to = process.env.RELATORIO_EMAIL_TO;
   if (!to) throw new Error('RELATORIO_EMAIL_TO não configurado.');
   const dados = await montarDados();
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   await transporter.sendMail({
     from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
     to,
