@@ -102,6 +102,7 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     // sinalizar que viu - ver marcarNotificacaoVista
     notificacaoVista: false,
     notificacaoVistaPorEmail: null,
+    notificacaoVistaPorUsername: null,
     notificacaoVistaEm: null,
     criadoEm: agora,
     decididoPorEmail: null,
@@ -121,11 +122,11 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
   return registro;
 }
 
-async function marcarNotificacaoVista(id, { vistoPorEmail }) {
+async function marcarNotificacaoVista(id, { vistoPorEmail, vistoPorUsername }) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Solicitação não encontrada.');
-  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaEm: new Date().toISOString() });
+  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaPorUsername: vistoPorUsername || null, notificacaoVistaEm: new Date().toISOString() });
   solicitacoesCache.invalidar();
   return getOne(id);
 }

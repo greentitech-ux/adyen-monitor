@@ -3119,10 +3119,12 @@ app.post('/api/central/:tipo/:id/marcar-visto', auth.requireMasterOrAdmin, async
   try {
     const { tipo, id } = req.params;
     let registro;
-    if (tipo === 'estorno') registro = await refunds.marcarNotificacaoVista(id, { vistoPorEmail: req.user.email });
-    else if (tipo === 'ajuste-fechamento') registro = await fechamentosLive.marcarNotificacaoVistaEdicao(id, { vistoPorEmail: req.user.email });
-    else registro = await solicitacoes.marcarNotificacaoVista(id, { vistoPorEmail: req.user.email });
-    broadcast('central-notificacao-vista', { tipo, id, vistoPorEmail: req.user.email }, 'solicitacoes');
+    const vistoPorEmail = req.user.email;
+    const vistoPorUsername = req.user.username || null;
+    if (tipo === 'estorno') registro = await refunds.marcarNotificacaoVista(id, { vistoPorEmail, vistoPorUsername });
+    else if (tipo === 'ajuste-fechamento') registro = await fechamentosLive.marcarNotificacaoVistaEdicao(id, { vistoPorEmail, vistoPorUsername });
+    else registro = await solicitacoes.marcarNotificacaoVista(id, { vistoPorEmail, vistoPorUsername });
+    broadcast('central-notificacao-vista', { tipo, id, vistoPorEmail, vistoPorUsername }, 'solicitacoes');
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });

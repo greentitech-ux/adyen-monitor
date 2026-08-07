@@ -547,6 +547,7 @@ function kcardHtml(c){
         ${c.status==='CONVERTIDO' ? '<span class="tipo-badge" style="background:#12303a;color:var(--accent);">🔀 convertido</span>' : ''}
         ${c.ehOrcamento ? '<span class="tipo-badge" style="background:#3d2f0f;color:#e0b84c;">💰 orçamento</span>' : ''}
         ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
+        ${c.notificacaoVista ? '<span class="tipo-badge" style="background:#181d24;color:var(--muted);">👁 visto</span>' : ''}
         ${TIPOS_GERAIS.includes(c.tipo) && c.status==='APROVADO' ? `<span class="tipo-badge" style="background:#181d24;">${ANDAMENTO_INFO[c.execucaoStatus||'PENDENTE'].icone} ${ANDAMENTO_INFO[c.execucaoStatus||'PENDENTE'].label}</span>` : ''}
         ${badgeVencimento(c)}
       </div>
@@ -646,6 +647,12 @@ function abrirDetalhe(tipo, id){
   }
   if(c.status==='CONVERTIDO' && c.convertidoParaTipo){
     corpo += `<div style="color:var(--accent);font-weight:600;">🔀 Convertido em <a href="#" style="color:inherit;" onclick="event.preventDefault();abrirDetalhe('${c.convertidoParaTipo}','${c.convertidoParaId}')">${iconeTipo(c.convertidoParaTipo)} ${escapeHtml(TIPOS_INFO[c.convertidoParaTipo]?.label||c.convertidoParaTipo)}</a></div>`;
+  }
+  // avisa pra quem enviou (e quem mais estiver olhando) que algum Master/Admin
+  // ja sinalizou "já vi" essa solicitacao (marcarVistoNotificacao) - antes so
+  // servia pra silenciar o popup de quem via depois, sem aparecer pra ninguem
+  if(c.notificacaoVista && (c.notificacaoVistaPorEmail || c.notificacaoVistaPorUsername)){
+    corpo += `<div class="sub">👁 Visto por ${escapeHtml(nomeExibicao({email:c.notificacaoVistaPorEmail, username:c.notificacaoVistaPorUsername}))} em ${fmtDataHora(c.notificacaoVistaEm)}</div>`;
   }
   if(c.status!=='PENDENTE' && c.status!=='CONVERTIDO'){
     corpo += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;">

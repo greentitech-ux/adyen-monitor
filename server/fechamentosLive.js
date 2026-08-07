@@ -261,6 +261,7 @@ async function solicitarEdicao({ fechamentoId, tipoCorrecao, mudancas, itemNovo,
     // sinalizar que viu - ver marcarNotificacaoVista
     notificacaoVista: false,
     notificacaoVistaPorEmail: null,
+    notificacaoVistaPorUsername: null,
     notificacaoVistaEm: null,
     criadoEm: null,
     decididoPorEmail: null,
@@ -408,11 +409,11 @@ async function getEdicao(id) {
   return doc.exists ? doc.data() : null;
 }
 
-async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail }) {
+async function marcarNotificacaoVistaEdicao(id, { vistoPorEmail, vistoPorUsername }) {
   const ref = EDITS.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Pedido não encontrado.');
-  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaEm: new Date().toISOString() });
+  await ref.update({ notificacaoVista: true, notificacaoVistaPorEmail: vistoPorEmail, notificacaoVistaPorUsername: vistoPorUsername || null, notificacaoVistaEm: new Date().toISOString() });
   edicoesCache.invalidar();
   return getEdicao(id);
 }
