@@ -78,7 +78,7 @@ function largurasPadrao(colunas) {
   return map;
 }
 
-function writePDF(res, { titulo, subtitulo, colunas, linhas, resumo, larguras, semDadosMsg, nomeArquivo, cabecalho }) {
+function writePDF(res, { titulo, subtitulo, colunas, linhas, resumo, larguras, semDadosMsg, nomeArquivo, cabecalho, linhasDinamicas }) {
   const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo || slugify(titulo)}.pdf"`);
@@ -125,8 +125,22 @@ function writePDF(res, { titulo, subtitulo, colunas, linhas, resumo, larguras, s
   }
 
   doc.fontSize(8).fillColor('#222');
-  const alturaLinha = 18;
+  const alturaLinhaMin = 18;
   for (const linha of linhas) {
+    // altura da linha: fixa por padrao (celula corta com "..."); com
+    // "linhasDinamicas" a linha cresce pra baixo ate caber a celula mais
+    // alta, quebrando o texto na largura da coluna - nada e cortado, mesmo
+    // que a linha fique bem maior que as outras (ex: lista de itens de uma
+    // Compra no relatorio da Central)
+    let alturaLinha = alturaLinhaMin;
+    if (linhasDinamicas) {
+      for (const c of colunas) {
+        const h = doc.heightOfString(String(linha[c.key] ?? ''), { width: (larg[c.key] || 60) - 8 }) + 10;
+        if (h > alturaLinha) alturaLinha = h;
+      }
+      // nunca mais alta que a area util de uma pagina inteira
+      alturaLinha = Math.min(alturaLinha, doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 30);
+    }
     if (y + alturaLinha > doc.page.height - doc.page.margins.bottom) {
       doc.addPage();
       y = linhaCabecalhoTabela(doc.page.margins.top);
@@ -134,7 +148,10 @@ function writePDF(res, { titulo, subtitulo, colunas, linhas, resumo, larguras, s
     }
     let x = tableX;
     for (const c of colunas) {
-      doc.text(String(linha[c.key] ?? ''), x + 4, y + 5, { width: (larg[c.key] || 60) - 8, height: alturaLinha - 4, ellipsis: true });
+      const opcoesCelula = linhasDinamicas
+        ? { width: (larg[c.key] || 60) - 8 }
+        : { width: (larg[c.key] || 60) - 8, height: alturaLinha - 4, ellipsis: true };
+      doc.text(String(linha[c.key] ?? ''), x + 4, y + 5, opcoesCelula);
       x += larg[c.key] || 60;
     }
     doc.moveTo(tableX, y + alturaLinha).lineTo(tableX + tableWidth, y + alturaLinha).strokeColor('#ddd').lineWidth(0.5).stroke();
