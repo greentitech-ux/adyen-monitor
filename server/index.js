@@ -2390,12 +2390,19 @@ app.get('/api/inventario/relatorio.:formato(csv|pdf)', requireSection('inventari
 // padrao entregas/entregas-lancamento) + uma secao de festas ----------
 app.post('/api/parque/checkins', requireSection('parque-checkin'), async (req, res) => {
   try {
-    const { unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto, observacao, adultoCortesia, quantAC, criancas, usou } = req.body;
+    const { unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto, observacao, adultoCortesia, quantAC, criancas, usou, usarCreditoMin } = req.body;
     if (!req.isMaster && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
+    // credito de tempo guardado de um checkout antecipado anterior (ver
+    // parque.checkout) - consome antes de criar, pra nao aplicar minutos
+    // que na verdade nao estavam mais disponiveis
+    let minutosExtras = 0;
+    if (usarCreditoMin > 0) {
+      minutosExtras = await parque.usarCredito(responsavel?.cpf, usarCreditoMin);
+    }
     const registro = await parque.criar({
-      unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto, observacao, adultoCortesia, quantAC, criancas, usou,
+      unidade, unidadeNome, responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto, observacao, adultoCortesia, quantAC, criancas, usou, minutosExtras,
       colaboradorId: req.user.id, colaboradorNome: req.user.email,
       criadoPorId: req.user.id, criadoPorEmail: req.user.email,
     });
@@ -2415,12 +2422,18 @@ app.get('/api/parque/checkins', requireAnySection('parque', 'parque-checkin'), a
 // autopreenchimento do formulario de check-in: acha o cadastro mais recente
 // com o mesmo CPF (de check-ins anteriores, inclusive os importados da
 // planilha antiga) pra loja nao ter que digitar tudo de novo num cliente
-// recorrente
+// recorrente. "credito" (tempo guardado de um checkout antecipado - ver
+// parque.checkout) vale pra qualquer unidade, independente do check-in
+// anterior estar ou nao dentro do que esse usuario enxerga
 app.get('/api/parque/cliente-por-cpf', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
-  const encontrado = await parque.buscarPorCpf(req.query.cpf);
-  if (!encontrado) return res.json(null);
-  if (!req.isMaster && !(req.permissions.unidades || []).includes(encontrado.unidade)) return res.json(null);
-  res.json({ responsavel: encontrado.responsavel });
+  const [encontrado, credito] = await Promise.all([
+    parque.buscarPorCpf(req.query.cpf),
+    parque.creditoPorCpf(req.query.cpf),
+  ]);
+  if (!encontrado || (!req.isMaster && !(req.permissions.unidades || []).includes(encontrado.unidade))) {
+    return res.json({ responsavel: null, credito });
+  }
+  res.json({ responsavel: encontrado.responsavel, credito });
 });
 
 // importacao unica (idempotente) dos dados historicos da planilha antiga -
@@ -2482,12 +2495,66 @@ app.post('/api/parque/checkins/:id/checkin', requireAnySection('parque', 'parque
   }
 });
 
-app.delete('/api/parque/checkins/:id', auth.requireMaster, async (req, res) => {
+// checkout antecipado (emergencia): a familia precisa sair antes do tempo
+// contratado acabar - fecha o check-in agora e guarda o tempo que sobrou
+// como credito pro mesmo CPF (ver parque.checkout)
+app.post('/api/parque/checkins/:id/checkout', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
   try {
-    await parque.remover(req.params.id);
-    broadcast('parque-checkin-excluido', { id: req.params.id }, 'parque');
-    broadcast('parque-checkin-excluido', { id: req.params.id }, 'parque-checkin');
-    res.json({ ok: true });
+    const atual = await parque.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Check-in não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const registro = await parque.checkout(req.params.id, { motivo: req.body.motivo });
+    broadcast('parque-checkin-atualizado', registro, 'parque');
+    broadcast('parque-checkin-atualizado', registro, 'parque-checkin');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// depois de enviado, um check-in nao pode mais ser excluido direto - so
+// mediante pedido de correcao (aprovado/rejeitado pelo Master), mesmo
+// fluxo do fechamento de caixa e das entregas
+app.post('/api/parque/checkins/:id/solicitar-edicao', requireAnySection('parque', 'parque-checkin'), async (req, res) => {
+  try {
+    const atual = await parque.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Check-in não encontrado.' });
+    if (!req.isMaster && !(req.permissions.unidades || []).includes(atual.unidade)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
+    }
+    const pedido = await parque.solicitarEdicao({
+      checkinId: req.params.id,
+      motivo: req.body.motivo,
+      solicitadoPorId: req.user.id,
+      solicitadoPorEmail: req.user.email,
+    });
+    broadcast('parque-edicao-solicitada', pedido, 'parque');
+    res.json(pedido);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/parque/checkins/edicoes', requireSection('parque'), async (req, res) => {
+  const todas = await parque.listarEdicoes();
+  if (req.isMaster) return res.json(todas);
+  res.json(todas.filter((p) => p.solicitadoPorId === req.user.id));
+});
+
+app.patch('/api/parque/checkins/edicoes/:id', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const pedido = await parque.decidirEdicao(req.params.id, req.body.status, {
+      decididoPorEmail: req.user.email,
+      motivoDecisao: req.body.motivoDecisao,
+    });
+    broadcast('parque-edicao-decidida', pedido, 'parque');
+    if (pedido.status === 'APROVADO') {
+      broadcast('parque-checkin-excluido', { id: pedido.checkinId }, 'parque');
+      broadcast('parque-checkin-excluido', { id: pedido.checkinId }, 'parque-checkin');
+    }
+    res.json(pedido);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

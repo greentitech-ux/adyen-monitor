@@ -483,13 +483,16 @@ const TOPICOS = [
     </ol>
     <div class="dica"><b>Termo de responsabilidade obrigatório:</b> depois de registrar, clique em <b>Imprimir termo de responsabilidade</b> e peça a assinatura do responsável. A entrada no parque só deve ser liberada depois de marcar <b>Confirmar termo assinado</b> - até lá o check-in aparece como "aguardando assinatura".</div>
     <div class="dica"><b>Check-in automático:</b> o horário previsto é só uma previsão - se o grupo chegar antes, o check-in continua sendo feito na hora certa pelo botão <b>▶ Fazer check-in</b>. Mas se ninguém confirmar a entrada até o horário previsto, o sistema faz o check-in sozinho nesse horário e marca o card com <b>🤖 automático</b> - é um sinal de que a entrada física não foi confirmada, vale conferir com a equipe.</div>
+    <div class="dica"><b>Check-out antecipado (emergência):</b> se a família precisar sair antes do tempo contratado acabar, use o botão <b>🚪 Check-out</b> no card do check-in. O tempo que sobrar vira um crédito guardado pra esse CPF - na próxima visita, se digitar o mesmo CPF, o sistema avisa quanto tempo tem guardado e oferece pra somar em cima do tempo escolhido dessa vez.</div>
+    <div class="dica"><b>Excluir um check-in não é direto:</b> depois de enviado, um cadastro só pode ser apagado mediante <b>pedido de correção</b> (botão <b>🗑️ Pedir correção</b>) - explique o motivo e o Master decide aprovar ou rejeitar, mesmo fluxo usado no fechamento de caixa.</div>
   `},
   { id:'parque', icone:'🤸', secoes:['parque'], titulo:'Parque - painel (Saltiverso)', corpo:`
-    <p>Lista todos os check-ins do parque, com filtro por unidade e período, exportação em CSV/PDF e o painel <b>"Quem está no parque agora"</b> (atualiza sozinho a cada 30s).</p>
+    <p>Lista todos os check-ins do parque, com filtro por unidade e período, exportação em CSV/PDF e o painel <b>"Quem está no parque agora"</b> (atualiza sozinho a cada 30s, e já não conta quem fez check-out antecipado).</p>
     <ul>
-      <li>Cada check-in mostra o status: <b>aguardando assinatura</b> (termo ainda não confirmado) ou <b>liberado</b>.</li>
+      <li>Cada check-in mostra o status: <b>aguardando assinatura</b> (termo ainda não confirmado), <b>liberado</b> ou <b>check-out feito</b>.</li>
       <li>Clique em <b>🖨️ Termo</b> pra reimprimir o termo de responsabilidade de qualquer check-in.</li>
-      <li>O Master pode editar ou excluir qualquer check-in.</li>
+      <li><b>🚪 Check-out</b>: encerra o check-in antes do tempo contratado acabar (emergência) e guarda o tempo restante como crédito pro CPF usar numa próxima visita.</li>
+      <li>O Master pode editar qualquer check-in. <b>Excluir não é mais direto</b>: qualquer pessoa com acesso pode pedir uma correção (botão <b>🗑️ Pedir correção</b>, com o motivo), e o pedido aparece no painel <b>Pedidos de correção</b> pro Master aprovar ou rejeitar - só aí o registro é realmente apagado.</li>
     </ul>
   `},
   { id:'mensalistas', icone:'📅', secoes:['parque'], titulo:'Mensalistas (Saltiverso)', corpo:`
