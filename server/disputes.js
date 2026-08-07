@@ -14,7 +14,10 @@ const COLLECTION = db.collection('disputes');
 
 // MONITORANDO: pedido ainda nao e chargeback, so esta sendo acompanhado.
 // ABERTA -> ENVIADA -> GANHA/PERDIDA: fluxo da disputa formal do chargeback.
-const STATUSES = ['MONITORANDO', 'ABERTA', 'ENVIADA', 'GANHA', 'PERDIDA'];
+// ERRO_SISTEMA: problema tecnico do nosso lado (ex: cliente tentando comprar
+// na loja e o sistema estornando sozinho) - nao e disputa com a bandeira.
+// Exibido como "ERRO SISTEMA" (o underscore e so pra classe CSS/valor).
+const STATUSES = ['MONITORANDO', 'ABERTA', 'ENVIADA', 'GANHA', 'PERDIDA', 'ERRO_SISTEMA'];
 
 async function create({ pedidoId, unidade, nomeContato, telefoneContato, notas, anexos }) {
   const doc = COLLECTION.doc();
