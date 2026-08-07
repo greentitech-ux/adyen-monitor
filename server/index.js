@@ -1962,7 +1962,7 @@ app.get('/api/grupos/responsaveis', requireSection('solicitacoes'), async (req, 
       (u.permissions?.sections || []).includes('manutencao') ||
       (u.permissions?.sections || []).includes('tecnico')
     ))
-    .map((u) => ({ id: u.id, email: u.email, papel: papelDe(u) }));
+    .map((u) => ({ id: u.id, email: u.email, username: u.username || null, papel: papelDe(u) }));
   res.json(responsaveis);
 });
 
@@ -3101,6 +3101,7 @@ app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manut
       cardId: req.params.id,
       autorId: req.user.id,
       autorEmail: req.user.email,
+      autorUsername: req.user.username || null,
       texto: req.body.texto,
     });
     broadcast('central-chat-nova', mensagem, 'solicitacoes');
