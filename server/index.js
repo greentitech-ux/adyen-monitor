@@ -3173,6 +3173,15 @@ function prepararRelatorioCentral(cards) {
   return { colunas, linhas };
 }
 
+// Titulo e' o campo mais lido do relatorio (o que identifica o pedido), por
+// isso ganha bem mais largura que o padrao uniforme - as demais colunas
+// perdem espaco proporcionalmente, sobretudo Decidido por/em e Motivo, que
+// costumam vir "-" enquanto o ticket ainda esta pendente
+const LARGURAS_RELATORIO_CENTRAL = {
+  tipo: 75, unidade: 80, titulo: 200, status: 60,
+  criadoPor: 105, criadoEm: 72, decididoPor: 65, decididoEm: 52, motivoDecisao: 52,
+};
+
 app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes'), async (req, res) => {
   const cards = filtrarCardsCentral(await todosCardsCentral(req), req);
   const { colunas, linhas } = prepararRelatorioCentral(cards);
@@ -3181,7 +3190,7 @@ app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes
     res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('central-solicitacoes')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, nomeArquivo: reportUtil.slugify('central-solicitacoes') });
+  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, larguras: LARGURAS_RELATORIO_CENTRAL, nomeArquivo: reportUtil.slugify('central-solicitacoes') });
 });
 
 // casa a lista de itens (descricao + "tem foto?") mandada em payload.itens
