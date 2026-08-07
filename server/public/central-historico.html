@@ -662,10 +662,13 @@ async function confirmarEnviarEmail(){
   const btn = document.getElementById('btn-confirmar-enviar-email');
   if(!destinatario){ msg.textContent = 'Informe o e-mail de destino.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
   btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = 'Enviando...';
   msg.classList.add('hidden');
   try{
     const res = await fetch('/api/central/enviar-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tickets: EMAIL_ENVIO_TICKETS, destinatario }) });
-    const body = await res.json();
+    let body;
+    try{ body = await res.json(); }catch(e){ throw new Error(`Resposta inesperada do servidor (${res.status}).`); }
     if(!res.ok) throw new Error(body.error||'Erro ao enviar');
     msg.textContent = `E-mail enviado (${body.enviados} ticket${body.enviados===1?'':'s'}).`;
     msg.className = 'msg ok';
@@ -676,7 +679,11 @@ async function confirmarEnviarEmail(){
     }, 1200);
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    // sempre reabilita o botao, nao importa o caminho - nunca fica preso
+    // desabilitado (era o bug reportado: "nao fica ativo o botao")
     btn.disabled = false;
+    btn.textContent = textoOriginal;
   }
 }
 
