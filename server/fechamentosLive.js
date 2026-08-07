@@ -9,9 +9,22 @@ const db = require('./firestore');
 const { createCache } = require('./liveCache');
 const grupos = require('./grupos');
 const ticketCounter = require('./ticketCounter');
+const solicitacoes = require('./solicitacoes');
 
 const COLLECTION = db.collection('fechamentosLive');
 const EDITS = db.collection('fechamentoEdicoes');
+
+// diferença (declarado - faturado) acima disso, pra qualquer lado, dispara
+// um ticket automatico de "Quebra de caixa" na Central pra alguem justificar/
+// aprovar (ver create() abaixo) - direcionado ao mesmo e-mail do relatorio
+// diario (RELATORIO_DIRECIONADO_EMAIL, ver relatorioMV.js), entao ja entra
+// no mesmo fluxo de aprovar/recusar por e-mail sem precisar duplicar nada
+const LIMITE_QUEBRA_CAIXA = 10;
+const EMAIL_QUEBRA_CAIXA_DIRECIONADO = process.env.RELATORIO_DIRECIONADO_EMAIL || 'mv@grupobravoempresarial.com';
+function fmtMoneyQuebra(v) {
+  const n = Number(v) || 0;
+  return `${n < 0 ? '-' : ''}R$ ${Math.abs(n).toFixed(2).replace('.', ',')}`;
+}
 
 
 function docId(unidade, data) {
@@ -194,7 +207,33 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
 
   await ref.set(registro);
   fechamentosCache.invalidar();
-  return registro;
+
+  // ticket automatico de "Quebra de caixa" quando a diferenca passa do
+  // limite (ver LIMITE_QUEBRA_CAIXA acima) - falha aqui NAO derruba o
+  // lançamento do fechamento em si, so fica sem o ticket dessa vez (logado
+  // pra investigar depois)
+  let cardQuebraCaixa = null;
+  if (Math.abs(registro.diferenca) > LIMITE_QUEBRA_CAIXA) {
+    try {
+      cardQuebraCaixa = await solicitacoes.create({
+        tipo: 'quebra-caixa',
+        unidade,
+        unidadeNome: registro.unidadeNome,
+        titulo: `Quebra de caixa · ${registro.unidadeNome} (${data}) · diferença de ${fmtMoneyQuebra(registro.diferenca)}`,
+        valorEstimado: registro.diferenca,
+        observacao: registro.observacao || 'Diferença detectada automaticamente no lançamento do fechamento - sem observação da loja.',
+        fechamentoId: id,
+        criadoPorId,
+        criadoPorEmail,
+        direcionadoParaId: null,
+        direcionadoParaEmail: EMAIL_QUEBRA_CAIXA_DIRECIONADO,
+      });
+    } catch (err) {
+      console.error(`Falha ao criar ticket automático de Quebra de caixa (fechamento ${id}):`, err.message);
+    }
+  }
+
+  return { ...registro, cardQuebraCaixa };
 }
 
 async function listAllUncached() {

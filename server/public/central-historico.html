@@ -469,6 +469,10 @@ const TIPOS_INFO = {
   'suporte-ti': { label:'Suporte de TI', secaoNecessaria:null },
   'pagamento': { label:'Pagamento', secaoNecessaria:null },
   'nota': { label:'Nota', secaoNecessaria:null },
+  // nasce sozinho (fechamentosLive.js) quando a diferença do fechamento
+  // passa do limite - nao entra em TIPOS_GERAIS (nao troca de tipo/converte,
+  // mesmo criterio do Ajuste de fechamento: preso a um fechamentoId)
+  'quebra-caixa': { label:'Quebra de caixa', secaoNecessaria:'lancamento' },
 };
 // os 5 tipos gerais que trocam de tipo entre si (mudarTipo) ou viram Estorno
 // (converterParaEstorno) - Estorno tambem pode virar um desses 5 (converter,
@@ -530,7 +534,7 @@ function ehBloqueioLogin(c){
 }
 
 function iconeTipo(tipo){
-  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻', pagamento:'💸', nota:'📄' }[tipo] || '📋';
+  return { estorno:'💳', 'ajuste-fechamento':'🧾', compra:'🛒', manutencao:'🔧', 'suporte-ti':'💻', pagamento:'💸', nota:'📄', 'quebra-caixa':'⚠️' }[tipo] || '📋';
 }
 
 // badge de vencimento pra demanda de pagamento - vermelho se ja venceu e
