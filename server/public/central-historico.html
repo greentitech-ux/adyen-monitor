@@ -798,6 +798,7 @@ function toggleResponsavel(){
 // (Master/Admin) - qualquer tipo de solicitacao, independente do status.
 // Reaproveita o mesmo endpoint de responsaveis do grupo ja usado no
 // formulario de nova solicitacao (central.html) ----------
+const PAPEL_LABEL = { master:'Master', admin:'Admin', manutencao:'Manutenção', tecnico:'Técnico' };
 async function carregarResponsavelSelect(c){
   const wrap = document.getElementById('d-responsavel-pessoas');
   wrap.innerHTML = '<div class="sub">carregando...</div>';
@@ -805,8 +806,8 @@ async function carregarResponsavelSelect(c){
   try{
     const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(c.unidade)).then(r=>r.json());
     wrap.innerHTML = lista.length
-      ? lista.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${u.id}" data-email="${escapeHtml(u.email)}" style="width:auto;" ${atribuidos.has(u.id)?'checked':''}> ${escapeHtml(u.email)} ${u.papel==='master'?'(Master)':'(Admin)'}</label>`).join('')
-      : '<div class="sub">nenhum Master/Admin disponível pra esse grupo</div>';
+      ? lista.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${u.id}" data-email="${escapeHtml(u.email)}" style="width:auto;" ${atribuidos.has(u.id)?'checked':''}> ${escapeHtml(u.email)} (${PAPEL_LABEL[u.papel]||u.papel})</label>`).join('')
+      : '<div class="sub">ninguém disponível pra esse grupo</div>';
   }catch(e){ wrap.innerHTML = '<div class="sub">erro ao carregar</div>'; }
 }
 
@@ -1506,7 +1507,7 @@ async function boot(){
   document.getElementById('nav-parque-checkin').classList.toggle('hidden', !SECOES.includes('parque-checkin'));
   document.getElementById('nav-festas').classList.toggle('hidden', !SECOES.includes('festas'));
 
-  if(!SECOES.includes('solicitacoes')){
+  if(!(SECOES.includes('solicitacoes') || SECOES.includes('manutencao') || SECOES.includes('tecnico'))){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }

@@ -561,7 +561,7 @@ function aplicarNav(){
   document.getElementById('nav-grupo-saltiverso').classList.toggle('hidden', !(podeSecao('parque') || podeSecao('parque-checkin') || podeSecao('festas')));
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(ME && (ME.role==='master' || ME.isAdmin)));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !podeSecao('solicitacoes'));
-  document.getElementById('nav-historico').classList.toggle('hidden', !podeSecao('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !(podeSecao('solicitacoes') || podeSecao('manutencao') || podeSecao('tecnico')));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !podeSecao('tecnico'));
   document.getElementById('nav-manutencao').classList.toggle('hidden', !podeSecao('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
