@@ -3280,13 +3280,14 @@ function grupoDaUnidadeServer(u) { return ARCFOOD_UNIDADES_CODIGOS.has(u) ? 'ARC
 const TIPOS_CENTRAL_LABEL = { estorno: 'Estorno', 'ajuste-fechamento': 'Ajuste de fechamento', compra: 'Compra', manutencao: 'Manutenção', 'suporte-ti': 'Suporte de TI' };
 
 function filtrarCardsCentral(cards, req) {
-  const { unidade, grupo, dataDe, dataAte } = req.query;
+  const { unidade, grupo, dataDe, dataAte, tipo } = req.query;
   return cards.filter((c) => {
     const dataBrasilia = (c.criadoEm || '').slice(0, 10);
     return (!unidade || c.unidade === unidade) &&
       (!grupo || grupoDaUnidadeServer(c.unidade) === grupo) &&
       (!dataDe || dataBrasilia >= dataDe) &&
-      (!dataAte || dataBrasilia <= dataAte);
+      (!dataAte || dataBrasilia <= dataAte) &&
+      (!tipo || c.tipo === tipo);
   });
 }
 
