@@ -355,9 +355,12 @@ function soDigitos(v) {
 }
 
 // checkout antecipado (emergencia): a familia precisa sair antes do tempo
-// contratado acabar. Fecha o check-in NESSE momento e guarda o tempo que
-// sobrou como credito pro mesmo CPF (ver registrarCredito/usarCredito) -
-// nao perde o que foi pago e nao usado, so adia pra proxima visita
+// contratado acabar. Para o relogio NESSE momento (a crianca ja nao conta
+// mais como "no parque agora"), mas o credito do tempo que sobrou so vira
+// de verdade quando um Gerente da unidade (ou Master/Admin) aprova - ver
+// aprovarCheckout() (quem aprova e checado no index.js, na camada de
+// permissao). Enquanto pendente, da pra desfazer com retomarCheckout() se
+// a crianca voltar a brincar antes de alguem decidir
 async function checkout(id, { motivo } = {}) {
   const ref = COLLECTION.doc(id);
   const snap = await ref.get();
@@ -372,12 +375,58 @@ async function checkout(id, { motivo } = {}) {
     checkoutAntecipado: restanteMin > 0,
     tempoRestanteMin: restanteMin,
     motivoCheckout: String(motivo || '').trim().slice(0, 300),
+    checkoutAprovado: false,
+    checkoutAprovadoPorEmail: null,
+    checkoutAprovadoEm: null,
   };
   await ref.update(merge);
   parqueCache.invalidar();
-  if (restanteMin > 0 && atual.responsavel?.cpf) {
-    await registrarCredito(atual.responsavel.cpf, restanteMin, id);
+  return getOne(id);
+}
+
+// Gerente da unidade (ou Master/Admin) confirma a saida antecipada - so ai
+// o tempo que sobrou vira credito de fato pro CPF (registrarCredito)
+async function aprovarCheckout(id, { aprovadoPorEmail }) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Check-in não encontrado.');
+  const atual = snap.data();
+  if (!atual.checkoutEm) throw new Error('Esse check-in não tem check-out pendente.');
+  if (atual.checkoutAprovado) throw new Error('Esse check-out já foi aprovado.');
+  await ref.update({
+    checkoutAprovado: true,
+    checkoutAprovadoPorEmail: aprovadoPorEmail,
+    checkoutAprovadoEm: new Date().toISOString(),
+  });
+  parqueCache.invalidar();
+  if (atual.tempoRestanteMin > 0 && atual.responsavel?.cpf) {
+    await registrarCredito(atual.responsavel.cpf, atual.tempoRestanteMin, id);
   }
+  return getOne(id);
+}
+
+// a crianca voltou a brincar antes do checkout ser aprovado - desfaz o
+// checkout e retoma o relogio com EXATAMENTE o tempo que sobrava no
+// momento da saida (a pausa nao conta contra o tempo contratado)
+async function retomarCheckout(id) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Check-in não encontrado.');
+  const atual = snap.data();
+  if (!atual.checkoutEm) throw new Error('Esse check-in não está com check-out pendente.');
+  if (atual.checkoutAprovado) throw new Error('Esse check-out já foi aprovado e não pode mais ser desfeito.');
+  const agora = horaAgoraBrasilia();
+  await ref.update({
+    timeFinal: somarMinutos(agora, atual.tempoRestanteMin || 0),
+    checkoutEm: null,
+    checkoutAntecipado: false,
+    tempoRestanteMin: null,
+    motivoCheckout: null,
+    checkoutAprovado: false,
+    checkoutAprovadoPorEmail: null,
+    checkoutAprovadoEm: null,
+  });
+  parqueCache.invalidar();
   return getOne(id);
 }
 
@@ -435,6 +484,6 @@ async function buscarPorCpf(cpf) {
 module.exports = {
   TEMPOS_VALIDOS, criar, checkin, listAll, listByUnidades, getOne, atualizar, buscarPorCpf, rodarAutoCheckins,
   solicitarEdicao, listarEdicoes, decidirEdicao,
-  checkout, creditoPorCpf, usarCredito,
+  checkout, aprovarCheckout, retomarCheckout, creditoPorCpf, usarCredito,
   invalidar: () => parqueCache.invalidar(),
 };

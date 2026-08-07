@@ -307,6 +307,7 @@ const TEMPOS_VALIDOS = [30,60,90,120,150,180,210,240];
 
 let ME = null;
 let IS_MASTER = false;
+let IS_ADMIN = false;
 let UNIDADES_NOMES = { ...PARQUE_UNIDADES_NOMES };
 let CHECKINS = [];
 let TEMPO_SELECIONADO = 60;
@@ -432,8 +433,15 @@ async function carregar(){
 
 function statusCheckin(c){
   if(!c.iniciado) return { classe:'pendente-checkin', texto:'aguardando check-in' };
+  if(c.checkoutEm && c.checkoutAprovado) return { classe:'liberado', texto:'check-out aprovado' };
+  if(c.checkoutEm) return { classe:'aguardando', texto:'check-out pendente de aprovação' };
   if(!c.termoAssinado) return { classe:'aguardando', texto:'aguardando assinatura' };
   return { classe:'liberado', texto:'liberado' };
+}
+
+function podeAprovarCheckout(unidade){
+  if(IS_MASTER || IS_ADMIN) return true;
+  return ME && ME.cargo==='gerente' && (ME.permissions?.unidades||[]).includes(unidade);
 }
 
 function renderLista(){
@@ -451,13 +459,15 @@ function renderLista(){
         <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtData(c.dataUtilizacao)}</span>
         <span class="badge ${status.classe}">${status.texto}</span>
       </div>
-      <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}${c.checkoutEm?` · 🚪 check-out feito${c.checkoutAntecipado?' ('+c.tempoRestanteMin+' min guardados)':''}`:''}</div>
+      <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}${c.checkoutAntecipado?` · 🕐 ${c.tempoRestanteMin} min ${c.checkoutAprovado?'guardados':'a confirmar'}`:''}</div>
       <div class="criancas">${escapeHtml(criancas)}</div>
       <div style="margin-top:8px;">
         <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
         ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
         ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
         ${(c.iniciado && !c.checkoutEm)?`<button type="button" class="link-btn" style="color:var(--warn);" onclick="checkoutEmergencia('${c.id}')">🚪 Check-out</button>`:''}
+        ${(c.checkoutEm && !c.checkoutAprovado)?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="retomarCheckout('${c.id}')">↩ Voltar (criança retornou)</button>`:''}
+        ${(c.checkoutEm && !c.checkoutAprovado && podeAprovarCheckout(c.unidade))?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="aprovarCheckout('${c.id}')">✓ Aprovar check-out</button>`:''}
         <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">🗑️ Pedir correção</button>
       </div>
     </div>`;
@@ -516,7 +526,31 @@ async function checkoutEmergencia(id){
     const res = await fetch(`/api/parque/checkins/${id}/checkout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({motivo}) });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao registrar check-out');
-    if(data.checkoutAntecipado) alert(`Check-out registrado. ${data.tempoRestanteMin} min guardados de crédito para esse CPF usar numa próxima visita.`);
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+
+async function aprovarCheckout(id){
+  if(!confirm('Aprovar esse check-out? O tempo que sobrou vira crédito pro CPF.')) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/aprovar-checkout`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao aprovar');
+    if(data.checkoutAntecipado) alert(`Check-out aprovado. ${data.tempoRestanteMin} min guardados de crédito para esse CPF usar numa próxima visita.`);
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+
+async function retomarCheckout(id){
+  if(!confirm('A criança voltou a brincar? Isso desfaz o check-out e retoma o tempo que sobrava.')) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/retomar-checkout`, { method:'POST' });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao retomar');
     await carregar();
   }catch(err){
     alert(err.message);
@@ -604,6 +638,7 @@ async function boot(){
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
+  IS_ADMIN = !!ME.isAdmin;
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
