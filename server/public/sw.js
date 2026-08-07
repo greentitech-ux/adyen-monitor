@@ -17,6 +17,7 @@ self.addEventListener('push', (event) => {
       vibrate: [200, 100, 200],
       silent: false,
       renotify: true,
+      requireInteraction: true, // fica na tela ate a pessoa interagir, em vez de sumir sozinha em poucos segundos
     })
   );
 });
