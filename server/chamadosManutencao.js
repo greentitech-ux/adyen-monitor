@@ -38,6 +38,19 @@ function sanitizarPecas(lista) {
     .filter((item) => item.descricao || item.valor);
 }
 
+// itens de "antes"/"depois" - cada um e uma descricao + 1 foto (opcional),
+// no mesmo espirito de lista dinamica das pecas/maquininhas/criancas ja
+// usadas no resto do app. fotos ja vem processadas (upload feito na rota)
+function sanitizarItensComFoto(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((item) => ({
+      descricao: String(item?.descricao || '').slice(0, 300),
+      foto: item?.foto && item.foto.path ? { nome: String(item.foto.nome || ''), path: item.foto.path, tipo: item.foto.tipo || 'application/octet-stream' } : null,
+    }))
+    .filter((item) => item.descricao || item.foto);
+}
+
 function sanitizarResponsaveis(lista) {
   if (!Array.isArray(lista)) return [];
   return lista
@@ -65,10 +78,12 @@ async function create({ unidade, unidadeNome, titulo, descricao, responsaveis, s
     dataExecucao: null,
     motivoRecusa: null,
     motivoEspera: null,
-    fotosAntes: [],
-    fotosDepois: [],
+    itensAntes: [],
+    itensDepois: [],
     observacaoResponsavel: '',
     pecas: [],
+    assinaturaNomeLoja: null,
+    assinatura: null,
     criadoPorEmail,
     criadoEm: agora,
     aceitoEm: null,
@@ -126,15 +141,15 @@ async function recusar(id, { userId, motivo }) {
   return getOne(id);
 }
 
-// check-in: chegou na loja, registra como esta antes de mexer
-async function iniciar(id, { fotosAntes, userId }) {
+// check-in: chegou na loja, registra os itens de como esta antes de mexer
+async function iniciar(id, { itensAntes, userId }) {
   const atual = await getOne(id);
   if (!atual) throw new Error('Chamado não encontrado.');
   if (!ehResponsavel(atual, userId)) throw new Error('Esse chamado não é seu.');
   if (atual.status !== 'ACEITO') throw new Error('Aceite o chamado e defina a data de execução antes de fazer o check-in.');
   await COLLECTION.doc(id).update({
     status: 'INICIADO',
-    fotosAntes: Array.isArray(fotosAntes) ? fotosAntes : [],
+    itensAntes: sanitizarItensComFoto(itensAntes),
     iniciadoEm: new Date().toISOString(),
   });
   chamadosCache.invalidar();
@@ -166,17 +181,23 @@ async function retomar(id, { userId }) {
   return getOne(id);
 }
 
-// finalizar: foto do depois, observacao do que foi feito, pecas compradas (se precisou)
-async function concluir(id, { fotosDepois, observacaoResponsavel, pecas, userId }) {
+// finalizar (checkout): itens do depois, observacao do que foi feito, pecas
+// compradas (se precisou) e assinatura de quem recebeu o servico na loja -
+// so fecha com o nome de quem assinou e a assinatura preenchidos
+async function concluir(id, { itensDepois, observacaoResponsavel, pecas, userId, assinaturaNomeLoja, assinatura }) {
   const atual = await getOne(id);
   if (!atual) throw new Error('Chamado não encontrado.');
   if (!ehResponsavel(atual, userId)) throw new Error('Esse chamado não é seu.');
   if (!['INICIADO', 'EM_ESPERA'].includes(atual.status)) throw new Error('Precisa fazer o check-in antes de concluir.');
+  if (!String(assinaturaNomeLoja || '').trim()) throw new Error('Informe o nome de quem está assinando pela loja.');
+  if (!assinatura || !assinatura.path) throw new Error('Colete a assinatura de quem recebeu o serviço.');
   await COLLECTION.doc(id).update({
     status: 'CONCLUIDO',
-    fotosDepois: Array.isArray(fotosDepois) ? fotosDepois : [],
+    itensDepois: sanitizarItensComFoto(itensDepois),
     observacaoResponsavel: String(observacaoResponsavel || '').slice(0, 2000),
     pecas: sanitizarPecas(pecas),
+    assinaturaNomeLoja: String(assinaturaNomeLoja).trim().slice(0, 200),
+    assinatura: { nome: String(assinatura.nome || ''), path: assinatura.path, tipo: assinatura.tipo || 'image/png' },
     concluidoEm: new Date().toISOString(),
   });
   chamadosCache.invalidar();

@@ -3181,6 +3181,31 @@ app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes
   reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, nomeArquivo: reportUtil.slugify('central-solicitacoes') });
 });
 
+// casa a lista de itens (descricao + "tem foto?") mandada em payload.itens
+// com os arquivos que vieram no upload, na mesma ordem - usado no check-in
+// ("antes") e na finalizacao ("depois") tanto de Chamados de TI quanto de
+// Manutencao (mesmo padrao de lista dinamica das pecas/maquininhas)
+async function processarItensComFoto(itensMeta, arquivos, chamadoId, pastaStorage) {
+  const restantes = [...(arquivos || [])];
+  const itens = [];
+  for (const meta of (Array.isArray(itensMeta) ? itensMeta : [])) {
+    let foto = null;
+    if (meta && meta.temFoto && restantes.length) {
+      const file = restantes.shift();
+      const path = await storage.salvarArquivo(chamadoId, file, pastaStorage);
+      foto = { nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' };
+    }
+    itens.push({ descricao: meta && meta.descricao, foto });
+  }
+  return itens;
+}
+
+async function processarAssinatura(file, chamadoId, pastaStorage) {
+  if (!file) return null;
+  const path = await storage.salvarArquivo(chamadoId, file, pastaStorage);
+  return { nome: file.originalname, path, tipo: file.mimetype || 'image/png' };
+}
+
 // ---------- Chamados de TI (secao "tecnico") - o tecnico so ve os chamados
 // atribuidos a ele; Master ve/cria todos. Nasce vinculado a uma solicitacao
 // de Suporte de TI aprovada (rota acima) ou criado direto pelo Master ----------
@@ -3201,15 +3226,13 @@ app.post('/api/chamados', auth.requireMaster, async (req, res) => {
   }
 });
 
-// check-in: tecnico chegou na loja, registra as fotos de "como esta antes"
+// check-in: tecnico chegou na loja, registra os itens (descricao + foto) de
+// como esta antes de mexer
 app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('fotosAntes', 6), async (req, res) => {
   try {
-    const fotosAntes = [];
-    for (const file of req.files || []) {
-      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-antes');
-      fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
-    }
-    const chamado = await chamadosTI.iniciar(req.params.id, { fotosAntes, tecnicoId: req.user.id });
+    const payload = JSON.parse(req.body.payload || '{}');
+    const itensAntes = await processarItensComFoto(payload.itens, req.files, req.params.id, 'chamados-antes');
+    const chamado = await chamadosTI.iniciar(req.params.id, { itensAntes, tecnicoId: req.user.id });
     broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
   } catch (err) {
@@ -3217,20 +3240,20 @@ app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('f
   }
 });
 
-// finalizar: fotos do "depois", observacao do que foi feito e pecas compradas (se precisou)
-app.post('/api/chamados/:id/concluir', requireSection('tecnico'), upload.array('fotosDepois', 6), async (req, res) => {
+// finalizar (checkout): itens do "depois", observacao, pecas compradas (se
+// precisou) e assinatura de quem recebeu o servico na loja
+app.post('/api/chamados/:id/concluir', requireSection('tecnico'), upload.fields([{ name: 'fotosDepois', maxCount: 6 }, { name: 'assinatura', maxCount: 1 }]), async (req, res) => {
   try {
     const payload = JSON.parse(req.body.payload || '{}');
-    const fotosDepois = [];
-    for (const file of req.files || []) {
-      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-depois');
-      fotosDepois.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
-    }
+    const itensDepois = await processarItensComFoto(payload.itens, req.files?.fotosDepois, req.params.id, 'chamados-depois');
+    const assinatura = await processarAssinatura((req.files?.assinatura || [])[0], req.params.id, 'chamados-assinatura');
     const chamado = await chamadosTI.concluir(req.params.id, {
-      fotosDepois,
+      itensDepois,
       observacaoTecnico: payload.observacaoTecnico,
       pecas: payload.pecas,
       tecnicoId: req.user.id,
+      assinaturaNomeLoja: payload.assinaturaNomeLoja,
+      assinatura,
     });
     broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
@@ -3243,9 +3266,9 @@ app.get('/api/chamados/foto/:chamadoId/:campo/:index', requireSection('tecnico')
   const chamado = await chamadosTI.getOne(req.params.chamadoId);
   if (!chamado) return res.sendStatus(404);
   if (!req.isMaster && chamado.tecnicoId !== req.user.id) return res.sendStatus(404);
-  const campo = ['fotosAntes', 'fotosDepois'].includes(req.params.campo) ? req.params.campo : null;
+  const campo = ['itensAntes', 'itensDepois', 'assinatura'].includes(req.params.campo) ? req.params.campo : null;
   if (!campo) return res.status(400).end();
-  const foto = chamado[campo] && chamado[campo][Number(req.params.index)];
+  const foto = campo === 'assinatura' ? chamado.assinatura : chamado[campo]?.[Number(req.params.index)]?.foto;
   if (!foto) return res.sendStatus(404);
   storage.streamArquivo(foto.path, foto.tipo, res);
 });
@@ -3298,15 +3321,13 @@ app.post('/api/chamados-manutencao/:id/recusar', requireSection('manutencao'), a
   }
 });
 
-// check-in: responsavel chegou na loja, registra as fotos de "como esta antes"
+// check-in: responsavel chegou na loja, registra os itens (descricao + foto)
+// de como esta antes de mexer
 app.post('/api/chamados-manutencao/:id/iniciar', requireSection('manutencao'), upload.array('fotosAntes', 6), async (req, res) => {
   try {
-    const fotosAntes = [];
-    for (const file of req.files || []) {
-      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-manutencao-antes');
-      fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
-    }
-    const chamado = await chamadosManutencao.iniciar(req.params.id, { fotosAntes, userId: req.user.id });
+    const payload = JSON.parse(req.body.payload || '{}');
+    const itensAntes = await processarItensComFoto(payload.itens, req.files, req.params.id, 'chamados-manutencao-antes');
+    const chamado = await chamadosManutencao.iniciar(req.params.id, { itensAntes, userId: req.user.id });
     broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
@@ -3334,20 +3355,20 @@ app.post('/api/chamados-manutencao/:id/retomar', requireSection('manutencao'), a
   }
 });
 
-// finalizar: fotos do "depois", observacao do que foi feito e pecas compradas (se precisou)
-app.post('/api/chamados-manutencao/:id/concluir', requireSection('manutencao'), upload.array('fotosDepois', 6), async (req, res) => {
+// finalizar (checkout): itens do "depois", observacao, pecas compradas (se
+// precisou) e assinatura de quem recebeu o servico na loja
+app.post('/api/chamados-manutencao/:id/concluir', requireSection('manutencao'), upload.fields([{ name: 'fotosDepois', maxCount: 6 }, { name: 'assinatura', maxCount: 1 }]), async (req, res) => {
   try {
     const payload = JSON.parse(req.body.payload || '{}');
-    const fotosDepois = [];
-    for (const file of req.files || []) {
-      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-manutencao-depois');
-      fotosDepois.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
-    }
+    const itensDepois = await processarItensComFoto(payload.itens, req.files?.fotosDepois, req.params.id, 'chamados-manutencao-depois');
+    const assinatura = await processarAssinatura((req.files?.assinatura || [])[0], req.params.id, 'chamados-manutencao-assinatura');
     const chamado = await chamadosManutencao.concluir(req.params.id, {
-      fotosDepois,
+      itensDepois,
       observacaoResponsavel: payload.observacaoResponsavel,
       pecas: payload.pecas,
       userId: req.user.id,
+      assinaturaNomeLoja: payload.assinaturaNomeLoja,
+      assinatura,
     });
     broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
@@ -3381,9 +3402,9 @@ app.get('/api/chamados-manutencao/foto/:chamadoId/:campo/:index', requireSection
   const chamado = await chamadosManutencao.getOne(req.params.chamadoId);
   if (!chamado) return res.sendStatus(404);
   if (!req.isMaster && !ehResponsavelManutencao(chamado, req.user.id)) return res.sendStatus(404);
-  const campo = ['fotosAntes', 'fotosDepois'].includes(req.params.campo) ? req.params.campo : null;
+  const campo = ['itensAntes', 'itensDepois', 'assinatura'].includes(req.params.campo) ? req.params.campo : null;
   if (!campo) return res.status(400).end();
-  const foto = chamado[campo] && chamado[campo][Number(req.params.index)];
+  const foto = campo === 'assinatura' ? chamado.assinatura : chamado[campo]?.[Number(req.params.index)]?.foto;
   if (!foto) return res.sendStatus(404);
   storage.streamArquivo(foto.path, foto.tipo, res);
 });

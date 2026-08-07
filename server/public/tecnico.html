@@ -59,6 +59,11 @@
   textarea{resize:vertical;min-height:64px;}
   .linha-item{display:grid;grid-template-columns:1fr 88px auto;gap:6px;align-items:center;margin-top:6px;}
   .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .linha-item-foto{display:flex;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item-foto input[type=text]{flex:1;padding:9px 10px;font-size:13.5px;}
+  .foto-btn{flex:none;width:36px;height:36px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;}
+  .foto-btn.tem-foto{border-color:var(--accent);color:var(--accent);}
+  .assinatura-canvas{width:100%;height:140px;background:#fff;border-radius:8px;touch-action:none;cursor:crosshair;margin-top:6px;display:block;}
   .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
   .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
   .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
@@ -163,8 +168,9 @@
 
     <!-- ABERTO: fazer check-in -->
     <div id="bloco-iniciar" class="hidden">
-      <label>Foto de como está antes de mexer</label>
-      <input type="file" id="i-fotos" multiple accept="image/*" capture="environment">
+      <label>Itens de como está antes de mexer (descrição + foto)</label>
+      <div id="lista-itens-antes"></div>
+      <button type="button" class="btn-add" onclick="adicionarItemAntes()">+ Adicionar item</button>
       <button type="button" class="btn-primary" id="btn-iniciar" onclick="iniciarChamado()">📍 Fazer check-in / Iniciar chamado</button>
     </div>
 
@@ -176,8 +182,13 @@
       <button type="button" class="btn-add" onclick="adicionarPeca()">+ Adicionar peça</button>
       <label>Observação (o que foi feito)</label>
       <textarea id="c-observacao" placeholder="descreva o serviço realizado"></textarea>
-      <label>Foto de como ficou depois</label>
-      <input type="file" id="c-fotos" multiple accept="image/*" capture="environment">
+      <label>Itens de como ficou depois (descrição + foto)</label>
+      <div id="lista-itens-depois"></div>
+      <button type="button" class="btn-add" onclick="adicionarItemDepois()">+ Adicionar item</button>
+      <label>Assinatura de quem recebeu o serviço na loja</label>
+      <input type="text" id="c-assinatura-nome" placeholder="nome de quem está assinando">
+      <canvas id="c-assinatura-canvas" class="assinatura-canvas" width="560" height="180"></canvas>
+      <button type="button" class="btn-add" onclick="limparAssinatura('c-assinatura-canvas')">🗑 Limpar assinatura</button>
       <button type="button" class="btn-primary" id="btn-concluir" onclick="concluirChamado()">✓ Concluir chamado</button>
     </div>
 
@@ -185,10 +196,12 @@
     <div id="bloco-concluido" class="hidden">
       <div><b>Observação:</b> <span id="v-observacao"></span></div>
       <div id="v-pecas" style="margin-top:8px;"></div>
-      <div class="sub" style="margin-top:10px;">Fotos antes</div>
-      <div class="fotos-grid" id="v-fotos-antes"></div>
-      <div class="sub" style="margin-top:10px;">Fotos depois</div>
-      <div class="fotos-grid" id="v-fotos-depois"></div>
+      <div class="sub" style="margin-top:10px;">Itens antes</div>
+      <div id="v-itens-antes"></div>
+      <div class="sub" style="margin-top:10px;">Itens depois</div>
+      <div id="v-itens-depois"></div>
+      <div class="sub" style="margin-top:10px;">Assinatura de quem recebeu na loja</div>
+      <div id="v-assinatura"></div>
     </div>
 
     <div class="msg hidden" id="msg-detalhe"></div>
@@ -265,6 +278,8 @@ let IS_MASTER = false;
 let CHAMADOS = [];
 let DETALHE_ATUAL = null;
 let PECAS = [];
+let ITENS_ANTES = [];
+let ITENS_DEPOIS = [];
 let SEQ = 0;
 
 function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
@@ -305,6 +320,70 @@ function renderPecas(){
     </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma peça adicionada.</div>';
 }
 
+// itens de "antes"/"depois" - descricao + 1 foto opcional cada, lista
+// dinamica no mesmo espirito das pecas
+function itemFotoBtnHtml(item, onchangeFn){
+  return `<label class="foto-btn ${item.file?'tem-foto':''}" title="${item.file?escapeHtml(item.file.name):'adicionar foto'}">${item.file?'✅':'📷'}<input type="file" accept="image/*" capture="environment" hidden onchange="${onchangeFn}(${item.id}, this.files[0])"></label>`;
+}
+function adicionarItemAntes(){ ITENS_ANTES.push({ id: ++SEQ, descricao:'', file:null }); renderItensAntes(); }
+function removerItemAntes(id){ ITENS_ANTES = ITENS_ANTES.filter(i=>i.id!==id); renderItensAntes(); }
+function fotoItemAntes(id, file){ const it = ITENS_ANTES.find(i=>i.id===id); if(it) it.file = file || null; renderItensAntes(); }
+function renderItensAntes(){
+  document.getElementById('lista-itens-antes').innerHTML = ITENS_ANTES.map(it=>`
+    <div class="linha-item-foto">
+      <input type="text" value="${escapeHtml(it.descricao)}" oninput="ITENS_ANTES.find(x=>x.id===${it.id}).descricao=this.value" placeholder="descrição (ex: bico quebrado)">
+      ${itemFotoBtnHtml(it, 'fotoItemAntes')}
+      <button type="button" class="btn-remover" onclick="removerItemAntes(${it.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum item adicionado.</div>';
+}
+function adicionarItemDepois(){ ITENS_DEPOIS.push({ id: ++SEQ, descricao:'', file:null }); renderItensDepois(); }
+function removerItemDepois(id){ ITENS_DEPOIS = ITENS_DEPOIS.filter(i=>i.id!==id); renderItensDepois(); }
+function fotoItemDepois(id, file){ const it = ITENS_DEPOIS.find(i=>i.id===id); if(it) it.file = file || null; renderItensDepois(); }
+function renderItensDepois(){
+  document.getElementById('lista-itens-depois').innerHTML = ITENS_DEPOIS.map(it=>`
+    <div class="linha-item-foto">
+      <input type="text" value="${escapeHtml(it.descricao)}" oninput="ITENS_DEPOIS.find(x=>x.id===${it.id}).descricao=this.value" placeholder="descrição (ex: serviço concluído)">
+      ${itemFotoBtnHtml(it, 'fotoItemDepois')}
+      <button type="button" class="btn-remover" onclick="removerItemDepois(${it.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum item adicionado.</div>';
+}
+function itensViewHtml(rota, chamadoId, campo, itens){
+  if(!itens || !itens.length) return '<span class="sub">nenhum</span>';
+  return itens.map((it,i)=>{
+    const fotoHtml = it.foto ? `<a href="${rota}/foto/${chamadoId}/${campo}/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="${rota}/foto/${chamadoId}/${campo}/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"></a>` : '';
+    return `<div style="display:flex;gap:8px;align-items:center;margin-top:6px;">${fotoHtml}<span style="font-size:12.5px;">${escapeHtml(it.descricao||'(sem descrição)')}</span></div>`;
+  }).join('');
+}
+
+// assinatura desenhada num canvas (mouse/toque) - vira PNG no envio
+function initSignaturePad(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas || canvas.dataset.padInit) return;
+  canvas.dataset.padInit = '1';
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  let desenhando = false;
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
+  }
+  canvas.addEventListener('pointerdown', e=>{ desenhando = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); });
+  canvas.addEventListener('pointermove', e=>{ if(!desenhando) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); });
+  window.addEventListener('pointerup', ()=>{ desenhando = false; });
+}
+function limparAssinatura(canvasId){
+  document.getElementById(canvasId).getContext('2d').clearRect(0, 0, document.getElementById(canvasId).width, document.getElementById(canvasId).height);
+}
+function assinaturaVazia(canvasId){
+  const canvas = document.getElementById(canvasId);
+  const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  for(let i=3;i<data.length;i+=4){ if(data[i]!==0) return false; }
+  return true;
+}
+function canvasToBlob(canvasId){
+  return new Promise(resolve=>document.getElementById(canvasId).toBlob(resolve, 'image/png'));
+}
+
 function abrirDetalhe(id){
   const c = CHAMADOS.find(x=>x.id===id);
   if(!c) return;
@@ -317,18 +396,28 @@ function abrirDetalhe(id){
   document.getElementById('bloco-concluir').classList.toggle('hidden', c.status!=='INICIADO');
   document.getElementById('bloco-concluido').classList.toggle('hidden', c.status!=='CONCLUIDO');
 
+  if(c.status==='ABERTO'){
+    ITENS_ANTES = []; renderItensAntes();
+  }
   if(c.status==='INICIADO'){
     document.getElementById('c-iniciado-em').textContent = `Check-in feito em ${fmtDataHora(c.iniciadoEm)}`;
     PECAS = []; renderPecas();
+    ITENS_DEPOIS = []; renderItensDepois();
     document.getElementById('c-observacao').value = '';
+    document.getElementById('c-assinatura-nome').value = '';
+    initSignaturePad('c-assinatura-canvas');
+    limparAssinatura('c-assinatura-canvas');
   }
   if(c.status==='CONCLUIDO'){
     document.getElementById('v-observacao').textContent = c.observacaoTecnico || '—';
     document.getElementById('v-pecas').innerHTML = (c.pecas||[]).length
       ? '<b>Peças:</b>' + c.pecas.map(p=>`<div>${escapeHtml(p.descricao)} - ${fmtMoney(p.valor)}${p.observacao?(' · '+escapeHtml(p.observacao)):''}</div>`).join('')
       : '';
-    document.getElementById('v-fotos-antes').innerHTML = (c.fotosAntes||[]).map((f,i)=>`<a href="/api/chamados/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/fotosAntes/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
-    document.getElementById('v-fotos-depois').innerHTML = (c.fotosDepois||[]).map((f,i)=>`<a href="/api/chamados/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/fotosDepois/${i}?token=${encodeURIComponent(AUTH_TOKEN)}"></a>`).join('') || '<span class="sub">nenhuma</span>';
+    document.getElementById('v-itens-antes').innerHTML = itensViewHtml('/api/chamados', c.id, 'itensAntes', c.itensAntes);
+    document.getElementById('v-itens-depois').innerHTML = itensViewHtml('/api/chamados', c.id, 'itensDepois', c.itensDepois);
+    document.getElementById('v-assinatura').innerHTML = c.assinatura
+      ? `<div style="font-size:12.5px;margin-bottom:4px;">${escapeHtml(c.assinaturaNomeLoja||'')}</div><a href="/api/chamados/foto/${c.id}/assinatura/0?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados/foto/${c.id}/assinatura/0?token=${encodeURIComponent(AUTH_TOKEN)}" style="max-width:240px;border-radius:8px;border:1px solid var(--line);background:#fff;"></a>`
+      : '<span class="sub">sem assinatura</span>';
   }
 
   document.getElementById('msg-detalhe').classList.add('hidden');
@@ -344,7 +433,8 @@ async function iniciarChamado(){
   btn.disabled = true; btn.textContent = 'Enviando...';
   try{
     const fd = new FormData();
-    for(const file of document.getElementById('i-fotos').files) fd.append('fotosAntes', file);
+    fd.append('payload', JSON.stringify({ itens: ITENS_ANTES.map(it=>({ descricao: it.descricao, temFoto: !!it.file })) }));
+    ITENS_ANTES.forEach(it=>{ if(it.file) fd.append('fotosAntes', it.file); });
     const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/iniciar`, { method:'POST', body: fd });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao iniciar chamado.');
@@ -359,8 +449,11 @@ async function iniciarChamado(){
 
 async function concluirChamado(){
   if(!DETALHE_ATUAL) return;
-  if(!confirm('Tem certeza que deseja concluir esse chamado? Confira as fotos/observações antes de continuar.')) return;
   const msg = document.getElementById('msg-detalhe');
+  const nomeAssinatura = document.getElementById('c-assinatura-nome').value.trim();
+  if(!nomeAssinatura){ msg.textContent = 'Informe o nome de quem está assinando pela loja.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
+  if(assinaturaVazia('c-assinatura-canvas')){ msg.textContent = 'Colete a assinatura de quem recebeu o serviço.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
+  if(!confirm('Tem certeza que deseja concluir esse chamado? Confira os itens/observações antes de continuar.')) return;
   const btn = document.getElementById('btn-concluir');
   msg.classList.add('hidden');
   btn.disabled = true; btn.textContent = 'Enviando...';
@@ -369,8 +462,11 @@ async function concluirChamado(){
     fd.append('payload', JSON.stringify({
       observacaoTecnico: document.getElementById('c-observacao').value,
       pecas: PECAS.map(p=>({ descricao:p.descricao, valor:p.valor, observacao:p.observacao })),
+      itens: ITENS_DEPOIS.map(it=>({ descricao: it.descricao, temFoto: !!it.file })),
+      assinaturaNomeLoja: nomeAssinatura,
     }));
-    for(const file of document.getElementById('c-fotos').files) fd.append('fotosDepois', file);
+    ITENS_DEPOIS.forEach(it=>{ if(it.file) fd.append('fotosDepois', it.file); });
+    fd.append('assinatura', await canvasToBlob('c-assinatura-canvas'), 'assinatura.png');
     const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/concluir`, { method:'POST', body: fd });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao concluir chamado.');

@@ -1,10 +1,11 @@
 // chamadosTI.js
 // Chamado de suporte tecnico (TI) atribuido a um tecnico especifico, que vai
 // ate a loja resolver. Fluxo: ABERTO (criado, aguardando o tecnico chegar) ->
-// INICIADO (tecnico fez check-in na loja, com foto do "antes") -> CONCLUIDO
-// (tecnico finalizou, com foto do "depois" + observacao + pecas compradas,
-// se precisou). Pode nascer vinculado a uma solicitacao de Suporte de TI (ver
-// solicitacoes.js) aprovada, ou ser criado direto pelo Master.
+// INICIADO (tecnico fez check-in na loja, com itens de "antes") -> CONCLUIDO
+// (tecnico finalizou, com itens de "depois" + observacao + pecas compradas,
+// se precisou, + assinatura de quem recebeu na loja). Pode nascer vinculado a
+// uma solicitacao de Suporte de TI (ver solicitacoes.js) aprovada, ou ser
+// criado direto pelo Master.
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
 
@@ -24,6 +25,19 @@ function sanitizarPecas(lista) {
     .filter((item) => item.descricao || item.valor);
 }
 
+// itens de "antes"/"depois" - cada um e uma descricao + 1 foto (opcional),
+// no mesmo espirito de lista dinamica das pecas/maquininhas/criancas ja
+// usadas no resto do app. fotos ja vem processadas (upload feito na rota)
+function sanitizarItensComFoto(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((item) => ({
+      descricao: String(item?.descricao || '').slice(0, 300),
+      foto: item?.foto && item.foto.path ? { nome: String(item.foto.nome || ''), path: item.foto.path, tipo: item.foto.tipo || 'application/octet-stream' } : null,
+    }))
+    .filter((item) => item.descricao || item.foto);
+}
+
 async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, solicitacaoId, criadoPorEmail }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o chamado.');
@@ -41,10 +55,12 @@ async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecn
     tecnicoEmail,
     solicitacaoId: solicitacaoId || null,
     status: 'ABERTO',
-    fotosAntes: [],
-    fotosDepois: [],
+    itensAntes: [],
+    itensDepois: [],
     observacaoTecnico: '',
     pecas: [],
+    assinaturaNomeLoja: null,
+    assinatura: null,
     criadoPorEmail,
     criadoEm: agora,
     iniciadoEm: null,
@@ -67,32 +83,38 @@ async function getOne(id) {
   return doc.exists ? doc.data() : null;
 }
 
-// check-in: tecnico chegou na loja, registra como esta antes de mexer
-async function iniciar(id, { fotosAntes, tecnicoId }) {
+// check-in: tecnico chegou na loja, registra os itens de como esta antes de mexer
+async function iniciar(id, { itensAntes, tecnicoId }) {
   const atual = await getOne(id);
   if (!atual) throw new Error('Chamado não encontrado.');
   if (atual.tecnicoId !== tecnicoId) throw new Error('Esse chamado não é seu.');
   if (atual.status !== 'ABERTO') throw new Error('Esse chamado já foi iniciado.');
   await COLLECTION.doc(id).update({
     status: 'INICIADO',
-    fotosAntes: Array.isArray(fotosAntes) ? fotosAntes : [],
+    itensAntes: sanitizarItensComFoto(itensAntes),
     iniciadoEm: new Date().toISOString(),
   });
   chamadosCache.invalidar();
   return getOne(id);
 }
 
-// finalizar: foto do depois, observacao do que foi feito, pecas compradas (se precisou)
-async function concluir(id, { fotosDepois, observacaoTecnico, pecas, tecnicoId }) {
+// finalizar (checkout): itens do depois, observacao do que foi feito, pecas
+// compradas (se precisou) e assinatura de quem recebeu o servico na loja -
+// so fecha com o nome de quem assinou e a assinatura preenchidos
+async function concluir(id, { itensDepois, observacaoTecnico, pecas, tecnicoId, assinaturaNomeLoja, assinatura }) {
   const atual = await getOne(id);
   if (!atual) throw new Error('Chamado não encontrado.');
   if (atual.tecnicoId !== tecnicoId) throw new Error('Esse chamado não é seu.');
   if (atual.status !== 'INICIADO') throw new Error('Precisa fazer o check-in antes de concluir.');
+  if (!String(assinaturaNomeLoja || '').trim()) throw new Error('Informe o nome de quem está assinando pela loja.');
+  if (!assinatura || !assinatura.path) throw new Error('Colete a assinatura de quem recebeu o serviço.');
   await COLLECTION.doc(id).update({
     status: 'CONCLUIDO',
-    fotosDepois: Array.isArray(fotosDepois) ? fotosDepois : [],
+    itensDepois: sanitizarItensComFoto(itensDepois),
     observacaoTecnico: String(observacaoTecnico || '').slice(0, 2000),
     pecas: sanitizarPecas(pecas),
+    assinaturaNomeLoja: String(assinaturaNomeLoja).trim().slice(0, 200),
+    assinatura: { nome: String(assinatura.nome || ''), path: assinatura.path, tipo: assinatura.tipo || 'image/png' },
     concluidoEm: new Date().toISOString(),
   });
   chamadosCache.invalidar();
