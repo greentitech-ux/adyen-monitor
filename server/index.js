@@ -883,7 +883,7 @@ app.get('/api/fraude/relatorio.csv', auth.requireMaster, async (req, res) => {
   const filtrado = historico.filter((m) => (!inicio || (m.criadoEm || '') >= inicio) && (!fim || (m.criadoEm || '') <= fim + 'T23:59:59'));
   const linhas = fraudReport.agruparPorCliente(filtrado);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${fraudReport.slugify('relatorio-fraude')}.csv"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${fraudReport.slugify('relatorio-fraude')}-${reportUtil.dataArquivo()}.csv"`);
   res.send(fraudReport.toCSV(linhas));
 });
 
@@ -894,7 +894,7 @@ app.get('/api/fraude/relatorio.pdf', auth.requireMaster, async (req, res) => {
   const linhas = fraudReport.agruparPorCliente(filtrado);
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
   const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} cliente(s) monitorado(s)`;
-  fraudReport.writePDF(res, { titulo: 'Relatório de Fraude', subtitulo, linhas });
+  fraudReport.writePDF(res, { titulo: 'Relatório de Fraude', subtitulo, linhas, nomeArquivo: `relatorio-fraude-${reportUtil.dataArquivo()}` });
 });
 
 // ---------- relatorio do painel "Alertas de falha/fraude" (Master) - mesma
@@ -904,7 +904,7 @@ app.get('/api/alertas/relatorio.csv', auth.requireMaster, (req, res) => {
   const transacoes = store.allTransactions().filter((t) => (!inicio || (t.dataHora || '') >= inicio) && (!fim || (t.dataHora || '') <= fim + 'T23:59:59'));
   const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${alertReport.slugify('relatorio-alertas')}.csv"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${alertReport.slugify('relatorio-alertas')}-${reportUtil.dataArquivo()}.csv"`);
   res.send(alertReport.toCSV(linhas));
 });
 
@@ -914,7 +914,7 @@ app.get('/api/alertas/relatorio.pdf', auth.requireMaster, (req, res) => {
   const linhas = alertReport.agruparPorCliente(alertReport.construirAlertas(transacoes));
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
   const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} cliente(s) com alerta`;
-  alertReport.writePDF(res, { titulo: 'Relatório de Alertas', subtitulo, linhas });
+  alertReport.writePDF(res, { titulo: 'Relatório de Alertas', subtitulo, linhas, nomeArquivo: `relatorio-alertas-${reportUtil.dataArquivo()}` });
 });
 
 app.get('/api/summary', requireSection('monitor'), (req, res) => {
@@ -1147,10 +1147,10 @@ app.get('/api/disputes/relatorio.:formato(csv|pdf)', requireSection('disputas'),
   });
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('relatorio-disputas')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('relatorio-disputas')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Relatório de Disputas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} registro(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('relatorio-disputas') });
+  reportUtil.writePDF(res, { titulo: 'Relatório de Disputas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} registro(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('relatorio-disputas') });
 });
 
 app.get('/api/disputes/:pedidoId', requireSection('disputas'), async (req, res) => {
@@ -1401,7 +1401,7 @@ app.get('/api/vault/export.csv', auth.requireMaster, async (req, res) => {
   try {
     const { titulo, rows } = await resolverEscopoExportacao(req);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${vaultExport.slugify(titulo)}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${vaultExport.slugify(titulo)}-${reportUtil.dataArquivo()}.csv"`);
     res.send(vaultExport.toCSV(rows));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1412,7 +1412,7 @@ app.get('/api/vault/export.pdf', auth.requireMaster, async (req, res) => {
   try {
     const { titulo, rows } = await resolverEscopoExportacao(req);
     const subtitulo = `Exportado em ${agoraBrasiliaFmt()} · ${rows.length} senha(s)`;
-    vaultExport.writePDF(res, { titulo, subtitulo, rows });
+    vaultExport.writePDF(res, { titulo, subtitulo, rows, nomeArquivo: `${vaultExport.slugify(titulo)}-${reportUtil.dataArquivo()}` });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -1591,10 +1591,10 @@ app.get('/api/users/relatorio.:formato(csv|pdf)', auth.requireMaster, async (req
   });
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('usuarios-acessos')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('usuarios-acessos')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Usuários · Acessos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} acesso(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('usuarios-acessos') });
+  reportUtil.writePDF(res, { titulo: 'Usuários · Acessos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} acesso(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('usuarios-acessos') });
 });
 
 app.post('/api/users', auth.requireMaster, async (req, res) => {
@@ -1961,10 +1961,10 @@ app.get('/api/fechamentos/relatorio-unidades.:formato(csv|pdf)', requireSection(
   const { colunas, linhas } = prepararFechamentosPorUnidade(await fechamentosFiltrados(req));
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('fechamentos-por-unidade')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('fechamentos-por-unidade')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Fechamentos · Comparativo por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('fechamentos-por-unidade') });
+  reportUtil.writePDF(res, { titulo: 'Fechamentos · Comparativo por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('fechamentos-por-unidade') });
 });
 
 // ---------- relatorio de Fechamentos (CSV/PDF) do periodo filtrado na tela -
@@ -1973,7 +1973,7 @@ app.get('/api/fechamentos/relatorio-unidades.:formato(csv|pdf)', requireSection(
 app.get('/api/fechamentos/relatorio.csv', requireSection('fechamentos'), async (req, res) => {
   const linhas = await montarLinhasRelatorioFechamentos(req);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${fechamentosReport.slugify('relatorio-fechamentos')}.csv"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${fechamentosReport.slugify('relatorio-fechamentos')}-${reportUtil.dataArquivo()}.csv"`);
   res.send(fechamentosReport.toCSV(linhas));
 });
 
@@ -1982,7 +1982,7 @@ app.get('/api/fechamentos/relatorio.pdf', requireSection('fechamentos'), async (
   const linhas = await montarLinhasRelatorioFechamentos(req);
   const periodo = inicio || fim ? ` · período: ${inicio || 'início'} a ${fim || 'hoje'}` : '';
   const subtitulo = `Exportado em ${agoraBrasiliaFmt()}${periodo} · ${linhas.length} fechamento(s)`;
-  fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, linhas });
+  fechamentosReport.writePDF(res, { titulo: 'Relatório de Fechamentos', subtitulo, linhas, nomeArquivo: `relatorio-fechamentos-${reportUtil.dataArquivo()}` });
 });
 
 app.get('/api/fechamentos/sincronizacao', requireSection('fechamentos'), (req, res) => {
@@ -2134,10 +2134,10 @@ app.get('/api/grupos/relatorio.:formato(csv|pdf)', requireAnySection('lancamento
   }));
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('grupos')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('grupos')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Grupos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} grupo(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('grupos') });
+  reportUtil.writePDF(res, { titulo: 'Grupos Cadastrados', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} grupo(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('grupos') });
 });
 
 app.post('/api/grupos', auth.requireMaster, async (req, res) => {
@@ -2369,7 +2369,7 @@ app.get('/api/inventario/relatorio.:formato(csv|pdf)', requireSection('inventari
       { key: 'diferencaQtd', label: 'Diferença (qtd)' }, { key: 'diferencaValor', label: 'Diferença (R$)' },
     ];
     const linhas = ofensores.map((o) => ({ ...o, setor: inventario.SETORES[o.setor] || o.setor, diferencaValor: reportUtil.fmtMoneyBR(o.diferencaValor) }));
-    const nomeArquivo = reportUtil.slugify(`inventario-diferencas-${unidade}`);
+    const nomeArquivo = reportUtil.nomeArquivoComData(`inventario-diferencas-${unidade}`);
     if (req.params.formato === 'csv') {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
@@ -2511,7 +2511,7 @@ app.get('/api/parque/relatorio.:formato(csv|pdf)', requireSection('parque'), asy
     checkin: c.iniciado ? 'Feito' : 'Aguardando',
     termo: c.termoAssinado ? 'Sim' : 'Não',
   }));
-  const nomeArquivo = reportUtil.slugify('parque-checkins');
+  const nomeArquivo = reportUtil.nomeArquivoComData('parque-checkins');
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
@@ -2579,7 +2579,7 @@ app.get('/api/festas/relatorio.:formato(csv|pdf)', requireSection('festas'), asy
     dataDeUso: reportUtil.fmtDataBR(f.dataDeUso), valorTotal: reportUtil.fmtMoneyBR(f.valorTotal),
     status: f.status, utilizado: f.utilizado ? 'Sim' : 'Não',
   }));
-  const nomeArquivo = reportUtil.slugify('festas');
+  const nomeArquivo = reportUtil.nomeArquivoComData('festas');
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
@@ -3318,12 +3318,19 @@ const LARGURAS_RELATORIO_CENTRAL = {
 app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes'), async (req, res) => {
   const cards = filtrarCardsCentral(await todosCardsCentral(req), req);
   const { colunas, linhas } = prepararRelatorioCentral(cards);
+  // nome do arquivo reflete o filtro de tipo ativo na tela (ex: "Compra" ->
+  // solicitacoes-compra-2026-08-07.csv), nao um "central-solicitacoes.csv"
+  // generico que nao diz se e de tudo ou so de um tipo
+  const baseArquivo = req.query.tipo
+    ? `solicitacoes-${TIPOS_CENTRAL_LABEL[req.query.tipo] || req.query.tipo}`
+    : 'central-solicitacoes-todas';
+  const nomeArquivo = reportUtil.nomeArquivoComData(baseArquivo);
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('central-solicitacoes')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, larguras: LARGURAS_RELATORIO_CENTRAL, nomeArquivo: reportUtil.slugify('central-solicitacoes') });
+  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, larguras: LARGURAS_RELATORIO_CENTRAL, nomeArquivo });
 });
 
 // casa a lista de itens (descricao + "tem foto?") mandada em payload.itens
@@ -3751,10 +3758,10 @@ app.get('/api/entregas/relatorio-entregadores.:formato(csv|pdf)', requireSection
   const { colunas, linhas } = prepararEntregasPorEntregador(rows);
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-por-entregador')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('entregas-por-entregador')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Entregas · Por Entregador', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} entregador(es)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-por-entregador') });
+  reportUtil.writePDF(res, { titulo: 'Entregas · Por Entregador', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} entregador(es)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('entregas-por-entregador') });
 });
 
 app.get('/api/entregas/relatorio-unidades.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
@@ -3762,10 +3769,10 @@ app.get('/api/entregas/relatorio-unidades.:formato(csv|pdf)', requireSection('en
   const { colunas, linhas } = prepararEntregasPorUnidade(rows);
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-por-unidade')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('entregas-por-unidade')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Entregas · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-por-unidade') });
+  reportUtil.writePDF(res, { titulo: 'Entregas · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('entregas-por-unidade') });
 });
 
 app.get('/api/entregas/relatorio-lancamentos.:formato(csv|pdf)', requireSection('entregas'), async (req, res) => {
@@ -3773,10 +3780,10 @@ app.get('/api/entregas/relatorio-lancamentos.:formato(csv|pdf)', requireSection(
   const { colunas, linhas } = prepararEntregasLancamentos(rows);
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('entregas-lancamentos')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('entregas-lancamentos')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Entregas · Lançamentos', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} lançamento(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('entregas-lancamentos') });
+  reportUtil.writePDF(res, { titulo: 'Entregas · Lançamentos', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} lançamento(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('entregas-lancamentos') });
 });
 
 app.get('/api/entregas/etiqueta/:id', (req, res, next) => {
@@ -3910,10 +3917,10 @@ app.get('/api/ifood/relatorio-unidades.:formato(csv|pdf)', requireSection('ifood
   const { colunas, linhas } = prepararIfoodPorUnidade(rows);
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('ifood-por-unidade')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('ifood-por-unidade')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'iFood · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('ifood-por-unidade') });
+  reportUtil.writePDF(res, { titulo: 'iFood · Por Unidade', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} unidade(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('ifood-por-unidade') });
 });
 
 app.get('/api/ifood/relatorio-vendas.:formato(csv|pdf)', requireSection('ifood'), async (req, res) => {
@@ -3921,10 +3928,10 @@ app.get('/api/ifood/relatorio-vendas.:formato(csv|pdf)', requireSection('ifood')
   const { colunas, linhas } = prepararIfoodVendas(rows);
   if (req.params.formato === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.slugify('ifood-vendas')}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportUtil.nomeArquivoComData('ifood-vendas')}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'iFood · Vendas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} venda(s)`, colunas, linhas, nomeArquivo: reportUtil.slugify('ifood-vendas') });
+  reportUtil.writePDF(res, { titulo: 'iFood · Vendas', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} venda(s)`, colunas, linhas, nomeArquivo: reportUtil.nomeArquivoComData('ifood-vendas') });
 });
 
 app.get('/api/ifood/sincronizacao', requireSection('ifood'), (req, res) => {

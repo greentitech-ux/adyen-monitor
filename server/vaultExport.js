@@ -49,10 +49,10 @@ function toCSV(rows) {
 // larguras em pt somando ~770 (A4 paisagem menos margens de 36pt de cada lado)
 const LARGURAS = { grupo: 70, subgrupo: 80, titulo: 110, url: 130, usuario: 80, senha: 90, observacao: 130, atualizadoEm: 80 };
 
-function writePDF(res, { titulo, subtitulo, rows }) {
+function writePDF(res, { titulo, subtitulo, rows, nomeArquivo }) {
   const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${slugify(titulo)}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${slugify(nomeArquivo || titulo)}.pdf"`);
   doc.pipe(res);
 
   const tableX = doc.page.margins.left;
