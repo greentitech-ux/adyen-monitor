@@ -3262,6 +3262,28 @@ app.post('/api/central/:tipo/:id/marcar-visto', auth.requireMasterOrAdmin, async
   }
 });
 
+// envio manual (sob demanda) de 1 ou mais tickets por e-mail pra um
+// destinatario qualquer (fornecedor, gerente etc.) - Master/Admin decide na
+// hora quem recebe, sem fluxo de decisao por e-mail (isso e so informativo,
+// ver relatorioMV.enviarCardsPorEmail). Reaproveita todosCardsCentral(req)
+// pra so deixar enviar tickets que o usuario logado ja pode ver
+app.post('/api/central/enviar-email', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const { tickets, destinatario } = req.body;
+    if (!destinatario) return res.status(400).json({ error: 'Informe o e-mail de destino.' });
+    if (!Array.isArray(tickets) || !tickets.length) return res.status(400).json({ error: 'Selecione ao menos um ticket.' });
+    const todos = await todosCardsCentral(req);
+    const cards = tickets
+      .map(({ tipo, id }) => todos.find((c) => c.tipo === tipo && c.id === id))
+      .filter(Boolean);
+    if (!cards.length) return res.status(404).json({ error: 'Ticket(s) não encontrado(s).' });
+    await relatorioMV.enviarCardsPorEmail(cards, destinatario);
+    res.json({ enviados: cards.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // apagar mensagem - so o Master (nao o Admin, que so participa da conversa)
 app.delete('/api/central/:tipo/:id/chat/:messageId', auth.requireMaster, async (req, res) => {
   try {

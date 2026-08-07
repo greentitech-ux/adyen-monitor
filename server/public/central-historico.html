@@ -105,7 +105,7 @@
   .kanban-col-header .badge{font-size:11px;}
   .kanban-count{font-family:var(--mono);color:var(--muted);font-size:11.5px;}
   .kanban-cards{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
-  .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s ease;}
+  .kcard{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s ease;}
   .kcard:hover{border-color:var(--accent);}
   .kcard .linha1{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;font-size:12.5px;font-weight:600;}
   .kcard .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;}
@@ -119,6 +119,13 @@
   .sheet-wrap{position:relative;width:100%;max-width:640px;}
   .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
   .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
+  .sheet-email-flutuante{position:absolute;bottom:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet-email-flutuante:hover{color:var(--accent);border-color:var(--accent);}
+  .kcard-check{position:absolute;top:8px;right:8px;width:18px;height:18px;cursor:pointer;accent-color:var(--accent);z-index:2;}
+  .barra-selecao{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:40;background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);display:flex;align-items:center;gap:12px;font-size:12.5px;}
+  .barra-selecao button{font-family:var(--sans);font-size:12px;padding:7px 12px;border-radius:7px;border:none;cursor:pointer;}
+  .barra-selecao .bs-enviar{background:var(--accent);color:#06202b;font-weight:700;}
+  .barra-selecao .bs-cancelar{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
   .notif-chat .notif-corpo{font-size:11.5px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   @keyframes notif-in{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
   .notif-solicitacao-wrap{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 28px));}
@@ -207,6 +214,7 @@
   <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
     <span><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></span>
     <span style="display:flex;gap:6px;">
+      <button type="button" class="export-btn" id="btn-modo-selecao" onclick="toggleModoSelecao()">☑️ Selecionar</button>
       <button type="button" class="export-btn" onclick="baixarRelatorioCentral('csv')">📄 Relatório CSV</button>
       <button type="button" class="export-btn" onclick="baixarRelatorioCentral('pdf')">📄 Relatório PDF</button>
     </span>
@@ -312,6 +320,7 @@
 <div class="overlay hidden" id="overlay-detalhe">
   <div class="sheet-wrap">
     <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharDetalhe()">✕</span>
+    <span class="sheet-email-flutuante hidden" id="btn-email-detalhe" title="Enviar por e-mail" onclick="abrirEnviarEmailAtual()">✉️</span>
     <div class="sheet">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
       <h3 id="d-titulo" style="margin:0;"></h3>
@@ -376,6 +385,26 @@
       <div id="d-tipo-corpo"></div>
     </div>
     <div class="msg hidden" id="msg-detalhe"></div>
+    </div>
+  </div>
+</div>
+
+<div class="barra-selecao hidden" id="barra-selecao">
+  <span id="bs-contagem">0 selecionado(s)</span>
+  <button type="button" class="bs-enviar" onclick="abrirEnviarEmailSelecao()">✉️ Enviar por e-mail</button>
+  <button type="button" class="bs-cancelar" onclick="toggleModoSelecao()">Cancelar</button>
+</div>
+
+<div class="overlay hidden" id="overlay-enviar-email">
+  <div class="sheet-wrap" style="max-width:420px;">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharEnviarEmail()">✕</span>
+    <div class="sheet">
+      <h3 style="margin:0 0 4px;">✉️ Enviar por e-mail</h3>
+      <div class="sub" id="ee-resumo" style="margin-bottom:12px;"></div>
+      <label>E-mail de destino</label>
+      <input type="email" id="ee-destinatario" placeholder="ex: fornecedor@exemplo.com">
+      <div class="msg hidden" id="msg-enviar-email"></div>
+      <button type="button" class="btn-primary" style="margin-top:12px;" onclick="confirmarEnviarEmail()" id="btn-confirmar-enviar-email">Enviar</button>
     </div>
   </div>
 </div>
@@ -489,6 +518,9 @@ const TIPOS_GERAIS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota']
 let ME = null;
 let IS_MASTER = false;
 let IS_ADMIN = false;
+let MODO_SELECAO = false;
+let TICKETS_SELECIONADOS = new Set(); // chaves "tipo::id"
+let EMAIL_ENVIO_TICKETS = []; // [{tipo,id}] do modal de envio por e-mail aberto no momento
 let SECOES = [];
 let TECNICOS = [];
 let PESSOAS_MANUTENCAO = [];
@@ -556,8 +588,11 @@ function badgeVencimento(c){
 const STATUS_COLUNAS = ['PENDENTE','APROVADO','REJEITADO'];
 
 function kcardHtml(c){
+  const chave = c.tipo+'::'+c.id;
+  const onclickCard = MODO_SELECAO ? `toggleSelecaoCard('${chave}')` : `abrirDetalhe('${c.tipo}','${c.id}')`;
   return `
-    <div class="kcard" onclick="abrirDetalhe('${c.tipo}','${c.id}')">
+    <div class="kcard" onclick="${onclickCard}">
+      ${MODO_SELECAO ? `<input type="checkbox" class="kcard-check" ${TICKETS_SELECIONADOS.has(chave)?'checked':''} onclick="event.stopPropagation();toggleSelecaoCard('${chave}')">` : ''}
       <div class="linha1">
         <span class="tipo-badge" style="background:#1a2230;color:var(--muted);">#${c.numeroTicket ?? '—'}</span>
         <span class="tipo-badge">${iconeTipo(c.tipo)} ${TIPOS_INFO[c.tipo]?.label||c.tipo}</span>
@@ -572,6 +607,77 @@ function kcardHtml(c){
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade||'—')} · ${escapeHtml(c.criadoPorEmail||'')} · ${fmtDataHora(c.criadoEm)}</div>
       ${(c.atribuidosEmails && c.atribuidosEmails.length) ? `<div class="sub" style="color:var(--accent);">👤 atribuído a ${escapeHtml(c.atribuidosEmails.join(', '))}</div>` : (c.direcionadoParaEmail ? `<div class="sub" style="color:var(--accent);">👤 direcionado a ${escapeHtml(c.direcionadoParaEmail)}</div>` : '')}
     </div>`;
+}
+
+// ---------- selecao em lote (checkbox nos cards) + envio por e-mail (1 card
+// ou vários) - so Master/Admin (mesmo gate da rota POST /api/central/enviar-email) ----------
+function toggleModoSelecao(){
+  MODO_SELECAO = !MODO_SELECAO;
+  TICKETS_SELECIONADOS.clear();
+  document.getElementById('btn-modo-selecao').textContent = MODO_SELECAO ? '✕ Cancelar seleção' : '☑️ Selecionar';
+  atualizarBarraSelecao();
+  renderKanban();
+}
+
+function toggleSelecaoCard(chave){
+  if(TICKETS_SELECIONADOS.has(chave)) TICKETS_SELECIONADOS.delete(chave);
+  else TICKETS_SELECIONADOS.add(chave);
+  atualizarBarraSelecao();
+  renderKanban();
+}
+
+function atualizarBarraSelecao(){
+  const n = TICKETS_SELECIONADOS.size;
+  document.getElementById('barra-selecao').classList.toggle('hidden', !MODO_SELECAO || n===0);
+  document.getElementById('bs-contagem').textContent = `${n} selecionado${n===1?'':'s'}`;
+}
+
+function abrirEnviarEmailAtual(){
+  if(!DETALHE_ATUAL) return;
+  abrirEnviarEmail([{tipo:DETALHE_ATUAL.tipo, id:DETALHE_ATUAL.id}], `Ticket #${DETALHE_ATUAL.numeroTicket ?? '—'} · ${DETALHE_ATUAL.titulo||''}`);
+}
+
+function abrirEnviarEmailSelecao(){
+  if(!TICKETS_SELECIONADOS.size) return;
+  const lista = [...TICKETS_SELECIONADOS].map(ch=>{ const [tipo,id]=ch.split('::'); return {tipo,id}; });
+  abrirEnviarEmail(lista, `${lista.length} ticket${lista.length===1?'':'s'} selecionado${lista.length===1?'':'s'}`);
+}
+
+function abrirEnviarEmail(lista, resumoTexto){
+  EMAIL_ENVIO_TICKETS = lista;
+  document.getElementById('ee-resumo').textContent = resumoTexto;
+  document.getElementById('ee-destinatario').value = '';
+  document.getElementById('msg-enviar-email').classList.add('hidden');
+  document.getElementById('btn-confirmar-enviar-email').disabled = false;
+  document.getElementById('overlay-enviar-email').classList.remove('hidden');
+}
+
+function fecharEnviarEmail(){
+  document.getElementById('overlay-enviar-email').classList.add('hidden');
+}
+
+async function confirmarEnviarEmail(){
+  const destinatario = document.getElementById('ee-destinatario').value.trim();
+  const msg = document.getElementById('msg-enviar-email');
+  const btn = document.getElementById('btn-confirmar-enviar-email');
+  if(!destinatario){ msg.textContent = 'Informe o e-mail de destino.'; msg.className = 'msg err'; msg.classList.remove('hidden'); return; }
+  btn.disabled = true;
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch('/api/central/enviar-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tickets: EMAIL_ENVIO_TICKETS, destinatario }) });
+    const body = await res.json();
+    if(!res.ok) throw new Error(body.error||'Erro ao enviar');
+    msg.textContent = `E-mail enviado (${body.enviados} ticket${body.enviados===1?'':'s'}).`;
+    msg.className = 'msg ok';
+    msg.classList.remove('hidden');
+    setTimeout(()=>{
+      fecharEnviarEmail();
+      if(MODO_SELECAO) toggleModoSelecao(); // sai do modo selecao depois de um envio em lote
+    }, 1200);
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+    btn.disabled = false;
+  }
 }
 
 function contagemStatus(lista){
@@ -708,6 +814,9 @@ function abrirDetalhe(tipo, id){
   document.getElementById('btn-atribuir-responsavel').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('d-responsavel').classList.add('hidden'); // sempre comeca fechado, abre so no clique do botao ao lado do nome
   if(IS_MASTER) carregarResponsavelSelect(c);
+
+  // mesma permissao da rota POST /api/central/enviar-email (Master/Admin)
+  document.getElementById('btn-email-detalhe').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
 
   const podeReatribuir = IS_MASTER || IS_ADMIN;
   const podeMudarTipo = podeReatribuir && c.status !== 'CONVERTIDO' && (TIPOS_GERAIS.includes(c.tipo) || c.tipo === 'estorno');
@@ -1546,6 +1655,7 @@ async function boot(){
   document.getElementById('nav-mensalistas').classList.toggle('hidden', !SECOES.includes('parque'));
   document.getElementById('nav-grupo-saltiverso').classList.toggle('hidden', !(SECOES.includes('parque') || SECOES.includes('parque-checkin') || SECOES.includes('festas')));
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
+  document.getElementById('btn-modo-selecao').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
   document.getElementById('nav-solicitacoes').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
   document.getElementById('nav-manutencao').classList.toggle('hidden', !SECOES.includes('manutencao'));
