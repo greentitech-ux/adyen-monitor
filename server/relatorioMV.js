@@ -220,7 +220,19 @@ function getTransporter() {
   const pass = process.env.RELATORIO_EMAIL_PASS;
   if (!user || !pass) throw new Error('RELATORIO_EMAIL_USER/RELATORIO_EMAIL_PASS não configurados.');
   if (!transporterCache) {
-    transporterCache = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+    transporterCache = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user, pass },
+      // Render (e outros PaaS) as vezes resolvem smtp.gmail.com por IPv6
+      // e a rota trava sem completar a conexao (fica em "Connection
+      // timeout" em vez de erro de autenticacao). Forcar IPv4 evita isso.
+      family: 4,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+    });
   }
   return transporterCache;
 }
