@@ -2206,6 +2206,16 @@ app.delete('/api/inventario/saidas/:id', auth.requireMaster, async (req, res) =>
   }
 });
 
+// contagens de TODAS as unidades permitidas numa data - usado pelo card de
+// Estoque no Painel (quantas/quais unidades ja fizeram a contagem hoje +
+// detalhamento por setor/item quando o usuario clica numa unidade)
+app.get('/api/inventario/contagens-do-dia', requireSection('inventario'), async (req, res) => {
+  const { data } = req.query;
+  if (!data) return res.status(400).json({ error: 'Informe a data.' });
+  const todas = await inventario.listContagens();
+  res.json(todas.filter((c) => c.data === data && podeUnidadeInventario(req, c.unidade)));
+});
+
 app.get('/api/inventario/contagens', requireSection('inventario'), async (req, res) => {
   const { unidade, data } = req.query;
   if (!unidade || !data) return res.status(400).json({ error: 'Informe unidade e data.' });
