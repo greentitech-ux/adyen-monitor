@@ -20,6 +20,7 @@ const EDITS = db.collection('fechamentoEdicoes');
 // diario (RELATORIO_DIRECIONADO_EMAIL, ver relatorioMV.js), entao ja entra
 // no mesmo fluxo de aprovar/recusar por e-mail sem precisar duplicar nada
 const LIMITE_QUEBRA_CAIXA = 10;
+const DATA_RE_SIMPLES = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_QUEBRA_CAIXA_DIRECIONADO = process.env.RELATORIO_DIRECIONADO_EMAIL || 'mv@grupobravoempresarial.com';
 function fmtMoneyQuebra(v) {
   const n = Number(v) || 0;
@@ -215,25 +216,64 @@ async function create({ unidade, unidadeNome, grupo, data, gerente, campos, kpis
   let cardQuebraCaixa = null;
   if (Math.abs(registro.diferenca) > LIMITE_QUEBRA_CAIXA) {
     try {
-      cardQuebraCaixa = await solicitacoes.create({
-        tipo: 'quebra-caixa',
-        unidade,
-        unidadeNome: registro.unidadeNome,
-        titulo: `Quebra de caixa · ${registro.unidadeNome} (${data}) · diferença de ${fmtMoneyQuebra(registro.diferenca)}`,
-        valorEstimado: registro.diferenca,
-        observacao: registro.observacao || 'Diferença detectada automaticamente no lançamento do fechamento - sem observação da loja.',
-        fechamentoId: id,
-        criadoPorId,
-        criadoPorEmail,
-        direcionadoParaId: null,
-        direcionadoParaEmail: EMAIL_QUEBRA_CAIXA_DIRECIONADO,
-      });
+      cardQuebraCaixa = await criarCardQuebraCaixa(registro);
     } catch (err) {
       console.error(`Falha ao criar ticket automático de Quebra de caixa (fechamento ${id}):`, err.message);
     }
   }
 
   return { ...registro, cardQuebraCaixa };
+}
+
+// gera o ticket de "Quebra de caixa" pra um fechamento ja gravado - usado
+// tanto na hora do lançamento (create() acima) quanto retroativamente
+// (backfillQuebraCaixa, pra pegar fechamentos lançados ANTES dessa feature
+// existir)
+async function criarCardQuebraCaixa(registro) {
+  return solicitacoes.create({
+    tipo: 'quebra-caixa',
+    unidade: registro.unidade,
+    unidadeNome: registro.unidadeNome,
+    titulo: `Quebra de caixa · ${registro.unidadeNome} (${registro.data}) · diferença de ${fmtMoneyQuebra(registro.diferenca)}`,
+    valorEstimado: registro.diferenca,
+    observacao: registro.observacao || 'Diferença detectada automaticamente no lançamento do fechamento - sem observação da loja.',
+    fechamentoId: registro.id,
+    criadoPorId: registro.criadoPorId,
+    criadoPorEmail: registro.criadoPorEmail,
+    direcionadoParaId: null,
+    direcionadoParaEmail: EMAIL_QUEBRA_CAIXA_DIRECIONADO,
+  });
+}
+
+// varre fechamentos JA LANÇADOS num período (pensado pra pegar quem foi
+// lançado antes do ticket automático de Quebra de caixa existir) e cria o
+// ticket pra quem tem diferença acima do limite e ainda não tem um -
+// idempotente: rodar de novo no mesmo período não duplica (confere por
+// fechamentoId nos tickets de quebra-caixa já existentes)
+async function backfillQuebraCaixa(dataInicio, dataFim) {
+  if (!dataInicio || !DATA_RE_SIMPLES.test(dataInicio)) throw new Error('Data inicial inválida (use AAAA-MM-DD).');
+  if (!dataFim || !DATA_RE_SIMPLES.test(dataFim)) throw new Error('Data final inválida (use AAAA-MM-DD).');
+
+  const todos = await listAllUncached();
+  const doPeriodo = todos.filter((f) => f.data >= dataInicio && f.data <= dataFim);
+
+  const solicitacoesTodas = await solicitacoes.listAll();
+  const fechamentosComCard = new Set(
+    solicitacoesTodas.filter((s) => s.tipo === 'quebra-caixa' && s.fechamentoId).map((s) => s.fechamentoId)
+  );
+
+  const resultado = { verificados: doPeriodo.length, cardsCriados: [], jaTinhaCard: 0, semDiferencaRelevante: 0, erros: [] };
+  for (const f of doPeriodo) {
+    if (Math.abs(f.diferenca) <= LIMITE_QUEBRA_CAIXA) { resultado.semDiferencaRelevante++; continue; }
+    if (fechamentosComCard.has(f.id)) { resultado.jaTinhaCard++; continue; }
+    try {
+      const card = await criarCardQuebraCaixa(f);
+      resultado.cardsCriados.push(card);
+    } catch (err) {
+      resultado.erros.push({ fechamentoId: f.id, unidade: f.unidadeNome, data: f.data, erro: err.message });
+    }
+  }
+  return resultado;
 }
 
 async function listAllUncached() {
@@ -593,4 +633,5 @@ function invalidarCache() {
 module.exports = {
   CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao,
   decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache, marcarNotificacaoVistaEdicao, redirecionarEdicao,
+  backfillQuebraCaixa,
 };
