@@ -3512,6 +3512,25 @@ app.post('/api/chamados', auth.requireMaster, async (req, res) => {
   }
 });
 
+app.get('/api/chamados/:id', auth.requireMaster, async (req, res) => {
+  const chamado = await chamadosTI.getOne(req.params.id);
+  if (!chamado) return res.sendStatus(404);
+  res.json(chamado);
+});
+
+// Master troca o tecnico responsavel (ex: escalado ficou indisponivel) -
+// mesmo botao "Atribuir Técnico" ao lado de "Atribuir responsável" no
+// detalhe da Central (ver central-historico.html)
+app.patch('/api/chamados/:id', auth.requireMaster, async (req, res) => {
+  try {
+    const chamado = await chamadosTI.reatribuir(req.params.id, { tecnicoId: req.body.tecnicoId, tecnicoEmail: req.body.tecnicoEmail });
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // check-in: tecnico chegou na loja, registra os itens (descricao + foto) de
 // como esta antes de mexer
 app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('fotosAntes', 6), async (req, res) => {
@@ -3574,6 +3593,12 @@ app.get('/api/chamados-manutencao', requireSection('manutencao'), async (req, re
   const todos = await chamadosManutencao.listAll();
   if (req.isMaster) return res.json(todos);
   res.json(todos.filter((c) => ehResponsavelManutencao(c, req.user.id)));
+});
+
+app.get('/api/chamados-manutencao/:id', auth.requireMaster, async (req, res) => {
+  const chamado = await chamadosManutencao.getOne(req.params.id);
+  if (!chamado) return res.sendStatus(404);
+  res.json(chamado);
 });
 
 app.post('/api/chamados-manutencao', auth.requireMaster, async (req, res) => {

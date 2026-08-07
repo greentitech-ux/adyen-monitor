@@ -127,4 +127,16 @@ async function cancelar(id, { motivo }) {
   return getOne(id);
 }
 
-module.exports = { STATUSES, create, listAll, getOne, iniciar, concluir, cancelar };
+// Master troca o tecnico responsavel de um chamado ja existente (ex: o
+// tecnico escalado ficou indisponivel) - em qualquer status, igual o
+// Master ja pode reatribuir o responsavel de qualquer solicitacao
+async function reatribuir(id, { tecnicoId, tecnicoEmail }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  if (!tecnicoId) throw new Error('Escolha o técnico responsável.');
+  await COLLECTION.doc(id).update({ tecnicoId, tecnicoEmail: tecnicoEmail || null });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+module.exports = { STATUSES, create, listAll, getOne, iniciar, concluir, cancelar, reatribuir };

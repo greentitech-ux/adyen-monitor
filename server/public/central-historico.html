@@ -322,15 +322,32 @@
     <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharDetalhe()">✕</span>
     <span class="sheet-email-flutuante hidden" id="btn-email-detalhe" title="Enviar por e-mail" onclick="abrirEnviarEmailAtual()">✉️</span>
     <div class="sheet">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <h3 id="d-titulo" style="margin:0;"></h3>
-      <button type="button" class="link-btn" id="btn-atribuir-responsavel" style="flex:none;white-space:nowrap;" onclick="toggleResponsavel()">👤 Atribuir responsável</button>
+      <div style="display:flex;gap:10px;flex:none;">
+        <button type="button" class="link-btn" id="btn-atribuir-tecnico" style="flex:none;white-space:nowrap;" onclick="toggleTecnicoReatribuir()">🔧 Atribuir Técnico</button>
+        <button type="button" class="link-btn" id="btn-atribuir-responsavel" style="flex:none;white-space:nowrap;" onclick="toggleResponsavel()">👤 Atribuir responsável</button>
+      </div>
     </div>
     <div class="sub" id="d-sub"></div>
     <div id="d-corpo" style="font-size:13px;display:flex;flex-direction:column;gap:8px;"></div>
     <div id="d-master-crud" class="hidden" style="display:flex;gap:14px;margin-top:10px;">
       <button type="button" class="link-btn" id="btn-editar-card" onclick="abrirEdicaoCard()">✏️ Editar</button>
       <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCard()">🗑️ Excluir</button>
+    </div>
+    <div id="d-tecnico-reatribuir" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">🔧 Atribuir Técnico</div>
+      <div class="sub" style="margin:-2px 0 8px;">Troca quem está responsável pelo chamado já criado (ex: o técnico escalado ficou indisponível).</div>
+      <div id="dt-tecnico-wrap" class="hidden">
+        <label>Técnico responsável</label>
+        <select id="dt-tecnico"></select>
+      </div>
+      <div id="dt-manutencao-wrap" class="hidden">
+        <label>Quem vai fazer a manutenção</label>
+        <div class="sub" style="margin:-2px 0 8px;">Escolha 1 ou mais - só quem for escolhido enxerga o chamado.</div>
+        <div id="dt-manutencao-pessoas"></div>
+      </div>
+      <button type="button" class="btn-primary" style="margin-top:8px;" onclick="salvarTecnicoReatribuir()">Salvar</button>
     </div>
     <div id="d-responsavel" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">👤 Atribuir responsável</div>
@@ -822,6 +839,14 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-responsavel').classList.add('hidden'); // sempre comeca fechado, abre so no clique do botao ao lado do nome
   if(IS_MASTER) carregarResponsavelSelect(c);
 
+  // atribuir Técnico: quem de fato executa o chamado ja criado (Manutencao/
+  // Suporte de TI, ja aprovado) - separado de "Atribuir responsável" (quem
+  // ENXERGA o ticket na Central). So existe depois que o chamado nasceu.
+  const podeAtribuirTecnico = IS_MASTER && c.chamadoId && (c.tipo==='suporte-ti' || c.tipo==='manutencao');
+  document.getElementById('btn-atribuir-tecnico').classList.toggle('hidden', !podeAtribuirTecnico);
+  document.getElementById('d-tecnico-reatribuir').classList.add('hidden');
+  if(podeAtribuirTecnico) carregarTecnicoReatribuir(c);
+
   // mesma permissao da rota POST /api/central/enviar-email (Master/Admin)
   document.getElementById('btn-email-detalhe').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
 
@@ -953,6 +978,55 @@ async function carregarResponsavelSelect(c){
       ? lista.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${u.id}" data-email="${escapeHtml(u.email)}" style="width:auto;" ${atribuidos.has(u.id)?'checked':''}> ${escapeHtml(nomeExibicao(u))} (${PAPEL_LABEL[u.papel]||u.papel})</label>`).join('')
       : '<div class="sub">ninguém disponível pra esse grupo</div>';
   }catch(e){ wrap.innerHTML = '<div class="sub">erro ao carregar</div>'; }
+}
+
+// ---------- atribuir Técnico: reatribui quem EXECUTA um chamado ja criado
+// (chamados/tecnico para Suporte de TI, chamados-manutencao para Manutencao) -
+// diferente de "Atribuir responsável" (quem enxerga o ticket na Central) ----------
+function toggleTecnicoReatribuir(){
+  document.getElementById('d-tecnico-reatribuir').classList.toggle('hidden');
+}
+
+async function carregarTecnicoReatribuir(c){
+  const wrapTecnico = document.getElementById('dt-tecnico-wrap');
+  const wrapManutencao = document.getElementById('dt-manutencao-wrap');
+  wrapTecnico.classList.toggle('hidden', c.tipo!=='suporte-ti');
+  wrapManutencao.classList.toggle('hidden', c.tipo!=='manutencao');
+  try{
+    if(c.tipo==='suporte-ti'){
+      const chamado = await fetch(`/api/chamados/${c.chamadoId}`).then(r=>r.ok?r.json():null);
+      document.getElementById('dt-tecnico').innerHTML = TECNICOS.length
+        ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}" ${chamado && chamado.tecnicoId===t.id?'selected':''}>${escapeHtml(nomeExibicao(t))}</option>`).join('')
+        : '<option value="" disabled selected>nenhum técnico cadastrado</option>';
+    } else if(c.tipo==='manutencao'){
+      const chamado = await fetch(`/api/chamados-manutencao/${c.chamadoId}`).then(r=>r.ok?r.json():null);
+      const atribuidos = new Set((chamado && chamado.responsaveis || []).map(r=>r.id));
+      document.getElementById('dt-manutencao-pessoas').innerHTML = PESSOAS_MANUTENCAO.length
+        ? PESSOAS_MANUTENCAO.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${p.id}" data-email="${escapeHtml(p.email)}" style="width:auto;" ${atribuidos.has(p.id)?'checked':''}> ${escapeHtml(nomeExibicao(p))}</label>`).join('')
+        : '<div class="sub">nenhuma pessoa com acesso de manutenção cadastrada</div>';
+    }
+  }catch(e){ /* falha ao pre-carregar o chamado atual - o select/checkboxes ficam sem selecao previa */ }
+}
+
+async function salvarTecnicoReatribuir(){
+  const c = DETALHE_ATUAL;
+  if(!c || !c.chamadoId) return;
+  try{
+    if(c.tipo==='suporte-ti'){
+      const sel = document.getElementById('dt-tecnico');
+      const opt = sel.selectedOptions[0];
+      if(!opt) throw new Error('Escolha o técnico responsável.');
+      const res = await fetch(`/api/chamados/${c.chamadoId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tecnicoId: opt.value, tecnicoEmail: opt.dataset.email }) });
+      if(!res.ok) throw new Error((await res.json()).error || 'Erro ao salvar técnico.');
+    } else if(c.tipo==='manutencao'){
+      const marcados = Array.from(document.querySelectorAll('#dt-manutencao-pessoas input[type=checkbox]:checked'));
+      if(!marcados.length) throw new Error('Escolha quem vai fazer a manutenção.');
+      const responsaveis = marcados.map(i=>({ id:i.value, email:i.dataset.email }));
+      const res = await fetch(`/api/chamados-manutencao/${c.chamadoId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ responsaveis }) });
+      if(!res.ok) throw new Error((await res.json()).error || 'Erro ao salvar responsáveis.');
+    }
+    document.getElementById('d-tecnico-reatribuir').classList.add('hidden');
+  }catch(err){ alert(err.message); }
 }
 
 function rotaDirecionar(c){
