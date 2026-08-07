@@ -145,6 +145,47 @@ function montarHtmlCardUnico(card, titulo) {
   </div>`;
 }
 
+// html de N cards (1 ou varios) - usado no envio manual sob demanda (botao
+// "enviar por e-mail" no detalhe de um card, ou selecionar varios na lista),
+// diferente de notificarCardMV/enviarRelatorio que sao fluxos automaticos
+// pro MV. Aqui NUNCA gera token de decisao nem botoes Aprovar/Recusar - o
+// destinatario pode ser qualquer e-mail digitado na hora (fornecedor,
+// gerente etc.), entao dar poder de decisao por link seria arriscado demais
+// pra um envio ad-hoc
+function montarHtmlCards(cards, titulo) {
+  const semBotoesDecisao = cards.map((c) => ({ ...c, tokenAcao: null }));
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
+    <div style="background:#1a56db;color:#fff;padding:18px 22px;border-radius:8px 8px 0 0;">
+      <div style="font-size:17px;font-weight:bold;">${escapeHtml(titulo)}</div>
+      <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${dataHojeBR()} · ${cards.length} ticket${cards.length === 1 ? '' : 's'}</div>
+    </div>
+    <div style="border:1px solid #e5e5e5;border-top:none;padding:18px 22px;border-radius:0 0 8px 8px;">
+      ${semBotoesDecisao.map(htmlCard).join('')}
+    </div>
+    <div style="font-family:Arial,sans-serif;font-size:11px;color:#999;text-align:center;margin-top:14px;">
+      Zenith Ops · enviado manualmente
+    </div>
+  </div>`;
+}
+
+// envio manual (Master/Admin escolhe o destinatario na hora) de 1 ou mais
+// cards - ver rota POST /api/central/enviar-email em index.js
+async function enviarCardsPorEmail(cards, destinatario) {
+  if (!destinatario) throw new Error('Informe o e-mail de destino.');
+  if (!cards || !cards.length) throw new Error('Nenhum ticket selecionado.');
+  const transporter = getTransporter();
+  const titulo = cards.length === 1
+    ? `Ticket #${cards[0].numeroTicket ?? '—'} · ${cards[0].titulo || ''}`
+    : `${cards.length} tickets · Zenith Ops`;
+  await transporter.sendMail({
+    from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
+    to: destinatario,
+    subject: titulo,
+    html: montarHtmlCards(cards, titulo),
+  });
+}
+
 // e-mail IMEDIATO de UM card assim que ele e direcionado ao MV (na criacao
 // ou num redirecionamento depois) - diferente do relatorio diario
 // (enviarRelatorio), que manda o resumo de todos de uma vez no horario
@@ -211,4 +252,4 @@ function iniciarAgendamento() {
   }, { timezone: FUSO_BR });
 }
 
-module.exports = { enviarRelatorio, iniciarAgendamento, montarDados, montarHtml, notificarCardMV, MV_EMAIL, TIPOS_COM_ACAO_POR_EMAIL };
+module.exports = { enviarRelatorio, iniciarAgendamento, montarDados, montarHtml, notificarCardMV, enviarCardsPorEmail, MV_EMAIL, TIPOS_COM_ACAO_POR_EMAIL };
