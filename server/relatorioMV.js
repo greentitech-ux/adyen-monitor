@@ -222,6 +222,76 @@ async function notificarCardMV(card) {
 // o IP literal como host - "servername" garante que a validacao do
 // certificado TLS (SNI) continua batendo com smtp.gmail.com normalmente.
 //
+// ---------- caminho preferido: API HTTPS do Gmail (porta 443) ----------
+// Em producao (Render) o SMTP de saida esta bloqueado por completo: timeout
+// de conexao na 465 E na 587, em todos os IPs do Gmail - nada a ver com a
+// conta/senha. A API REST do Gmail (gmail.googleapis.com, HTTPS/443) passa
+// sempre, e a mesma porta que o app ja usa pro Firestore. Requer um refresh
+// token OAuth2 da conta remetente (escopo gmail.send) nas envs:
+//   GMAIL_OAUTH_CLIENT_ID / GMAIL_OAUTH_CLIENT_SECRET / GMAIL_OAUTH_REFRESH_TOKEN
+// (passo a passo no .env.example). Quando as 3 estao presentes, todo envio
+// vai por aqui; sem elas, cai no caminho SMTP antigo (util em ambiente que
+// nao bloqueia SMTP).
+function gmailApiConfigurada() {
+  return !!(process.env.GMAIL_OAUTH_CLIENT_ID && process.env.GMAIL_OAUTH_CLIENT_SECRET && process.env.GMAIL_OAUTH_REFRESH_TOKEN);
+}
+
+let tokenGmailCache = null; // { accessToken, expiraEm (ms epoch) }
+async function accessTokenGmail(forcarNovo) {
+  if (!forcarNovo && tokenGmailCache && Date.now() < tokenGmailCache.expiraEm) return tokenGmailCache.accessToken;
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GMAIL_OAUTH_CLIENT_ID,
+      client_secret: process.env.GMAIL_OAUTH_CLIENT_SECRET,
+      refresh_token: process.env.GMAIL_OAUTH_REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.access_token) {
+    throw new Error(`Falha ao renovar o token OAuth do Gmail (${body.error || res.status}): ${body.error_description || 'confira GMAIL_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN'}`);
+  }
+  // renova 60s antes de expirar pra nunca mandar um token no limite
+  tokenGmailCache = { accessToken: body.access_token, expiraEm: Date.now() + Math.max((body.expires_in || 3600) - 60, 60) * 1000 };
+  return tokenGmailCache.accessToken;
+}
+
+// Subject pode ter acento (Relatório, solicitação...) - RFC 2047 obriga
+// codificar header nao-ASCII
+function encodeHeaderUtf8(texto) {
+  return /^[\x20-\x7e]*$/.test(texto) ? texto : `=?UTF-8?B?${Buffer.from(texto, 'utf8').toString('base64')}?=`;
+}
+
+async function enviarViaGmailApi({ from, to, subject, html }) {
+  const mime = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${encodeHeaderUtf8(subject)}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(html, 'utf8').toString('base64'),
+  ].join('\r\n');
+  const raw = Buffer.from(mime, 'utf8').toString('base64url');
+
+  const mandar = async (token) => fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw }),
+  });
+
+  let res = await mandar(await accessTokenGmail());
+  if (res.status === 401) res = await mandar(await accessTokenGmail(true)); // token velho em cache - renova e tenta 1x
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`Gmail API recusou o envio (${res.status}): ${body.error?.message || 'erro desconhecido'}`);
+  }
+}
+
+// ---------- caminho SMTP (so quando a API nao esta configurada) ----------
 // Um endereco IPv4 especifico do Gmail pode ficar temporariamente
 // inalcancavel (blackhole de rede, throttling) sem que a conta tenha nada
 // de errado - por isso NAO cacheamos o transportador/IP escolhido: um
@@ -238,6 +308,7 @@ async function notificarCardMV(card) {
 // de rede costumam tratar melhor). Cada tentativa que falha e logada com
 // ip:porta pra ficar obvio nos logs do Render o que esta acontecendo.
 async function enviarComFallback(opcoesEmail) {
+  if (gmailApiConfigurada()) return enviarViaGmailApi(opcoesEmail);
   const user = process.env.RELATORIO_EMAIL_USER;
   // senha de app do Google e exibida em grupos de 4 ("xxxx xxxx xxxx xxxx")
   // mas a senha real sao os 16 caracteres sem espaco - tira qualquer espaco
