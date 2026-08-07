@@ -381,6 +381,12 @@
 </div>
 
 <script>
+// sinaliza pro notif-central.js (carregado no fim da pagina) que essa
+// pagina ja tem a sua propria versao do toast+som de solicitacao nova
+// (ver conectarStreamChat/notificarPendentesNaoVistas abaixo) - assim ele
+// so cuida do overlay de fraude aqui, sem duplicar o toast
+window.__ZENITH_SOLICITACAO_NOTIF_OWN__ = true;
+
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
 if(!AUTH_TOKEN){ location.href = '/'; }
 
@@ -1701,5 +1707,6 @@ function conectarStreamChat(){
 
 boot();
 </script>
+<script src="/notif-central.js"></script>
 </body>
 </html>
