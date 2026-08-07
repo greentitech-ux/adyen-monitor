@@ -175,11 +175,10 @@ function montarHtmlCards(cards, titulo) {
 async function enviarCardsPorEmail(cards, destinatario) {
   if (!destinatario) throw new Error('Informe o e-mail de destino.');
   if (!cards || !cards.length) throw new Error('Nenhum ticket selecionado.');
-  const transporter = await getTransporter();
   const titulo = cards.length === 1
     ? `Ticket #${cards[0].numeroTicket ?? '—'} · ${cards[0].titulo || ''}`
     : `${cards.length} tickets · Zenith Ops`;
-  await transporter.sendMail({
+  await enviarComFallback({
     from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
     to: destinatario,
     subject: titulo,
@@ -205,9 +204,8 @@ async function notificarCardMV(card) {
     cardParaEnviar.tokenAcao = tokenAcao;
   }
 
-  const transporter = await getTransporter();
   const titulo = `Nova solicitação · MV`;
-  await transporter.sendMail({
+  await enviarComFallback({
     from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
     to,
     subject: `${titulo} - #${cardParaEnviar.numeroTicket ?? '—'} - ${cardParaEnviar.titulo || ''}`,
@@ -215,7 +213,6 @@ async function notificarCardMV(card) {
   });
 }
 
-let transporterCache = null;
 // o resolvedor de host do nodemailer (lib/shared/index.js) busca IPv4 E
 // IPv6 de smtp.gmail.com e sorteia um endereco qualquer dos dois pra
 // conectar - nao tem nenhuma opcao (nem "family") pra forcar so IPv4. Em
@@ -224,14 +221,26 @@ let transporterCache = null;
 // Pra contornar, resolvemos o IPv4 nos mesmos com dns.resolve4 e passamos
 // o IP literal como host - "servername" garante que a validacao do
 // certificado TLS (SNI) continua batendo com smtp.gmail.com normalmente.
-async function getTransporter() {
+//
+// Um endereco IPv4 especifico do Gmail pode ficar temporariamente
+// inalcancavel (blackhole de rede, throttling) sem que a conta tenha nada
+// de errado - por isso NAO cacheamos o transportador/IP escolhido: um
+// primeiro pick ruim ficava memorizado pra sempre (so um restart do
+// processo resolvia), travando literalmente TODO envio de e-mail dali em
+// diante. Em vez disso, tenta cada endereco resolvido, em ordem aleatoria,
+// e so desiste se TODOS falharem.
+async function enviarComFallback(opcoesEmail) {
   const user = process.env.RELATORIO_EMAIL_USER;
   const pass = process.env.RELATORIO_EMAIL_PASS;
   if (!user || !pass) throw new Error('RELATORIO_EMAIL_USER/RELATORIO_EMAIL_PASS não configurados.');
-  if (!transporterCache) {
-    const enderecosIpv4 = await dns.resolve4('smtp.gmail.com');
-    const ip = enderecosIpv4[Math.floor(Math.random() * enderecosIpv4.length)];
-    transporterCache = nodemailer.createTransport({
+  const enderecos = await dns.resolve4('smtp.gmail.com');
+  for (let i = enderecos.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [enderecos[i], enderecos[j]] = [enderecos[j], enderecos[i]];
+  }
+  let ultimoErro;
+  for (const ip of enderecos) {
+    const transporter = nodemailer.createTransport({
       host: ip,
       servername: 'smtp.gmail.com',
       port: 465,
@@ -241,16 +250,21 @@ async function getTransporter() {
       greetingTimeout: 15000,
       socketTimeout: 20000,
     });
+    try {
+      await transporter.sendMail(opcoesEmail);
+      return;
+    } catch (err) {
+      ultimoErro = err;
+    }
   }
-  return transporterCache;
+  throw ultimoErro;
 }
 
 async function enviarRelatorio() {
   const to = process.env.RELATORIO_EMAIL_TO;
   if (!to) throw new Error('RELATORIO_EMAIL_TO não configurado.');
   const dados = await montarDados();
-  const transporter = await getTransporter();
-  await transporter.sendMail({
+  await enviarComFallback({
     from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
     to,
     subject: `Relatório de Solicitações - MV - ${dataHojeBR()}`,
