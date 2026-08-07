@@ -53,6 +53,11 @@
   .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
   .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
   .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .pestoque-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .pestoque-chip{font-family:var(--mono);font-size:11px;padding:5px 9px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;transition:border-color .15s ease,color .15s ease;}
+  .pestoque-chip:hover{border-color:var(--accent);color:var(--text);}
+  .pestoque-chip.ok{color:var(--ok);}
+  .pestoque-chip.ativo{border-color:var(--accent);color:var(--text);background:rgba(92,200,255,.1);}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
   @media(max-width:640px){ .panel{padding:12px;} }
   label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
@@ -220,6 +225,13 @@
     <button type="button" class="tab-btn" data-tab="diferencas" onclick="mudarAba('diferencas')">📊 Diferenças</button>
     <button type="button" class="tab-btn hidden" id="tab-btn-catalogo" data-tab="catalogo" onclick="mudarAba('catalogo')">🗂️ Catálogo</button>
   </div>
+</div>
+
+<div class="panel" id="painel-estoque-hoje">
+  <h2>📦 Contagem de hoje - todas as unidades</h2>
+  <div class="sub" id="estoque-hoje-resumo" style="margin-bottom:10px;">Carregando...</div>
+  <div class="pestoque-chips" id="estoque-hoje-chips"></div>
+  <div id="estoque-hoje-detalhe"></div>
 </div>
 
 <!-- ---------- Contagem ---------- -->
@@ -535,6 +547,77 @@ let ABA_ATUAL = 'contagem';
 
 function unidadeAtual(){ return document.getElementById('sel-unidade').value; }
 
+// ---------- painel "Contagem de hoje - todas as unidades" ----------
+// mesmo padrao do card Estoque do painel.html, so que embutido direto na
+// pagina de Estoque - detalhe de cada unidade so busca o catalogo dela ao
+// clicar no chip (lazy), pra nao pesar o carregamento inicial com o
+// catalogo de todas as lojas de uma vez
+let ESTOQUE_HOJE_CONTAGENS = {};
+let ESTOQUE_HOJE_CATALOGO_CACHE = {};
+let ESTOQUE_HOJE_ABERTA = null;
+
+function renderEstoqueHojeChips(){
+  return [...UNIDADES].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(u=>{
+    const contou = !!ESTOQUE_HOJE_CONTAGENS[u.codigo];
+    const ativo = ESTOQUE_HOJE_ABERTA===u.codigo;
+    return `<button type="button" class="pestoque-chip ${contou?'ok':''} ${ativo?'ativo':''}" onclick="toggleEstoqueHojeUnidade('${u.codigo.replace(/'/g,"\\'")}')">${contou?'✅':'⬜'} ${escapeHtml(u.nome)}</button>`;
+  }).join('');
+}
+
+async function carregarEstoqueHoje(){
+  const chips = document.getElementById('estoque-hoje-chips');
+  const resumo = document.getElementById('estoque-hoje-resumo');
+  if(!chips || !resumo || !UNIDADES.length) return;
+  try{
+    const hoje = hojeBrasilia();
+    const contagensDoDia = await fetch(`/api/inventario/contagens-do-dia?data=${hoje}`).then(r=>r.json());
+    ESTOQUE_HOJE_CONTAGENS = {};
+    contagensDoDia.forEach(c=>{ ESTOQUE_HOJE_CONTAGENS[c.unidade] = c; });
+    ESTOQUE_HOJE_CATALOGO_CACHE = {};
+    ESTOQUE_HOJE_ABERTA = null;
+    const contaram = UNIDADES.filter(u=>ESTOQUE_HOJE_CONTAGENS[u.codigo]).length;
+    resumo.textContent = `${contaram} de ${UNIDADES.length} unidades já contaram hoje`;
+    chips.innerHTML = renderEstoqueHojeChips();
+    document.getElementById('estoque-hoje-detalhe').innerHTML = '';
+  }catch(err){
+    resumo.textContent = 'Não foi possível carregar a contagem de hoje.';
+  }
+}
+
+async function toggleEstoqueHojeUnidade(codigo){
+  const chips = document.getElementById('estoque-hoje-chips');
+  const det = document.getElementById('estoque-hoje-detalhe');
+  if(!chips || !det) return;
+  if(ESTOQUE_HOJE_ABERTA===codigo){
+    ESTOQUE_HOJE_ABERTA = null;
+    chips.innerHTML = renderEstoqueHojeChips();
+    det.innerHTML = '';
+    return;
+  }
+  ESTOQUE_HOJE_ABERTA = codigo;
+  chips.innerHTML = renderEstoqueHojeChips();
+  det.innerHTML = '<div class="empty">Carregando...</div>';
+  const contagem = ESTOQUE_HOJE_CONTAGENS[codigo];
+  if(!contagem){ det.innerHTML = '<div class="empty">Essa unidade ainda não fez a contagem hoje.</div>'; return; }
+  try{
+    if(!ESTOQUE_HOJE_CATALOGO_CACHE[codigo]){
+      ESTOQUE_HOJE_CATALOGO_CACHE[codigo] = await fetch(`/api/inventario/catalogo?unidade=${encodeURIComponent(codigo)}`).then(r=>r.json());
+    }
+  }catch(err){ det.innerHTML = '<div class="empty">Não foi possível carregar o catálogo dessa unidade.</div>'; return; }
+  if(ESTOQUE_HOJE_ABERTA!==codigo) return; // usuario trocou de unidade enquanto carregava
+  const catalogoPorId = {};
+  ESTOQUE_HOJE_CATALOGO_CACHE[codigo].forEach(i=>{ catalogoPorId[i.id]=i; });
+  const linhas = Object.entries(contagem.contagens||{})
+    .map(([itemId,qtd])=>({ item: catalogoPorId[itemId], qtd }))
+    .filter(l=>l.item)
+    .sort((a,b)=>(a.item.setor||'').localeCompare(b.item.setor||'','pt-BR') || a.item.nome.localeCompare(b.item.nome,'pt-BR'));
+  if(!linhas.length){ det.innerHTML = '<div class="empty">Sem itens contados.</div>'; return; }
+  det.innerHTML = `<table>
+    <thead><tr><th>Setor</th><th>Item</th><th>Quantidade</th></tr></thead>
+    <tbody>${linhas.map(l=>`<tr><td>${escapeHtml(l.item.setor||'')}</td><td>${escapeHtml(l.item.nome)}</td><td>${l.qtd} ${escapeHtml(l.item.unidadeMedida||'')}</td></tr>`).join('')}</tbody>
+  </table>`;
+}
+
 async function mudarAba(aba){
   ABA_ATUAL = aba;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===aba));
@@ -752,6 +835,7 @@ async function salvarContagem(){
     if(!res.ok) throw new Error(body.error||'erro ao salvar');
     msg.textContent = 'Contagem salva com sucesso.'; msg.className = 'msg ok';
     await iniciarContagem();
+    if(data===hojeBrasilia()) carregarEstoqueHoje();
   }catch(err){
     msg.textContent = err.message; msg.className = 'msg err';
   }finally{
@@ -1322,7 +1406,7 @@ async function boot(){
     ? UNIDADES.map(u=>`<option value="${escapeHtml(u.codigo)}">${escapeHtml(u.nome)}</option>`).join('')
     : '<option value="" disabled selected>nenhuma unidade liberada</option>';
 
-  await Promise.all([carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas()]);
+  await Promise.all([carregarSetoresTipos(), carregarCatalogo(), carregarRecebimentos(), carregarSaidas(), carregarEstoqueHoje()]);
   document.getElementById('i-setor').innerHTML = ORDEM_SETORES.map(s=>`<option value="${s}">${escapeHtml(SETORES[s])}</option>`).join('');
   document.getElementById('i-tipo').innerHTML = TIPOS_ITEM.map(t=>`<option value="${t}">${escapeHtml(t)}</option>`).join('');
 
