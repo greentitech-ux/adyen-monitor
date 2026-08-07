@@ -444,6 +444,15 @@ function podeAprovarCheckout(unidade){
   return ME && ME.cargo==='gerente' && (ME.permissions?.unidades||[]).includes(unidade);
 }
 
+// sem tempo restante o check-out nao serve pra nada (nao ha o que pausar
+// nem o que retomar depois) - o botao so aparece enquanto ainda sobra tempo
+function aindaTemTempoPraCheckout(c){
+  if(!c.iniciado || !c.timeFinal) return false;
+  const agoraChave = hojeBrasilia() + horaCurtaBrasilia(agoraBrasilia());
+  const finalChave = c.dataUtilizacao + c.timeFinal.slice(0,5);
+  return finalChave > agoraChave;
+}
+
 function renderLista(){
   const el = document.getElementById('lista-checkins');
   if(!CHECKINS.length){ el.innerHTML = '<div class="empty">Nenhum check-in ainda.</div>'; return; }
@@ -465,7 +474,7 @@ function renderLista(){
         <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
         ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
         ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
-        ${(c.iniciado && !c.checkoutEm)?`<button type="button" class="link-btn" style="color:var(--warn);" onclick="checkoutEmergencia('${c.id}')">🚪 Check-out</button>`:''}
+        ${(c.iniciado && !c.checkoutEm && aindaTemTempoPraCheckout(c))?`<button type="button" class="link-btn" style="color:var(--warn);" onclick="checkoutEmergencia('${c.id}')">🚪 Check-out</button>`:''}
         ${(c.checkoutEm && !c.checkoutAprovado)?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="retomarCheckout('${c.id}')">↩ Voltar (criança retornou)</button>`:''}
         ${(c.checkoutEm && !c.checkoutAprovado && podeAprovarCheckout(c.unidade))?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="aprovarCheckout('${c.id}')">✓ Aprovar check-out</button>`:''}
         <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">🗑️ Pedir correção</button>
