@@ -16,7 +16,12 @@ const COLLECTION = db.collection('solicitacoes');
 // 'pagamento': demanda de pagamento pro financeiro (boleto/fatura/despesa da
 // unidade, com fornecedor e vencimento - aprovar = pago). 'nota': pedido de
 // nota fiscal ao financeiro. Os dois entram na mesma fila/Kanban da Central.
-const TIPOS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota'];
+// 'quebra-caixa': NAO e criado manualmente (fora do formulario de "Nova
+// solicitação", ver TIPOS_INFO em central.html) - nasce sozinho quando um
+// fechamento e lançado com diferença (declarado x faturado) maior que
+// fechamentosLive.LIMITE_QUEBRA_CAIXA, pra alguem justificar/aprovar (ver
+// fechamentosLive.create())
+const TIPOS = ['compra', 'manutencao', 'suporte-ti', 'pagamento', 'nota', 'quebra-caixa'];
 // 'CONVERTIDO': o ticket saiu desse tipo/colecao e virou um Estorno (ver
 // converterParaEstorno) - o registro fica de historico, quem continua a
 // historia e o novo registro em refunds.js (convertidoParaId)
@@ -45,7 +50,7 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao);
 }
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail, numeroTicket, convertidoDeTipo, convertidoDeId }) {
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail, numeroTicket, convertidoDeTipo, convertidoDeId, fechamentoId }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
@@ -89,6 +94,9 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     // vencimento (o Kanban destaca pagamento vencido ainda pendente)
     fornecedor: fornecedor ? String(fornecedor).trim().slice(0, 120) : null,
     vencimento: vencimento || null,
+    // so pra tipo 'quebra-caixa' - referencia do fechamento que gerou esse
+    // ticket automaticamente (ver fechamentosLive.create())
+    fechamentoId: fechamentoId || null,
     status: 'PENDENTE',
     // andamento da execucao, so preenchido (e so relevante) apos Aprovado -
     // ver EXECUCAO_STATUSES/atualizarExecucao

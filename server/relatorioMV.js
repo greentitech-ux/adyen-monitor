@@ -30,6 +30,7 @@ const TIPOS_COM_ACAO_POR_EMAIL = new Set(solicitacoes.TIPOS);
 const TIPOS_LABEL = {
   estorno: 'Estorno', 'ajuste-fechamento': 'Ajuste de fechamento',
   compra: 'Compra', manutencao: 'Manutenção', 'suporte-ti': 'Suporte de TI', pagamento: 'Pagamento', nota: 'Nota fiscal',
+  'quebra-caixa': 'Quebra de caixa',
 };
 const STATUS_LABEL = { PENDENTE: 'Pendentes', APROVADO: 'Aprovadas', REJEITADO: 'Recusadas' };
 const STATUS_COR = { PENDENTE: '#b8860b', APROVADO: '#1a7f37', REJEITADO: '#c62828' };

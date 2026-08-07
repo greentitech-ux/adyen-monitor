@@ -1981,6 +1981,17 @@ app.post('/api/fechamentos/lancar', requireSection('lancamento'), upload.any(), 
       criadoPorEmail: req.user.email,
     });
     broadcast('fechamento-lancado', registro, 'lancamento');
+    // diferença passou do limite (ver fechamentosLive.LIMITE_QUEBRA_CAIXA) -
+    // ticket automatico de "Quebra de caixa" ja nasceu junto, so falta
+    // avisar a Central igual qualquer solicitacao nova
+    if (registro.cardQuebraCaixa) {
+      broadcast('solicitacao-criada', registro.cardQuebraCaixa, 'solicitacoes');
+      push.notifySolicitacao(
+        `Ticket #${registro.cardQuebraCaixa.numeroTicket} · Quebra de caixa`,
+        `${registro.unidadeNome} · ${registro.cardQuebraCaixa.titulo}`,
+        registro.cardQuebraCaixa.id,
+      );
+    }
     res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
