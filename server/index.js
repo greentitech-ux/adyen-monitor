@@ -1141,7 +1141,7 @@ app.get('/api/disputes/relatorio.:formato(csv|pdf)', requireSection('disputas'),
     const o = ordersById[d.pedidoId] || {};
     return {
       pedidoId: d.pedidoId, cliente: o.cliente || 'cliente desconhecido', unidade: o.unidade || d.unidade || '—',
-      valor: reportUtil.fmtMoneyBR(o.valor), status: d.status,
+      valor: reportUtil.fmtMoneyBR(o.valor), status: String(d.status || '').replace(/_/g, ' '),
       contato: [d.nomeContato, d.telefoneContato].filter(Boolean).join(' · ') || '—',
       notas: d.notas || '—', criadoEm: reportUtil.fmtDataHoraBR(d.criadoEm),
     };

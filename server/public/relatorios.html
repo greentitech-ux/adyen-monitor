@@ -55,6 +55,7 @@
   .badge.ENVIADA{background:#1e2733;color:var(--accent);}
   .badge.GANHA{background:var(--ok-dim);color:var(--ok);}
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
+  .badge.ERRO_SISTEMA{background:#2a2033;color:#c9a2ff;}
   select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:11px;font-family:var(--sans);}
   .empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
   .hidden{display:none!important;}
@@ -214,7 +215,9 @@ function initNavDrawerAccordion(){
 }
 initNavDrawerAccordion();
 
-const STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA'];
+const STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA','ERRO_SISTEMA'];
+// o valor interno usa underscore (classe CSS/rota); na tela mostra com espaco
+function lblDisputa(s){ return String(s||'').replace(/_/g,' '); }
 let DISPUTES = [];
 let ORDERS_BY_ID = {};
 let FILTRO = 'TODOS';
@@ -258,7 +261,7 @@ function renderTabs(){
   STATUSES.forEach(s=>{ contagem[s] = DISPUTES.filter(d=>d.status===s).length; });
   const tabs = ['TODOS', ...STATUSES];
   document.getElementById('tabs').innerHTML = tabs.map(t=>
-    `<button type="button" class="tab ${FILTRO===t?'active':''}" onclick="mudarFiltro('${t}')">${t==='TODOS'?'Todos':t}<span class="count">${contagem[t]}</span></button>`
+    `<button type="button" class="tab ${FILTRO===t?'active':''}" onclick="mudarFiltro('${t}')">${t==='TODOS'?'Todos':lblDisputa(t)}<span class="count">${contagem[t]}</span></button>`
   ).join('');
 }
 
@@ -300,9 +303,9 @@ function render(){
       ${registros.map(d=>`
         <div class="registro">
           <div class="linha1">
-            <span class="badge ${d.status}">${d.status}</span>
+            <span class="badge ${d.status}">${lblDisputa(d.status)}</span>
             <select onchange="atualizarStatus('${d.id}', this.value)">
-              ${STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+              ${STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${lblDisputa(s)}</option>`).join('')}
               <option value="__REMOVER__">Remover</option>
             </select>
           </div>

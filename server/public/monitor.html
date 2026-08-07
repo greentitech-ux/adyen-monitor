@@ -137,6 +137,7 @@
   .badge.ENVIADA{background:#1e2733;color:var(--accent);}
   .badge.GANHA{background:var(--ok-dim);color:var(--ok);}
   .badge.PERDIDA{background:var(--bad-dim);color:var(--bad);}
+  .badge.ERRO_SISTEMA{background:#2a2033;color:#c9a2ff;}
   .btn-disputa{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--accent);cursor:pointer;margin-left:6px;}
   .btn-disputa:hover{border-color:var(--accent);}
   .back{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;transition:border-color .15s ease,color .15s ease,background .15s ease;}
@@ -701,7 +702,7 @@ async function refreshDisputeMarkers(){
 function marcadorDisputa(pedidoId){
   const d = DISPUTE_MARKERS[pedidoId];
   if(!d) return '';
-  return `<span class="badge ${d.status}" title="Registro de acompanhamento: ${d.status}" style="margin-left:4px;">📎 ${d.status}</span>`;
+  return `<span class="badge ${d.status}" title="Registro de acompanhamento: ${lblDisputa(d.status)}" style="margin-left:4px;">📎 ${lblDisputa(d.status)}</span>`;
 }
 
 // pedidoId -> solicitacao de estorno mais recente (usuario Leitor pede,
@@ -876,7 +877,9 @@ function renderChargebacks(){
 // formal de um chargeback ja aberto. Acessivel clicando no pedido (nao fica
 // como botao solto nas listas) ----
 let DISPUTE_PEDIDO = null;
-const DISPUTE_STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA'];
+const DISPUTE_STATUSES = ['MONITORANDO','ABERTA','ENVIADA','GANHA','PERDIDA','ERRO_SISTEMA'];
+// o valor interno usa underscore (classe CSS/rota); na tela mostra com espaco
+function lblDisputa(s){ return String(s||'').replace(/_/g,' '); }
 
 // mostra a miniatura certa conforme o tipo do anexo (foto/print, video ou
 // audio da ligacao) - qualquer outro tipo vira link de download
@@ -906,7 +909,7 @@ async function carregarHistoricoDisputas(pedidoId){
   box.innerHTML = lista.length ? lista.map(d=>`
     <div class="dispute-item">
       <div class="top">
-        <span class="badge ${d.status}">${d.status}</span>
+        <span class="badge ${d.status}">${lblDisputa(d.status)}</span>
         <span style="color:var(--muted);font-family:var(--mono);">${fmtDT(d.criadoEm)}</span>
       </div>
       ${(d.nomeContato||d.telefoneContato)?`<div class="notas">${d.nomeContato||'—'}${d.telefoneContato?(' · '+d.telefoneContato):''}</div>`:''}
@@ -915,7 +918,7 @@ async function carregarHistoricoDisputas(pedidoId){
         ${(d.anexos||[]).map((a,i)=>renderAnexo(d.id,i,a)).join('')}
       </div>
       <select onchange="atualizarStatusDisputa('${d.id}', this.value)">
-        ${DISPUTE_STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${s}</option>`).join('')}
+        ${DISPUTE_STATUSES.map(s=>`<option value="${s}" ${s===d.status?'selected':''}>${lblDisputa(s)}</option>`).join('')}
         <option value="__REMOVER__">Remover</option>
       </select>
     </div>
