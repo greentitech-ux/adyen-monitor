@@ -489,6 +489,9 @@ function fmtMoney(v){ return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {min
 const FUSO_BR = 'America/Sao_Paulo';
 function fmtDataHora(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('pt-BR',{timeZone:FUSO_BR}); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// mostra o usuario (username) quando existir, senao cai pro email - so a
+// exibicao muda, o que fica guardado (data-email, autorEmail etc.) continua email
+function nomeExibicao(u){ return (u && (u.username || u.email)) || ''; }
 function dataBrasilia(iso){
   if(!iso) return '';
   const partes = new Intl.DateTimeFormat('en-US', { timeZone:FUSO_BR, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(iso));
@@ -658,13 +661,13 @@ function abrirDetalhe(tipo, id){
   document.getElementById('d-tecnico-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='suporte-ti' && !ehBloqueioLogin(c)));
   if(podeDecidir && c.tipo==='suporte-ti' && !ehBloqueioLogin(c)){
     document.getElementById('d-tecnico').innerHTML = TECNICOS.length
-      ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}">${escapeHtml(t.email)}</option>`).join('')
+      ? TECNICOS.map(t=>`<option value="${t.id}" data-email="${escapeHtml(t.email)}">${escapeHtml(nomeExibicao(t))}</option>`).join('')
       : '<option value="" disabled selected>nenhum técnico cadastrado</option>';
   }
   document.getElementById('d-manutencao-wrap').classList.toggle('hidden', !(podeDecidir && c.tipo==='manutencao'));
   if(podeDecidir && c.tipo==='manutencao'){
     document.getElementById('d-manutencao-pessoas').innerHTML = PESSOAS_MANUTENCAO.length
-      ? PESSOAS_MANUTENCAO.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${p.id}" data-email="${escapeHtml(p.email)}" style="width:auto;"> ${escapeHtml(p.email)}</label>`).join('')
+      ? PESSOAS_MANUTENCAO.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${p.id}" data-email="${escapeHtml(p.email)}" style="width:auto;"> ${escapeHtml(nomeExibicao(p))}</label>`).join('')
       : '<div class="sub">nenhuma pessoa com acesso de manutenção cadastrada</div>';
   }
   document.getElementById('d-motivo-decisao').value = '';
@@ -806,7 +809,7 @@ async function carregarResponsavelSelect(c){
   try{
     const lista = await fetch('/api/grupos/responsaveis?unidade='+encodeURIComponent(c.unidade)).then(r=>r.json());
     wrap.innerHTML = lista.length
-      ? lista.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${u.id}" data-email="${escapeHtml(u.email)}" style="width:auto;" ${atribuidos.has(u.id)?'checked':''}> ${escapeHtml(u.email)} (${PAPEL_LABEL[u.papel]||u.papel})</label>`).join('')
+      ? lista.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-family:var(--sans);color:var(--text);font-size:13px;margin-top:6px;"><input type="checkbox" value="${u.id}" data-email="${escapeHtml(u.email)}" style="width:auto;" ${atribuidos.has(u.id)?'checked':''}> ${escapeHtml(nomeExibicao(u))} (${PAPEL_LABEL[u.papel]||u.papel})</label>`).join('')
       : '<div class="sub">ninguém disponível pra esse grupo</div>';
   }catch(e){ wrap.innerHTML = '<div class="sub">erro ao carregar</div>'; }
 }
@@ -950,7 +953,7 @@ function renderChatLista(){
     ? CHAT_ATUAL.map(m=>`
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-          <div style="font-size:11px;color:var(--muted);">${escapeHtml(m.autorEmail||'')} · ${fmtDataHora(m.criadoEm)}</div>
+          <div style="font-size:11px;color:var(--muted);">${escapeHtml(m.autorUsername||m.autorEmail||'')} · ${fmtDataHora(m.criadoEm)}</div>
           ${IS_MASTER ? `<button type="button" class="link-btn" style="color:var(--bad);flex:none;" title="Excluir mensagem" onclick="excluirMensagemChat('${m.id}')">🗑️</button>` : ''}
         </div>
         <div style="white-space:pre-wrap;">${escapeHtml(m.texto)}</div>
@@ -1553,7 +1556,7 @@ function mostrarNotificacaoChat(msg){
   el.innerHTML = `
     <span class="notif-fechar" title="Fechar">✕</span>
     <div class="notif-titulo">💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</div>
-    <div class="notif-corpo"><b>${escapeHtml(msg.autorEmail||'')}:</b> ${escapeHtml(msg.texto)}</div>
+    <div class="notif-corpo"><b>${escapeHtml(msg.autorUsername||msg.autorEmail||'')}:</b> ${escapeHtml(msg.texto)}</div>
   `;
   el.querySelector('.notif-fechar').addEventListener('click', (ev)=>{ ev.stopPropagation(); el.remove(); });
   el.onclick = ()=>{

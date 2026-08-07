@@ -23,7 +23,7 @@ async function listByCard(tipo, cardId) {
   return snap.docs.map((d) => d.data()).sort((a, b) => (a.criadoEm || '').localeCompare(b.criadoEm || ''));
 }
 
-async function addMessage({ tipo, cardId, autorId, autorEmail, texto }) {
+async function addMessage({ tipo, cardId, autorId, autorEmail, autorUsername, texto }) {
   const texto2 = String(texto || '').trim();
   if (!texto2) throw new Error('Escreva uma mensagem.');
   const doc = COLLECTION.doc();
@@ -34,6 +34,7 @@ async function addMessage({ tipo, cardId, autorId, autorEmail, texto }) {
     cardId,
     autorId,
     autorEmail,
+    autorUsername: autorUsername || null,
     texto: texto2.slice(0, 2000),
     criadoEm: new Date().toISOString(),
   };
