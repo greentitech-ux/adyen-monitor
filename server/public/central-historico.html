@@ -88,6 +88,8 @@
   .badge.REJEITADO{background:var(--bad-dim);color:var(--bad);}
   .tipo-badge{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
   .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+  .foto-btn{flex:none;width:36px;height:36px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;}
+  .foto-btn.tem-foto{border-color:var(--accent);color:var(--accent);}
   .export-btn{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .export-btn:hover{color:var(--text);border-color:var(--accent);}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
@@ -349,8 +351,13 @@
       <div class="secao-titulo">💬 Chat</div>
       <div class="sub" style="margin:-2px 0 8px;">Master e Admin podem questionar antes de decidir; quem pediu pode responder.</div>
       <div id="d-chat-lista" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+      <div id="d-chat-preview" class="hidden" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <img id="d-chat-preview-img" style="max-height:60px;max-width:90px;border-radius:6px;border:1px solid var(--line);object-fit:cover;">
+        <button type="button" class="link-btn" style="color:var(--bad);" onclick="removerFotoChat()">✕ remover foto</button>
+      </div>
       <div style="display:flex;gap:8px;">
         <input type="text" id="d-chat-texto" placeholder="Escrever uma mensagem..." style="flex:1 1 auto;min-width:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarChat();}">
+        <label class="foto-btn" id="d-chat-foto-btn" title="Anexar foto">📷<input type="file" accept="image/*" capture="environment" hidden onchange="selecionarFotoChat(this.files[0])"></label>
         <button type="button" class="btn-primary" style="flex:none;width:auto;margin-top:0;white-space:nowrap;" onclick="enviarChat()">Enviar</button>
       </div>
     </div>
@@ -947,8 +954,10 @@ async function desmarcarComprada(){
 function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
 
 let CHAT_ATUAL = [];
+let FOTO_CHAT = null;
 async function carregarChat(tipo, id){
   document.getElementById('d-chat-texto').value = '';
+  removerFotoChat();
   try{
     CHAT_ATUAL = await fetch(`/api/central/${tipo}/${id}/chat`).then(r=>r.json());
   }catch(e){ CHAT_ATUAL = []; }
@@ -963,17 +972,36 @@ function renderChatLista(){
           <div style="font-size:11px;color:var(--muted);">${escapeHtml(m.autorUsername||m.autorEmail||'')} · ${fmtDataHora(m.criadoEm)}</div>
           ${IS_MASTER ? `<button type="button" class="link-btn" style="color:var(--bad);flex:none;" title="Excluir mensagem" onclick="excluirMensagemChat('${m.id}')">🗑️</button>` : ''}
         </div>
-        <div style="white-space:pre-wrap;">${escapeHtml(m.texto)}</div>
+        ${m.texto ? `<div style="white-space:pre-wrap;">${escapeHtml(m.texto)}</div>` : ''}
+        ${m.imagem ? `<a href="/api/central/chat/foto/${m.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/central/chat/foto/${m.id}?token=${encodeURIComponent(AUTH_TOKEN)}" style="max-width:160px;max-height:160px;border-radius:6px;margin-top:4px;display:block;"></a>` : ''}
       </div>`).join('')
     : '<div style="color:var(--muted);font-size:12px;">Nenhuma mensagem ainda.</div>';
   el.scrollTop = el.scrollHeight;
 }
+function selecionarFotoChat(file){
+  if(!file) return;
+  FOTO_CHAT = file;
+  document.getElementById('d-chat-preview-img').src = URL.createObjectURL(file);
+  document.getElementById('d-chat-preview').classList.remove('hidden');
+  document.getElementById('d-chat-foto-btn').classList.add('tem-foto');
+}
+function removerFotoChat(){
+  FOTO_CHAT = null;
+  document.getElementById('d-chat-preview').classList.add('hidden');
+  document.getElementById('d-chat-foto-btn').classList.remove('tem-foto');
+  const input = document.querySelector('#d-chat-foto-btn input[type=file]');
+  if(input) input.value = '';
+}
 async function enviarChat(){
   const input = document.getElementById('d-chat-texto');
   const texto = input.value.trim();
-  if(!texto || !DETALHE_ATUAL) return;
+  if(!texto && !FOTO_CHAT) return;
+  if(!DETALHE_ATUAL) return;
   try{
-    const resp = await fetch(`/api/central/${DETALHE_ATUAL.tipo}/${DETALHE_ATUAL.id}/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({texto}) });
+    const fd = new FormData();
+    fd.append('texto', texto);
+    if(FOTO_CHAT) fd.append('imagem', FOTO_CHAT);
+    const resp = await fetch(`/api/central/${DETALHE_ATUAL.tipo}/${DETALHE_ATUAL.id}/chat`, { method:'POST', body: fd });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao enviar mensagem.');
     await carregarChat(DETALHE_ATUAL.tipo, DETALHE_ATUAL.id);
@@ -1563,7 +1591,7 @@ function mostrarNotificacaoChat(msg){
   el.innerHTML = `
     <span class="notif-fechar" title="Fechar">✕</span>
     <div class="notif-titulo">💬 ${iconeTipo(msg.tipo)} ${escapeHtml(tituloCard)}</div>
-    <div class="notif-corpo"><b>${escapeHtml(msg.autorUsername||msg.autorEmail||'')}:</b> ${escapeHtml(msg.texto)}</div>
+    <div class="notif-corpo"><b>${escapeHtml(msg.autorUsername||msg.autorEmail||'')}:</b> ${msg.texto ? escapeHtml(msg.texto) : '📷 enviou uma foto'}</div>
   `;
   el.querySelector('.notif-fechar').addEventListener('click', (ev)=>{ ev.stopPropagation(); el.remove(); });
   el.onclick = ()=>{

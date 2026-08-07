@@ -23,9 +23,12 @@ async function listByCard(tipo, cardId) {
   return snap.docs.map((d) => d.data()).sort((a, b) => (a.criadoEm || '').localeCompare(b.criadoEm || ''));
 }
 
-async function addMessage({ tipo, cardId, autorId, autorEmail, autorUsername, texto }) {
+// imagem (opcional): {nome, path, tipo} ja salva no Storage (ver rota em
+// index.js) - pra quando o tecnico pede foto pra entender o problema antes
+// de decidir. Mensagem precisa ter texto OU imagem, pelo menos um dos dois
+async function addMessage({ tipo, cardId, autorId, autorEmail, autorUsername, texto, imagem }) {
   const texto2 = String(texto || '').trim();
-  if (!texto2) throw new Error('Escreva uma mensagem.');
+  if (!texto2 && !imagem) throw new Error('Escreva uma mensagem ou anexe uma foto.');
   const doc = COLLECTION.doc();
   const registro = {
     id: doc.id,
@@ -36,11 +39,17 @@ async function addMessage({ tipo, cardId, autorId, autorEmail, autorUsername, te
     autorEmail,
     autorUsername: autorUsername || null,
     texto: texto2.slice(0, 2000),
+    imagem: imagem || null,
     criadoEm: new Date().toISOString(),
   };
   await doc.set(registro);
   chatCache.invalidar();
   return registro;
+}
+
+async function getMessage(id) {
+  const doc = await COLLECTION.doc(id).get();
+  return doc.exists ? doc.data() : null;
 }
 
 async function removeMessage(id) {
@@ -68,4 +77,4 @@ async function reatribuirCard(tipoAntigo, idAntigo, tipoNovo, idNovo) {
   chatCache.invalidar();
 }
 
-module.exports = { listByCard, addMessage, removeMessage, listAllCached, reatribuirCard };
+module.exports = { listByCard, addMessage, getMessage, removeMessage, listAllCached, reatribuirCard };
