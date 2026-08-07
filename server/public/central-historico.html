@@ -215,6 +215,7 @@
     <span><span id="titulo-lista">Solicitações</span> <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></span>
     <span style="display:flex;gap:6px;">
       <button type="button" class="export-btn" id="btn-modo-selecao" onclick="toggleModoSelecao()">☑️ Selecionar</button>
+      <button type="button" class="export-btn hidden" id="btn-selecionar-todos" onclick="toggleSelecionarTodos()">☑️ Selecionar todos</button>
       <button type="button" class="export-btn" onclick="baixarRelatorioCentral('csv')">📄 Relatório CSV</button>
       <button type="button" class="export-btn" onclick="baixarRelatorioCentral('pdf')">📄 Relatório PDF</button>
     </span>
@@ -537,6 +538,7 @@ let IS_MASTER = false;
 let IS_ADMIN = false;
 let MODO_SELECAO = false;
 let TICKETS_SELECIONADOS = new Set(); // chaves "tipo::id"
+let CHAVES_VISIVEIS = []; // chaves "tipo::id" dos cards visiveis (filtros atuais), atualizado a cada renderKanban()
 let EMAIL_ENVIO_TICKETS = []; // [{tipo,id}] do modal de envio por e-mail aberto no momento
 let SECOES = [];
 let TECNICOS = [];
@@ -632,14 +634,25 @@ function toggleModoSelecao(){
   MODO_SELECAO = !MODO_SELECAO;
   TICKETS_SELECIONADOS.clear();
   document.getElementById('btn-modo-selecao').textContent = MODO_SELECAO ? '✕ Cancelar seleção' : '☑️ Selecionar';
-  atualizarBarraSelecao();
+  document.getElementById('btn-selecionar-todos').classList.toggle('hidden', !MODO_SELECAO);
   renderKanban();
 }
 
 function toggleSelecaoCard(chave){
   if(TICKETS_SELECIONADOS.has(chave)) TICKETS_SELECIONADOS.delete(chave);
   else TICKETS_SELECIONADOS.add(chave);
-  atualizarBarraSelecao();
+  renderKanban();
+}
+
+// marca/desmarca de uma vez todos os cards visiveis na tela (respeitando os
+// filtros de loja/grupo/data/tipo ativos) - facilita selecionar em lote
+// quando tem muitos cards, sem precisar clicar card por card. So mexe nos
+// visiveis: se alguma selecao de fora do filtro atual ja existir, ela nao
+// e mexida por aqui
+function toggleSelecionarTodos(){
+  const todosJaSelecionados = CHAVES_VISIVEIS.length > 0 && CHAVES_VISIVEIS.every(ch=>TICKETS_SELECIONADOS.has(ch));
+  if(todosJaSelecionados) CHAVES_VISIVEIS.forEach(ch=>TICKETS_SELECIONADOS.delete(ch));
+  else CHAVES_VISIVEIS.forEach(ch=>TICKETS_SELECIONADOS.add(ch));
   renderKanban();
 }
 
@@ -647,6 +660,10 @@ function atualizarBarraSelecao(){
   const n = TICKETS_SELECIONADOS.size;
   document.getElementById('barra-selecao').classList.toggle('hidden', !MODO_SELECAO || n===0);
   document.getElementById('bs-contagem').textContent = `${n} selecionado${n===1?'':'s'}`;
+  if(MODO_SELECAO){
+    const todosJaSelecionados = CHAVES_VISIVEIS.length > 0 && CHAVES_VISIVEIS.every(ch=>TICKETS_SELECIONADOS.has(ch));
+    document.getElementById('btn-selecionar-todos').textContent = todosJaSelecionados ? '✕ Desmarcar todos' : '☑️ Selecionar todos';
+  }
 }
 
 function abrirEnviarEmailAtual(){
@@ -735,6 +752,7 @@ function renderKanban(){
   renderFiltroTipoRow(base);
   let filtradas = FILTRO_TIPO ? base.filter(c=>c.tipo===FILTRO_TIPO) : base;
   document.getElementById('lista-count').textContent = filtradas.length;
+  CHAVES_VISIVEIS = filtradas.map(c=>c.tipo+'::'+c.id);
 
   STATUS_COLUNAS.forEach(status=>{
     const doColuna = filtradas.filter(c=>c.status===status);
@@ -743,6 +761,7 @@ function renderKanban(){
       ? doColuna.map(kcardHtml).join('')
       : '<div class="kanban-empty">Nenhuma aqui.</div>';
   });
+  atualizarBarraSelecao();
 }
 
 // relatorio (CSV/PDF) do quadro inteiro - usa os mesmos filtros de loja/
