@@ -460,6 +460,7 @@ async function copiarLinkSolicitacaoPublica(){
 // lista de Master/Admin responsaveis pelo grupo da unidade escolhida - pra
 // quem esta lançando poder direcionar a solicitação pra alguém específico
 // do próprio grupo de lojas (ver GET /api/grupos/responsaveis em index.js)
+const PAPEL_LABEL = { master:'Master', admin:'Admin', manutencao:'Manutenção', tecnico:'Técnico' };
 async function carregarResponsaveis(){
   const unidade = document.getElementById('f-unidade').value;
   const sel = document.getElementById('f-direcionado');
@@ -470,7 +471,7 @@ async function carregarResponsaveis(){
     lista.forEach(u=>{
       const opt = document.createElement('option');
       opt.value = u.id; opt.dataset.email = u.email;
-      opt.textContent = u.email + (u.papel==='master' ? ' (Master)' : ' (Admin)');
+      opt.textContent = u.email + ' (' + (PAPEL_LABEL[u.papel] || u.papel) + ')';
       sel.appendChild(opt);
     });
   }catch(e){ /* mantem só a opção padrão */ }
@@ -654,7 +655,7 @@ async function boot(){
   document.getElementById('nav-mensalistas').classList.toggle('hidden', !SECOES.includes('parque'));
   document.getElementById('nav-grupo-saltiverso').classList.toggle('hidden', !(SECOES.includes('parque') || SECOES.includes('parque-checkin') || SECOES.includes('festas')));
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
-  document.getElementById('nav-historico').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
+  document.getElementById('nav-historico').classList.toggle('hidden', !(SECOES.includes('solicitacoes') || SECOES.includes('manutencao') || SECOES.includes('tecnico')));
   document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
   document.getElementById('nav-manutencao').classList.toggle('hidden', !SECOES.includes('manutencao'));
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);

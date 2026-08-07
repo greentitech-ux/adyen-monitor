@@ -1912,17 +1912,21 @@ app.get('/api/grupos', requireAnySection('lancamento', 'fechamentos', 'solicitac
   res.json(await grupos.list());
 });
 
-// so id+email dos Master/Admin que podem receber uma solicitação direcionada
-// da unidade - usado pra quem NAO e Master/Admin poder "direcionar" uma
-// solicitação pra alguem do proprio grupo de lojas (ver central.html), sem
-// expor a lista inteira de usuarios (essa e Master/Admin-only, GET /api/users).
-// Quem entra na lista:
+// so id+email de quem pode ser "responsavel" por uma solicitação - usado
+// tanto pra quem NAO e Master/Admin poder "direcionar" uma solicitação pra
+// alguem do proprio grupo de lojas na criação (ver central.html) quanto pro
+// Master "Atribuir responsável" (visibilidade na Central, ver
+// central-historico.html), sem expor a lista inteira de usuarios (essa e
+// Master/Admin-only, GET /api/users). Quem entra na lista:
 //   - todo Master ativo (sempre, sem precisar configurar nada);
 //   - Admins configurados como responsaveis do grupo em /grupos.html;
 //   - Admins que ja se ENGAJARAM com solicitações dessas lojas (aprovaram/
 //     rejeitaram alguma, ou mandaram mensagem no chat) - assim o admin que
 //     comeca a atuar num grupo passa a aparecer/ser notificavel sozinho,
-//     sem depender do Master lembrar de cadastra-lo como responsavel
+//     sem depender do Master lembrar de cadastra-lo como responsavel;
+//   - qualquer pessoa com a seção "manutencao" ou "tecnico" liberada (por
+//     pedido do usuario: precisa poder marcar o Joao/tecnico direto aqui
+//     pra ele enxergar o card no proprio Histórico/Painel)
 app.get('/api/grupos/responsaveis', requireSection('solicitacoes'), async (req, res) => {
   const { unidade } = req.query;
   if (!unidade) return res.status(400).json({ error: 'Informe a unidade.' });
@@ -1943,12 +1947,22 @@ app.get('/api/grupos/responsaveis', requireSection('solicitacoes'), async (req, 
   const emailsEngajados = new Set(cardsDoGrupo.map((c) => c.decisor).filter(Boolean));
   chats.forEach((m) => { if (chavesDoGrupo.has(m.cardKey) && m.autorEmail) emailsEngajados.add(m.autorEmail); });
 
+  function papelDe(u) {
+    if (u.role === 'master') return 'master';
+    if (u.isAdmin) return 'admin';
+    const secoesUsuario = u.permissions?.sections || [];
+    if (secoesUsuario.includes('manutencao')) return 'manutencao';
+    if (secoesUsuario.includes('tecnico')) return 'tecnico';
+    return null;
+  }
   const responsaveis = todos
     .filter((u) => u.active !== false && (
       u.role === 'master' ||
-      (u.isAdmin && (idsConfigurados.has(u.id) || emailsEngajados.has(u.email)))
+      (u.isAdmin && (idsConfigurados.has(u.id) || emailsEngajados.has(u.email))) ||
+      (u.permissions?.sections || []).includes('manutencao') ||
+      (u.permissions?.sections || []).includes('tecnico')
     ))
-    .map((u) => ({ id: u.id, email: u.email, papel: u.role === 'master' ? 'master' : 'admin' }));
+    .map((u) => ({ id: u.id, email: u.email, papel: papelDe(u) }));
   res.json(responsaveis);
 });
 
@@ -3026,7 +3040,12 @@ async function todosCardsCentral(req) {
   return cards;
 }
 
-app.get('/api/central', requireSection('solicitacoes'), async (req, res) => {
+// tecnico/manutencao tambem podem chamar - nao tem a secao "solicitacoes",
+// mas podem ter sido atribuidos a um card (ver "Atribuir responsável",
+// Master-only) e precisam conseguir abrir o Histórico pra ve-lo; a
+// visibilidade real quem decide e todosCardsCentral() (so o que criou ou
+// foi atribuido, exceto Master que ve tudo)
+app.get('/api/central', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
   res.json(await todosCardsCentral(req));
 });
 
@@ -3059,7 +3078,7 @@ function podeVerCard(req, card) {
 // chat de uma solicitacao da Central - quem criou o pedido, quem foi
 // atribuido, ou o Master podem ver/participar (pra questionar antes de
 // decidir, e pra quem pediu poder responder)
-app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
+app.get('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
   try {
     const card = await buscarCardCru(req.params.tipo, req.params.id);
     if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
@@ -3071,7 +3090,7 @@ app.get('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (re
   }
 });
 
-app.post('/api/central/:tipo/:id/chat', requireSection('solicitacoes'), async (req, res) => {
+app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
   try {
     const card = await buscarCardCru(req.params.tipo, req.params.id);
     if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
