@@ -8,6 +8,15 @@ const db = require('./firestore');
 const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('parqueCheckins');
+// depois de enviado, o check-in nao pode ser excluido direto - qualquer
+// exclusao passa por um pedido de correcao (parqueEdicoes) que so e
+// aplicado quando o Master aprova, mesmo fluxo do fechamento de caixa
+// (fechamentosLive.js) e das entregas (entregasLive.js)
+const EDITS = db.collection('parqueEdicoes');
+// checkout antecipado (emergencia) guarda o tempo que sobrou como credito
+// pro mesmo CPF usar numa proxima visita - um doc por CPF, ver checkout()/
+// registrarCredito()/creditoPorCpf()/usarCredito() mais abaixo
+const CREDITOS = db.collection('parqueCreditos');
 
 const TEMPOS_VALIDOS = [30, 60, 90, 120, 150, 180, 210, 240];
 
@@ -28,6 +37,11 @@ function somarMinutos(hora, minutos) {
   const hh = Math.floor((total % 1440) / 60);
   const mm = total % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+}
+
+function paraMinutos(hora) {
+  const [h, m] = hora.split(':').map(Number);
+  return h * 60 + m;
 }
 
 const FUSO_BR = 'America/Sao_Paulo';
@@ -85,10 +99,14 @@ function validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, cr
 async function criar({
   unidade, unidadeNome, colaboradorId, colaboradorNome,
   responsavel, dataUtilizacao, tempoMinutos, timeInicial, horarioPrevisto,
-  observacao, adultoCortesia, quantAC, criancas, usou,
+  observacao, adultoCortesia, quantAC, criancas, usou, minutosExtras,
   criadoPorId, criadoPorEmail,
 }) {
   const { tempo, criancasOk } = validarPayload({ unidade, responsavel, dataUtilizacao, tempoMinutos, criancas });
+  // minutosExtras: credito de tempo guardado de um checkout antecipado
+  // anterior (ver checkout()/usarCredito() abaixo) - soma por cima do
+  // tempo contratado normal, nao muda o "bucket" escolhido (TEMPOS_VALIDOS)
+  const extras = Math.max(0, Math.min(240, num(minutosExtras)));
   // timeInicial e opcional na criacao (usado so pela importacao da planilha
   // antiga, que ja tem o horario real de visitas que ja aconteceram) - no
   // fluxo normal do formulario isso fica em branco ate o check-in
@@ -118,8 +136,9 @@ async function criar({
     },
     dataUtilizacao,
     tempoMinutos: tempo,
+    minutosExtras: extras,
     timeInicial: inicio,
-    timeFinal: inicio ? somarMinutos(inicio, tempo) : null,
+    timeFinal: inicio ? somarMinutos(inicio, tempo + extras) : null,
     iniciado: !!inicio,
     horarioPrevisto: previsto,
     autoCheckin: false, // vira true so se o check-in for disparado pela varredura (ver rodarAutoCheckins)
@@ -149,7 +168,7 @@ async function checkin(id) {
   const inicio = horaAgoraBrasilia();
   const merge = {
     timeInicial: inicio,
-    timeFinal: somarMinutos(inicio, atual.tempoMinutos),
+    timeFinal: somarMinutos(inicio, atual.tempoMinutos + (atual.minutosExtras || 0)),
     iniciado: true,
     checkinEm: new Date().toISOString(),
   };
@@ -202,9 +221,11 @@ async function atualizar(id, patch) {
     merge.timeInicial = validarHora(patch.timeInicial, 'o horário inicial');
     merge.iniciado = true; // ajuste manual do Master tambem conta como check-in feito
   }
-  if (patch.timeInicial !== undefined || patch.tempoMinutos !== undefined) {
+  const extras = patch.minutosExtras !== undefined ? Math.max(0, Math.min(240, num(patch.minutosExtras))) : (atual.minutosExtras || 0);
+  if (patch.minutosExtras !== undefined) merge.minutosExtras = extras;
+  if (patch.timeInicial !== undefined || patch.tempoMinutos !== undefined || patch.minutosExtras !== undefined) {
     const inicioBase = merge.timeInicial || atual.timeInicial;
-    if (inicioBase) merge.timeFinal = somarMinutos(inicioBase, tempo);
+    if (inicioBase) merge.timeFinal = somarMinutos(inicioBase, tempo + extras);
   }
   if (patch.observacao !== undefined) merge.observacao = String(patch.observacao).slice(0, 300);
   if (patch.adultoCortesia !== undefined) {
@@ -245,7 +266,7 @@ async function rodarAutoCheckins() {
     if (c.horarioPrevisto > agora) continue;
     const merge = {
       timeInicial: c.horarioPrevisto,
-      timeFinal: somarMinutos(c.horarioPrevisto, c.tempoMinutos),
+      timeFinal: somarMinutos(c.horarioPrevisto, c.tempoMinutos + (c.minutosExtras || 0)),
       iniciado: true,
       autoCheckin: true,
       checkinEm: new Date().toISOString(),
@@ -265,8 +286,137 @@ async function remover(id) {
   parqueCache.invalidar();
 }
 
+// pedido de exclusao (unico tipo de correcao por enquanto - o resto do
+// cadastro ja pode ser editado direto via atualizar()) - so aplica de
+// verdade quando o Master aprova em decidirEdicao()
+async function solicitarEdicao({ checkinId, motivo, solicitadoPorId, solicitadoPorEmail }) {
+  const atual = await getOne(checkinId);
+  if (!atual) throw new Error('Check-in não encontrado.');
+  if (!motivo || !String(motivo).trim()) throw new Error('Descreva o motivo da correção.');
+  const pendentes = await listarEdicoes();
+  if (pendentes.some((p) => p.checkinId === checkinId && p.status === 'PENDENTE')) {
+    throw new Error('Já existe um pedido de correção pendente para esse check-in.');
+  }
+
+  const ref = EDITS.doc();
+  const pedido = {
+    id: ref.id,
+    checkinId,
+    tipoCorrecao: 'excluir',
+    unidade: atual.unidade,
+    unidadeNome: atual.unidadeNome,
+    responsavelNome: atual.responsavel?.nome || '',
+    dataUtilizacao: atual.dataUtilizacao,
+    motivo: String(motivo).trim(),
+    status: 'PENDENTE',
+    solicitadoPorId,
+    solicitadoPorEmail,
+    criadoEm: new Date().toISOString(),
+    decididoPorEmail: null,
+    decididoEm: null,
+    motivoDecisao: null,
+  };
+  await ref.set(pedido);
+  edicoesParqueCache.invalidar();
+  return pedido;
+}
+
+async function listarEdicoesUncached() {
+  const snap = await EDITS.orderBy('criadoEm', 'desc').get();
+  return snap.docs.map((d) => d.data());
+}
+const edicoesParqueCache = createCache(listarEdicoesUncached, 20 * 1000);
+const listarEdicoes = edicoesParqueCache.cached;
+
+async function decidirEdicao(id, status, { decididoPorEmail, motivoDecisao }) {
+  if (!['APROVADO', 'REJEITADO'].includes(status)) throw new Error('Status inválido.');
+  const ref = EDITS.doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new Error('Pedido não encontrado.');
+  const pedido = doc.data();
+  if (pedido.status !== 'PENDENTE') throw new Error('Esse pedido já foi decidido.');
+
+  await ref.update({
+    status,
+    decididoPorEmail,
+    motivoDecisao: motivoDecisao || null,
+    decididoEm: new Date().toISOString(),
+  });
+  edicoesParqueCache.invalidar();
+
+  if (status === 'APROVADO' && pedido.tipoCorrecao === 'excluir') {
+    await remover(pedido.checkinId);
+  }
+  return { ...pedido, status };
+}
+
 function soDigitos(v) {
   return String(v || '').replace(/\D/g, '');
+}
+
+// checkout antecipado (emergencia): a familia precisa sair antes do tempo
+// contratado acabar. Fecha o check-in NESSE momento e guarda o tempo que
+// sobrou como credito pro mesmo CPF (ver registrarCredito/usarCredito) -
+// nao perde o que foi pago e nao usado, so adia pra proxima visita
+async function checkout(id, { motivo } = {}) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Check-in não encontrado.');
+  const atual = snap.data();
+  if (!atual.iniciado) throw new Error('Esse check-in ainda não teve o check-in físico feito.');
+  if (atual.checkoutEm) throw new Error('Esse check-in já teve o check-out registrado.');
+  const agora = horaAgoraBrasilia();
+  const restanteMin = Math.max(0, paraMinutos(atual.timeFinal) - paraMinutos(agora));
+  const merge = {
+    checkoutEm: new Date().toISOString(),
+    checkoutAntecipado: restanteMin > 0,
+    tempoRestanteMin: restanteMin,
+    motivoCheckout: String(motivo || '').trim().slice(0, 300),
+  };
+  await ref.update(merge);
+  parqueCache.invalidar();
+  if (restanteMin > 0 && atual.responsavel?.cpf) {
+    await registrarCredito(atual.responsavel.cpf, restanteMin, id);
+  }
+  return getOne(id);
+}
+
+async function registrarCredito(cpf, minutos, origemCheckinId) {
+  const chave = soDigitos(cpf);
+  if (!chave || minutos <= 0) return;
+  const ref = CREDITOS.doc(chave);
+  const snap = await ref.get();
+  const atual = snap.exists ? snap.data() : { cpf: chave, minutosDisponiveis: 0, historico: [] };
+  await ref.set({
+    cpf: chave,
+    minutosDisponiveis: (atual.minutosDisponiveis || 0) + minutos,
+    historico: [...(atual.historico || []), { minutos, origemCheckinId, criadoEm: new Date().toISOString() }].slice(-30),
+    atualizadoEm: new Date().toISOString(),
+  });
+}
+
+async function creditoPorCpf(cpf) {
+  const chave = soDigitos(cpf);
+  if (!chave) return null;
+  const doc = await CREDITOS.doc(chave).get();
+  if (!doc.exists || !(doc.data().minutosDisponiveis > 0)) return null;
+  return doc.data();
+}
+
+// consome (parte d)o credito guardado - chamado quando um novo check-in
+// aplica esse tempo (ver minutosExtras em criar()); minutos e sempre o que
+// realmente vai ser aplicado, nunca mais do que o disponivel
+async function usarCredito(cpf, minutos) {
+  const chave = soDigitos(cpf);
+  if (!chave) throw new Error('CPF inválido.');
+  const ref = CREDITOS.doc(chave);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Esse cliente não tem crédito de tempo guardado.');
+  const atual = snap.data();
+  const usar = Math.max(0, Math.min(Number(minutos) || 0, atual.minutosDisponiveis || 0));
+  if (usar <= 0) throw new Error('Nenhum crédito de tempo disponível pra esse CPF.');
+  await ref.update({ minutosDisponiveis: atual.minutosDisponiveis - usar, atualizadoEm: new Date().toISOString() });
+  return usar;
 }
 
 // pra autopreenchimento do formulario de check-in: acha o cadastro mais
@@ -282,4 +432,9 @@ async function buscarPorCpf(cpf) {
   return encontrados[0];
 }
 
-module.exports = { TEMPOS_VALIDOS, criar, checkin, listAll, listByUnidades, getOne, atualizar, remover, buscarPorCpf, rodarAutoCheckins, invalidar: () => parqueCache.invalidar() };
+module.exports = {
+  TEMPOS_VALIDOS, criar, checkin, listAll, listByUnidades, getOne, atualizar, buscarPorCpf, rodarAutoCheckins,
+  solicitarEdicao, listarEdicoes, decidirEdicao,
+  checkout, creditoPorCpf, usarCredito,
+  invalidar: () => parqueCache.invalidar(),
+};

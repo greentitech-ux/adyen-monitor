@@ -156,6 +156,12 @@
         <div><label>CPF</label><input type="text" id="f-cpf" inputmode="numeric"></div>
         <div><label>Contato (whatsapp)</label><input type="text" id="f-contato" required></div>
       </div>
+      <div class="hidden" id="wrap-credito" style="background:var(--panel2);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:10px;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-family:var(--sans);color:var(--text);text-transform:none;margin:0;">
+          <input type="checkbox" id="usar-credito" style="width:auto;margin-top:2px;" onchange="alternarUsoCredito(this.checked)">
+          <span>Esse CPF tem <b id="credito-min">0</b> min guardados de um check-out antecipado anterior. Usar agora (soma por cima do tempo escolhido)?</span>
+        </label>
+      </div>
       <label>Email (opcional)</label>
       <input type="email" id="f-email">
       <label>CEP</label>
@@ -306,6 +312,8 @@ let CHECKINS = [];
 let TEMPO_SELECIONADO = 60;
 let AC_ATIVO = false;
 let ULTIMO_CRIADO_ID = null;
+let CREDITO_ATUAL = null; // {minutosDisponiveis,...} do CPF preenchido, se houver
+let USAR_CREDITO = false;
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -335,11 +343,22 @@ function selecionarTempo(t){ TEMPO_SELECIONADO = t; renderTempos(); }
 // recente com esse CPF (de check-ins anteriores, inclusive os importados da
 // planilha antiga) e preenche so os campos que ainda estao vazios - nunca
 // sobrescreve o que a pessoa ja digitou na tela
+function alternarUsoCredito(marcado){ USAR_CREDITO = marcado; }
+
 document.getElementById('f-cpf').addEventListener('blur', async (ev) => {
   const cpf = ev.target.value.replace(/\D/g, '');
+  CREDITO_ATUAL = null;
+  USAR_CREDITO = false;
+  document.getElementById('wrap-credito').classList.add('hidden');
+  document.getElementById('usar-credito').checked = false;
   if (cpf.length < 8) return;
   try {
     const dados = await fetch(`/api/parque/cliente-por-cpf?cpf=${encodeURIComponent(cpf)}`).then(r => r.json());
+    if (dados && dados.credito && dados.credito.minutosDisponiveis > 0) {
+      CREDITO_ATUAL = dados.credito;
+      document.getElementById('credito-min').textContent = dados.credito.minutosDisponiveis;
+      document.getElementById('wrap-credito').classList.remove('hidden');
+    }
     if (!dados || !dados.responsavel) return;
     const r = dados.responsavel;
     const preencherSeVazio = (id, valor) => {
@@ -432,13 +451,14 @@ function renderLista(){
         <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtData(c.dataUtilizacao)}</span>
         <span class="badge ${status.classe}">${status.texto}</span>
       </div>
-      <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}</div>
+      <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''}${c.checkoutEm?` · 🚪 check-out feito${c.checkoutAntecipado?' ('+c.tempoRestanteMin+' min guardados)':''}`:''}</div>
       <div class="criancas">${escapeHtml(criancas)}</div>
       <div style="margin-top:8px;">
         <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
         ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
         ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
-        ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">✕ Excluir</button>`:''}
+        ${(c.iniciado && !c.checkoutEm)?`<button type="button" class="link-btn" style="color:var(--warn);" onclick="checkoutEmergencia('${c.id}')">🚪 Check-out</button>`:''}
+        <button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">🗑️ Pedir correção</button>
       </div>
     </div>`;
   }).join('');
@@ -460,10 +480,20 @@ async function marcarAssinado(){
   await marcarAssinadoId(ULTIMO_CRIADO_ID);
   atualizarPainelTermoVisibilidade();
 }
+// depois de enviado, um check-in nao pode mais ser excluido direto - so
+// mediante pedido de correcao (o Master aprova ou rejeita em parque.html)
 async function excluirCheckin(id){
-  if(!confirm('Excluir esse check-in?')) return;
-  await fetch(`/api/parque/checkins/${id}`, { method:'DELETE' });
-  await carregar();
+  const motivo = prompt('Por que esse check-in precisa ser excluído? (vai para aprovação do Master)');
+  if(!motivo || !motivo.trim()) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/solicitar-edicao`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({motivo}) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');
+    alert('Pedido de correção enviado. O Master vai revisar antes de excluir.');
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
 }
 
 async function fazerCheckin(id){
@@ -471,6 +501,22 @@ async function fazerCheckin(id){
     const res = await fetch(`/api/parque/checkins/${id}/checkin`, { method:'POST' });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error||'erro ao fazer check-in');
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
+}
+
+// checkout antecipado (emergencia): fecha o check-in agora e guarda o
+// tempo que sobrou como credito pro mesmo CPF usar numa proxima visita
+async function checkoutEmergencia(id){
+  const motivo = prompt('Motivo do check-out antecipado (emergência):');
+  if(motivo===null) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/checkout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({motivo}) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao registrar check-out');
+    if(data.checkoutAntecipado) alert(`Check-out registrado. ${data.tempoRestanteMin} min guardados de crédito para esse CPF usar numa próxima visita.`);
     await carregar();
   }catch(err){
     alert(err.message);
@@ -492,6 +538,9 @@ function resetarForm(){
   setAC(false);
   atualizarPreviewPulseiras();
   adicionarCrianca();
+  CREDITO_ATUAL = null;
+  USAR_CREDITO = false;
+  document.getElementById('wrap-credito').classList.add('hidden');
 }
 
 document.getElementById('form-checkin').addEventListener('keydown', (ev)=>{
@@ -530,6 +579,7 @@ document.getElementById('form-checkin').addEventListener('submit', async (ev)=>{
       adultoCortesia: AC_ATIVO,
       quantAC: AC_ATIVO ? document.getElementById('f-quantAC').value : 0,
       criancas,
+      usarCreditoMin: (USAR_CREDITO && CREDITO_ATUAL) ? CREDITO_ATUAL.minutosDisponiveis : 0,
     };
     const res = await fetch('/api/parque/checkins', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const data = await res.json();

@@ -169,6 +169,11 @@
   </div>
 </div>
 
+<div class="panel hidden" id="edicoes-panel">
+  <h2>Pedidos de correção</h2>
+  <div id="edicoes-lista" style="display:flex;flex-direction:column;gap:10px;"></div>
+</div>
+
 <div class="panel hidden" id="painel-importar">
   <h2>Importar dados da planilha antiga</h2>
   <div class="sub" style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
@@ -234,6 +239,23 @@
       </label>
       <div class="msg hidden" id="msg-master"></div>
       <button class="btn-primary" type="submit" style="width:100%;margin-top:14px;">Salvar alterações</button>
+    </form>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay-correcao">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharCorrecao()">✕</span>
+    <div class="sheet">
+    <h3>Pedir correção</h3>
+    <div class="sub" id="correcao-info"></div>
+    <form id="form-correcao">
+      <div class="sub" style="color:var(--bad);">Esse check-in (dados, crianças, termo) será excluído se o Master aprovar. Depois de aprovado, não tem como desfazer.</div>
+      <label>Motivo</label>
+      <textarea id="cor-motivo" placeholder="explique o que aconteceu, o Master vai revisar antes de aprovar" required></textarea>
+      <div class="msg hidden" id="msg-correcao"></div>
+      <button class="btn-primary" type="submit" style="width:100%;margin-top:14px;">Enviar pedido ao Master</button>
     </form>
     </div>
   </div>
@@ -307,9 +329,12 @@ const PARQUE_UNIDADES_NOMES = { 'Saltiverso Patteo': 'Saltiverso Patteo' };
 
 let ME = null;
 let IS_MASTER = false;
+let IS_ADMIN = false;
 let UNIDADES_NOMES = { ...PARQUE_UNIDADES_NOMES };
 let TODOS = [];
+let EDICOES = [];
 let EDITANDO_ID = null;
+let CORRIGINDO_ID = null;
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
@@ -328,9 +353,75 @@ function hojeBrasilia(){ return isoLocalBR(agoraBrasilia()); }
 function horaBrasilia(d){ return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`; }
 
 async function carregar(){
-  TODOS = await fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]);
+  const [checkins, edicoes] = await Promise.all([
+    fetch('/api/parque/checkins').then(r=>r.json()).catch(()=>[]),
+    fetch('/api/parque/checkins/edicoes').then(r=>r.ok?r.json():[]).catch(()=>[]),
+  ]);
+  TODOS = checkins;
+  EDICOES = edicoes;
   renderTudo();
+  renderEdicoes();
 }
+
+function edicaoPendentePara(checkinId){
+  return EDICOES.find(e=>e.checkinId===checkinId && e.status==='PENDENTE');
+}
+
+// pedidos de correção de check-in (so o Master/Admin decide, mesmo fluxo
+// do fechamento de caixa e das entregas - ver server/parque.js)
+function renderEdicoes(){
+  const pendentes = EDICOES.filter(e=>e.status==='PENDENTE');
+  const podeDecidir = IS_MASTER || IS_ADMIN;
+  document.getElementById('edicoes-panel').classList.toggle('hidden', !podeDecidir || pendentes.length===0);
+  document.getElementById('edicoes-lista').innerHTML = pendentes.map(p=>`
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;">
+      <div style="font-size:12.5px;font-weight:600;">${escapeHtml(p.responsavelNome)} · ${escapeHtml(p.unidadeNome||p.unidade)} · ${fmtData(p.dataUtilizacao)}</div>
+      <div class="sub" style="margin:2px 0 6px;">excluir o check-in · pedido por ${escapeHtml(p.solicitadoPorEmail)} em ${new Date(p.criadoEm).toLocaleString('pt-BR',{timeZone:FUSO_BR})}</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:8px;white-space:pre-wrap;">${escapeHtml(p.motivo)}</div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-secundario" style="color:var(--ok);border-color:var(--ok-dim);" onclick="decidirEdicaoParque('${p.id}','APROVADO')">✓ Aprovar</button>
+        <button type="button" class="btn-secundario" style="color:var(--bad);border-color:var(--bad-dim);" onclick="decidirEdicaoParque('${p.id}','REJEITADO')">✕ Rejeitar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function decidirEdicaoParque(id, status){
+  const pergunta = status==='APROVADO' ? 'Tem certeza que deseja aprovar? O check-in será excluído.' : 'Tem certeza que deseja rejeitar esse pedido?';
+  if(!confirm(pergunta)) return;
+  let motivoDecisao = '';
+  if(status==='REJEITADO'){ motivoDecisao = prompt('Motivo da rejeição (opcional):') || ''; }
+  await fetch(`/api/parque/checkins/edicoes/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status, motivoDecisao}) });
+  await carregar();
+}
+
+function abrirCorrecao(id){
+  CORRIGINDO_ID = id;
+  const c = TODOS.find(x=>x.id===id);
+  document.getElementById('correcao-info').textContent = `${c.responsavel?.nome||''} · ${c.unidadeNome||c.unidade} · ${fmtData(c.dataUtilizacao)}`;
+  document.getElementById('cor-motivo').value = '';
+  document.getElementById('msg-correcao').classList.add('hidden');
+  document.getElementById('overlay-correcao').classList.remove('hidden');
+}
+function fecharCorrecao(){ document.getElementById('overlay-correcao').classList.add('hidden'); CORRIGINDO_ID=null; }
+
+document.getElementById('form-correcao').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const msg = document.getElementById('msg-correcao');
+  msg.classList.add('hidden');
+  try{
+    const res = await fetch(`/api/parque/checkins/${CORRIGINDO_ID}/solicitar-edicao`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ motivo: document.getElementById('cor-motivo').value }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao enviar pedido');
+    fecharCorrecao();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+});
 
 function checkinsFiltrados(){
   const unidade = document.getElementById('f-unidade').value;
@@ -347,7 +438,7 @@ function checkinsFiltrados(){
 function renderAgora(){
   const hoje = hojeBrasilia();
   const agora = horaBrasilia(agoraBrasilia());
-  const dentro = TODOS.filter(c=>c.iniciado && c.dataUtilizacao===hoje && c.timeInicial<=agora && c.timeFinal>=agora && c.termoAssinado);
+  const dentro = TODOS.filter(c=>c.iniciado && !c.checkoutEm && c.dataUtilizacao===hoje && c.timeInicial<=agora && c.timeFinal>=agora && c.termoAssinado);
   const el = document.getElementById('lista-agora');
   if(!dentro.length){ el.innerHTML = '<div class="empty">Ninguém no parque agora.</div>'; return; }
   el.innerHTML = dentro.map(c=>{
@@ -364,8 +455,23 @@ function renderAgora(){
 
 function statusCheckin(c){
   if(!c.iniciado) return { classe:'pendente-checkin', texto:'aguardando check-in' };
+  if(c.checkoutEm) return { classe:'dentro', texto:'check-out feito' };
   if(!c.termoAssinado) return { classe:'aguardando', texto:'aguardando assinatura' };
   return { classe:'liberado', texto:'liberado' };
+}
+
+async function checkoutEmergencia(id){
+  const motivo = prompt('Motivo do check-out antecipado (emergência):');
+  if(motivo===null) return;
+  try{
+    const res = await fetch(`/api/parque/checkins/${id}/checkout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({motivo}) });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'erro ao registrar check-out');
+    if(data.checkoutAntecipado) alert(`Check-out registrado. ${data.tempoRestanteMin} min guardados de crédito para esse CPF usar numa próxima visita.`);
+    await carregar();
+  }catch(err){
+    alert(err.message);
+  }
 }
 
 function renderLista(lista){
@@ -389,14 +495,15 @@ function renderLista(lista){
           <span>${escapeHtml(c.responsavel?.nome||'')} · ${escapeHtml(c.unidadeNome||c.unidade)}</span>
           <span class="badge ${status.classe}">${status.texto}</span>
         </div>
-        <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}</div>
+        <div class="sub">${horario} · ${c.pulseiras} pulseira(s)${c.adultoCortesia?' · A.C. x'+c.quantAC:''} · ${escapeHtml(c.responsavel?.contato||'')}${c.checkoutAntecipado?` · 🕐 ${c.tempoRestanteMin} min guardados`:''}</div>
         <div class="criancas">${escapeHtml(criancas)}</div>
         <div>
           <a class="link-btn" href="/api/parque/checkins/${c.id}/termo.pdf?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">🖨️ Termo</a>
           ${!c.termoAssinado?`<button type="button" class="link-btn" onclick="marcarAssinadoId('${c.id}')">✔ Marcar assinado</button>`:''}
           ${!c.iniciado?`<button type="button" class="link-btn" style="color:var(--ok);" onclick="fazerCheckin('${c.id}')">▶ Fazer check-in</button>`:''}
+          ${(c.iniciado && !c.checkoutEm)?`<button type="button" class="link-btn" style="color:var(--warn);" onclick="checkoutEmergencia('${c.id}')">🚪 Check-out</button>`:''}
           ${IS_MASTER?`<button type="button" class="link-btn" onclick="abrirMaster('${c.id}')">✎ Editar</button>`:''}
-          ${IS_MASTER?`<button type="button" class="link-btn" style="color:var(--bad);" onclick="excluirCheckin('${c.id}')">✕ Excluir</button>`:''}
+          ${edicaoPendentePara(c.id)?`<span class="sub" style="color:var(--accent);">correção pendente</span>`:`<button type="button" class="link-btn" style="color:var(--bad);" onclick="abrirCorrecao('${c.id}')">🗑️ Pedir correção</button>`}
         </div>
       </div>`;
     }).join('');
@@ -446,12 +553,6 @@ function renderTudo(){
   renderLista(lista);
   renderAgora();
   atualizarLinksExport();
-}
-
-async function excluirCheckin(id){
-  if(!confirm('Excluir esse check-in?')) return;
-  await fetch(`/api/parque/checkins/${id}`, { method:'DELETE' });
-  await carregar();
 }
 
 async function importarPlanilha(){
@@ -528,6 +629,7 @@ async function boot(){
   ME = await res.json();
   const isMaster = ME.role==='master';
   IS_MASTER = isMaster;
+  IS_ADMIN = !!ME.isAdmin;
   const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
   document.getElementById('nav-monitor').classList.toggle('hidden', !secoes.includes('monitor'));
   document.getElementById('nav-lancamento').classList.toggle('hidden', !secoes.includes('lancamento'));
