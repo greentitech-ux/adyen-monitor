@@ -623,6 +623,7 @@ function baixarRelatorioCentral(formato){
   if(FILTRO_GRUPO) params.set('grupo', FILTRO_GRUPO);
   if(FILTRO_DATA_DE) params.set('dataDe', FILTRO_DATA_DE);
   if(FILTRO_DATA_ATE) params.set('dataAte', FILTRO_DATA_ATE);
+  if(FILTRO_TIPO) params.set('tipo', FILTRO_TIPO);
   window.location.href = `/api/central/relatorio.${formato}?${params.toString()}`;
 }
 
