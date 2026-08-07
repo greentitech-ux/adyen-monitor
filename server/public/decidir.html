@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Decidir solicitação · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:520px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .hidden{display:none!important;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .ticket-titulo{font-size:15px;font-weight:700;}
+  .ticket-meta{font-size:12.5px;color:var(--muted);margin-top:4px;}
+  .ticket-obs{font-size:13px;margin-top:12px;white-space:pre-wrap;line-height:1.5;color:#ccd3da;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:14px 0 4px;font-family:var(--mono);}
+  label:first-of-type{margin-top:0;}
+  input,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .acoes{display:flex;gap:10px;margin-top:6px;}
+  .acao-btn{flex:1;padding:12px;border-radius:8px;border:2px solid var(--line);background:var(--panel2);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .acao-btn.aprovar.active{border-color:var(--ok);background:var(--ok-dim);color:var(--ok);}
+  .acao-btn.recusar.active{border-color:var(--bad);background:var(--bad-dim);color:var(--bad);}
+  .btn-primary{width:100%;margin-top:18px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .btn-primary.recusar{background:var(--bad);color:#fff;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .sucesso{text-align:center;padding:36px 10px;}
+  .sucesso .icone{font-size:40px;margin-bottom:10px;}
+  .sucesso h2{font-size:16px;margin:0 0 8px;}
+  .sucesso p{font-size:13px;color:var(--muted);line-height:1.6;margin:0;}
+  .erro-carregar{text-align:center;padding:36px 10px;color:var(--muted);}
+  .erro-carregar .icone{font-size:34px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+  <h1>Decidir solicitação</h1>
+</header>
+
+<div id="carregando" class="panel" style="text-align:center;color:var(--muted);">Carregando...</div>
+
+<div id="erro-carregar" class="panel erro-carregar hidden">
+  <div class="icone">⚠️</div>
+  <p id="erro-carregar-texto">Link inválido, expirado ou já usado.</p>
+</div>
+
+<div id="sucesso" class="panel sucesso hidden">
+  <div class="icone" id="sucesso-icone">✅</div>
+  <h2 id="sucesso-titulo">Decisão registrada!</h2>
+  <p id="sucesso-texto"></p>
+</div>
+
+<form id="form-decidir" class="panel hidden">
+  <div class="ticket-titulo" id="t-titulo"></div>
+  <div class="ticket-meta" id="t-meta"></div>
+  <div class="ticket-obs hidden" id="t-obs"></div>
+
+  <label>Ação</label>
+  <div class="acoes">
+    <button type="button" class="acao-btn aprovar" id="btn-acao-aprovar" onclick="escolherAcao('aprovar')">✓ Aprovar</button>
+    <button type="button" class="acao-btn recusar" id="btn-acao-recusar" onclick="escolherAcao('recusar')">✗ Recusar</button>
+  </div>
+
+  <label>Comprovante (opcional)</label>
+  <input type="file" id="comprovante" accept="image/*,application/pdf" capture="environment">
+
+  <label>Observação (opcional)</label>
+  <textarea id="motivoDecisao" placeholder="algum detalhe da decisão"></textarea>
+
+  <div class="msg hidden" id="msg"></div>
+  <button type="submit" class="btn-primary" id="btn-enviar" disabled>Escolha uma ação acima</button>
+</form>
+
+<script>
+const params = new URLSearchParams(location.search);
+const TICKET = params.get('ticket');
+const TOKEN = params.get('token');
+let ACAO = params.get('acao') === 'recusar' ? 'recusar' : (params.get('acao') === 'aprovar' ? 'aprovar' : null);
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMoney(v){ return v==null ? null : 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtData(iso){ if(!iso) return ''; return new Date(iso).toLocaleString('pt-BR', { timeZone:'America/Sao_Paulo' }); }
+
+const TIPOS_LABEL = { compra:'Compra', manutencao:'Manutenção', 'suporte-ti':'Suporte de TI', pagamento:'Pagamento', nota:'Nota fiscal' };
+
+function escolherAcao(acao){
+  ACAO = acao;
+  document.getElementById('btn-acao-aprovar').classList.toggle('active', acao==='aprovar');
+  document.getElementById('btn-acao-recusar').classList.toggle('active', acao==='recusar');
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = false;
+  btn.textContent = acao==='aprovar' ? '✓ Confirmar aprovação' : '✗ Confirmar recusa';
+  btn.className = 'btn-primary' + (acao==='recusar' ? ' recusar' : '');
+}
+
+async function carregar(){
+  if(!TICKET || !TOKEN){
+    mostrarErro('Link incompleto.');
+    return;
+  }
+  try{
+    const resp = await fetch(`/api/solicitacoes/decidir-info?ticket=${encodeURIComponent(TICKET)}&token=${encodeURIComponent(TOKEN)}`);
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Link inválido, expirado ou já usado.');
+
+    document.getElementById('carregando').classList.add('hidden');
+    document.getElementById('form-decidir').classList.remove('hidden');
+    document.getElementById('t-titulo').textContent = `#${data.numeroTicket} - ${data.titulo || ''}`;
+    const meta = [TIPOS_LABEL[data.tipo] || data.tipo, data.unidadeNome, fmtData(data.criadoEm)].filter(Boolean).join(' · ');
+    const valor = fmtMoney(data.valorEstimado);
+    document.getElementById('t-meta').textContent = meta + (valor ? ` · ${valor}` : '');
+    if(data.observacao){
+      document.getElementById('t-obs').textContent = data.observacao;
+      document.getElementById('t-obs').classList.remove('hidden');
+    }
+    if(ACAO) escolherAcao(ACAO);
+  }catch(err){
+    mostrarErro(err.message);
+  }
+}
+
+function mostrarErro(msg){
+  document.getElementById('carregando').classList.add('hidden');
+  document.getElementById('erro-carregar-texto').textContent = msg;
+  document.getElementById('erro-carregar').classList.remove('hidden');
+}
+
+document.getElementById('form-decidir').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!ACAO) return;
+  const btn = document.getElementById('btn-enviar');
+  const msgEl = document.getElementById('msg');
+  msgEl.classList.add('hidden');
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = 'Enviando...';
+  try{
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify({ ticket: TICKET, token: TOKEN, acao: ACAO, motivoDecisao: document.getElementById('motivoDecisao').value }));
+    const arquivo = document.getElementById('comprovante').files[0];
+    if(arquivo) fd.append('comprovante', arquivo);
+    const resp = await fetch('/api/solicitacoes/decidir', { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Não foi possível registrar a decisão.');
+    document.getElementById('form-decidir').classList.add('hidden');
+    document.getElementById('sucesso-icone').textContent = ACAO==='aprovar' ? '✅' : '🚫';
+    document.getElementById('sucesso-titulo').textContent = ACAO==='aprovar' ? 'Aprovado!' : 'Recusado!';
+    document.getElementById('sucesso-texto').textContent = `Solicitação #${data.numeroTicket} marcada como ${data.status}.`;
+    document.getElementById('sucesso').classList.remove('hidden');
+  }catch(err){
+    msgEl.textContent = err.message;
+    msgEl.className = 'msg err';
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
+carregar();
+</script>
+</body>
+</html>
