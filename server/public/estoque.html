@@ -230,6 +230,17 @@
 <div class="panel" id="painel-estoque-hoje">
   <h2>📦 Contagem de hoje - todas as unidades</h2>
   <div class="sub" id="estoque-hoje-resumo" style="margin-bottom:10px;">Carregando...</div>
+  <div class="toolbar" style="margin-bottom:8px;">
+    <div class="campo" style="min-width:200px;">
+      <label>Grupo</label>
+      <select id="eh-grupo" onchange="mudarGrupoEstoqueHoje()">
+        <option value="todos">Todos</option>
+        <option value="ARCFOOD">ARCFOOD</option>
+        <option value="Grupo Bravo (GBE)">Grupo Bravo (GBE)</option>
+      </select>
+    </div>
+    <div class="sub" style="padding-bottom:9px;">Clique nas unidades abaixo pra escolher quais comparar lado a lado.</div>
+  </div>
   <div class="pestoque-chips" id="estoque-hoje-chips"></div>
   <div id="estoque-hoje-detalhe"></div>
 </div>
@@ -548,74 +559,127 @@ let ABA_ATUAL = 'contagem';
 function unidadeAtual(){ return document.getElementById('sel-unidade').value; }
 
 // ---------- painel "Contagem de hoje - todas as unidades" ----------
-// mesmo padrao do card Estoque do painel.html, so que embutido direto na
-// pagina de Estoque - detalhe de cada unidade so busca o catalogo dela ao
-// clicar no chip (lazy), pra nao pesar o carregamento inicial com o
-// catalogo de todas as lojas de uma vez
+// embutido direto na pagina de Estoque (era so um card no painel.html,
+// que so linkava pra fora). Filtro por Grupo (ARCFOOD / Grupo Bravo) pra
+// nao misturar redes/franquias diferentes, e comparativo lado a lado das
+// unidades selecionadas - mesma logica de grupoDaUnidade ja usada em
+// central-historico.html/central.html (so as 4 lojas ARCFOOD tem codigo
+// numerico; todo o resto do roster de Inventario e Grupo Bravo)
+const ESTOQUE_HOJE_CODIGOS_ARCFOOD = new Set(['19821','19855','19888','19889']);
+function grupoDaUnidadeEstoque(codigo){ return ESTOQUE_HOJE_CODIGOS_ARCFOOD.has(codigo) ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
+
 let ESTOQUE_HOJE_CONTAGENS = {};
 let ESTOQUE_HOJE_CATALOGO_CACHE = {};
-let ESTOQUE_HOJE_ABERTA = null;
+let ESTOQUE_HOJE_SELECIONADAS = null; // Set de codigos - null = ainda nao inicializado pro grupo atual
+let ESTOQUE_HOJE_COMPARATIVO_GERACAO = 0; // invalida um carregamento de catalogo em andamento se o usuario mudar a selecao antes dele terminar
 
-function renderEstoqueHojeChips(){
-  return [...UNIDADES].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(u=>{
+function unidadesEstoqueHojeDoGrupo(){
+  const grupo = document.getElementById('eh-grupo').value;
+  return UNIDADES.filter(u=>grupo==='todos' || grupoDaUnidadeEstoque(u.codigo)===grupo)
+    .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+}
+
+function mudarGrupoEstoqueHoje(){
+  ESTOQUE_HOJE_SELECIONADAS = null; // reseta pro default (todas as que ja contaram) no grupo novo
+  renderEstoqueHoje();
+}
+
+function toggleEstoqueHojeSelecao(codigo){
+  if(ESTOQUE_HOJE_SELECIONADAS.has(codigo)) ESTOQUE_HOJE_SELECIONADAS.delete(codigo);
+  else ESTOQUE_HOJE_SELECIONADAS.add(codigo);
+  renderEstoqueHoje();
+}
+
+function renderEstoqueHoje(){
+  const chips = document.getElementById('estoque-hoje-chips');
+  if(!chips) return;
+  const unidadesGrupo = unidadesEstoqueHojeDoGrupo();
+  if(ESTOQUE_HOJE_SELECIONADAS===null){
+    // default: comparar de cara as unidades do grupo que ja contaram hoje
+    ESTOQUE_HOJE_SELECIONADAS = new Set(unidadesGrupo.filter(u=>ESTOQUE_HOJE_CONTAGENS[u.codigo]).map(u=>u.codigo));
+  }
+  chips.innerHTML = unidadesGrupo.map(u=>{
     const contou = !!ESTOQUE_HOJE_CONTAGENS[u.codigo];
-    const ativo = ESTOQUE_HOJE_ABERTA===u.codigo;
-    return `<button type="button" class="pestoque-chip ${contou?'ok':''} ${ativo?'ativo':''}" onclick="toggleEstoqueHojeUnidade('${u.codigo.replace(/'/g,"\\'")}')">${contou?'✅':'⬜'} ${escapeHtml(u.nome)}</button>`;
-  }).join('');
+    const ativo = ESTOQUE_HOJE_SELECIONADAS.has(u.codigo);
+    return `<button type="button" class="pestoque-chip ${contou?'ok':''} ${ativo?'ativo':''}" onclick="toggleEstoqueHojeSelecao('${u.codigo.replace(/'/g,"\\'")}')">${contou?'✅':'⬜'} ${escapeHtml(u.nome)}</button>`;
+  }).join('') || '<div class="empty">Nenhuma unidade nesse grupo.</div>';
+  renderEstoqueHojeComparativo(unidadesGrupo);
 }
 
 async function carregarEstoqueHoje(){
-  const chips = document.getElementById('estoque-hoje-chips');
   const resumo = document.getElementById('estoque-hoje-resumo');
-  if(!chips || !resumo || !UNIDADES.length) return;
+  if(!resumo || !UNIDADES.length) return;
   try{
     const hoje = hojeBrasilia();
     const contagensDoDia = await fetch(`/api/inventario/contagens-do-dia?data=${hoje}`).then(r=>r.json());
     ESTOQUE_HOJE_CONTAGENS = {};
     contagensDoDia.forEach(c=>{ ESTOQUE_HOJE_CONTAGENS[c.unidade] = c; });
     ESTOQUE_HOJE_CATALOGO_CACHE = {};
-    ESTOQUE_HOJE_ABERTA = null;
+    ESTOQUE_HOJE_SELECIONADAS = null;
     const contaram = UNIDADES.filter(u=>ESTOQUE_HOJE_CONTAGENS[u.codigo]).length;
     resumo.textContent = `${contaram} de ${UNIDADES.length} unidades já contaram hoje`;
-    chips.innerHTML = renderEstoqueHojeChips();
-    document.getElementById('estoque-hoje-detalhe').innerHTML = '';
+    renderEstoqueHoje();
   }catch(err){
     resumo.textContent = 'Não foi possível carregar a contagem de hoje.';
   }
 }
 
-async function toggleEstoqueHojeUnidade(codigo){
-  const chips = document.getElementById('estoque-hoje-chips');
+// tabela comparativa: uma coluna por unidade selecionada (que ja contou),
+// uma linha por item (uniao dos itens contados em qualquer uma delas) - da
+// pra bater o olho e ver quem esta com quantidade destoante do resto do
+// grupo (maior valor da linha em destaque). E so comparativo de quantidade
+// em estoque no momento da contagem, nao de consumo/venda - pra isso e a
+// aba Diferencas, que ja cruza com recebimento/saida
+async function renderEstoqueHojeComparativo(unidadesGrupo){
   const det = document.getElementById('estoque-hoje-detalhe');
-  if(!chips || !det) return;
-  if(ESTOQUE_HOJE_ABERTA===codigo){
-    ESTOQUE_HOJE_ABERTA = null;
-    chips.innerHTML = renderEstoqueHojeChips();
-    det.innerHTML = '';
-    return;
-  }
-  ESTOQUE_HOJE_ABERTA = codigo;
-  chips.innerHTML = renderEstoqueHojeChips();
+  if(!det) return;
+  const selecionadas = unidadesGrupo.filter(u=>ESTOQUE_HOJE_SELECIONADAS.has(u.codigo));
+  const comContagem = selecionadas.filter(u=>ESTOQUE_HOJE_CONTAGENS[u.codigo]);
+  if(!selecionadas.length){ det.innerHTML = '<div class="empty">Selecione uma ou mais unidades acima pra comparar as quantidades.</div>'; return; }
+  if(!comContagem.length){ det.innerHTML = '<div class="empty">Nenhuma unidade selecionada fez a contagem hoje ainda.</div>'; return; }
   det.innerHTML = '<div class="empty">Carregando...</div>';
-  const contagem = ESTOQUE_HOJE_CONTAGENS[codigo];
-  if(!contagem){ det.innerHTML = '<div class="empty">Essa unidade ainda não fez a contagem hoje.</div>'; return; }
+  const geracao = ++ESTOQUE_HOJE_COMPARATIVO_GERACAO;
   try{
-    if(!ESTOQUE_HOJE_CATALOGO_CACHE[codigo]){
-      ESTOQUE_HOJE_CATALOGO_CACHE[codigo] = await fetch(`/api/inventario/catalogo?unidade=${encodeURIComponent(codigo)}`).then(r=>r.json());
-    }
-  }catch(err){ det.innerHTML = '<div class="empty">Não foi possível carregar o catálogo dessa unidade.</div>'; return; }
-  if(ESTOQUE_HOJE_ABERTA!==codigo) return; // usuario trocou de unidade enquanto carregava
-  const catalogoPorId = {};
-  ESTOQUE_HOJE_CATALOGO_CACHE[codigo].forEach(i=>{ catalogoPorId[i.id]=i; });
-  const linhas = Object.entries(contagem.contagens||{})
-    .map(([itemId,qtd])=>({ item: catalogoPorId[itemId], qtd }))
-    .filter(l=>l.item)
-    .sort((a,b)=>(a.item.setor||'').localeCompare(b.item.setor||'','pt-BR') || a.item.nome.localeCompare(b.item.nome,'pt-BR'));
+    await Promise.all(comContagem.map(async u=>{
+      if(!ESTOQUE_HOJE_CATALOGO_CACHE[u.codigo]){
+        ESTOQUE_HOJE_CATALOGO_CACHE[u.codigo] = await fetch(`/api/inventario/catalogo?unidade=${encodeURIComponent(u.codigo)}`).then(r=>r.json());
+      }
+    }));
+  }catch(err){ det.innerHTML = '<div class="empty">Não foi possível carregar o catálogo dessas unidades.</div>'; return; }
+  if(geracao!==ESTOQUE_HOJE_COMPARATIVO_GERACAO) return; // usuario mudou grupo/selecao enquanto carregava
+
+  // uniao dos itens contados em qualquer unidade selecionada, agrupados por setor+nome
+  const itensPorChave = {};
+  comContagem.forEach(u=>{
+    const catalogoPorId = {};
+    ESTOQUE_HOJE_CATALOGO_CACHE[u.codigo].forEach(i=>{ catalogoPorId[i.id]=i; });
+    const contagem = ESTOQUE_HOJE_CONTAGENS[u.codigo];
+    Object.entries(contagem.contagens||{}).forEach(([itemId,qtd])=>{
+      const item = catalogoPorId[itemId];
+      if(!item) return;
+      const chave = `${item.setor||''}::${item.nome}`;
+      if(!itensPorChave[chave]) itensPorChave[chave] = { setor:item.setor||'', nome:item.nome, unidadeMedida:item.unidadeMedida||'', valores:{} };
+      itensPorChave[chave].valores[u.codigo] = Number(qtd)||0;
+    });
+  });
+  const linhas = Object.values(itensPorChave)
+    .sort((a,b)=>a.setor.localeCompare(b.setor,'pt-BR') || a.nome.localeCompare(b.nome,'pt-BR'));
   if(!linhas.length){ det.innerHTML = '<div class="empty">Sem itens contados.</div>'; return; }
-  det.innerHTML = `<table>
-    <thead><tr><th>Setor</th><th>Item</th><th>Quantidade</th></tr></thead>
-    <tbody>${linhas.map(l=>`<tr><td>${escapeHtml(l.item.setor||'')}</td><td>${escapeHtml(l.item.nome)}</td><td>${l.qtd} ${escapeHtml(l.item.unidadeMedida||'')}</td></tr>`).join('')}</tbody>
-  </table>`;
+
+  const colunas = comContagem;
+  det.innerHTML = `<div style="overflow-x:auto;"><table>
+    <thead><tr><th>Setor</th><th>Item</th>${colunas.map(u=>`<th>${escapeHtml(u.nome)}</th>`).join('')}</tr></thead>
+    <tbody>${linhas.map(l=>{
+      const max = Math.max(...colunas.map(u=>l.valores[u.codigo]??-Infinity));
+      return `<tr><td>${escapeHtml(l.setor)}</td><td>${escapeHtml(l.nome)}</td>${colunas.map(u=>{
+        const v = l.valores[u.codigo];
+        if(v==null) return '<td style="color:var(--muted);">—</td>';
+        const destaque = v===max && colunas.length>1 ? 'color:var(--accent);font-weight:700;' : '';
+        return `<td style="${destaque}">${v} ${escapeHtml(l.unidadeMedida)}</td>`;
+      }).join('')}</tr>`;
+    }).join('')}</tbody>
+  </table></div>
+  ${colunas.length>1 ? '<div class="sub" style="margin-top:8px;">Em destaque, a unidade com a maior quantidade de cada item entre as selecionadas.</div>' : ''}`;
 }
 
 async function mudarAba(aba){
