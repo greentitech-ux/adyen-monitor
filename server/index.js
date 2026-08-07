@@ -3415,13 +3415,16 @@ const TIPOS_CENTRAL_LABEL = { estorno: 'Estorno', 'ajuste-fechamento': 'Ajuste d
 
 function filtrarCardsCentral(cards, req) {
   const { unidade, grupo, dataDe, dataAte, tipo } = req.query;
+  // "tipo" aceita 1 ou varios separados por virgula (a tela permite marcar
+  // mais de um tipo ao mesmo tempo pelo check no canto do botao de filtro)
+  const tipos = tipo ? String(tipo).split(',').filter(Boolean) : [];
   return cards.filter((c) => {
     const dataBrasilia = (c.criadoEm || '').slice(0, 10);
     return (!unidade || c.unidade === unidade) &&
       (!grupo || grupoDaUnidadeServer(c.unidade) === grupo) &&
       (!dataDe || dataBrasilia >= dataDe) &&
       (!dataAte || dataBrasilia <= dataAte) &&
-      (!tipo || c.tipo === tipo);
+      (!tipos.length || tipos.includes(c.tipo));
   });
 }
 
@@ -3466,8 +3469,9 @@ app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes
   // nome do arquivo reflete o filtro de tipo ativo na tela (ex: "Compra" ->
   // solicitacoes-compra-2026-08-07.csv), nao um "central-solicitacoes.csv"
   // generico que nao diz se e de tudo ou so de um tipo
-  const baseArquivo = req.query.tipo
-    ? `solicitacoes-${TIPOS_CENTRAL_LABEL[req.query.tipo] || req.query.tipo}`
+  const tiposArquivo = req.query.tipo ? String(req.query.tipo).split(',').filter(Boolean) : [];
+  const baseArquivo = tiposArquivo.length
+    ? `solicitacoes-${tiposArquivo.map((t) => TIPOS_CENTRAL_LABEL[t] || t).join('-')}`
     : 'central-solicitacoes-todas';
   const nomeArquivo = reportUtil.nomeArquivoComData(baseArquivo);
   if (req.params.formato === 'csv') {

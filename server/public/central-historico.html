@@ -137,9 +137,16 @@
   @keyframes notif-pulse{0%,100%{border-color:var(--warn);}50%{border-color:var(--accent);}}
   @media(max-width:760px){ .kanban-col{min-width:82vw;max-height:none;} }
   .tipo-filtro-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;}
-  .tipo-filtro-btn{font-family:var(--sans);font-size:11.5px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:112px;transition:border-color .15s ease,background .15s ease;}
+  .tipo-filtro-btn{position:relative;font-family:var(--sans);font-size:11.5px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:112px;transition:border-color .15s ease,background .15s ease;}
   .tipo-filtro-btn:hover{border-color:var(--accent);}
   .tipo-filtro-btn.active{border-color:var(--accent);background:rgba(92,200,255,.1);}
+  /* check discreto no canto superior direito de cada tipo: marca varios
+     tipos de uma vez (uniao), sem precisar do "Todas" nem de trocar de
+     um em um - contorno preto apagado de proposito pra nao brigar com o
+     conteudo do botao */
+  .tf-check{position:absolute;top:4px;right:4px;width:15px;height:15px;border-radius:4px;border:1px solid rgba(0,0,0,.6);background:rgba(0,0,0,.25);color:transparent;font-size:10px;line-height:13px;text-align:center;cursor:pointer;transition:border-color .15s ease,color .15s ease;}
+  .tf-check:hover{border-color:var(--muted);}
+  .tf-check.checked{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.12);}
   .tipo-filtro-btn .tf-label{font-weight:600;white-space:nowrap;}
   .tipo-filtro-btn .tf-counts{font-family:var(--mono);font-size:10px;white-space:nowrap;}
   .tipo-filtro-btn .tf-counts b{font-weight:600;}
@@ -548,7 +555,9 @@ let FILTRO_UNIDADE = '';
 let FILTRO_GRUPO = '';
 let FILTRO_DATA_DE = '';
 let FILTRO_DATA_ATE = '';
-let FILTRO_TIPO = '';
+// filtro de tipo: vazio = todas; 1 item = clique normal no botao (exclusivo);
+// varios itens = marcados pelo check no canto do botao (uniao dos tipos)
+let FILTRO_TIPOS = new Set();
 let TIPOS_DISPONIVEIS = Object.keys(TIPOS_INFO);
 function grupoDaUnidade(u){ return ARCFOOD_UNIDADES[u] ? 'ARCFOOD' : 'Grupo Bravo (GBE)'; }
 let DETALHE_ATUAL = null;
@@ -729,17 +738,29 @@ function contagemStatus(lista){
   };
 }
 function renderFiltroTipoRow(base){
-  const botaoHtml = (tipo, label, contagem) => `
-    <button type="button" class="tipo-filtro-btn ${FILTRO_TIPO===tipo?'active':''}" onclick="selecionarFiltroTipo('${tipo}')">
+  const botaoHtml = (tipo, label, contagem) => {
+    const ativo = tipo ? FILTRO_TIPOS.has(tipo) : FILTRO_TIPOS.size===0;
+    return `
+    <button type="button" class="tipo-filtro-btn ${ativo?'active':''}" onclick="selecionarFiltroTipo('${tipo}')">
+      ${tipo ? `<span class="tf-check ${FILTRO_TIPOS.has(tipo)?'checked':''}" title="Marcar/desmarcar este tipo (pode combinar vários)" onclick="event.stopPropagation();toggleFiltroTipoMulti('${tipo}')">✓</span>` : ''}
       <span class="tf-label">${tipo?iconeTipo(tipo)+' '+label:label}</span>
       <span class="tf-counts"><b style="color:var(--warn);">${contagem.P}</b> pend · <b style="color:var(--ok);">${contagem.A}</b> aprov · <b style="color:var(--bad);">${contagem.R}</b> rej</span>
     </button>`;
+  };
   document.getElementById('tipo-filtro-row').innerHTML =
     botaoHtml('', 'Todas', contagemStatus(base)) +
     TIPOS_DISPONIVEIS.map(tipo=>botaoHtml(tipo, TIPOS_INFO[tipo].label, contagemStatus(base.filter(c=>c.tipo===tipo)))).join('');
 }
+// clique no corpo do botao: comportamento de sempre - so aquele tipo
+// (ou "Todas" limpa tudo)
 function selecionarFiltroTipo(tipo){
-  FILTRO_TIPO = tipo;
+  FILTRO_TIPOS = tipo ? new Set([tipo]) : new Set();
+  renderKanban();
+}
+// clique no check do canto: entra/sai da combinacao sem mexer nos outros
+function toggleFiltroTipoMulti(tipo){
+  if(FILTRO_TIPOS.has(tipo)) FILTRO_TIPOS.delete(tipo);
+  else FILTRO_TIPOS.add(tipo);
   renderKanban();
 }
 
@@ -750,18 +771,28 @@ function renderKanban(){
   if(FILTRO_DATA_DE) base = base.filter(c=>dataBrasilia(c.criadoEm) >= FILTRO_DATA_DE);
   if(FILTRO_DATA_ATE) base = base.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
   renderFiltroTipoRow(base);
-  let filtradas = FILTRO_TIPO ? base.filter(c=>c.tipo===FILTRO_TIPO) : base;
+  let filtradas = FILTRO_TIPOS.size ? base.filter(c=>FILTRO_TIPOS.has(c.tipo)) : base;
   document.getElementById('lista-count').textContent = filtradas.length;
   CHAVES_VISIVEIS = filtradas.map(c=>c.tipo+'::'+c.id);
 
   STATUS_COLUNAS.forEach(status=>{
-    const doColuna = filtradas.filter(c=>c.status===status);
+    // dentro de cada coluna, o andamento manda na ordem: Pendente em cima,
+    // Em andamento no meio, Finalizado SEMPRE embaixo (ja foi resolvido,
+    // nao precisa disputar atencao com o que ainda esta aberto). O sort e
+    // estavel, entao dentro do mesmo andamento a ordem original se mantem
+    const doColuna = filtradas.filter(c=>c.status===status)
+      .sort((a,b)=>ordemAndamento(a)-ordemAndamento(b));
     document.getElementById('kcount-'+status).textContent = doColuna.length;
     document.getElementById('kcards-'+status).innerHTML = doColuna.length
       ? doColuna.map(kcardHtml).join('')
       : '<div class="kanban-empty">Nenhuma aqui.</div>';
   });
   atualizarBarraSelecao();
+}
+
+const ORDEM_ANDAMENTO = { PENDENTE: 0, EM_ANDAMENTO: 1, FINALIZADO: 2 };
+function ordemAndamento(c){
+  return ORDEM_ANDAMENTO[c.execucaoStatus || 'PENDENTE'] ?? 0;
 }
 
 // relatorio (CSV/PDF) do quadro inteiro - usa os mesmos filtros de loja/
@@ -772,7 +803,7 @@ function baixarRelatorioCentral(formato){
   if(FILTRO_GRUPO) params.set('grupo', FILTRO_GRUPO);
   if(FILTRO_DATA_DE) params.set('dataDe', FILTRO_DATA_DE);
   if(FILTRO_DATA_ATE) params.set('dataAte', FILTRO_DATA_ATE);
-  if(FILTRO_TIPO) params.set('tipo', FILTRO_TIPO);
+  if(FILTRO_TIPOS.size) params.set('tipo', [...FILTRO_TIPOS].join(','));
   window.location.href = `/api/central/relatorio.${formato}?${params.toString()}`;
 }
 
