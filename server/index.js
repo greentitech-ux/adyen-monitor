@@ -1815,6 +1815,45 @@ app.get('/api/fechamentos/:id/bruto', auth.requireMaster, async (req, res) => {
   res.json(registro);
 });
 
+// data de hoje em Brasilia, formato YYYY-MM-DD
+function hojeBrasiliaISO() {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_BR, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const o = {};
+  partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
+// varre fechamentos ja lançados num período e cria os tickets de Quebra de
+// caixa que faltaram (ver fechamentosLive.backfillQuebraCaixa) - pensado pra
+// pegar retroativamente quem foi lançado ANTES dessa feature existir.
+// Idempotente: pode rodar de novo sem duplicar. So Master.
+app.post('/api/fechamentos/quebra-caixa/backfill', auth.requireMaster, async (req, res) => {
+  try {
+    const inicio = (req.body && req.body.inicio) || '2026-07-01';
+    const fim = (req.body && req.body.fim) || hojeBrasiliaISO();
+    const resultado = await fechamentosLive.backfillQuebraCaixa(inicio, fim);
+    resultado.cardsCriados.forEach((card) => broadcast('solicitacao-criada', card, 'solicitacoes'));
+    if (resultado.cardsCriados.length) {
+      push.notifySolicitacao(
+        `${resultado.cardsCriados.length} ticket(s) de Quebra de caixa criados retroativamente`,
+        `Período ${inicio} a ${fim}`,
+        resultado.cardsCriados[0].id,
+      );
+    }
+    res.json({
+      periodo: { inicio, fim },
+      verificados: resultado.verificados,
+      criados: resultado.cardsCriados.length,
+      jaTinhaCard: resultado.jaTinhaCard,
+      semDiferencaRelevante: resultado.semDiferencaRelevante,
+      erros: resultado.erros,
+      tickets: resultado.cardsCriados.map((c) => ({ numeroTicket: c.numeroTicket, unidade: c.unidadeNome, titulo: c.titulo })),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // data de ontem em Brasilia, formato YYYY-MM-DD (mesmo padrao ja usado em
 // parque.js/hojeBrasiliaISO, so que D-1)
 function ontemBrasiliaISO() {
