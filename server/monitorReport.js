@@ -15,15 +15,25 @@ function slugify(text) {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'relatorio';
 }
 
+// data de hoje (Brasilia) pra sufixo de nome de arquivo - mesmo formato
+// de reportUtil.dataArquivo(), duplicado aqui de proposito pra nao criar
+// dependencia entre os modulos de relatorio (ver reportUtil.js)
+function dataArquivo() {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_BR, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const o = {}; partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
 // nome de arquivo identificavel: pedido explicito do usuario pra nao ter
-// varios "relatorio-transacoes.csv" genericos sem saber de qual loja e -
-// inclui a(s) unidade(s) filtrada(s) (codigo/nome/iniciais); sem filtro,
-// cai pra "todas-unidades"
+// varios "relatorio-transacoes.csv" genericos sem saber de qual loja e nem
+// de quando e - inclui a(s) unidade(s) filtrada(s) (codigo/nome/iniciais,
+// ou "todas-unidades" sem filtro) e a data de hoje
 function nomeArquivoComUnidades(base, unidades) {
   const lista = (unidades || []).filter(Boolean);
-  if (!lista.length) return slugify(`${base}-todas-unidades`);
-  if (lista.length <= 3) return slugify(`${base}-${lista.join('-')}`);
-  return slugify(`${base}-${lista.length}-unidades`);
+  const sufixoUnidades = !lista.length ? `${base}-todas-unidades`
+    : lista.length <= 3 ? `${base}-${lista.join('-')}`
+      : `${base}-${lista.length}-unidades`;
+  return `${slugify(sufixoUnidades)}-${dataArquivo()}`;
 }
 
 function fmtDT(iso) {

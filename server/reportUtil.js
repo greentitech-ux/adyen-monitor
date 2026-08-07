@@ -40,6 +40,23 @@ function agoraBrasiliaFmt() {
   return new Date().toLocaleString('pt-BR', { timeZone: FUSO_BR });
 }
 
+// data de hoje (Brasilia) no formato pra sufixo de nome de arquivo -
+// pedido explicito do usuario pra nunca sair um "relatorio.csv" generico
+// sem saber nem do que e nem de quando e (ver uso em index.js, em todo
+// nomeArquivo/Content-Disposition de relatorio)
+function dataArquivo() {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_BR, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const o = {}; partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  return `${o.year}-${o.month}-${o.day}`;
+}
+
+// atalho pro caso mais comum: nome base (ex: "grupos", "ifood-vendas") + data
+// de hoje, ja passado pelo slugify - usado em quase todo relatorio que nao
+// tem um recorte mais especifico (unidade, tipo) pra incluir no nome
+function nomeArquivoComData(base) {
+  return `${slugify(base)}-${dataArquivo()}`;
+}
+
 function toCSV(colunas, linhas) {
   const escape = (v) => {
     const s = String(v ?? '');
@@ -127,4 +144,4 @@ function writePDF(res, { titulo, subtitulo, colunas, linhas, resumo, larguras, s
   doc.end();
 }
 
-module.exports = { slugify, toCSV, writePDF, fmtMoneyBR, fmtDataBR, fmtDataHoraBR, agoraBrasiliaFmt };
+module.exports = { slugify, toCSV, writePDF, fmtMoneyBR, fmtDataBR, fmtDataHoraBR, agoraBrasiliaFmt, dataArquivo, nomeArquivoComData };

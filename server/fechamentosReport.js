@@ -84,10 +84,10 @@ const LARGURAS = {
   diferenca: 58, quebra: 56, adyen: 58, ifood: 58, food99: 54, pix: 54, loja: 58, observacao: 75,
 };
 
-function writePDF(res, { titulo, subtitulo, linhas }) {
+function writePDF(res, { titulo, subtitulo, linhas, nomeArquivo }) {
   const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${slugify(titulo)}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${slugify(nomeArquivo || titulo)}.pdf"`);
   doc.pipe(res);
 
   const tableX = doc.page.margins.left;

@@ -105,10 +105,10 @@ function toCSV(linhas) {
 
 const LARGURAS = { cliente: 110, unidades: 100, tiposAlerta: 220, quantidade: 65, valorTotal: 85, primeiro: 85, ultimo: 85 };
 
-function writePDF(res, { titulo, subtitulo, linhas }) {
+function writePDF(res, { titulo, subtitulo, linhas, nomeArquivo }) {
   const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${slugify(titulo)}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${slugify(nomeArquivo || titulo)}.pdf"`);
   doc.pipe(res);
 
   const tableX = doc.page.margins.left;
