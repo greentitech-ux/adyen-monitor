@@ -3425,14 +3425,24 @@ function filtrarCardsCentral(cards, req) {
   });
 }
 
+// junta os itens da lista de compra (descricao + qtd) numa unica string pra
+// caber numa celula de tabela - mesmo formato "descricao · qtd. N" usado no
+// modal de detalhe (central-historico.html), so que numa linha so
+function formatarItensCompra(itens) {
+  if (!Array.isArray(itens) || !itens.length) return '—';
+  return itens.map((i) => i.quantidade != null && i.quantidade !== '' ? `${i.descricao} · qtd. ${i.quantidade}` : i.descricao).join('; ');
+}
+
 function prepararRelatorioCentral(cards) {
   const colunas = [
     { key: 'tipo', label: 'Tipo' }, { key: 'unidade', label: 'Unidade' }, { key: 'titulo', label: 'Título' },
+    { key: 'itens', label: 'Itens' },
     { key: 'valor', label: 'Valor' }, { key: 'status', label: 'Status' }, { key: 'criadoPor', label: 'Criado por' }, { key: 'criadoEm', label: 'Criado em' },
     { key: 'decididoPor', label: 'Decidido por' }, { key: 'decididoEm', label: 'Decidido em' }, { key: 'motivoDecisao', label: 'Motivo da decisão' },
   ];
   const linhas = cards.map((c) => ({
     tipo: TIPOS_CENTRAL_LABEL[c.tipo] || c.tipo, unidade: c.unidadeNome || c.unidade || '—', titulo: c.titulo || '—',
+    itens: formatarItensCompra(c.itens),
     valor: c.valorEstimado != null ? reportUtil.fmtMoneyBR(c.valorEstimado) : '—',
     status: c.status, criadoPor: c.criadoPorEmail || '—', criadoEm: reportUtil.fmtDataHoraBR(c.criadoEm),
     decididoPor: c.decididoPorEmail || '—', decididoEm: reportUtil.fmtDataHoraBR(c.decididoEm), motivoDecisao: c.motivoDecisao || '—',
@@ -3440,13 +3450,14 @@ function prepararRelatorioCentral(cards) {
   return { colunas, linhas };
 }
 
-// Titulo e' o campo mais lido do relatorio (o que identifica o pedido), por
-// isso ganha bem mais largura que o padrao uniforme - as demais colunas
-// perdem espaco proporcionalmente, sobretudo Decidido por/em e Motivo, que
-// costumam vir "-" enquanto o ticket ainda esta pendente
+// Titulo e Itens sao os campos mais lidos do relatorio (o que identifica o
+// pedido e o que precisa ser comprado), por isso ganham bem mais largura que
+// o padrao uniforme - as demais colunas perdem espaco proporcionalmente,
+// sobretudo Decidido por/em e Motivo, que costumam vir "-" enquanto o ticket
+// ainda esta pendente
 const LARGURAS_RELATORIO_CENTRAL = {
-  tipo: 70, unidade: 75, titulo: 175, valor: 55, status: 60,
-  criadoPor: 100, criadoEm: 70, decididoPor: 62, decididoEm: 50, motivoDecisao: 50,
+  tipo: 55, unidade: 62, titulo: 135, itens: 125, valor: 48, status: 52,
+  criadoPor: 80, criadoEm: 60, decididoPor: 50, decididoEm: 42, motivoDecisao: 40,
 };
 
 app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes'), async (req, res) => {
