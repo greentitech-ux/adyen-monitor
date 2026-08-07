@@ -345,10 +345,14 @@
         <button type="button" class="btn-primary" style="margin-top:0;background:var(--bad);color:#fff;" onclick="decidir('REJEITADO')">✕ Rejeitar</button>
       </div>
     </div>
-    <div id="d-tipo-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-      <div class="secao-titulo">🔀 Categoria do ticket</div>
-      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de categoria ou virar Estorno conforme o atendimento evolui.</div>
-      <div id="d-tipo-corpo"></div>
+    <div id="d-chat" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">💬 Chat</div>
+      <div class="sub" style="margin:-2px 0 8px;">Master e Admin podem questionar antes de decidir; quem pediu pode responder.</div>
+      <div id="d-chat-lista" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="d-chat-texto" placeholder="Escrever uma mensagem..." style="flex:1 1 auto;min-width:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarChat();}">
+        <button type="button" class="btn-primary" style="flex:none;width:auto;margin-top:0;white-space:nowrap;" onclick="enviarChat()">Enviar</button>
+      </div>
     </div>
     <div id="d-comprada" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <div class="secao-titulo">🛍️ Comprada</div>
@@ -359,14 +363,10 @@
       <div class="sub" style="margin:-2px 0 8px;">Depois de aprovado, acompanhe a execução de verdade do ticket.</div>
       <div id="d-andamento-corpo"></div>
     </div>
-    <div id="d-chat" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-      <div class="secao-titulo">💬 Chat</div>
-      <div class="sub" style="margin:-2px 0 8px;">Master e Admin podem questionar antes de decidir; quem pediu pode responder.</div>
-      <div id="d-chat-lista" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="d-chat-texto" placeholder="Escrever uma mensagem..." style="flex:1 1 auto;min-width:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarChat();}">
-        <button type="button" class="btn-primary" style="flex:none;width:auto;margin-top:0;white-space:nowrap;" onclick="enviarChat()">Enviar</button>
-      </div>
+    <div id="d-tipo-acoes" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+      <div class="secao-titulo">🔀 Categoria do ticket</div>
+      <div class="sub" style="margin:-2px 0 8px;">Este ticket pode mudar de categoria ou virar Estorno conforme o atendimento evolui.</div>
+      <div id="d-tipo-corpo"></div>
     </div>
     <div class="msg hidden" id="msg-detalhe"></div>
     </div>
