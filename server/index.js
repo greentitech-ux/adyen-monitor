@@ -346,7 +346,11 @@ function requireAnySection(...sections) {
 
 // ---------- clientes SSE conectados (para empurrar atualizacoes ao vivo pro dashboard) ----------
 // cada cliente guarda suas proprias permissoes, pra so receber eventos das
-// unidades/secoes que ele pode ver
+// unidades/secoes que ele pode ver. ATENCAO: eventos de chamado (TI/
+// manutencao) mandam so { id } de proposito, sem `unidade` - quem e
+// tecnico/responsavel de manutencao enxerga pela lista de atribuicao (nao
+// pela permissao de unidade), entao incluir `unidade` faria o filtro abaixo
+// descartar o evento pra quem tem permissions.unidades vazio/diferente
 const sseClients = new Set();
 function broadcast(event, data, section) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -2823,7 +2827,7 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
           criadoPorEmail: req.user.email,
         });
         await solicitacoes.vincularChamado(atual.id, chamado.id);
-        broadcast('chamado-criado', chamado, 'tecnico');
+        broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
       }
     } else if (status === 'APROVADO' && atual.tipo === 'manutencao') {
       chamado = await chamadosManutencao.create({
@@ -2836,7 +2840,7 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
         criadoPorEmail: req.user.email,
       });
       await solicitacoes.vincularChamado(atual.id, chamado.id);
-      broadcast('chamado-manutencao-criado', chamado, 'manutencao');
+      broadcast('chamado-manutencao-criado', { id: chamado.id }, 'manutencao');
     }
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json({ ...registro, chamado, senhaPadrao, avisoSenha });
@@ -3171,7 +3175,7 @@ app.post('/api/chamados', auth.requireMaster, async (req, res) => {
   try {
     const { unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail } = req.body;
     const chamado = await chamadosTI.create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, criadoPorEmail: req.user.email });
-    broadcast('chamado-criado', chamado, 'tecnico');
+    broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3187,7 +3191,7 @@ app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('f
       fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
     }
     const chamado = await chamadosTI.iniciar(req.params.id, { fotosAntes, tecnicoId: req.user.id });
-    broadcast('chamado-atualizado', chamado, 'tecnico');
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3209,7 +3213,7 @@ app.post('/api/chamados/:id/concluir', requireSection('tecnico'), upload.array('
       pecas: payload.pecas,
       tecnicoId: req.user.id,
     });
-    broadcast('chamado-atualizado', chamado, 'tecnico');
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3248,7 +3252,7 @@ app.post('/api/chamados-manutencao', auth.requireMaster, async (req, res) => {
   try {
     const { unidade, unidadeNome, titulo, descricao, responsaveis } = req.body;
     const chamado = await chamadosManutencao.create({ unidade, unidadeNome, titulo, descricao, responsaveis, criadoPorEmail: req.user.email });
-    broadcast('chamado-manutencao-criado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-criado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3258,7 +3262,7 @@ app.post('/api/chamados-manutencao', auth.requireMaster, async (req, res) => {
 app.post('/api/chamados-manutencao/:id/aceitar', requireSection('manutencao'), async (req, res) => {
   try {
     const chamado = await chamadosManutencao.aceitar(req.params.id, { userId: req.user.id, dataExecucao: req.body.dataExecucao });
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3268,7 +3272,7 @@ app.post('/api/chamados-manutencao/:id/aceitar', requireSection('manutencao'), a
 app.post('/api/chamados-manutencao/:id/recusar', requireSection('manutencao'), async (req, res) => {
   try {
     const chamado = await chamadosManutencao.recusar(req.params.id, { userId: req.user.id, motivo: req.body.motivo });
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3284,7 +3288,7 @@ app.post('/api/chamados-manutencao/:id/iniciar', requireSection('manutencao'), u
       fotosAntes.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
     }
     const chamado = await chamadosManutencao.iniciar(req.params.id, { fotosAntes, userId: req.user.id });
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3294,7 +3298,7 @@ app.post('/api/chamados-manutencao/:id/iniciar', requireSection('manutencao'), u
 app.post('/api/chamados-manutencao/:id/em-espera', requireSection('manutencao'), async (req, res) => {
   try {
     const chamado = await chamadosManutencao.marcarEmEspera(req.params.id, { userId: req.user.id, motivo: req.body.motivo });
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3304,7 +3308,7 @@ app.post('/api/chamados-manutencao/:id/em-espera', requireSection('manutencao'),
 app.post('/api/chamados-manutencao/:id/retomar', requireSection('manutencao'), async (req, res) => {
   try {
     const chamado = await chamadosManutencao.retomar(req.params.id, { userId: req.user.id });
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3326,7 +3330,7 @@ app.post('/api/chamados-manutencao/:id/concluir', requireSection('manutencao'), 
       pecas: payload.pecas,
       userId: req.user.id,
     });
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3337,7 +3341,7 @@ app.post('/api/chamados-manutencao/:id/concluir', requireSection('manutencao'), 
 app.patch('/api/chamados-manutencao/:id', auth.requireMaster, async (req, res) => {
   try {
     const chamado = await chamadosManutencao.atualizar(req.params.id, req.body);
-    broadcast('chamado-manutencao-atualizado', chamado, 'manutencao');
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });

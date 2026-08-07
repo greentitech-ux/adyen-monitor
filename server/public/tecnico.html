@@ -418,6 +418,16 @@ async function boot(){
   }
   document.getElementById('root').classList.remove('hidden');
   await carregarChamados();
+  iniciarStreamChamados();
+}
+
+// ao vivo: quando um chamado e criado/atualizado (ex: Master te atribui um
+// chamado novo), recarrega a lista sem precisar dar F5
+function iniciarStreamChamados(){
+  const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
+  ['chamado-criado','chamado-atualizado'].forEach(evento=>{
+    es.addEventListener(evento, ()=>{ carregarChamados(); });
+  });
 }
 
 boot();
