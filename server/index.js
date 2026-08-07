@@ -50,6 +50,8 @@ const festas = require('./festas');
 const mensalistas = require('./mensalistas');
 const termoResponsabilidade = require('./termoResponsabilidade');
 const saltiversoImport = require('./saltiversoImport');
+const centralCards = require('./centralCards');
+const relatorioMV = require('./relatorioMV');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -119,6 +121,9 @@ const ROTAS_PUBLICAS_SEM_DASHBOARD = new Set([
   '/api/refund-requests/publico',
   '/api/solicitacoes/publico',
   '/api/bot/solicitacoes',
+  '/decidir.html',
+  '/api/solicitacoes/decidir-info',
+  '/api/solicitacoes/decidir',
 ]);
 if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
   app.use((req, res, next) => {
@@ -293,6 +298,47 @@ app.post('/api/bot/solicitacoes', async (req, res) => {
     broadcast('solicitacao-criada', registro, 'solicitacoes');
     push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Nova solicitação (robô de cobranças)`, `${registro.titulo || ''} · ${registro.unidadeNome || ''}`, registro.id);
     res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- aprovar/recusar por e-mail, SEM LOGIN (ver decidir.html e
+// relatorioMV.js) - protegido pelo token de uso unico gerado a cada envio do
+// relatorio diario (solicitacoes.gerarTokenAcao), nao pela sessao do
+// dashboard. So devolve/aceita o minimo necessario pra pagina publica
+// funcionar (nunca a lista inteira do pedido nem dados de outras
+// solicitacoes), seguindo o mesmo cuidado do link publico de estorno. ----------
+app.get('/api/solicitacoes/decidir-info', async (req, res) => {
+  const registro = await solicitacoes.validarToken(req.query.ticket, req.query.token);
+  if (!registro) return res.status(404).json({ error: 'Link inválido, expirado ou já usado.' });
+  res.json({
+    numeroTicket: registro.numeroTicket,
+    tipo: registro.tipo,
+    titulo: registro.titulo,
+    unidadeNome: registro.unidadeNome || registro.unidade,
+    valorEstimado: registro.valorEstimado,
+    observacao: registro.observacao,
+    criadoEm: registro.criadoEm,
+  });
+});
+
+app.post('/api/solicitacoes/decidir', upload.single('comprovante'), async (req, res) => {
+  try {
+    const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
+    const { ticket, token, acao, motivoDecisao } = payload;
+    const registro = await solicitacoes.validarToken(ticket, token);
+    if (!registro) return res.status(404).json({ error: 'Link inválido, expirado ou já usado.' });
+    let comprovante = null;
+    if (req.file) {
+      const path = await storage.salvarArquivo(registro.unidade || 'geral', req.file, 'solicitacoes');
+      comprovante = { nome: req.file.originalname, path, tipo: req.file.mimetype || 'application/octet-stream' };
+    }
+    const atualizado = await solicitacoes.decidirPorToken(ticket, token, {
+      acao, motivoDecisao, comprovante, decididoPorEmail: relatorioMV.MV_EMAIL,
+    });
+    broadcast('solicitacao-decidida', atualizado, 'solicitacoes');
+    res.json({ ok: true, numeroTicket: atualizado.numeroTicket, status: atualizado.status });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -3008,74 +3054,11 @@ app.delete('/api/solicitacoes/:id', auth.requireMaster, async (req, res) => {
 // Fechamento (fechamentosLive.js) + Compra/Manutenção/Suporte de TI
 // (solicitacoes.js) num feed so, cada card ja normalizado no mesmo formato -
 // cada usuario ve exatamente o que veria nas rotas individuais de cada tipo
-// (Master ve tudo, loja ve so o que ela mesma pediu)
-function normalizarCard(tipo, r) {
-  if (tipo === 'estorno') {
-    const ehCliente = r.origem === 'cliente';
-    const titulo = ehCliente
-      ? `Estorno (cliente) · ${r.nomeCliente || 'sem nome informado'}`
-      : `Estorno · pedido ${r.pedidoId}`;
-    let observacao = r.observacao || '';
-    if (ehCliente) {
-      const linhas = [
-        `Motivo: ${r.motivoEstorno}${r.motivoOutro ? ' - ' + r.motivoOutro : ''}`,
-        `Valor da venda: ${fmtMoneyServer(r.valorVenda)} · Valor a estornar: ${fmtMoneyServer(r.valorEstornar)}`,
-        `Forma de pagamento: ${r.formaPagamento}${r.bandeira ? ' · ' + r.bandeira : ''}${r.ultimos4 ? ' final ' + r.ultimos4 : ''}`,
-        `Venda em ${r.dataVenda}${r.horaVenda ? ' às ' + r.horaVenda : ''}`,
-        r.telefoneCliente ? `Telefone do cliente: ${r.telefoneCliente}` : null,
-      ].filter(Boolean);
-      observacao = linhas.join('\n');
-    }
-    return {
-      ...r,
-      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome || r.unidade, status: r.status, criadoEm: r.criadoEm,
-      titulo, observacao, anexos: r.anexos || [], valorEstimado: null,
-      criadoPorId: r.requestedById, criadoPorEmail: r.requestedByEmail || (ehCliente ? 'pedido do cliente final' : ''),
-      motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decidedByEmail, decididoEm: r.decidedEm,
-      chamadoId: null,
-    };
-  }
-  if (tipo === 'ajuste-fechamento') {
-    const desc = r.tipoCorrecao === 'item'
-      ? `adicionar ${r.itemNovo?.tipo === 'maquininha' ? 'maquininha' : 'saída'} "${r.itemNovo?.descricao || ''}" (${fmtMoneyServer(r.itemNovo?.valor)})`
-      : r.tipoCorrecao === 'excluir'
-        ? 'excluir o lançamento inteiro'
-        : r.tipoCorrecao === 'data'
-          ? `corrigir a data para ${r.novaData}`
-          : `corrigir ${Object.keys(r.mudancas || {}).join(', ')}`;
-    return {
-      ...r,
-      tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
-      titulo: `Ajuste de fechamento (${r.data}) - ${desc}`, observacao: r.motivo, anexos: r.anexos || [], valorEstimado: null,
-      criadoPorId: r.solicitadoPorId, criadoPorEmail: r.solicitadoPorEmail,
-      motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
-      chamadoId: null, fechamentoId: r.fechamentoId,
-    };
-  }
-  return {
-    ...r,
-    tipo, id: r.id, unidade: r.unidade, unidadeNome: r.unidadeNome, status: r.status, criadoEm: r.criadoEm,
-    titulo: r.titulo, observacao: r.observacao, anexos: r.anexos || [], valorEstimado: r.valorEstimado, itens: r.itens || [],
-    criadoPorId: r.criadoPorId, criadoPorEmail: r.criadoPorEmail,
-    motivoDecisao: r.motivoDecisao, decididoPorEmail: r.decididoPorEmail, decididoEm: r.decididoEm,
-    chamadoId: r.chamadoId,
-  };
-}
-function fmtMoneyServer(v) {
-  return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
+// (Master ve tudo, loja ve so o que ela mesma pediu). A agregacao em si (sem
+// filtro de permissao) mora em centralCards.js, reaproveitada tambem pelo
+// relatorio diario do MV (relatorioMV.js) - ver aviso la no topo do arquivo
 async function todosCardsCentral(req) {
-  const [estornos, ajustes, gerais] = await Promise.all([
-    refunds.listAll(),
-    fechamentosLive.listarEdicoes(),
-    solicitacoes.listAll(),
-  ]);
-  let cards = [
-    ...estornos.map((r) => normalizarCard('estorno', r)),
-    ...ajustes.map((r) => normalizarCard('ajuste-fechamento', r)),
-    ...gerais.map((r) => normalizarCard(r.tipo, r)),
-  ];
+  let cards = await centralCards.listarTodos();
   // so o Master enxerga tudo. Admin/qualquer outro usuario so ve o que
   // criou ou o que foi explicitamente atribuido a ele (👤 Atribuir
   // responsável, agora multi-pessoa) - Admin perdeu o bypass automatico
@@ -3099,6 +3082,16 @@ async function todosCardsCentral(req) {
 // foi atribuido, exceto Master que ve tudo)
 app.get('/api/central', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
   res.json(await todosCardsCentral(req));
+});
+
+// dispara o relatorio diario do MV na hora, pra testar (ver relatorioMV.js -
+// mesmo relatorio que roda sozinho no horario configurado em RELATORIO_HORA)
+app.get('/api/relatorio-mv/testar', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await relatorioMV.enviarRelatorio());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // busca o card cru (de qualquer um dos 3 modulos) - usado no gate de acesso
@@ -3973,5 +3966,15 @@ app.use((err, req, res, next) => {
     setInterval(() => {
       rodarAutoCheckinsParque().catch((err) => console.error('Erro na varredura de check-in automático:', err.message));
     }, 60 * 1000);
+
+    // relatorio diario do MV por e-mail (ver relatorioMV.js) - so agenda se
+    // as credenciais de envio estiverem configuradas; sem elas, o Master
+    // ainda pode disparar na hora por GET /api/relatorio-mv/testar (que ai
+    // sim avisa o erro de configuração)
+    if (process.env.RELATORIO_EMAIL_USER && process.env.RELATORIO_EMAIL_PASS && process.env.RELATORIO_EMAIL_TO) {
+      relatorioMV.iniciarAgendamento();
+    } else {
+      console.warn('AVISO: RELATORIO_EMAIL_USER/RELATORIO_EMAIL_PASS/RELATORIO_EMAIL_TO não configurados - relatório diário do MV desativado.');
+    }
   });
 })();

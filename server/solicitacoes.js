@@ -5,6 +5,7 @@
 // dois: a loja pede, o Master aprova/rejeita (com motivo opcional), com
 // anexo (foto/print/orcamento) e observacao. Aprovar um pedido de Suporte
 // de TI cria um Chamado (ver chamadosTI.js) pro tecnico ir na loja.
+const crypto = require('crypto');
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
 const ticketCounter = require('./ticketCounter');
@@ -116,6 +117,13 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     comprovante: null, // { nome, path, tipo }
     marcadoCompradoPorEmail: null,
     marcadoCompradoEm: null,
+    // token de aprovar/recusar por e-mail, sem login (ver gerarTokenAcao/
+    // decidirPorToken e GET+POST /decidir em index.js) - regenerado a cada
+    // envio do relatorio diario, o que invalida sozinho o link de um e-mail
+    // anterior (so o mais recente funciona)
+    tokenAcao: null,
+    tokenAcaoExpiraEm: null,
+    tokenAcaoUsado: false,
   };
   await doc.set(registro);
   solicitacoesCache.invalidar();
@@ -156,6 +164,64 @@ async function updateStatus(id, status, { motivoDecisao, decidedByEmail }) {
   };
   // aprovar comeca o andamento de execucao em Pendente (ver EXECUCAO_STATUSES)
   if (status === 'APROVADO') patch.execucaoStatus = 'PENDENTE';
+  await ref.update(patch);
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+// gera (ou renova) o token de aprovar/recusar por e-mail sem login - so faz
+// sentido pra pedido ainda PENDENTE. Chamado pelo relatorioMV.js toda vez
+// que manda o relatorio diario; sobrescrever o token de um envio anterior
+// invalida os links daquele e-mail mais antigo sozinho, sem precisar de
+// nenhuma limpeza a parte
+async function gerarTokenAcao(id, { validadeDias = 3 } = {}) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  if (snap.data().status !== 'PENDENTE') throw new Error('Só é possível gerar link de ação pra pedido ainda pendente.');
+  const tokenAcao = crypto.randomUUID();
+  const tokenAcaoExpiraEm = new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString();
+  await ref.update({ tokenAcao, tokenAcaoExpiraEm, tokenAcaoUsado: false });
+  solicitacoesCache.invalidar();
+  return { tokenAcao, tokenAcaoExpiraEm };
+}
+
+// confere um token recebido na pagina publica /decidir (ver index.js) -
+// devolve o registro se o token bate, ainda esta dentro da validade, nao foi
+// usado ainda e o pedido continua PENDENTE; null em qualquer outro caso (sem
+// detalhar o motivo pro chamador, pra nao dar pista sobre tokens de outras
+// solicitacoes - ver aviso de seguranca no cabecalho do arquivo)
+async function validarToken(id, token) {
+  if (!id || !token) return null;
+  const registro = await getOne(id);
+  if (!registro) return null;
+  if (registro.status !== 'PENDENTE') return null;
+  if (!registro.tokenAcao || registro.tokenAcao !== token) return null;
+  if (registro.tokenAcaoUsado) return null;
+  if (!registro.tokenAcaoExpiraEm || new Date(registro.tokenAcaoExpiraEm).getTime() < Date.now()) return null;
+  return registro;
+}
+
+// decide (aprova/recusa) via o link publico do e-mail - mesma logica de
+// updateStatus, mas validando o token em vez de exigir login, e anexando o
+// comprovante (foto) enviado no formulario ao array de anexos do pedido (nao
+// usa o campo `comprovante` porque esse ja significa outra coisa: o print da
+// COMPRA em si, ver marcarComprada - aqui e o comprovante da DECISAO)
+async function decidirPorToken(id, token, { acao, motivoDecisao, comprovante, decididoPorEmail }) {
+  const registro = await validarToken(id, token);
+  if (!registro) throw new Error('Link inválido, expirado ou já usado.');
+  if (!['aprovar', 'recusar'].includes(acao)) throw new Error('Ação inválida.');
+  const status = acao === 'aprovar' ? 'APROVADO' : 'REJEITADO';
+  const ref = COLLECTION.doc(id);
+  const patch = {
+    status,
+    motivoDecisao: motivoDecisao || null,
+    decididoPorEmail: decididoPorEmail || registro.direcionadoParaEmail || 'via e-mail',
+    decididoEm: new Date().toISOString(),
+    tokenAcaoUsado: true,
+  };
+  if (status === 'APROVADO') patch.execucaoStatus = 'PENDENTE';
+  if (comprovante) patch.anexos = [...(registro.anexos || []), comprovante];
   await ref.update(patch);
   solicitacoesCache.invalidar();
   return getOne(id);
@@ -343,5 +409,5 @@ async function converterParaEstorno(id, dadosEstorno, porEmail) {
 module.exports = {
   TIPOS, STATUSES, EXECUCAO_STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove,
   marcarNotificacaoVista, marcarComprada, desmarcarComprada, redirecionar, mudarTipo, converterParaEstorno,
-  atualizarExecucao,
+  atualizarExecucao, gerarTokenAcao, validarToken, decidirPorToken,
 };
