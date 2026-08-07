@@ -3294,11 +3294,12 @@ function filtrarCardsCentral(cards, req) {
 function prepararRelatorioCentral(cards) {
   const colunas = [
     { key: 'tipo', label: 'Tipo' }, { key: 'unidade', label: 'Unidade' }, { key: 'titulo', label: 'Título' },
-    { key: 'status', label: 'Status' }, { key: 'criadoPor', label: 'Criado por' }, { key: 'criadoEm', label: 'Criado em' },
+    { key: 'valor', label: 'Valor' }, { key: 'status', label: 'Status' }, { key: 'criadoPor', label: 'Criado por' }, { key: 'criadoEm', label: 'Criado em' },
     { key: 'decididoPor', label: 'Decidido por' }, { key: 'decididoEm', label: 'Decidido em' }, { key: 'motivoDecisao', label: 'Motivo da decisão' },
   ];
   const linhas = cards.map((c) => ({
     tipo: TIPOS_CENTRAL_LABEL[c.tipo] || c.tipo, unidade: c.unidadeNome || c.unidade || '—', titulo: c.titulo || '—',
+    valor: c.valorEstimado != null ? reportUtil.fmtMoneyBR(c.valorEstimado) : '—',
     status: c.status, criadoPor: c.criadoPorEmail || '—', criadoEm: reportUtil.fmtDataHoraBR(c.criadoEm),
     decididoPor: c.decididoPorEmail || '—', decididoEm: reportUtil.fmtDataHoraBR(c.decididoEm), motivoDecisao: c.motivoDecisao || '—',
   }));
@@ -3310,8 +3311,8 @@ function prepararRelatorioCentral(cards) {
 // perdem espaco proporcionalmente, sobretudo Decidido por/em e Motivo, que
 // costumam vir "-" enquanto o ticket ainda esta pendente
 const LARGURAS_RELATORIO_CENTRAL = {
-  tipo: 75, unidade: 80, titulo: 200, status: 60,
-  criadoPor: 105, criadoEm: 72, decididoPor: 65, decididoEm: 52, motivoDecisao: 52,
+  tipo: 70, unidade: 75, titulo: 175, valor: 55, status: 60,
+  criadoPor: 100, criadoEm: 70, decididoPor: 62, decididoEm: 50, motivoDecisao: 50,
 };
 
 app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes'), async (req, res) => {
