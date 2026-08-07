@@ -1769,6 +1769,48 @@ app.get('/api/fechamentos/:id/bruto', auth.requireMaster, async (req, res) => {
   res.json(registro);
 });
 
+// data de ontem em Brasilia, formato YYYY-MM-DD (mesmo padrao ja usado em
+// parque.js/hojeBrasiliaISO, so que D-1)
+function ontemBrasiliaISO() {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_BR, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const o = {};
+  partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = p.value; });
+  const hoje = new Date(`${o.year}-${o.month}-${o.day}T00:00:00`);
+  hoje.setDate(hoje.getDate() - 1);
+  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+}
+
+// caminho inverso do sincronizarPlanilhasFechamento acima: manda o
+// fechamento lançado ao vivo no app (nao mais preenchido na planilha) de
+// volta pra planilha ARCFOOD, pros stakeholders que ainda acompanham por
+// ela. So Master, e so sob demanda (nao automatico) - escreve numa
+// planilha externa/compartilhada, e um dado errado lá tem mais trabalho
+// pra desfazer do que só rodar de novo depois de corrigir.
+app.post('/api/fechamentos/arcfood/enviar-planilha', auth.requireMaster, async (req, res) => {
+  try {
+    const data = (req.body && req.body.data) || ontemBrasiliaISO();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ error: 'Data inválida.' });
+    const unidadesArcfood = ['19821', '19855', '19888', '19889'];
+    const lancados = (await fechamentosLive.listByUnidades(unidadesArcfood)).filter((f) => f.data === data);
+    const porUnidade = new Map(lancados.map((f) => [f.unidade, f]));
+
+    const resultado = { data, enviados: [], semLancamento: [], erros: [] };
+    for (const cod of unidadesArcfood) {
+      const f = porUnidade.get(cod);
+      if (!f) { resultado.semLancamento.push(FECHAMENTO_UNIDADES_NOMES[cod] || cod); continue; }
+      try {
+        const r = await sheetsSync.enviarFechamentoArcfood(f);
+        resultado.enviados.push({ unidade: f.unidadeNome || FECHAMENTO_UNIDADES_NOMES[cod] || cod, acao: r.acao });
+      } catch (err) {
+        resultado.erros.push({ unidade: f.unidadeNome || FECHAMENTO_UNIDADES_NOMES[cod] || cod, erro: err.message });
+      }
+    }
+    res.json(resultado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // aplica os mesmos filtros do front (periodo ja efetivo - o proprio front
 // resolve qualquer corte extra da tabela antes de mandar inicio/fim - mais
 // grupo e unidades) - usado pelos relatorios de Fechamentos e de Comparativo

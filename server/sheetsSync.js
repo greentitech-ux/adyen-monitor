@@ -8,8 +8,12 @@
 // servico (como leitor).
 
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+// escopo de leitura E escrita - a escrita e usada pelo caminho inverso
+// (enviarFechamentoArcfood), que manda o fechamento lançado ao vivo no app
+// de volta pra planilha
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
 const PLANILHAS = [
@@ -275,4 +279,208 @@ async function sincronizar() {
   return mesclarLancamentosDoMesmoDia(resultado);
 }
 
-module.exports = { sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, getAccessToken, buscarAba, mesclarLancamentosDoMesmoDia };
+// ---------- caminho inverso: manda o fechamento lançado ao vivo no app
+// (fechamentosLive.js) de volta pra planilha ARCFOOD (aba BD) - pros
+// stakeholders que ainda acompanham por ela. So ARCFOOD por enquanto (Grupo
+// Bravo nunca teve planilha, nasceu direto no app) ----------
+
+// mesmo nome sem acento gravado na coluna "Unidade" da planilha (ver
+// ARCFOOD_UNIDADES_POR_NOME acima, que faz o caminho contrario)
+const ARCFOOD_NOME_PLANILHA = { '19821': 'Sao Miguel', '19855': 'Carrao', '19888': 'Mooca', '19889': 'Tatuape' };
+const ARCFOOD_EMAIL = {
+  '19821': 'saomiguel.arcfood@gmail.com', '19855': 'carrao.arcfood@gmail.com',
+  '19888': 'mooca.arcfood@gmail.com', '19889': 'tatuape.arcfood@gmail.com',
+};
+const MESES_PT_INVERSO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function ddmmDaData(dataISO) {
+  const [, mm, dd] = String(dataISO).split('-');
+  return `${dd}/${mm}`;
+}
+function mesDaDataArcfood(dataISO) {
+  const [ano, mm] = String(dataISO).split('-');
+  return `${MESES_PT_INVERSO[Number(mm) - 1].toUpperCase()}/${ano}`;
+}
+
+// manda numero puro (nao string "R$ x,xx") - a coluna ja tem formatacao de
+// moeda aplicada na planilha, o Sheets so precisa do valor
+function numEnvio(v) {
+  return Number(v) || 0;
+}
+
+// pares [coluna do valor da maquina, coluna do valor "pos 00hs" dessa mesma
+// maquina] - MaqBalcao/PosMaqBalcao e' a 1a maquina, Maquina02.../Pos00hs 02
+// em diante as demais (ate 8 no total, mesmo limite da planilha)
+const ARCFOOD_MAQ_SLOTS = [
+  ['MaqBalcao', 'PosMaqBalcao'], ['Maquina02', 'Pos00hs 02'], ['Maquina03', 'Pos00hs 03'], ['Maquina04', 'Pos00hs 04'],
+  ['Maquina05', 'Pos00hs 05'], ['Maquina06', 'Pos00hs 06'], ['Maquina07', 'Pos00hs 07'], ['Maquina08', 'Pos00hs 08'],
+];
+// pares [coluna do valor da saida, coluna da descricao] - ate 5 saidas
+const ARCFOOD_SAIDA_SLOTS = [
+  ['Saida Dinheiro', 'Descricao Saida'], ['Saida Dinheiro 02', 'Descricao Saida 02'], ['Saida Dinheiro 03', 'Descricao Saida 03'],
+  ['Saida Dinheiro 04', 'Descricao Saida 04'], ['Saida Dinheiro 05', 'Descricao Saida 05'],
+];
+
+// campos escalares do fechamento lançado ao vivo -> nome da coluna na
+// planilha (caminho inverso de linhaParaFechamento). "adyen"/"adyenPos" no
+// registro do app SÃO a soma das maquininhas/maquininhas-POS (ver
+// lancamento.html, campos.adyen = soma de MAQUINAS) - por isso tambem
+// preenchem Adyen/SomaMaq/SomaPOS
+function camposEscalaresArcfood(f) {
+  return {
+    Nome: f.gerente || '',
+    Unidade: ARCFOOD_NOME_PLANILHA[f.unidade] || f.unidadeNome || f.unidade,
+    Data: ddmmDaData(f.data),
+    Mes: mesDaDataArcfood(f.data),
+    'Caixa Inicial': numEnvio(f.caixaInicial),
+    'Caixa Final': numEnvio(f.caixaFinal),
+    Delivery: numEnvio(f.delivery),
+    Carryout: numEnvio(f.carryout),
+    'Pick-UP': numEnvio(f.pickup),
+    Loja: numEnvio(f.loja),
+    Adyen: numEnvio(f.adyen),
+    Ifood: numEnvio(f.ifood),
+    '99Food': numEnvio(f.food99),
+    Pix: numEnvio(f.pix),
+    'Pix CNPJ': numEnvio(f.pixCnpj),
+    Outros: numEnvio(f.outros),
+    SomaMaq: numEnvio(f.adyen),
+    SomaPOS: numEnvio(f.adyenPos),
+    'Entrada Dinheiro': numEnvio(f.entradaDinheiro),
+    Deposito: numEnvio(f.deposito),
+    'Total Saida': numEnvio(f.totalSaida),
+    'Faturam.': numEnvio(f.faturamento),
+    'Total Decla': numEnvio(f.totalDeclarado),
+    'Dif.': numEnvio(f.diferenca),
+    'Obs. Dif': f.obsDif || '',
+    Observação: f.observacao || '',
+    Quebra: numEnvio(f.quebra),
+    TC: numEnvio(f.tc),
+    Cancelados: numEnvio(f.cancelados),
+    Email: ARCFOOD_EMAIL[f.unidade] || '',
+  };
+}
+
+// linha completa (array na ordem do cabecalho real da planilha) pra uma
+// linha NOVA - colunas que a gente nao conhece (Pedido Anulado, Venda,
+// AnaliseEspecialista etc) ficam em branco, sem problema numa linha nova
+function novaLinhaArcfood(header, f) {
+  const linha = header.map(() => '');
+  const setCol = (nome, valor) => {
+    const i = header.indexOf(nome);
+    if (i >= 0) linha[i] = valor;
+  };
+  setCol('ID', crypto.randomBytes(4).toString('hex'));
+  Object.entries(camposEscalaresArcfood(f)).forEach(([nome, valor]) => setCol(nome, valor));
+  (f.detalhesMaquinas || []).slice(0, ARCFOOD_MAQ_SLOTS.length).forEach((m, i) => setCol(ARCFOOD_MAQ_SLOTS[i][0], numEnvio(m.valor)));
+  (f.detalhesMaquinasPos || []).slice(0, ARCFOOD_MAQ_SLOTS.length).forEach((m, i) => setCol(ARCFOOD_MAQ_SLOTS[i][1], numEnvio(m.valor)));
+  (f.detalhesSaidas || []).slice(0, ARCFOOD_SAIDA_SLOTS.length).forEach((s, i) => {
+    setCol(ARCFOOD_SAIDA_SLOTS[i][0], numEnvio(s.valor));
+    setCol(ARCFOOD_SAIDA_SLOTS[i][1], s.descricao || '');
+  });
+  return linha;
+}
+
+// mapa {nome da coluna: valor} pra ATUALIZAR uma linha existente - deliberadamente
+// so as colunas que a gente conhece (nunca mexe no ID nem nas colunas que
+// esse sistema nao usa, tipo Pedido Anulado/Venda/AnaliseEspecialista, pra
+// nao apagar algo preenchido manualmente ali)
+function mudancasArcfood(f) {
+  const mudancas = { ...camposEscalaresArcfood(f) };
+  (f.detalhesMaquinas || []).slice(0, ARCFOOD_MAQ_SLOTS.length).forEach((m, i) => { mudancas[ARCFOOD_MAQ_SLOTS[i][0]] = numEnvio(m.valor); });
+  (f.detalhesMaquinasPos || []).slice(0, ARCFOOD_MAQ_SLOTS.length).forEach((m, i) => { mudancas[ARCFOOD_MAQ_SLOTS[i][1]] = numEnvio(m.valor); });
+  (f.detalhesSaidas || []).slice(0, ARCFOOD_SAIDA_SLOTS.length).forEach((s, i) => {
+    mudancas[ARCFOOD_SAIDA_SLOTS[i][0]] = numEnvio(s.valor);
+    mudancas[ARCFOOD_SAIDA_SLOTS[i][1]] = s.descricao || '';
+  });
+  return mudancas;
+}
+
+// indice zero -> letra de coluna do Sheets (0->A, 25->Z, 26->AA...)
+function colunaLetra(indiceZero) {
+  let n = indiceZero + 1;
+  let s = '';
+  while (n > 0) {
+    const resto = (n - 1) % 26;
+    s = String.fromCharCode(65 + resto) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+async function valuesAppend(spreadsheetId, aba, row, token) {
+  const range = encodeURIComponent(`${aba}!A1`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [row] }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(`Erro ao adicionar linha na planilha: ${data.error?.message || resp.status}`);
+  return data;
+}
+
+// atualiza so as celulas passadas em "mudancas" (uma por range), nao a
+// linha inteira - assim colunas que a gente nao conhece ficam intocadas
+async function valuesBatchUpdate(spreadsheetId, aba, linhaNumero, header, mudancas, token) {
+  const data = Object.entries(mudancas)
+    .map(([nome, valor]) => {
+      const i = header.indexOf(nome);
+      if (i < 0) return null;
+      return { range: `${aba}!${colunaLetra(i)}${linhaNumero}`, values: [[valor]] };
+    })
+    .filter(Boolean);
+  if (!data.length) return null;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
+  });
+  const body = await resp.json();
+  if (!resp.ok) throw new Error(`Erro ao atualizar linha na planilha: ${body.error?.message || resp.status}`);
+  return body;
+}
+
+// manda o fechamento (lançado ao vivo, ja no formato de server/fechamentosLive.js)
+// de UMA loja ARCFOOD pra planilha, aba BD. Se ja existir uma linha da
+// mesma loja+data+mes (por exemplo alguem tambem lançou direto na
+// planilha), atualiza so as colunas conhecidas em vez de acrescentar linha
+// duplicada; senao, adiciona uma linha nova no final
+async function enviarFechamentoArcfood(f) {
+  const planilha = PLANILHAS.find((p) => p.grupo === 'ARCFOOD');
+  if (!planilha) throw new Error('Planilha ARCFOOD não configurada.');
+  const token = await getAccessToken();
+  const valores = await buscarAba(planilha.id, planilha.aba);
+  const header = valores[0] || [];
+  if (!header.length) throw new Error('Planilha ARCFOOD sem cabeçalho na aba BD.');
+
+  const iUnidade = header.indexOf('Unidade');
+  const iData = header.indexOf('Data');
+  const iMes = header.indexOf('Mes');
+  const unidadeAlvo = normalizarTexto(ARCFOOD_NOME_PLANILHA[f.unidade] || '');
+  const dataAlvo = ddmmDaData(f.data);
+  const mesAlvo = mesDaDataArcfood(f.data);
+
+  let linhaExistente = -1;
+  for (let i = 1; i < valores.length; i++) {
+    const linha = valores[i];
+    if (normalizarTexto(linha[iUnidade]) === unidadeAlvo && String(linha[iData] || '').trim() === dataAlvo && String(linha[iMes] || '').trim() === mesAlvo) {
+      linhaExistente = i + 1; // 1-indexado + linha de cabecalho
+      break;
+    }
+  }
+
+  if (linhaExistente > 0) {
+    await valuesBatchUpdate(planilha.id, planilha.aba, linhaExistente, header, mudancasArcfood(f), token);
+    return { acao: 'atualizado', linha: linhaExistente };
+  }
+  await valuesAppend(planilha.id, planilha.aba, novaLinhaArcfood(header, f), token);
+  return { acao: 'adicionado' };
+}
+
+module.exports = {
+  sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, getAccessToken, buscarAba, mesclarLancamentosDoMesmoDia,
+  enviarFechamentoArcfood,
+};
