@@ -3479,7 +3479,9 @@ app.get('/api/central/relatorio.:formato(csv|pdf)', requireSection('solicitacoes
     res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`);
     return res.send(reportUtil.toCSV(colunas, linhas));
   }
-  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, larguras: LARGURAS_RELATORIO_CENTRAL, nomeArquivo });
+  // linhasDinamicas: a linha cresce pra baixo ate mostrar a lista de itens
+  // inteira (e qualquer outra celula longa), em vez de cortar com "..."
+  reportUtil.writePDF(res, { titulo: 'Central de Solicitações · Histórico', subtitulo: `Exportado em ${reportUtil.agoraBrasiliaFmt()} · ${linhas.length} solicitação(ões)`, colunas, linhas, larguras: LARGURAS_RELATORIO_CENTRAL, nomeArquivo, linhasDinamicas: true });
 });
 
 // casa a lista de itens (descricao + "tem foto?") mandada em payload.itens
