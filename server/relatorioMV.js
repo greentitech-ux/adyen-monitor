@@ -229,35 +229,55 @@ async function notificarCardMV(card) {
 // processo resolvia), travando literalmente TODO envio de e-mail dali em
 // diante. Em vez disso, tenta cada endereco resolvido, em ordem aleatoria,
 // e so desiste se TODOS falharem.
+//
+// Alem do IP, a PORTA tambem pode ser o problema: em producao (Render) a
+// conexao na 465 (TLS direto) chegou a dar timeout em todos os IPs - rede
+// da plataforma dropando/estrangulando a porta, nada a ver com a conta.
+// Por isso cada IP e tentado nas duas portas oficiais do Gmail: 465 (TLS
+// direto) e 587 (STARTTLS, a porta padrao de submissao, que as politicas
+// de rede costumam tratar melhor). Cada tentativa que falha e logada com
+// ip:porta pra ficar obvio nos logs do Render o que esta acontecendo.
 async function enviarComFallback(opcoesEmail) {
   const user = process.env.RELATORIO_EMAIL_USER;
-  const pass = process.env.RELATORIO_EMAIL_PASS;
+  // senha de app do Google e exibida em grupos de 4 ("xxxx xxxx xxxx xxxx")
+  // mas a senha real sao os 16 caracteres sem espaco - tira qualquer espaco
+  // que tenha vindo colado na env var, funciona dos dois jeitos
+  const pass = (process.env.RELATORIO_EMAIL_PASS || '').replace(/\s+/g, '');
   if (!user || !pass) throw new Error('RELATORIO_EMAIL_USER/RELATORIO_EMAIL_PASS não configurados.');
   const enderecos = await dns.resolve4('smtp.gmail.com');
   for (let i = enderecos.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [enderecos[i], enderecos[j]] = [enderecos[j], enderecos[i]];
   }
+  // no maximo 2 IPs x 2 portas = 4 tentativas, com timeouts curtos, pra
+  // nunca segurar a requisicao alem de ~35s mesmo no pior caso
+  const tentativas = [];
+  for (const ip of enderecos.slice(0, 2)) {
+    tentativas.push({ ip, port: 465, secure: true });
+    tentativas.push({ ip, port: 587, secure: false });
+  }
   let ultimoErro;
-  for (const ip of enderecos) {
+  for (const t of tentativas) {
     const transporter = nodemailer.createTransport({
-      host: ip,
+      host: t.ip,
       servername: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      port: t.port,
+      secure: t.secure,
+      requireTLS: !t.secure, // na 587 o STARTTLS e obrigatorio, nunca manda credencial em claro
       auth: { user, pass },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 20000,
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 15000,
     });
     try {
       await transporter.sendMail(opcoesEmail);
       return;
     } catch (err) {
+      console.error(`[email] falha em ${t.ip}:${t.port} (${t.secure ? 'TLS' : 'STARTTLS'}): ${err.message}`);
       ultimoErro = err;
     }
   }
-  throw ultimoErro;
+  throw new Error(`Falha ao conectar no Gmail em todas as portas/IPs (último erro: ${ultimoErro.message}). Veja os logs do servidor.`);
 }
 
 async function enviarRelatorio() {
