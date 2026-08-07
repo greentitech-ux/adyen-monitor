@@ -515,6 +515,19 @@ const BRAVO_UNIDADES_NOMES = {
 };
 GRUPOS.BRAVO.forEach(u=>{ UNIDADES_NOMES[u] = BRAVO_UNIDADES_NOMES[u] || u; });
 
+// codigo IDPULSE conhecido de algumas unidades do Grupo Bravo (mesmos
+// numeros ja usados como apelido no Monitor/Adyen, ver UNIDADES_APELIDOS em
+// server/index.js) - so pra exibir algo realmente util do lado do nome
+// (ex: "Dom Garanhuns 19911"), sem mexer no codigo que a unidade usa de
+// verdade pro Fechamento/permissoes (isso continua sendo o nome completo,
+// ver GRUPOS.BRAVO acima - nao dá pra trocar sem desalinhar dado já gravado)
+const UNIDADES_IDPULSE = {
+  'Dominos Bessa': '19706',
+  'Dominos Campina Grande': '19633',
+  'Dominos Caruaru': '19798',
+  'Dominos Garanhuns': '19911',
+};
+
 // paleta categorica validada (8 tons, ordem fixa - ver color-formula.md do
 // skill de dataviz). Usada so quando ate 6 series aparecem juntas no mesmo
 // grafico; alem disso a identidade vira "small multiples" (um card por
@@ -1377,8 +1390,14 @@ function renderUnidadesTable(rows){
   document.getElementById('unidades-body').innerHTML = linhas.length ? linhas.map(([u,c])=>{
     const cor = c.diferenca<0?'var(--bad)':(c.diferenca>0?'var(--warn)':'var(--ok)');
     const previsao = previsaoMensal(u, refIso);
+    // so mostra um subtitulo quando ele agrega informacao de verdade (o
+    // codigo IDPULSE, seja o proprio "u" quando ele ja e numerico - unidades
+    // ARCFOOD - ou o apelido de UNIDADES_IDPULSE pras unidades do Grupo
+    // Bravo que ja tem um numero conhecido) - nunca uma reescrita do mesmo
+    // nome (ex: "Dom Tirol" / "Dominos Tirol"), que so duplicava a info
+    const codigoIdpulse = UNIDADES_IDPULSE[u] || (/^\d+$/.test(u) ? u : null);
     return `<tr>
-      <td>${escapeHtml(UNIDADES_NOMES[u]||u)}${(UNIDADES_NOMES[u] && UNIDADES_NOMES[u]!==u) ? ` <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${escapeHtml(u)}</span>` : ''}</td>
+      <td>${escapeHtml(UNIDADES_NOMES[u]||u)}${codigoIdpulse ? ` <span style="color:var(--muted);font-family:var(--mono);font-size:10px;">${escapeHtml(codigoIdpulse)}</span>` : ''}</td>
       <td class="valor" style="color:var(--accent);">${previsao==null ? '—' : fmtMoney(previsao)}</td>
       <td class="valor">${c.qtd}</td>
       <td class="valor">${fmtMoney(c.faturamento)}</td>
