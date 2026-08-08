@@ -233,6 +233,7 @@ function requireAuth(req, res, next) {
       req.isMaster = user.role === 'master';
       req.isAdmin = !!user.isAdmin;
       req.podeCatalogoEstoque = !!user.podeCatalogoEstoque;
+      req.podeCatalogoInsumos = !!user.podeCatalogoInsumos;
       req.permissions = req.isMaster ? null : user.permissions || emptyPermissions();
       next();
     })

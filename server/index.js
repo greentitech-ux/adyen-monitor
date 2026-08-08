@@ -369,6 +369,7 @@ app.get('/api/me', (req, res) => {
     permissions: req.permissions,
     isAdmin: req.isAdmin,
     podeCatalogoEstoque: req.podeCatalogoEstoque,
+    podeCatalogoInsumos: req.podeCatalogoInsumos,
     precisaTrocarSenha: !!req.user.precisaTrocarSenha,
   });
 });
@@ -1652,6 +1653,14 @@ app.put('/api/users/:id/is-admin', auth.requireMaster, async (req, res) => {
 app.put('/api/users/:id/catalogo-estoque', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.updatePodeCatalogoEstoque(req.params.id, req.body.podeCatalogoEstoque));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/users/:id/catalogo-insumos', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updatePodeCatalogoInsumos(req.params.id, req.body.podeCatalogoInsumos));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -3616,16 +3625,33 @@ app.post('/api/chamados', auth.requireAuth, async (req, res) => {
   }
 });
 
-// ---------- Abastecimento do carrinho Dominos Aeroporto (secao
-// "abastecimento-carrinho") - o CARRINHO abre um PEDIDO de pizzas/insumos e
-// a LOJA registra o ENVIO (de preferencia vinculado ao pedido que atende).
-// Substitui o AppSheet/planilha "AbastecimentoCarrinho" ----------
-app.get('/api/abastecimento', requireSection('abastecimento-carrinho'), async (req, res) => {
+// ---------- Abastecimento do carrinho Dominos Aeroporto - o CARRINHO abre
+// um PEDIDO de pizzas/insumos e a LOJA registra o ENVIO (de preferencia
+// vinculado ao pedido que atende). Substitui o AppSheet/planilha
+// "AbastecimentoCarrinho". Permissao POR PONTA: a secao
+// 'abastecimento-carrinho' e de quem PEDE (carrinho) e a
+// 'abastecimento-loja' de quem ENVIA (loja) - Master/Admin fazem os dois.
+// O broadcast vai sem filtro de secao porque as duas pontas tem secoes
+// diferentes e o payload e so { id } ----------
+function podePedirAbastecimento(req) {
+  return req.isAdmin || auth.hasSection(req, 'abastecimento-carrinho');
+}
+function podeEnviarAbastecimento(req) {
+  return req.isAdmin || auth.hasSection(req, 'abastecimento-loja');
+}
+
+app.get('/api/abastecimento', requireAnySection('abastecimento-carrinho', 'abastecimento-loja'), async (req, res) => {
   res.json(await abastecimentoCarrinho.listAll());
 });
 
-app.post('/api/abastecimento', requireSection('abastecimento-carrinho'), async (req, res) => {
+app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
   try {
+    if (req.body.tipo === 'PEDIDO' && !podePedirAbastecimento(req)) {
+      return res.status(403).json({ error: 'Você não tem a permissão de PEDIDO (lado do carrinho).' });
+    }
+    if (req.body.tipo === 'ENVIO' && !podeEnviarAbastecimento(req)) {
+      return res.status(403).json({ error: 'Você não tem a permissão de ENVIO (lado da loja).' });
+    }
     const registro = await abastecimentoCarrinho.criar({
       tipo: req.body.tipo,
       pizzas: req.body.pizzas,
@@ -3636,7 +3662,7 @@ app.post('/api/abastecimento', requireSection('abastecimento-carrinho'), async (
       criadoPorEmail: req.user.email,
       criadoPorNome: req.user.username || req.user.email,
     });
-    broadcast('abastecimento-atualizado', { id: registro.id }, 'abastecimento-carrinho');
+    broadcast('abastecimento-atualizado', { id: registro.id, tipo: registro.tipo });
     if (registro.tipo === 'PEDIDO') {
       push.notifySolicitacao('🛒 Carrinho pediu abastecimento', `${registro.criadoPorNome} · pizzas/insumos aguardando envio`, registro.id);
     }
@@ -3646,10 +3672,55 @@ app.post('/api/abastecimento', requireSection('abastecimento-carrinho'), async (
   }
 });
 
+// OK do popup de pedido novo (lado da loja): para o alarme e sinaliza pro
+// carrinho que a loja ja viu o pedido
+app.post('/api/abastecimento/:id/visto', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podeEnviarAbastecimento(req)) return res.status(403).json({ error: 'Você não tem a permissão de ENVIO (lado da loja).' });
+    const registro = await abastecimentoCarrinho.marcarVisto(req.params.id, { email: req.user.email, nome: req.user.username || req.user.email });
+    broadcast('abastecimento-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ----- catalogo de insumos (padroniza o que pode ser lancado) -----
+// ler: qualquer ponta; gerenciar: Master/Admin ou permissao podeCatalogoInsumos
+function podeGerirCatalogoInsumos(req) {
+  return req.isMaster || req.isAdmin || req.podeCatalogoInsumos;
+}
+
+app.get('/api/abastecimento-insumos', requireAnySection('abastecimento-carrinho', 'abastecimento-loja'), async (req, res) => {
+  res.json(await abastecimentoCarrinho.listarInsumos());
+});
+
+app.post('/api/abastecimento-insumos', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podeGerirCatalogoInsumos(req)) return res.status(403).json({ error: 'Você não tem permissão pra mexer no cadastro de insumos.' });
+    const registro = await abastecimentoCarrinho.criarInsumo({ nome: req.body.nome, qtdPorCaixa: req.body.qtdPorCaixa, criadoPorEmail: req.user.email });
+    broadcast('abastecimento-insumos-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/abastecimento-insumos/:id', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podeGerirCatalogoInsumos(req)) return res.status(403).json({ error: 'Você não tem permissão pra mexer no cadastro de insumos.' });
+    const registro = await abastecimentoCarrinho.atualizarInsumo(req.params.id, { nome: req.body.nome, qtdPorCaixa: req.body.qtdPorCaixa, ativo: req.body.ativo });
+    broadcast('abastecimento-insumos-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.delete('/api/abastecimento/:id', auth.requireMaster, async (req, res) => {
   try {
     await abastecimentoCarrinho.remover(req.params.id);
-    broadcast('abastecimento-atualizado', { id: req.params.id, excluido: true }, 'abastecimento-carrinho');
+    broadcast('abastecimento-atualizado', { id: req.params.id, excluido: true });
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
