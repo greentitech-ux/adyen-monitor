@@ -134,6 +134,29 @@
   .alarme-timer.estourado{color:var(--bad);}
   .alarme-timer-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;}
   .alarme-ok{width:100%;background:var(--ok);color:#06231a;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;font-family:var(--sans);}
+  .alarme-card.atrasado{border-color:var(--bad);box-shadow:0 0 60px rgba(255,92,92,.45);}
+  .alarme-card.atrasado h2{color:var(--bad);}
+  .alarme-btn2{width:100%;margin-top:8px;background:var(--envio-dim);color:var(--envio);border:1px solid rgba(138,180,248,.4);border-radius:10px;padding:13px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .badge.preparando{background:#2a2033;color:#c9a2ff;}
+
+  /* conversa lateral do pedido: chip fixo na lateral direita + gaveta */
+  .conversa-chip{position:fixed;right:0;top:42%;z-index:8000;background:var(--panel2);border:1px solid var(--line);border-right:none;color:var(--accent);border-radius:10px 0 0 10px;padding:12px 8px;font-size:16px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--mono);letter-spacing:.06em;box-shadow:-2px 2px 12px rgba(0,0,0,.4);}
+  .conversa-chip .conversa-badge{background:var(--bad);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;writing-mode:horizontal-tb;display:inline-block;margin-top:6px;}
+  .conversa-painel{position:fixed;right:0;top:0;bottom:0;width:320px;max-width:92vw;z-index:9500;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.5);}
+  .conversa-painel.hidden{display:none!important;}
+  .conversa-head{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .conversa-head b{font-size:13px;}
+  .conversa-corpo{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:7px;}
+  .conversa-msg{max-width:88%;padding:7px 10px;border-radius:10px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;}
+  .conversa-msg.carrinho{align-self:flex-start;background:var(--pedido-dim);border:1px solid rgba(255,138,128,.3);}
+  .conversa-msg.loja{align-self:flex-end;background:var(--envio-dim);border:1px solid rgba(138,180,248,.3);}
+  .conversa-msg .quem{font-family:var(--mono);font-size:9.5px;color:var(--muted);display:block;margin-bottom:2px;}
+  .conversa-atalhos{display:flex;flex-direction:column;gap:6px;padding:0 12px 8px;}
+  .conversa-atalho{background:var(--panel2);border:1px dashed var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:12px;cursor:pointer;text-align:left;font-family:var(--sans);}
+  .conversa-atalho:hover{border-color:var(--accent);}
+  .conversa-atalho.urgente{color:var(--warn);border-color:rgba(242,179,61,.5);}
+  .conversa-rodape{padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:6px;}
+  .conversa-rodape input{flex:1;}
   .cat-linha{display:grid;grid-template-columns:1fr 92px 70px;gap:6px;align-items:center;margin-top:6px;}
   .cat-linha input{padding:8px 9px;font-size:13px;}
   .cat-toggle{font-family:var(--mono);font-size:10px;padding:6px 4px;border-radius:8px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
@@ -265,13 +288,33 @@
 <!-- ALARME: pedido novo do carrinho toca alto no lado da loja ate alguem
      apertar OK (que sinaliza "visto" pra quem pediu) -->
 <div class="alarme-overlay hidden" id="alarme-overlay">
-  <div class="alarme-card">
-    <h2>🛒 NOVO PEDIDO DO CARRINHO!</h2>
+  <div class="alarme-card" id="alarme-card">
+    <h2 id="al-titulo">🛒 NOVO PEDIDO DO CARRINHO!</h2>
     <div class="alarme-sub" id="al-sub"></div>
     <div class="alarme-itens" id="al-itens"></div>
     <div class="alarme-timer ok" id="al-timer">5:00</div>
     <div class="alarme-timer-label" id="al-timer-label">pra confirmar que a loja viu</div>
-    <button type="button" class="alarme-ok" onclick="confirmarVisto()">✓ OK, VISTO — vamos preparar</button>
+    <button type="button" class="alarme-ok hidden" id="al-btn-visto" onclick="confirmarVisto()">✓ OK, VISTO — vamos preparar</button>
+    <button type="button" class="alarme-ok hidden" id="al-btn-preparo" onclick="confirmarPreparo()">👨‍🍳 SENDO PREPARADO</button>
+    <button type="button" class="alarme-btn2 hidden" id="al-btn-rapido" onclick="envioRapidoDoAlarme()">⚡ Envio rápido — mandar agora o que foi pedido</button>
+  </div>
+</div>
+
+<!-- conversa lateral do pedido (carrinho <-> loja) -->
+<div class="conversa-chip hidden" id="conversa-chip" onclick="abrirConversa()">💬 conversa <span class="conversa-badge hidden" id="conversa-badge"></span></div>
+<div class="conversa-painel hidden" id="conversa-painel">
+  <div class="conversa-head">
+    <b>💬 Conversa do pedido</b>
+    <button type="button" class="btn-notif" onclick="fecharConversa()" title="Fechar">✕</button>
+  </div>
+  <div style="padding:10px 12px 0;">
+    <select id="conversa-pedido" onchange="renderConversa()"></select>
+  </div>
+  <div class="conversa-corpo" id="conversa-corpo"></div>
+  <div class="conversa-atalhos" id="conversa-atalhos"></div>
+  <div class="conversa-rodape">
+    <input type="text" id="conversa-input" maxlength="500" placeholder="escreva sua mensagem...">
+    <button type="button" class="btn-abrir-chamado" id="conversa-enviar" onclick="enviarMensagemConversa()">➤</button>
   </div>
 </div>
 
@@ -445,9 +488,14 @@ function regCardHtml(r){
     const p = porId[r.atendePedidoId];
     statusBadge = `<span class="badge vinculo">→ atende pedido${p ? ' de '+fmtHora(p.criadoEm) : ''}</span>`;
   }
-  // pedido ja visto pela loja (OK do alarme) - quem pediu enxerga daqui
-  if(r.tipo==='PEDIDO' && r.vistoEm && !r.atendidoPorEnvioId){
-    statusBadge += ` <span class="badge visto">👁 visto pela loja ${fmtHora(r.vistoEm)}</span>`;
+  // pedido ja visto pela loja (OK do alarme) - quem pediu enxerga daqui;
+  // "sendo preparado" e o retorno seguinte que o carrinho espera
+  if(r.tipo==='PEDIDO' && !r.atendidoPorEnvioId){
+    if(r.preparoEm) statusBadge += ` <span class="badge preparando">👨‍🍳 preparando ${fmtHora(r.preparoEm)}</span>`;
+    else if(r.vistoEm) statusBadge += ` <span class="badge visto">👁 visto pela loja ${fmtHora(r.vistoEm)}</span>`;
+  }
+  if(r.tipo==='PEDIDO' && (r.mensagens||[]).length){
+    statusBadge += ` <span class="badge vinculo" style="cursor:pointer;" onclick="event.stopPropagation();abrirConversa('${r.id}')">💬 ${r.mensagens.length}</span>`;
   }
   const insumosHtml = (r.insumos||[]).length
     ? `<div class="reg-insumos">${r.insumos.map(insumoTexto).join(' &nbsp;•&nbsp; ')}</div>`
@@ -494,6 +542,7 @@ async function carregar(){
   renderResumo();
   renderLista();
   verificarAlarme();
+  if(CONVERSA_ABERTA) abrirConversa(); else atualizarChipConversa();
 }
 
 async function carregarCatalogo(){
@@ -663,23 +712,43 @@ async function envioRapido(pedidoId){
 // apertar OK. O relogio conta 5:00 regressivos a partir da criacao do
 // pedido; estourou, fica vermelho e o som continua - so o OK encerra.
 let ALARME_PEDIDO = null;
+let ALARME_MODO = null;   // 'novo' (nao visto) | 'atrasado' (visto ha 5min sem preparo)
 let ALARME_TIMER = null;
 let ALARME_AUDIO_CTX = null;
 let ALARME_SOM_TIMER = null;
 
-function pedidoPrecisaAlarme(r){ return pendente(r) && !r.vistoEm; }
+const CINCO_MIN = 5*60*1000;
+function pedidoNaoVisto(r){ return pendente(r) && !r.vistoEm; }
+// escalonamento: apos o OK (visto), a loja tem 5min pra marcar SENDO
+// PREPARADO; estourou, vira alarme de PEDIDO ATRASADO
+function pedidoAtrasado(r){
+  return pendente(r) && r.vistoEm && !r.preparoEm && (Date.now() - new Date(r.vistoEm).getTime()) > CINCO_MIN;
+}
+
+function resumoPedidoHtml(p){
+  return SABORES.filter(s=>Number(p.pizzas?.[s])>0).map(s=>`<b>${p.pizzas[s]}</b> ${SABOR_LABEL[s]}`)
+    .concat((p.insumos||[]).map(i=>i.insumoId ? `${escapeHtml(i.nome)} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : escapeHtml(i.descricao)))
+    .join(' · ') || '—';
+}
 
 function verificarAlarme(){
   if(!TEM_ENVIO) return;
-  const pendentes = REGS.filter(pedidoPrecisaAlarme).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
-  if(!pendentes.length){ fecharAlarme(); return; }
-  const alvo = pendentes[0];
-  if(ALARME_PEDIDO && ALARME_PEDIDO.id === alvo.id) return; // ja esta tocando pra esse
+  // prioridade: pedido novo sem OK > pedido atrasado sem preparo
+  const naoVistos = REGS.filter(pedidoNaoVisto).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
+  const atrasados = REGS.filter(pedidoAtrasado).sort((a,b)=>(a.vistoEm||'').localeCompare(b.vistoEm||''));
+  const alvo = naoVistos[0] || atrasados[0] || null;
+  const modo = naoVistos[0] ? 'novo' : (atrasados[0] ? 'atrasado' : null);
+  if(!alvo){ fecharAlarme(); return; }
+  if(ALARME_PEDIDO && ALARME_PEDIDO.id === alvo.id && ALARME_MODO === modo){ ALARME_PEDIDO = alvo; return; }
   ALARME_PEDIDO = alvo;
-  const resumo = SABORES.filter(s=>Number(alvo.pizzas?.[s])>0).map(s=>`<b>${alvo.pizzas[s]}</b> ${SABOR_LABEL[s]}`)
-    .concat((alvo.insumos||[]).map(i=>i.insumoId ? `${escapeHtml(i.nome)} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : escapeHtml(i.descricao)));
+  ALARME_MODO = modo;
+  document.getElementById('al-titulo').textContent = modo==='novo' ? '🛒 NOVO PEDIDO DO CARRINHO!' : '🚨 PEDIDO ATRASADO — ENVIE IMEDIATAMENTE!';
+  document.getElementById('alarme-card').classList.toggle('atrasado', modo==='atrasado');
   document.getElementById('al-sub').textContent = `${fmtHora(alvo.criadoEm)} · por ${alvo.criadoPorNome||alvo.criadoPorEmail||'—'}`;
-  document.getElementById('al-itens').innerHTML = resumo.join(' · ') || '—';
+  document.getElementById('al-itens').innerHTML = resumoPedidoHtml(alvo);
+  document.getElementById('al-btn-visto').classList.toggle('hidden', modo!=='novo');
+  document.getElementById('al-btn-preparo').classList.toggle('hidden', modo!=='atrasado');
+  document.getElementById('al-btn-rapido').classList.toggle('hidden', modo!=='atrasado');
   document.getElementById('alarme-overlay').classList.remove('hidden');
   atualizarTimerAlarme();
   if(ALARME_TIMER) clearInterval(ALARME_TIMER);
@@ -689,11 +758,13 @@ function verificarAlarme(){
 
 function atualizarTimerAlarme(){
   if(!ALARME_PEDIDO) return;
-  const fim = new Date(ALARME_PEDIDO.criadoEm).getTime() + 5*60*1000;
-  const resta = Math.round((fim - Date.now())/1000);
   const el = document.getElementById('al-timer');
   const lbl = document.getElementById('al-timer-label');
-  if(resta >= 0){
+  // 'novo': regressivo de 5:00 desde a criacao do pedido, pra apertar OK;
+  // 'atrasado': cronometro subindo desde que estourou o prazo de preparo
+  const base = ALARME_MODO==='novo' ? new Date(ALARME_PEDIDO.criadoEm).getTime() : new Date(ALARME_PEDIDO.vistoEm).getTime();
+  const resta = Math.round((base + CINCO_MIN - Date.now())/1000);
+  if(ALARME_MODO==='novo' && resta >= 0){
     el.textContent = `${Math.floor(resta/60)}:${String(resta%60).padStart(2,'0')}`;
     el.className = 'alarme-timer ok';
     lbl.textContent = 'pra confirmar que a loja viu';
@@ -701,7 +772,7 @@ function atualizarTimerAlarme(){
     const passou = -resta;
     el.textContent = `-${Math.floor(passou/60)}:${String(passou%60).padStart(2,'0')}`;
     el.className = 'alarme-timer estourado';
-    lbl.textContent = '⚠️ tempo esgotado — confirme AGORA';
+    lbl.textContent = ALARME_MODO==='novo' ? '⚠️ tempo esgotado — confirme AGORA' : '⚠️ atrasado — envie IMEDIATAMENTE';
   }
 }
 
@@ -741,6 +812,7 @@ function fecharAlarme(){
   pararSomAlarme();
   if(ALARME_TIMER){ clearInterval(ALARME_TIMER); ALARME_TIMER = null; }
   ALARME_PEDIDO = null;
+  ALARME_MODO = null;
   document.getElementById('alarme-overlay').classList.add('hidden');
 }
 
@@ -752,7 +824,125 @@ async function confirmarVisto(){
     const resp = await fetch(`/api/abastecimento/${id}/visto`, { method:'POST' });
     if(!resp.ok){ const d = await resp.json(); throw new Error(d.error||'Erro ao confirmar.'); }
   }catch(err){ alert(err.message); }
-  await carregar(); // proximo pedido nao-visto (se houver) reabre o alarme
+  await carregar(); // proximo alarme (se houver) reabre sozinho
+}
+
+// popup de ATRASADO: marcar "sendo preparado" encerra o alarme (e avisa o
+// carrinho); envio rapido resolve de vez
+async function confirmarPreparo(){
+  if(!ALARME_PEDIDO) return;
+  const id = ALARME_PEDIDO.id;
+  fecharAlarme();
+  await marcarPreparo(id);
+}
+async function marcarPreparo(id){
+  try{
+    const resp = await fetch(`/api/abastecimento/${id}/preparo`, { method:'POST' });
+    if(!resp.ok){ const d = await resp.json(); throw new Error(d.error||'Erro ao marcar preparo.'); }
+  }catch(err){ alert(err.message); }
+  await carregar();
+}
+async function envioRapidoDoAlarme(){
+  if(!ALARME_PEDIDO) return;
+  const id = ALARME_PEDIDO.id;
+  fecharAlarme();
+  await envioRapido(id);
+}
+
+// ---------- conversa lateral do pedido ----------
+let CONVERSA_ABERTA = false;
+let CONVERSA_PEDIDO_ID = null;
+
+function pedidosComConversa(){
+  // pedidos ativos primeiro (mais novo em cima); finalizados com mensagem
+  // continuam acessiveis pelo select
+  return REGS.filter(r=>r.tipo==='PEDIDO' && (pendente(r) || (r.mensagens||[]).length))
+    .sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
+}
+
+function atualizarChipConversa(){
+  const lista = pedidosComConversa();
+  const chip = document.getElementById('conversa-chip');
+  chip.classList.toggle('hidden', !lista.length || CONVERSA_ABERTA);
+  const totalMsgs = lista.reduce((n,r)=>n+(r.mensagens||[]).length, 0);
+  const badge = document.getElementById('conversa-badge');
+  badge.textContent = totalMsgs || '';
+  badge.classList.toggle('hidden', !totalMsgs);
+}
+
+function abrirConversa(pedidoId){
+  const lista = pedidosComConversa();
+  if(!lista.length) return;
+  CONVERSA_ABERTA = true;
+  CONVERSA_PEDIDO_ID = pedidoId || CONVERSA_PEDIDO_ID || lista[0].id;
+  if(!lista.some(r=>r.id===CONVERSA_PEDIDO_ID)) CONVERSA_PEDIDO_ID = lista[0].id;
+  document.getElementById('conversa-pedido').innerHTML = lista.map(r=>
+    `<option value="${r.id}" ${r.id===CONVERSA_PEDIDO_ID?'selected':''}>Pedido ${fmtHora(r.criadoEm)} · ${escapeHtml(r.criadoPorNome||'')}${r.atendidoPorEnvioId?' · atendido':''}</option>`).join('');
+  document.getElementById('conversa-painel').classList.remove('hidden');
+  renderConversa();
+  atualizarChipConversa();
+}
+function fecharConversa(){
+  CONVERSA_ABERTA = false;
+  document.getElementById('conversa-painel').classList.add('hidden');
+  atualizarChipConversa();
+}
+
+function renderConversa(){
+  CONVERSA_PEDIDO_ID = document.getElementById('conversa-pedido').value || CONVERSA_PEDIDO_ID;
+  const p = REGS.find(r=>r.id===CONVERSA_PEDIDO_ID);
+  if(!p) return;
+  const corpo = document.getElementById('conversa-corpo');
+  corpo.innerHTML = (p.mensagens||[]).map(m=>`
+    <div class="conversa-msg ${m.de==='loja'?'loja':'carrinho'}">
+      <span class="quem">${m.de==='loja'?'🏬 Loja':'🛒 Carrinho'}${m.autorNome?(' · '+escapeHtml(m.autorNome)):''} · ${fmtHora(m.em)}</span>${escapeHtml(m.texto)}
+    </div>`).join('') || '<div class="empty" style="padding:16px;">Sem mensagens ainda — use um atalho abaixo ou escreva.</div>';
+  corpo.scrollTop = corpo.scrollHeight;
+
+  // atalhos por ponta: carrinho tem "esqueci uma observacao" sempre e
+  // "o pedido esta demorando" quando ha 5min sem retorno de preparo;
+  // loja tem o "SENDO PREPARADO" (o retorno que o carrinho espera)
+  const atalhos = [];
+  const ativo = pendente(p);
+  if(TEM_PEDIDO && ativo){
+    atalhos.push(`<button type="button" class="conversa-atalho" onclick="atalhoConversa('obs')">📝 Esqueci uma observação…</button>`);
+    if(!p.preparoEm && (Date.now() - new Date(p.criadoEm).getTime()) > CINCO_MIN){
+      atalhos.push(`<button type="button" class="conversa-atalho urgente" onclick="atalhoConversa('demora')">⏱️ O pedido está demorando</button>`);
+    }
+  }
+  if(TEM_ENVIO && ativo && !p.preparoEm){
+    atalhos.push(`<button type="button" class="conversa-atalho" style="color:#c9a2ff;border-color:rgba(201,162,255,.5);" onclick="marcarPreparo('${p.id}')">👨‍🍳 Marcar SENDO PREPARADO</button>`);
+  }
+  document.getElementById('conversa-atalhos').innerHTML = atalhos.join('');
+  document.getElementById('conversa-input').disabled = !ativo && false;
+}
+
+function atalhoConversa(tipo){
+  const input = document.getElementById('conversa-input');
+  if(tipo==='obs'){
+    input.value = 'Esqueci uma observação: ';
+    input.focus();
+  } else if(tipo==='demora'){
+    input.value = '⏱️ O pedido está demorando — podem dar um retorno?';
+    enviarMensagemConversa();
+  }
+}
+
+async function enviarMensagemConversa(){
+  const input = document.getElementById('conversa-input');
+  const texto = input.value.trim();
+  if(!texto || !CONVERSA_PEDIDO_ID) return;
+  const btn = document.getElementById('conversa-enviar');
+  btn.disabled = true;
+  try{
+    const resp = await fetch(`/api/abastecimento/${CONVERSA_PEDIDO_ID}/mensagem`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ texto }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar.');
+    input.value = '';
+    await carregar();
+    renderConversa();
+  }catch(err){ alert(err.message); }
+  finally{ btn.disabled = false; }
 }
 
 // ---------- gestao do catalogo de insumos ----------
@@ -841,6 +1031,10 @@ async function boot(){
   await carregarCatalogo();
   await carregar();
   iniciarStream();
+  // os limites de 5min (preparo atrasado / "esta demorando") estouram SEM
+  // evento novo - re-checa periodicamente
+  setInterval(()=>{ verificarAlarme(); if(CONVERSA_ABERTA) renderConversa(); }, 15000);
+  document.getElementById('conversa-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') enviarMensagemConversa(); });
 }
 
 // ao vivo: pedido novo do carrinho aparece na loja sem F5 (e vice-versa),

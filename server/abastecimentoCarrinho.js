@@ -195,6 +195,15 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criado
     vistoEm: null,
     vistoPorEmail: null,
     vistoPorNome: null,
+    // PEDIDO: a loja marcou "SENDO PREPARADO" - e o retorno que o carrinho
+    // espera. Depois do visto, a loja tem 5min pra marcar; sem marcar, o
+    // popup de PEDIDO ATRASADO dispara do lado de quem envia
+    preparoEm: null,
+    preparoPorEmail: null,
+    preparoPorNome: null,
+    // conversa lateral do pedido (carrinho <-> loja): "esqueci uma
+    // observacao", "o pedido esta demorando", combinados de preparo...
+    mensagens: [],
     criadoPorId: criadoPorId || null,
     criadoPorEmail: criadoPorEmail || null,
     criadoPorNome: criadoPorNome || null,
@@ -229,6 +238,47 @@ async function marcarVisto(id, { email, nome }) {
   return getOne(id);
 }
 
+// loja marca "SENDO PREPARADO" - retorno que o carrinho espera ver. Marca
+// o visto junto se ainda nao tinha (preparar implica ter visto). Idempotente
+async function marcarPreparo(id, { email, nome }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Registro não encontrado.');
+  if (atual.tipo !== 'PEDIDO') throw new Error('Só pedido tem status de preparo.');
+  if (atual.preparoEm) return atual;
+  const agora = new Date().toISOString();
+  const patch = { preparoEm: agora, preparoPorEmail: email || null, preparoPorNome: nome || null };
+  if (!atual.vistoEm) {
+    patch.vistoEm = agora;
+    patch.vistoPorEmail = email || null;
+    patch.vistoPorNome = nome || null;
+  }
+  await COLLECTION.doc(id).update(patch);
+  cache.invalidar();
+  return getOne(id);
+}
+
+// conversa lateral do pedido: cada mensagem identifica a ponta (carrinho/
+// loja) e quem escreveu. So em PEDIDO, limite de tamanho e de mensagens
+async function adicionarMensagem(id, { de, texto, autorEmail, autorNome }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Registro não encontrado.');
+  if (atual.tipo !== 'PEDIDO') throw new Error('A conversa fica no pedido.');
+  const textoLimpo = String(texto || '').trim().slice(0, 500);
+  if (!textoLimpo) throw new Error('Escreva a mensagem.');
+  const mensagens = atual.mensagens || [];
+  if (mensagens.length >= 200) throw new Error('Essa conversa ficou muito longa.');
+  const nova = {
+    de: de === 'loja' ? 'loja' : 'carrinho',
+    texto: textoLimpo,
+    autorEmail: autorEmail || null,
+    autorNome: autorNome || null,
+    em: new Date().toISOString(),
+  };
+  await COLLECTION.doc(id).update({ mensagens: [...mensagens, nova] });
+  cache.invalidar();
+  return getOne(id);
+}
+
 // so o Master apaga (registro errado). Se era um envio que atendia um
 // pedido, o pedido volta pra fila de "aguardando envio"
 async function remover(id) {
@@ -251,4 +301,4 @@ async function listAllUncached() {
 const cache = createCache(listAllUncached, 15 * 1000);
 const listAll = cache.cached;
 
-module.exports = { TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, listarInsumos, criarInsumo, atualizarInsumo };
+module.exports = { TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem, listarInsumos, criarInsumo, atualizarInsumo };
