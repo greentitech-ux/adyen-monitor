@@ -238,6 +238,7 @@
     </select></div>
     <div><label>De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
     <div><label>Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
+    <div><label>Pesquisar</label><input type="search" id="filtro-busca" placeholder="🔍 palavra, ticket #, quem pediu..." oninput="aplicarFiltrosExtra()"></div>
     <div><label>Prioridade</label><select id="filtro-prioridade" onchange="aplicarFiltrosExtra()">
       <option value="">Todas</option>
       <option value="critica">🔴 Crítica</option>
@@ -566,6 +567,7 @@ let FILTRO_GRUPO = '';
 let FILTRO_DATA_DE = '';
 let FILTRO_DATA_ATE = '';
 let FILTRO_PRIORIDADE = '';
+let FILTRO_BUSCA = '';
 // filtro de tipo: vazio = todas; 1 item = clique normal no botao (exclusivo);
 // varios itens = marcados pelo check no canto do botao (uniao dos tipos)
 let FILTRO_TIPOS = new Set();
@@ -593,6 +595,7 @@ function aplicarFiltrosExtra(){
   FILTRO_DATA_DE = document.getElementById('filtro-data-de').value;
   FILTRO_DATA_ATE = document.getElementById('filtro-data-ate').value;
   FILTRO_PRIORIDADE = document.getElementById('filtro-prioridade').value;
+  FILTRO_BUSCA = document.getElementById('filtro-busca').value.trim().toLowerCase();
   renderKanban();
 }
 function limparFiltrosExtra(){
@@ -601,7 +604,17 @@ function limparFiltrosExtra(){
   document.getElementById('filtro-data-de').value = '';
   document.getElementById('filtro-data-ate').value = '';
   document.getElementById('filtro-prioridade').value = '';
+  document.getElementById('filtro-busca').value = '';
   aplicarFiltrosExtra();
+}
+// busca por palavra: bate em titulo, observacao, loja, quem pediu,
+// fornecedor e Ticket # - todas as palavras digitadas precisam aparecer
+function passaBusca(c){
+  if(!FILTRO_BUSCA) return true;
+  const alvo = [c.titulo, c.observacao, c.unidadeNome, c.unidade, c.criadoPorEmail, c.criadoPorUsername, c.fornecedor,
+    c.numeroTicket!=null?('#'+c.numeroTicket):'', c.numeroTicket, c.motivoDecisao, c.tipo]
+    .filter(v=>v!=null).join(' ').toLowerCase();
+  return FILTRO_BUSCA.split(/\s+/).every(p=>alvo.includes(p));
 }
 
 // ticket automatico de "Login bloqueado" (criado por auth.criarChamadoBloqueio
@@ -813,6 +826,7 @@ function renderKanban(){
   if(FILTRO_GRUPO) base = base.filter(c=>grupoDaUnidade(c.unidade)===FILTRO_GRUPO);
   if(FILTRO_DATA_DE) base = base.filter(c=>dataBrasilia(c.criadoEm) >= FILTRO_DATA_DE);
   if(FILTRO_DATA_ATE) base = base.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
+  base = base.filter(passaBusca);
   renderFiltroTipoRow(base);
   let filtradas = FILTRO_TIPOS.size ? base.filter(c=>FILTRO_TIPOS.has(c.tipo)) : base;
   if(FILTRO_PRIORIDADE==='estourado') filtradas = filtradas.filter(slaEstourado);

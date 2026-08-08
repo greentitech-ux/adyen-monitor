@@ -4249,6 +4249,45 @@ app.get('/api/chamados/:id/cobranca/boleto', requireAnySection('tecnico', 'supor
   storage.streamArquivo(chamado.cobranca.boleto.path, chamado.cobranca.boleto.tipo, res);
 });
 
+// evidencias do chamado: observacao (texto) + quantas fotos precisar por
+// observacao - registradas a qualquer momento
+app.post('/api/chamados/:id/evidencias', requireAnySection('tecnico', 'suporte'), upload.array('fotos', 10), async (req, res) => {
+  try {
+    const fotos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-evidencias');
+      fotos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosTI.adicionarEvidencia(req.params.id, {
+      descricao: req.body.descricao,
+      fotos,
+      autorEmail: req.user.email,
+      autorNome: req.user.username || req.user.email,
+    });
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/chamados/:id/evidencias/:indice', auth.requireMaster, async (req, res) => {
+  try {
+    const chamado = await chamadosTI.removerEvidencia(req.params.id, req.params.indice);
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/chamados/:id/evidencia-foto/:indice/:fotoIndice', requireAnySection('tecnico', 'suporte'), async (req, res) => {
+  const chamado = await chamadosTI.getOne(req.params.id);
+  const foto = chamado?.evidencias?.[Number(req.params.indice)]?.fotos?.[Number(req.params.fotoIndice)];
+  if (!foto) return res.sendStatus(404);
+  storage.streamArquivo(foto.path, foto.tipo, res);
+});
+
 // check-in: tecnico chegou na loja, registra os itens (descricao + foto) de
 // como esta antes de mexer
 app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('fotosAntes', 6), async (req, res) => {
@@ -4445,6 +4484,44 @@ app.get('/api/chamados-manutencao/:id/cobranca/boleto', requireSection('manutenc
   const chamado = await chamadosManutencao.getOne(req.params.id);
   if (!chamado || !chamado.cobranca || !chamado.cobranca.boleto) return res.sendStatus(404);
   storage.streamArquivo(chamado.cobranca.boleto.path, chamado.cobranca.boleto.tipo, res);
+});
+
+// evidencias do chamado de manutencao (mesma mecanica da TI)
+app.post('/api/chamados-manutencao/:id/evidencias', requireSection('manutencao'), upload.array('fotos', 10), async (req, res) => {
+  try {
+    const fotos = [];
+    for (const file of req.files || []) {
+      const path = await storage.salvarArquivo(req.params.id, file, 'chamados-evidencias');
+      fotos.push({ nome: file.originalname, path, tipo: file.mimetype || 'application/octet-stream' });
+    }
+    const chamado = await chamadosManutencao.adicionarEvidencia(req.params.id, {
+      descricao: req.body.descricao,
+      fotos,
+      autorEmail: req.user.email,
+      autorNome: req.user.username || req.user.email,
+    });
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/chamados-manutencao/:id/evidencias/:indice', auth.requireMaster, async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.removerEvidencia(req.params.id, req.params.indice);
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/chamados-manutencao/:id/evidencia-foto/:indice/:fotoIndice', requireSection('manutencao'), async (req, res) => {
+  const chamado = await chamadosManutencao.getOne(req.params.id);
+  const foto = chamado?.evidencias?.[Number(req.params.indice)]?.fotos?.[Number(req.params.fotoIndice)];
+  if (!foto) return res.sendStatus(404);
+  storage.streamArquivo(foto.path, foto.tipo, res);
 });
 
 app.patch('/api/chamados-manutencao/:id', auth.requireMaster, async (req, res) => {

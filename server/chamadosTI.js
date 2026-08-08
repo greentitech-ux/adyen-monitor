@@ -92,6 +92,10 @@ async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecn
     // ver salvarOrcamentoPecas/salvarCobranca
     orcamentoPecas: [],
     cobranca: null,
+    // evidencias avulsas do chamado: observacao (texto) + N fotos cada -
+    // ver adicionarEvidencia (diferente de itensAntes/Depois, que pertencem
+    // ao check-in/checkout e tem 1 foto por item)
+    evidencias: [],
     assinaturaNomeLoja: null,
     assinatura: null,
     resolvidoNaAbertura: !!jaResolvido,
@@ -233,6 +237,45 @@ async function definirDataExecucao(id, { dataExecucao, tecnicoId, ehGestor }) {
   return getOne(id);
 }
 
+// evidencia: observacao (texto) + quantas fotos precisar - registrada em
+// qualquer momento do chamado (fotos ja vem salvas pela rota)
+function sanitizarFotos(fotos) {
+  return (Array.isArray(fotos) ? fotos : [])
+    .filter((f) => f && f.path)
+    .map((f) => ({ nome: String(f.nome || 'foto'), path: f.path, tipo: f.tipo || 'application/octet-stream' }));
+}
+
+async function adicionarEvidencia(id, { descricao, fotos, autorEmail, autorNome }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  const descricaoLimpa = String(descricao || '').trim().slice(0, 500);
+  const fotosOk = sanitizarFotos(fotos);
+  if (!descricaoLimpa && !fotosOk.length) throw new Error('Escreva a observação da evidência (e/ou anexe fotos).');
+  const nova = {
+    descricao: descricaoLimpa,
+    fotos: fotosOk,
+    autorEmail: autorEmail || null,
+    autorNome: autorNome || null,
+    em: new Date().toISOString(),
+  };
+  await COLLECTION.doc(id).update({ evidencias: [...(atual.evidencias || []), nova] });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// remover evidencia: so Master (rota) - indice na lista
+async function removerEvidencia(id, indice) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  const lista = [...(atual.evidencias || [])];
+  const i = Number(indice);
+  if (!Number.isInteger(i) || i < 0 || i >= lista.length) throw new Error('Evidência não encontrada.');
+  lista.splice(i, 1);
+  await COLLECTION.doc(id).update({ evidencias: lista });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
 // orcamento de peca: pode existir em qualquer modalidade (remoto tambem -
 // ex: diagnostico a distancia que aponta a peca a comprar)
 async function salvarOrcamentoPecas(id, lista) {
@@ -292,4 +335,5 @@ async function reatribuir(id, { tecnicoId, tecnicoEmail }) {
 module.exports = {
   STATUSES, MODALIDADES, modalidadeDe, create, listAll, getOne, iniciar, concluir, concluirRemoto, cancelar, reatribuir,
   garantirTicket, editarMaster, definirDataExecucao, salvarOrcamentoPecas, salvarCobranca, marcarCobrancaEnviada,
+  adicionarEvidencia, removerEvidencia,
 };
