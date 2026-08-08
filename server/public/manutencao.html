@@ -164,6 +164,7 @@
 <div id="root" class="hidden">
 <div class="panel">
   <h2>Meus chamados <span class="sub" id="lista-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
+  <input type="search" id="busca-chamados" placeholder="🔍 pesquisar por palavra (título, loja, ticket #...)" style="margin:8px 0 4px;font-size:12.5px;" oninput="renderLista()">
   <div id="lista-cards"><div class="empty">carregando...</div></div>
 </div>
 </div>
@@ -242,6 +243,17 @@
       <div id="v-itens-depois"></div>
       <div class="sub" style="margin-top:10px;">Assinatura de quem recebeu na loja</div>
       <div id="v-assinatura"></div>
+    </div>
+
+    <!-- evidencias: observacao (texto) + quantas fotos precisar, por linha -->
+    <div id="bloco-evidencias" class="hidden bloco-sep">
+      <label>📎 Evidências <span style="text-transform:none;letter-spacing:0;">(observação + fotos — quantas precisar por observação)</span></label>
+      <div id="lista-evidencias"></div>
+      <div id="lista-ev-novas"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" style="flex:1;" onclick="adicionarEvidencia()">+ Adicionar evidência</button>
+        <button type="button" class="btn-add hidden" style="flex:1;" id="btn-salvar-evidencias" onclick="salvarEvidencias()">💾 Salvar evidências</button>
+      </div>
     </div>
 
     <!-- orcamento de pecas -->
@@ -400,9 +412,18 @@ function fmtData(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `$
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
+// busca por palavra - ajuda quando a fila esta grande
+function passaBusca(c){
+  const q = (document.getElementById('busca-chamados')?.value || '').trim().toLowerCase();
+  if(!q) return true;
+  const alvo = [c.titulo, c.descricao, c.unidadeNome, c.unidade, c.numeroTicket!=null?('#'+c.numeroTicket):'', c.numeroTicket, c.observacaoResponsavel]
+    .filter(v=>v!=null).join(' ').toLowerCase();
+  return q.split(/\s+/).every(p=>alvo.includes(p));
+}
 function renderLista(){
-  document.getElementById('lista-count').textContent = CHAMADOS.length;
-  document.getElementById('lista-cards').innerHTML = CHAMADOS.length ? CHAMADOS.map(c=>`
+  const visiveis = CHAMADOS.filter(passaBusca);
+  document.getElementById('lista-count').textContent = visiveis.length;
+  document.getElementById('lista-cards').innerHTML = visiveis.length ? visiveis.map(c=>`
     <div class="card" onclick="abrirDetalhe('${c.id}')">
       <div class="linha1">
         <span>${c.numeroTicket!=null?`<span style="font-family:var(--mono);color:var(--accent);">#${c.numeroTicket}</span> `:''}${escapeHtml(c.titulo)}</span>
@@ -555,6 +576,12 @@ function abrirDetalhe(id){
   document.getElementById('bloco-master').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('bloco-editar').classList.add('hidden');
 
+  // evidencias: quem enxerga o chamado registra
+  document.getElementById('bloco-evidencias').classList.remove('hidden');
+  EV_NOVAS = [];
+  renderEvidenciasNovas();
+  renderEvidenciasSalvas(c);
+
   // orcamento de pecas + cobranca: responsavel ou Master
   const podeFinanceiro = souResponsavel(c) || IS_MASTER;
   document.getElementById('bloco-orcamento').classList.toggle('hidden', !podeFinanceiro);
@@ -585,6 +612,80 @@ function erroDetalhe(texto){
 function okDetalhe(texto){
   const msg = document.getElementById('msg-detalhe');
   msg.textContent = texto; msg.className = 'msg ok'; msg.classList.remove('hidden');
+}
+
+// ---------- evidencias: observacao + N fotos por linha ----------
+let EV_NOVAS = [];
+function adicionarEvidencia(){ EV_NOVAS.push({ id: ++SEQ, descricao:'', files: [] }); renderEvidenciasNovas(); }
+function removerEvidenciaNova(id){ EV_NOVAS = EV_NOVAS.filter(e=>e.id!==id); renderEvidenciasNovas(); }
+function fotosEvidencia(id, fileList){
+  const ev = EV_NOVAS.find(e=>e.id===id);
+  if(!ev) return;
+  ev.files = ev.files.concat([...fileList]); // acumula - quantas precisar
+  renderEvidenciasNovas();
+}
+function tirarFotoEvidencia(id, idx){
+  const ev = EV_NOVAS.find(e=>e.id===id);
+  if(ev){ ev.files.splice(idx, 1); renderEvidenciasNovas(); }
+}
+function renderEvidenciasNovas(){
+  document.getElementById('lista-ev-novas').innerHTML = EV_NOVAS.map(ev=>`
+    <div style="border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:8px;">
+      <div class="linha-item-foto">
+        <input type="text" value="${escapeHtml(ev.descricao)}" oninput="EV_NOVAS.find(x=>x.id===${ev.id}).descricao=this.value" placeholder="observação (ex: infiltração na parede do fundo)">
+        <label class="foto-btn ${ev.files.length?'tem-foto':''}" title="anexar fotos (pode várias)">${ev.files.length?('📷'+ev.files.length):'📷'}<input type="file" accept="image/*" multiple hidden onchange="fotosEvidencia(${ev.id}, this.files); this.value='';"></label>
+        <button type="button" class="btn-remover" onclick="removerEvidenciaNova(${ev.id})">✕</button>
+      </div>
+      ${ev.files.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${ev.files.map((f,i)=>`<span class="badge" style="cursor:pointer;" title="remover" onclick="tirarFotoEvidencia(${ev.id},${i})">🖼 ${escapeHtml(f.name.slice(0,18))} ✕</span>`).join('')}</div>`:''}
+    </div>`).join('');
+  document.getElementById('btn-salvar-evidencias').classList.toggle('hidden', !EV_NOVAS.length);
+}
+function renderEvidenciasSalvas(c){
+  document.getElementById('lista-evidencias').innerHTML = (c.evidencias||[]).map((ev,i)=>`
+    <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <span style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml(ev.descricao||'(sem observação)')}</span>
+        ${IS_MASTER?`<button type="button" class="btn-remover" title="remover evidência" onclick="removerEvidenciaSalva(${i})">✕</button>`:''}
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${escapeHtml(ev.autorNome||ev.autorEmail||'—')} · ${fmtDataHora(ev.em)}</div>
+      ${(ev.fotos||[]).length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${ev.fotos.map((f,fi)=>`
+        <a href="/api/chamados-manutencao/${c.id}/evidencia-foto/${i}/${fi}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/chamados-manutencao/${c.id}/evidencia-foto/${i}/${fi}?token=${encodeURIComponent(AUTH_TOKEN)}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"></a>`).join('')}</div>`:''}
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma evidência registrada.</div>';
+}
+async function salvarEvidencias(){
+  if(!DETALHE_ATUAL) return;
+  const pendentes = EV_NOVAS.filter(ev=>ev.descricao.trim() || ev.files.length);
+  if(!pendentes.length) return;
+  const btn = document.getElementById('btn-salvar-evidencias');
+  btn.disabled = true;
+  try{
+    for(const ev of pendentes){
+      const fd = new FormData();
+      fd.append('descricao', ev.descricao);
+      ev.files.forEach(f=>fd.append('fotos', f));
+      const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/evidencias`, { method:'POST', body: fd });
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error || 'Erro ao salvar evidência.');
+      DETALHE_ATUAL = data;
+    }
+    EV_NOVAS = [];
+    renderEvidenciasNovas();
+    renderEvidenciasSalvas(DETALHE_ATUAL);
+    okDetalhe('Evidências salvas.');
+    await carregarChamados();
+  }catch(err){ erroDetalhe(err.message); }
+  finally{ btn.disabled = false; }
+}
+async function removerEvidenciaSalva(indice){
+  if(!DETALHE_ATUAL || !confirm('Remover essa evidência?')) return;
+  try{
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/evidencias/${indice}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao remover.');
+    DETALHE_ATUAL = data;
+    renderEvidenciasSalvas(DETALHE_ATUAL);
+    await carregarChamados();
+  }catch(err){ erroDetalhe(err.message); }
 }
 
 // ---------- orcamento de pecas ----------

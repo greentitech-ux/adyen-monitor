@@ -189,6 +189,7 @@
     <button type="button" class="filtro-chip" data-filtro="remoto" onclick="filtrarChamados('remoto')">🎧 Remoto</button>
     <button type="button" class="filtro-chip" data-filtro="concluidos" onclick="filtrarChamados('concluidos')">✓ Concluídos</button>
   </div>
+  <input type="search" id="busca-chamados" placeholder="🔍 pesquisar por palavra (título, loja, ticket #, descrição...)" style="margin:8px 0 4px;font-size:12.5px;" oninput="renderLista()">
   <div id="lista-cards"><div class="empty">carregando...</div></div>
 </div>
 
@@ -331,28 +332,41 @@
       </div>
     </div>
 
-    <!-- edicao do Master: modalidade / status / prioridade -->
+    <!-- edicao do Master: modalidade / status / prioridade + salvar, tudo
+         numa linha so (clean) -->
     <div id="bloco-master" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px;">
       <label>⚙️ Edição do chamado (Master)</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <select id="m-modalidade">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;align-items:stretch;">
+        <select id="m-modalidade" style="margin:0;">
           <option value="presencial">🚗 Presencial</option>
           <option value="remoto">🎧 Remoto</option>
         </select>
-        <select id="m-status">
+        <select id="m-status" style="margin:0;">
           <option value="ABERTO">ABERTO (ativo)</option>
           <option value="INICIADO">INICIADO</option>
           <option value="CONCLUIDO">CONCLUÍDO</option>
           <option value="CANCELADO">CANCELADO</option>
         </select>
-        <select id="m-prioridade">
+        <select id="m-prioridade" style="margin:0;">
           <option value="critica">🔴 Crítica</option>
           <option value="alta">🟠 Alta</option>
           <option value="media">🟡 Média</option>
           <option value="baixa">🟢 Baixa</option>
         </select>
+        <button type="button" class="btn-add" style="margin:0;white-space:nowrap;" onclick="salvarEdicaoMaster()">💾 Salvar</button>
       </div>
-      <button type="button" class="btn-add" onclick="salvarEdicaoMaster()">💾 Salvar edição</button>
+    </div>
+
+    <!-- evidencias: observacao (texto) + quantas fotos precisar, por linha -
+         mesmo jeito do "adicionar peca" -->
+    <div id="bloco-evidencias" class="hidden" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px;">
+      <label>📎 Evidências <span style="text-transform:none;letter-spacing:0;">(observação + fotos — quantas precisar por observação)</span></label>
+      <div id="lista-evidencias"></div>
+      <div id="lista-ev-novas"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" style="flex:1;" onclick="adicionarEvidencia()">+ Adicionar evidência</button>
+        <button type="button" class="btn-add hidden" style="flex:1;" id="btn-salvar-evidencias" onclick="salvarEvidencias()">💾 Salvar evidências</button>
+      </div>
     </div>
 
     <!-- orcamento de pecas: qualquer modalidade -->
@@ -517,7 +531,17 @@ function filtrarChamados(f){
   document.querySelectorAll('#filtros-chips .filtro-chip').forEach(b=>b.classList.toggle('ativo', b.dataset.filtro===f));
   renderLista();
 }
+// busca por palavra em cima do filtro ativo (titulo, descricao, loja,
+// responsavel, ticket #...) - ajuda quando a fila esta grande
+function passaBusca(c){
+  const q = (document.getElementById('busca-chamados')?.value || '').trim().toLowerCase();
+  if(!q) return true;
+  const alvo = [c.titulo, c.descricao, c.unidadeNome, c.unidade, c.tecnicoEmail, c.criadoPorEmail, c.observacaoTecnico, c.numeroTicket!=null?('#'+c.numeroTicket):'', c.numeroTicket]
+    .filter(v=>v!=null).join(' ').toLowerCase();
+  return q.split(/\s+/).every(p=>alvo.includes(p));
+}
 function passaFiltro(c){
+  if(!passaBusca(c)) return false;
   if(FILTRO_ATUAL==='ativos') return c.status==='ABERTO' || c.status==='INICIADO';
   if(FILTRO_ATUAL==='concluidos') return c.status==='CONCLUIDO';
   if(FILTRO_ATUAL==='presencial') return modalidadeDe(c)==='presencial';
@@ -694,6 +718,12 @@ function abrirDetalhe(id){
     document.getElementById('m-prioridade').value = c.prioridade || 'media';
   }
 
+  // evidencias: observacao + N fotos, a qualquer momento
+  document.getElementById('bloco-evidencias').classList.remove('hidden');
+  EV_NOVAS = [];
+  renderEvidenciasNovas();
+  renderEvidenciasSalvas(c);
+
   // orcamento de pecas (qualquer modalidade) + cobranca
   document.getElementById('bloco-orcamento').classList.remove('hidden');
   ORC_ITENS = [];
@@ -749,6 +779,83 @@ async function salvarEdicaoMaster(){
     if(!resp.ok) throw new Error(data.error || 'Erro ao editar.');
     await carregarChamados();
     fecharDetalhe();
+  }catch(err){ erroDetalhe(err.message); }
+}
+
+// ---------- evidencias: observacao + N fotos por linha ----------
+// linhas NOVAS (ainda nao salvas) funcionam como o "adicionar peca": campo
+// de texto + 📷 que ACUMULA fotos (clicou de novo, soma mais) + remover
+let EV_NOVAS = [];
+function adicionarEvidencia(){ EV_NOVAS.push({ id: ++SEQ, descricao:'', files: [] }); renderEvidenciasNovas(); }
+function removerEvidenciaNova(id){ EV_NOVAS = EV_NOVAS.filter(e=>e.id!==id); renderEvidenciasNovas(); }
+function fotosEvidencia(id, fileList){
+  const ev = EV_NOVAS.find(e=>e.id===id);
+  if(!ev) return;
+  ev.files = ev.files.concat([...fileList]); // acumula - quantas precisar
+  renderEvidenciasNovas();
+}
+function tirarFotoEvidencia(id, idx){
+  const ev = EV_NOVAS.find(e=>e.id===id);
+  if(ev){ ev.files.splice(idx, 1); renderEvidenciasNovas(); }
+}
+function renderEvidenciasNovas(){
+  document.getElementById('lista-ev-novas').innerHTML = EV_NOVAS.map(ev=>`
+    <div style="border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:8px;">
+      <div class="linha-item-foto">
+        <input type="text" value="${escapeHtml(ev.descricao)}" oninput="EV_NOVAS.find(x=>x.id===${ev.id}).descricao=this.value" placeholder="observação (ex: cabo rompido atrás do balcão)">
+        <label class="foto-btn ${ev.files.length?'tem-foto':''}" title="anexar fotos (pode várias)">${ev.files.length?('📷'+ev.files.length):'📷'}<input type="file" accept="image/*" multiple hidden onchange="fotosEvidencia(${ev.id}, this.files); this.value='';"></label>
+        <button type="button" class="btn-remover" onclick="removerEvidenciaNova(${ev.id})">✕</button>
+      </div>
+      ${ev.files.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${ev.files.map((f,i)=>`<span class="badge" style="cursor:pointer;" title="remover" onclick="tirarFotoEvidencia(${ev.id},${i})">🖼 ${escapeHtml(f.name.slice(0,18))} ✕</span>`).join('')}</div>`:''}
+    </div>`).join('');
+  document.getElementById('btn-salvar-evidencias').classList.toggle('hidden', !EV_NOVAS.length);
+}
+function renderEvidenciasSalvas(c){
+  const rota = c._rotaEvidencias || '/api/chamados';
+  document.getElementById('lista-evidencias').innerHTML = (c.evidencias||[]).map((ev,i)=>`
+    <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <span style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml(ev.descricao||'(sem observação)')}</span>
+        ${IS_MASTER?`<button type="button" class="btn-remover" title="remover evidência" onclick="removerEvidenciaSalva(${i})">✕</button>`:''}
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${escapeHtml(ev.autorNome||ev.autorEmail||'—')} · ${fmtDataHora(ev.em)}</div>
+      ${(ev.fotos||[]).length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${ev.fotos.map((f,fi)=>`
+        <a href="${rota}/${c.id}/evidencia-foto/${i}/${fi}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="${rota}/${c.id}/evidencia-foto/${i}/${fi}?token=${encodeURIComponent(AUTH_TOKEN)}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"></a>`).join('')}</div>`:''}
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma evidência registrada.</div>';
+}
+async function salvarEvidencias(){
+  if(!DETALHE_ATUAL) return;
+  const pendentes = EV_NOVAS.filter(ev=>ev.descricao.trim() || ev.files.length);
+  if(!pendentes.length) return;
+  const btn = document.getElementById('btn-salvar-evidencias');
+  btn.disabled = true;
+  try{
+    for(const ev of pendentes){
+      const fd = new FormData();
+      fd.append('descricao', ev.descricao);
+      ev.files.forEach(f=>fd.append('fotos', f));
+      const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/evidencias`, { method:'POST', body: fd });
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error || 'Erro ao salvar evidência.');
+      DETALHE_ATUAL = data;
+    }
+    EV_NOVAS = [];
+    renderEvidenciasNovas();
+    renderEvidenciasSalvas(DETALHE_ATUAL);
+    okDetalhe('Evidências salvas.');
+    await carregarChamados();
+  }catch(err){ erroDetalhe(err.message); }
+  finally{ btn.disabled = false; }
+}
+async function removerEvidenciaSalva(indice){
+  if(!DETALHE_ATUAL || !confirm('Remover essa evidência?')) return;
+  try{
+    const resp = await fetch(`/api/chamados/${DETALHE_ATUAL.id}/evidencias/${indice}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao remover.');
+    DETALHE_ATUAL = data;
+    renderEvidenciasSalvas(DETALHE_ATUAL);
+    await carregarChamados();
   }catch(err){ erroDetalhe(err.message); }
 }
 
