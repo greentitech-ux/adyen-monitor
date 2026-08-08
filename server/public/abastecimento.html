@@ -533,6 +533,10 @@ let ME = null;
 let IS_MASTER = false;
 let TEM_PEDIDO = false;   // lado do carrinho (secao abastecimento-carrinho)
 let TEM_ENVIO = false;    // lado da loja (secao abastecimento-loja)
+// Master/Admin enxergam a tela toda (as duas pontas) mas nao operam o
+// balcao - os popups automaticos (pedido novo, recebimento pendente,
+// lembrete de contagem) sao so pra quem esta na ponta de verdade
+let SOU_OPERADOR_PONTA = false;
 let PODE_CATALOGO = false;
 let REGS = [];
 let CATALOGO_INSUMOS = [];
@@ -603,7 +607,7 @@ function envioAguardandoConfirmacao(r){
     && (Date.now() - new Date(r.criadoEm).getTime()) >= SETE_MIN;
 }
 function verificarRecebimento(){
-  if(!TEM_PEDIDO) return;
+  if(!TEM_PEDIDO || !SOU_OPERADOR_PONTA) return;
   if(document.getElementById('alarme-overlay') && !document.getElementById('alarme-overlay').classList.contains('hidden')) return;
   const fila = REGS.filter(envioAguardandoConfirmacao).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
   if(!fila.length){
@@ -759,7 +763,7 @@ function contagemDevida(){
   return null;
 }
 function verificarContagem(){
-  if(!TEM_PEDIDO) return;
+  if(!TEM_PEDIDO || !SOU_OPERADOR_PONTA) return;
   if(CONTAGEM_SNOOZE > Date.now()) return;
   // nao briga com os outros popups
   const outros = ['alarme-overlay','receb-overlay','overlay-form'];
@@ -1313,7 +1317,7 @@ function fmtDuracao(ms){
 }
 
 function verificarAlarme(){
-  if(!TEM_ENVIO) return;
+  if(!TEM_ENVIO || !SOU_OPERADOR_PONTA) return;
   // prioridade: pedido novo sem OK > atrasado sem preparo > lembrete 5/5min
   const naoVistos = REGS.filter(pedidoNaoVisto).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
   const atrasados = REGS.filter(pedidoAtrasado).sort((a,b)=>(a.vistoEm||'').localeCompare(b.vistoEm||''));
@@ -1664,6 +1668,7 @@ async function boot(){
   TEM_PEDIDO = IS_MASTER || !!ME.isAdmin || secoes.includes('abastecimento-carrinho');
   TEM_ENVIO = IS_MASTER || !!ME.isAdmin || secoes.includes('abastecimento-loja');
   PODE_CATALOGO = IS_MASTER || !!ME.isAdmin || !!ME.podeCatalogoInsumos;
+  SOU_OPERADOR_PONTA = !IS_MASTER && !ME.isAdmin;
 
   // menu sempre visivel (politica do app) - so administracao continua restrita
   ['nav-monitor','nav-lancamento','nav-fechamentos','nav-entregas','nav-entrega-lancamento','nav-cofre','nav-relatorios','nav-ifood','nav-parque','nav-mensalistas','nav-grupo-saltiverso','nav-solicitacoes','nav-historico','nav-tecnico','nav-manutencao','nav-inventario','nav-parque-checkin','nav-festas'].forEach(id=>{
