@@ -1182,7 +1182,9 @@ function renderOperadores(){
       <select onchange="salvarOperador('${o.id}', { papel: this.value })" style="width:auto;padding:5px 8px;font-size:11.5px;">
         <option value="pedido" ${o.papel==='pedido'?'selected':''}>🛒 PEDE</option>
         <option value="envio" ${o.papel==='envio'?'selected':''}>🚚 ENVIA</option>
-      </select>` : `<span class="badge">${o.papel==='pedido'?'🛒 PEDE':'🚚 ENVIA'}</span>`}
+      </select>` : (o.bloqueado
+        ? `<span class="badge">${o.papel==='pedido'?'🛒 PEDE':'🚚 ENVIA'}</span>`
+        : `<button type="button" class="cat-toggle on" title="trocar papel (autentica com a senha do próprio operador)" onclick="trocarPapelNaLista('${escapeHtml(o.usuario)}','${o.papel==='pedido'?'envio':'pedido'}')">${o.papel==='pedido'?'🛒 PEDE':'🚚 ENVIA'} ⇄</button>`)}
       ${o.bloqueado
         ? (IS_MASTER
           ? `<button type="button" class="cat-toggle off" onclick="desbloquearOperador('${o.id}')">🔓 desbloquear</button>`
@@ -1192,6 +1194,20 @@ function renderOperadores(){
           : `<span class="badge" style="${o.ativo===false?'background:var(--bad-dim);color:var(--bad);':'background:var(--ok-dim,rgba(61,220,151,.12));color:var(--ok,#3ddc97);'}">${o.ativo===false?'inativo':'ativo'}</span>`)}
       ${IS_MASTER ? `<button type="button" class="btn-remover" title="remover operador" onclick="removerOperador('${o.id}','${escapeHtml(o.usuario)}')">🗑</button>` : ''}
     </div>`).join('') || '<div class="empty">Nenhum operador cadastrado.</div>';
+}
+// troca de papel direto na lista, pra nao criar gargalo: o PROPRIO operador
+// autentica com a senha dele (mesma rota do balcao) - nao precisa do Master
+async function trocarPapelNaLista(usuario, novoPapel){
+  const rotulo = novoPapel==='envio' ? '🚚 ENVIA (loja)' : '🛒 PEDE (carrinho)';
+  const senha = prompt(`Trocar @${usuario} pra ${rotulo}.\nDigite a SENHA do operador (4 números):`);
+  if(senha === null || senha === '') return;
+  try{
+    const resp = await fetch('/api/abastecimento-operadores/trocar-papel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ usuario, senha, papel: novoPapel }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao trocar o papel.');
+    await carregarOperadores();
+    renderOperadores();
+  }catch(err){ erroOperadores(err.message); }
 }
 // remover: SO Master
 async function removerOperador(id, usuario){

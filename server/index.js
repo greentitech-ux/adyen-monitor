@@ -3929,7 +3929,7 @@ app.get('/api/abastecimento-operadores', auth.requireAuth, async (req, res) => {
 // qualquer usuario logado das duas pontas pode acionar do balcao
 app.post('/api/abastecimento-operadores/trocar-papel', auth.requireAuth, async (req, res) => {
   try {
-    if (!podePedirAbastecimento(req) && !podeEnviarAbastecimento(req)) {
+    if (!podePedirAbastecimento(req) && !podeEnviarAbastecimento(req) && !podeCadastrarOperadores(req)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
     }
     res.json(await abastecimentoCarrinho.trocarPapelOperador({
