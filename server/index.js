@@ -3685,6 +3685,40 @@ app.post('/api/abastecimento/:id/visto', auth.requireAuth, async (req, res) => {
   }
 });
 
+// loja marca "SENDO PREPARADO" (o retorno que o carrinho espera; sem isso em
+// 5min apos o visto, o lado da loja recebe o popup de PEDIDO ATRASADO)
+app.post('/api/abastecimento/:id/preparo', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podeEnviarAbastecimento(req)) return res.status(403).json({ error: 'Você não tem a permissão de ENVIO (lado da loja).' });
+    const registro = await abastecimentoCarrinho.marcarPreparo(req.params.id, { email: req.user.email, nome: req.user.username || req.user.email });
+    broadcast('abastecimento-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// conversa lateral do pedido (carrinho <-> loja). A ponta e derivada da
+// permissao de quem escreve; Master/Admin (que tem as duas) escolhe no body
+app.post('/api/abastecimento/:id/mensagem', auth.requireAuth, async (req, res) => {
+  try {
+    const pede = podePedirAbastecimento(req);
+    const envia = podeEnviarAbastecimento(req);
+    if (!pede && !envia) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    const de = pede && !envia ? 'carrinho' : (envia && !pede ? 'loja' : (req.body.de === 'carrinho' ? 'carrinho' : 'loja'));
+    const registro = await abastecimentoCarrinho.adicionarMensagem(req.params.id, {
+      de,
+      texto: req.body.texto,
+      autorEmail: req.user.email,
+      autorNome: req.user.username || req.user.email,
+    });
+    broadcast('abastecimento-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ----- catalogo de insumos (padroniza o que pode ser lancado) -----
 // ler: qualquer ponta; gerenciar: Master/Admin ou permissao podeCatalogoInsumos
 function podeGerirCatalogoInsumos(req) {
