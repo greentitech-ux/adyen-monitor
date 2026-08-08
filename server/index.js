@@ -3788,6 +3788,26 @@ app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
   }
 });
 
+// "Ja lancei" do pedido retroativo ("ja recebi"): a loja confirma que o
+// envio ja tinha sido registrado antes - fecha o ciclo SEM criar envio
+// duplicado. Exige a senha do operador (papel envio), como todo lancamento
+app.post('/api/abastecimento/:id/ja-lancei', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podeEnviarAbastecimento(req)) return res.status(403).json({ error: 'Você não tem a permissão de ENVIO (lado da loja).' });
+    const operador = await abastecimentoCarrinho.validarOperador({
+      usuario: req.body.operadorUsuario,
+      senha: req.body.operadorSenha,
+      papel: 'envio',
+    });
+    const registro = await abastecimentoCarrinho.marcarJaLancado(req.params.id, { operador });
+    broadcast('abastecimento-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    if (err.operadorBloqueado) abrirTicketBloqueioOperador(err.operadorBloqueado, req);
+    res.status(400).json({ error: err.message, papelErrado: !!err.papelErrado });
+  }
+});
+
 // OK do popup de pedido novo (lado da loja): para o alarme e sinaliza pro
 // carrinho que a loja ja viu o pedido
 app.post('/api/abastecimento/:id/visto', auth.requireAuth, async (req, res) => {

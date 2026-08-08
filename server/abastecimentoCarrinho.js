@@ -356,6 +356,7 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, jaRece
     pedidoAtendido = await getOne(atendePedidoId);
     if (!pedidoAtendido || pedidoAtendido.tipo !== 'PEDIDO') throw new Error('Pedido não encontrado.');
     if (pedidoAtendido.atendidoPorEnvioId) throw new Error('Esse pedido já foi atendido por outro envio.');
+    if (pedidoAtendido.jaLancadoEm) throw new Error('Esse pedido já foi baixado como "Já lancei" - o envio já existia, não crie outro.');
   }
 
   const doc = COLLECTION.doc();
@@ -428,6 +429,27 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, jaRece
 async function getOne(id) {
   const doc = await COLLECTION.doc(id).get();
   return doc.exists ? doc.data() : null;
+}
+
+// "Ja lancei": pedido retroativo ("ja recebi") cujo ENVIO ja tinha sido
+// registrado antes (ex: envio avulso na hora, so o pedido que faltou) - a
+// loja fecha o ciclo SEM criar outro envio, evitando duplicar o material
+// nos totais. Assinado pela senha do operador, como todo lancamento.
+async function marcarJaLancado(id, { operador }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Pedido não encontrado.');
+  if (atual.tipo !== 'PEDIDO') throw new Error('Só pedido pode ser baixado como "Já lancei".');
+  if (!atual.jaRecebido) throw new Error('"Já lancei" vale só pra pedido marcado como "já recebi" (lançamento atrasado).');
+  if (atual.atendidoPorEnvioId) throw new Error('Esse pedido já foi atendido por um envio.');
+  if (atual.jaLancadoEm) return atual;
+  const merge = {
+    jaLancadoEm: new Date().toISOString(),
+    jaLancadoPorOperadorUsuario: operador ? operador.usuario : null,
+    jaLancadoPorOperadorNome: operador ? operador.nome : null,
+  };
+  await COLLECTION.doc(id).update(merge);
+  cache.invalidar();
+  return { ...atual, ...merge };
 }
 
 // a loja aperta OK no popup de pedido novo: registra quem viu e quando.
@@ -616,7 +638,7 @@ const cache = createCache(listAllUncached, 15 * 1000);
 const listAll = cache.cached;
 
 module.exports = {
-  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem, confirmarRecebimento, registrarDivergencia, getConfig, salvarConfig,
+  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, marcarJaLancado, adicionarMensagem, confirmarRecebimento, registrarDivergencia, getConfig, salvarConfig,
   listarInsumos, criarInsumo, atualizarInsumo,
   listarOperadores, criarOperador, atualizarOperador, removerOperador, desbloquearOperador, validarOperador, trocarPapelOperador,
 };
