@@ -10,6 +10,7 @@ const db = require('./firestore');
 const { createCache } = require('./liveCache');
 const ticketCounter = require('./ticketCounter');
 const centralChat = require('./centralChat');
+const prioridades = require('./prioridades');
 
 const COLLECTION = db.collection('solicitacoes');
 
@@ -50,7 +51,7 @@ function sanitizarItens(lista) {
     .filter((item) => item.descricao);
 }
 
-async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail, numeroTicket, convertidoDeTipo, convertidoDeId, fechamentoId }) {
+async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, anexos, ehOrcamento, fornecedor, vencimento, criadoPorId, criadoPorEmail, direcionadoParaId, direcionadoParaEmail, numeroTicket, convertidoDeTipo, convertidoDeId, fechamentoId, prioridade }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo de solicitação inválido.');
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o que está sendo pedido.');
@@ -98,6 +99,10 @@ async function create({ tipo, unidade, unidadeNome, titulo, valorEstimado, obser
     // ticket automaticamente (ver fechamentosLive.create())
     fechamentoId: fechamentoId || null,
     status: 'PENDENTE',
+    // prioridade + prazo-alvo de resolucao (SLA) - ver prioridades.js. O
+    // kanban usa slaPrazo pra pintar "vence em"/"estourado" e ordenar a fila
+    prioridade: prioridades.sanitizarPrioridade(prioridade),
+    slaPrazo: prioridades.slaPrazo(prioridade, agora),
     // andamento da execucao, so preenchido (e so relevante) apos Aprovado -
     // ver EXECUCAO_STATUSES/atualizarExecucao
     execucaoStatus: null,
@@ -245,6 +250,19 @@ async function atualizarExecucao(id, execucaoStatus) {
   if (!snap.exists) throw new Error('Solicitação não encontrada.');
   if (snap.data().status !== 'APROVADO') throw new Error('Só é possível atualizar o andamento de um ticket já aprovado.');
   await ref.update({ execucaoStatus });
+  solicitacoesCache.invalidar();
+  return getOne(id);
+}
+
+// Master/Admin re-prioriza um ticket na triagem - o prazo de SLA e
+// recalculado a partir da CRIACAO do ticket (nao de agora), pra prioridade
+// nova valer desde o inicio da fila
+async function atualizarPrioridade(id, prioridade) {
+  const ref = COLLECTION.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitação não encontrada.');
+  const limpa = prioridades.sanitizarPrioridade(prioridade);
+  await ref.update({ prioridade: limpa, slaPrazo: prioridades.slaPrazo(limpa, snap.data().criadoEm) });
   solicitacoesCache.invalidar();
   return getOne(id);
 }
@@ -417,5 +435,5 @@ async function converterParaEstorno(id, dadosEstorno, porEmail) {
 module.exports = {
   TIPOS, STATUSES, EXECUCAO_STATUSES, create, listAll, getOne, updateStatus, vincularChamado, update, remove,
   marcarNotificacaoVista, marcarComprada, desmarcarComprada, redirecionar, mudarTipo, converterParaEstorno,
-  atualizarExecucao, gerarTokenAcao, validarToken, decidirPorToken,
+  atualizarExecucao, atualizarPrioridade, gerarTokenAcao, validarToken, decidirPorToken,
 };
