@@ -71,6 +71,8 @@
   .badge.catalogo{background:#132a1a;color:#5fd68a;border:1px solid var(--line);}
   .badge.loja{background:#12303a;color:var(--accent);border:1px solid var(--line);}
   .badge.gerente{background:#0f2f22;color:var(--ok);border:1px solid var(--line);}
+  .badge.tecnico{background:#1e2733;color:#8ab4f8;border:1px solid var(--line);}
+  .badge.manutencao{background:#3d2f0f;color:#e0b84c;border:1px solid var(--line);}
   .btn-acoes{font-family:var(--sans);font-size:11.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;white-space:nowrap;}
   .btn-acoes:hover{border-color:var(--accent);}
   .acoes-lista{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
@@ -781,7 +783,7 @@ function renderUsers(){
       ? { cor:'bad', texto:'bloqueado' }
       : (u.active ? { cor:'ok', texto:'ativo' } : { cor:'off', texto:'desativado' });
     const tags = [`<span class="badge ${u.role}">${u.role}</span>`];
-    if (u.cargo) tags.push(`<span class="badge ${u.cargo}" title="Tag de cargo (só organização, não muda permissão)">${u.cargo==='loja'?'🏬 loja':'👔 gerente'}</span>`);
+    if (u.cargo) tags.push(`<span class="badge ${u.cargo}" title="Tag de cargo - também define a tela inicial da pessoa ao entrar no app">${({loja:'🏬 loja', gerente:'👔 gerente', tecnico:'🔧 técnico', manutencao:'🛠️ manutenção'})[u.cargo]||u.cargo}</span>`);
     if (u.isAdmin) tags.push(`<span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>`);
     if (u.podeCatalogoEstoque) tags.push(`<span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque">📦 catálogo</span>`);
     if (horario && horario.ativo) tags.push(`<span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>`);
@@ -829,6 +831,8 @@ function abrirAcoes(id){
     <button type="button" onclick="fecharAcoes();alternarCatalogoEstoque('${u.id}', ${!u.podeCatalogoEstoque})">${u.podeCatalogoEstoque?'📦 Remover acesso ao Catálogo':'📦 Liberar Catálogo do Estoque'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='tecnico' ? 'null' : `'tecnico'`})">${u.cargo==='tecnico'?'🔧 Remover tag Técnico':'🔧 Marcar como Técnico'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='manutencao' ? 'null' : `'manutencao'`})">${u.cargo==='manutencao'?'🛠️ Remover tag Manutenção':'🛠️ Marcar como Manutenção'}</button>
     <div class="acoes-sep">Conta</div>
     <button type="button" class="danger" onclick="fecharAcoes();alternarAtivo('${u.id}', ${!u.active})">${u.active?'🚫 Desativar acesso':'✅ Reativar acesso'}</button>
     <button type="button" class="danger" onclick="fecharAcoes();excluirUsuario('${u.id}','${escapeHtml(u.email)}')">🗑️ Excluir acesso</button>

@@ -550,27 +550,27 @@ function podeSecao(secao){
 }
 
 function aplicarNav(){
-  document.getElementById('nav-lancamento').classList.toggle('hidden', !podeSecao('lancamento'));
-  document.getElementById('nav-fechamentos').classList.toggle('hidden', !podeSecao('fechamentos'));
-  document.getElementById('nav-entregas').classList.toggle('hidden', !podeSecao('entregas'));
-  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !podeSecao('entregas-lancamento'));
-  document.getElementById('nav-cofre').classList.toggle('hidden', !podeSecao('cofre'));
-  document.getElementById('nav-relatorios').classList.toggle('hidden', !podeSecao('disputas'));
-  document.getElementById('nav-ifood').classList.toggle('hidden', !podeSecao('ifood'));
-  document.getElementById('nav-parque').classList.toggle('hidden', !podeSecao('parque'));
-  document.getElementById('nav-mensalistas').classList.toggle('hidden', !podeSecao('parque'));
-  document.getElementById('nav-grupo-saltiverso').classList.toggle('hidden', !(podeSecao('parque') || podeSecao('parque-checkin') || podeSecao('festas')));
+  document.getElementById('nav-lancamento').classList.remove('hidden');
+  document.getElementById('nav-fechamentos').classList.remove('hidden');
+  document.getElementById('nav-entregas').classList.remove('hidden');
+  document.getElementById('nav-entrega-lancamento').classList.remove('hidden');
+  document.getElementById('nav-cofre').classList.remove('hidden');
+  document.getElementById('nav-relatorios').classList.remove('hidden');
+  document.getElementById('nav-ifood').classList.remove('hidden');
+  document.getElementById('nav-parque').classList.remove('hidden');
+  document.getElementById('nav-mensalistas').classList.remove('hidden');
+  document.getElementById('nav-grupo-saltiverso').classList.remove('hidden');
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(ME && (ME.role==='master' || ME.isAdmin)));
-  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !podeSecao('solicitacoes'));
-  document.getElementById('nav-historico').classList.toggle('hidden', !(podeSecao('solicitacoes') || podeSecao('manutencao') || podeSecao('tecnico')));
-  document.getElementById('nav-tecnico').classList.toggle('hidden', !podeSecao('tecnico'));
-  document.getElementById('nav-manutencao').classList.toggle('hidden', !podeSecao('manutencao'));
+  document.getElementById('nav-solicitacoes').classList.remove('hidden');
+  document.getElementById('nav-historico').classList.remove('hidden');
+  document.getElementById('nav-tecnico').classList.remove('hidden');
+  document.getElementById('nav-manutencao').classList.remove('hidden');
   document.getElementById('nav-usuarios').classList.toggle('hidden', ME.role!=='master');
   document.getElementById('nav-grupos').classList.toggle('hidden', ME.role!=='master');
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', ME.role!=='master');
-  document.getElementById('nav-inventario').classList.toggle('hidden', !podeSecao('inventario'));
-  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !podeSecao('parque-checkin'));
-  document.getElementById('nav-festas').classList.toggle('hidden', !podeSecao('festas'));
+  document.getElementById('nav-inventario').classList.remove('hidden');
+  document.getElementById('nav-parque-checkin').classList.remove('hidden');
+  document.getElementById('nav-festas').classList.remove('hidden');
   // a fila de solicitacoes de estorno e coisa do Master acompanhar - o usuario
   // que solicitou ve o status direto na linha do pedido dele
   document.getElementById('refund-panel').classList.toggle('hidden', ME.role!=='master');

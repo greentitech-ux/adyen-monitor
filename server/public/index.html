@@ -95,12 +95,20 @@
 // direto, senao nunca daria pra "sempre iniciar no Painel"
 let AUTH_TOKEN = localStorage.getItem('authToken') || null;
 
+// tela inicial por tag de cargo (definida na tela de Usuarios): Loja pousa
+// direto no Historico de Solicitacoes, Tecnico nos Chamados TI, Manutencao
+// na tela de Manutencao - quem nao tem tag (ou e Master) vai pro Painel
+function paginaInicial(cargo){
+  return { loja: '/central-historico.html', tecnico: '/tecnico.html', manutencao: '/manutencao.html' }[cargo] || '/painel.html';
+}
+
 async function boot(){
   if(!AUTH_TOKEN) return;
   try{
     const res = await fetch('/api/me', { headers: { Authorization: 'Bearer '+AUTH_TOKEN } });
     if(!res.ok){ localStorage.removeItem('authToken'); return; }
-    location.href = '/painel.html';
+    const me = await res.json();
+    location.href = paginaInicial(me.cargo);
   }catch(e){ /* API fora do ar - deixa a pessoa tentar o login normalmente */ }
 }
 
@@ -123,7 +131,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e)=>{
       mostrarTrocarSenha(data.token, senhaDigitada);
       return;
     }
-    location.href = '/painel.html';
+    location.href = paginaInicial(data.user && data.user.cargo);
   }catch(err){
     erroEl.textContent = err.message;
     erroEl.classList.remove('hidden');
@@ -165,7 +173,10 @@ document.getElementById('trocar-senha-form').addEventListener('submit', async (e
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Não foi possível salvar a nova senha.');
-    location.href = '/painel.html';
+    try{
+      const me = await fetch('/api/me', { headers: { Authorization: 'Bearer '+form.dataset.token } }).then(r=>r.json());
+      location.href = paginaInicial(me.cargo);
+    }catch(e){ location.href = '/painel.html'; }
   }catch(err){
     erroEl.textContent = err.message;
     erroEl.classList.remove('hidden');

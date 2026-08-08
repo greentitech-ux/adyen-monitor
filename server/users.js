@@ -204,12 +204,15 @@ async function updatePodeCatalogoEstoque(id, valor) {
   return toPublic(await ref.get());
 }
 
-// tag de cargo/funcao (Loja, Gerente) - so um rotulo de organizacao na tela
-// de Usuarios, nao muda nenhuma permissao (diferente da tag Admin)
-const CARGOS_VALIDOS = ['loja', 'gerente'];
+// tag de cargo/funcao (Loja, Gerente, Tecnico, Manutencao). Alem de rotulo
+// na tela de Usuarios, algumas tem efeito real: Gerente aprova check-out do
+// Parque, e a tag define a TELA INICIAL da pessoa ao entrar no app (ver
+// index.html): Loja -> Historico de Solicitacoes, Tecnico -> Chamados TI,
+// Manutencao -> Manutencao; sem tag -> Painel.
+const CARGOS_VALIDOS = ['loja', 'gerente', 'tecnico', 'manutencao'];
 async function updateCargo(id, cargo) {
   const limpo = cargo ? String(cargo).toLowerCase() : null;
-  if (limpo && !CARGOS_VALIDOS.includes(limpo)) throw new Error('Tag inválida. Use "loja" ou "gerente".');
+  if (limpo && !CARGOS_VALIDOS.includes(limpo)) throw new Error('Tag inválida. Use "loja", "gerente", "tecnico" ou "manutencao".');
   const ref = usersRef.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Acesso não encontrado.');

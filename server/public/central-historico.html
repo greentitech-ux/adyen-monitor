@@ -1774,28 +1774,28 @@ async function boot(){
     (!tiposPermitidos || !tiposPermitidos.length || tiposPermitidos.includes(tipo))
   );
 
-  document.getElementById('nav-monitor').classList.toggle('hidden', !SECOES.includes('monitor'));
-  document.getElementById('nav-lancamento').classList.toggle('hidden', !SECOES.includes('lancamento'));
-  document.getElementById('nav-fechamentos').classList.toggle('hidden', !SECOES.includes('fechamentos'));
-  document.getElementById('nav-entregas').classList.toggle('hidden', !SECOES.includes('entregas'));
-  document.getElementById('nav-entrega-lancamento').classList.toggle('hidden', !SECOES.includes('entregas-lancamento'));
-  document.getElementById('nav-cofre').classList.toggle('hidden', !SECOES.includes('cofre'));
-  document.getElementById('nav-relatorios').classList.toggle('hidden', !SECOES.includes('disputas'));
-  document.getElementById('nav-ifood').classList.toggle('hidden', !SECOES.includes('ifood'));
-  document.getElementById('nav-parque').classList.toggle('hidden', !SECOES.includes('parque'));
-  document.getElementById('nav-mensalistas').classList.toggle('hidden', !SECOES.includes('parque'));
-  document.getElementById('nav-grupo-saltiverso').classList.toggle('hidden', !(SECOES.includes('parque') || SECOES.includes('parque-checkin') || SECOES.includes('festas')));
+  document.getElementById('nav-monitor').classList.remove('hidden');
+  document.getElementById('nav-lancamento').classList.remove('hidden');
+  document.getElementById('nav-fechamentos').classList.remove('hidden');
+  document.getElementById('nav-entregas').classList.remove('hidden');
+  document.getElementById('nav-entrega-lancamento').classList.remove('hidden');
+  document.getElementById('nav-cofre').classList.remove('hidden');
+  document.getElementById('nav-relatorios').classList.remove('hidden');
+  document.getElementById('nav-ifood').classList.remove('hidden');
+  document.getElementById('nav-parque').classList.remove('hidden');
+  document.getElementById('nav-mensalistas').classList.remove('hidden');
+  document.getElementById('nav-grupo-saltiverso').classList.remove('hidden');
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
   document.getElementById('btn-modo-selecao').classList.toggle('hidden', !(IS_MASTER || IS_ADMIN));
-  document.getElementById('nav-solicitacoes').classList.toggle('hidden', !SECOES.includes('solicitacoes'));
-  document.getElementById('nav-tecnico').classList.toggle('hidden', !SECOES.includes('tecnico'));
-  document.getElementById('nav-manutencao').classList.toggle('hidden', !SECOES.includes('manutencao'));
+  document.getElementById('nav-solicitacoes').classList.remove('hidden');
+  document.getElementById('nav-tecnico').classList.remove('hidden');
+  document.getElementById('nav-manutencao').classList.remove('hidden');
   document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
-  document.getElementById('nav-inventario').classList.toggle('hidden', !SECOES.includes('inventario'));
-  document.getElementById('nav-parque-checkin').classList.toggle('hidden', !SECOES.includes('parque-checkin'));
-  document.getElementById('nav-festas').classList.toggle('hidden', !SECOES.includes('festas'));
+  document.getElementById('nav-inventario').classList.remove('hidden');
+  document.getElementById('nav-parque-checkin').classList.remove('hidden');
+  document.getElementById('nav-festas').classList.remove('hidden');
 
   if(!(SECOES.includes('solicitacoes') || SECOES.includes('manutencao') || SECOES.includes('tecnico'))){
     document.getElementById('sem-acesso').classList.remove('hidden');
