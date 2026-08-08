@@ -18,10 +18,21 @@ if (PUBLIC_KEY && PRIVATE_KEY) {
   webpush.setVapidDetails(SUBJECT, PUBLIC_KEY, PRIVATE_KEY);
 }
 
+// cache em memoria das inscricoes: notificacao e evento frequente (pedido,
+// solicitacao, mensagem de chat...) e cada envio relia a colecao INTEIRA do
+// Firestore. Com o cache, a releitura acontece no maximo 1x/min - inscricao
+// nova/removida invalida na hora, entao ninguem fica de fora por causa dele.
+const SUBS_TTL_MS = 60 * 1000;
+let SUBS_CACHE = null;
+let SUBS_CACHE_EM = 0;
 async function loadSubs() {
+  if (SUBS_CACHE && Date.now() - SUBS_CACHE_EM < SUBS_TTL_MS) return SUBS_CACHE;
   const snap = await COLLECTION.get();
-  return snap.docs.map((d) => d.data());
+  SUBS_CACHE = snap.docs.map((d) => d.data());
+  SUBS_CACHE_EM = Date.now();
+  return SUBS_CACHE;
 }
+function invalidarSubs() { SUBS_CACHE = null; }
 
 // meta = { userId, isMaster, unidades, sections } - null em unidades/sections
 // significa Master (sem restricao). Sem meta (inscricoes antigas, de antes
@@ -29,6 +40,7 @@ async function loadSubs() {
 // acesso total - mais seguro pedir pra re-inscrever do que vazar alerta.
 async function addSubscription(sub, meta) {
   await COLLECTION.doc(subDocId(sub.endpoint)).set({ ...sub, meta: meta || null }, { merge: true });
+  invalidarSubs();
 }
 
 function podeReceber(sub, { unidade, section }) {
@@ -62,6 +74,7 @@ function podeReceberParque(sub, unidade) {
 
 async function removeSubscription(endpoint) {
   await COLLECTION.doc(subDocId(endpoint)).delete();
+  invalidarSubs();
 }
 
 // eventos que merecem notificacao push (estorno, estorno agendado,

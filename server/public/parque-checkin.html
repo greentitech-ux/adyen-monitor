@@ -695,8 +695,10 @@ async function boot(){
   await carregar();
   // recarrega periodicamente pra refletir os check-ins automaticos que o
   // servidor dispara sozinho quando o horario previsto vence (ver
-  // rodarAutoCheckins em parque.js) - essa tela nao tem SSE proprio
-  setInterval(carregar, 30000);
+  // rodarAutoCheckins em parque.js) - essa tela nao tem SSE proprio.
+  // Aba em segundo plano nao busca; ao voltar pra aba, atualiza na hora
+  setInterval(()=>{ if(!document.hidden) carregar(); }, 30000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) carregar(); });
 }
 
 boot();
