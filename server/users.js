@@ -322,6 +322,7 @@ module.exports = {
   updateHorarioPermitido,
   updateIsAdmin,
   updatePodeCatalogoEstoque,
+  updatePodeCatalogoInsumos,
   updateCargo,
   updateUsername,
   updateUsernamesEmMassa,
