@@ -4043,6 +4043,9 @@ app.post('/api/suporte-chat/:id/mensagem', async (req, res) => {
   try {
     const chat = await suporteChat.adicionarMensagem(req.params.id, { de: 'visitante', texto: req.body.texto, token: req.body.token });
     broadcast('suporte-chat', { id: chat.id }, 'suporte');
+    // notificacao no celular do time tambem em MENSAGEM nova (nao so na
+    // abertura da conversa) - o atendente ve e responde de onde estiver
+    push.notifySolicitacao('💬 Nova mensagem no chat de suporte', `${chat.nome} · ${String(req.body.texto || '').slice(0, 80)}`, chat.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });

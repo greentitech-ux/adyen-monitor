@@ -212,9 +212,183 @@
   btn.addEventListener('click', () => {
     aberto = !aberto;
     panel.classList.toggle('szc-hidden', !aberto);
-    if (aberto) carregarConversa(); else pararPoll();
+    if (!aberto) { pararPoll(); return; }
+    // MASTER: o mesmo icone 💬 abre o ATENDIMENTO (lista de conversas) em
+    // vez do formulario de visitante - so no Master
+    if (ATEND.ehMaster) atendRenderLista();
+    else carregarConversa();
   });
   panel.querySelector('.szc-x').addEventListener('click', () => { aberto = false; panel.classList.add('szc-hidden'); pararPoll(); });
   panel.querySelector('#szc-enviar-msg').addEventListener('click', enviarMensagem);
   panel.querySelector('#szc-nova-msg').addEventListener('keydown', (e) => { if (e.key === 'Enter') enviarMensagem(); });
+
+  // ================= LADO DO ATENDIMENTO (Master/Admin/tag Suporte) =========
+  // - Mensagem nova de visitante: a caixa de dialogo ABRE SOZINHA em
+  //   qualquer aba, com resposta inline. Fechou? O marcador e salvo e a
+  //   conversa continua na tela de Chamados TI (💬 Chats de suporte).
+  // - MASTER: o proprio icone 💬 vira a central de chats (lista + conversa).
+  const ATEND = { ativo: false, ehMaster: false, chats: [], chatAberto: null, timer: null };
+  const LS_ATEND_VISTO = 'szcAtendVisto:'; // + chatId -> "em" da ultima msg de visitante ja vista
+
+  const badge = el('<span style="position:absolute;top:-4px;right:-4px;background:#ff5c5c;color:#fff;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 6px;display:none;font-family:ui-monospace,monospace;">0</span>');
+  btn.style.position = 'fixed';
+  btn.appendChild(badge);
+
+  function authHeaders() {
+    const t = localStorage.getItem('authToken');
+    return t ? { Authorization: 'Bearer ' + t } : {};
+  }
+
+  function ultimaMsgVisitante(chat) {
+    const msgs = chat.mensagens || [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].de === 'visitante') return msgs[i];
+      if (msgs[i].de === 'suporte') return null; // ja respondida
+    }
+    return null;
+  }
+
+  function atendAguardando() {
+    return ATEND.chats.filter((c) => c.status === 'ABERTO' && ultimaMsgVisitante(c));
+  }
+
+  async function atendCarregar() {
+    try {
+      const r = await rawFetch('/api/suporte-chats', { headers: authHeaders() });
+      if (!r.ok) return;
+      ATEND.chats = await r.json();
+      const fila = atendAguardando();
+      badge.textContent = fila.length;
+      badge.style.display = fila.length ? 'block' : 'none';
+      // conversa aberta no momento: atualiza ao vivo
+      if (aberto && ATEND.chatAberto) {
+        const atual = ATEND.chats.find((c) => c.id === ATEND.chatAberto);
+        if (atual) atendRenderConversa(atual, true);
+      }
+      // popup automatico: mensagem de visitante mais nova que o marcador
+      const nova = fila.find((c) => {
+        const m = ultimaMsgVisitante(c);
+        return m && m.em > (localStorage.getItem(LS_ATEND_VISTO + c.id) || '');
+      });
+      if (nova && !aberto) {
+        aberto = true;
+        panel.classList.remove('szc-hidden');
+        atendRenderConversa(nova);
+      }
+    } catch (e) { /* rede fora - tenta no proximo ciclo */ }
+  }
+
+  function atendMarcarVisto(chat) {
+    const m = ultimaMsgVisitante(chat) || (chat.mensagens || [])[(chat.mensagens || []).length - 1];
+    if (m) localStorage.setItem(LS_ATEND_VISTO + chat.id, m.em || new Date().toISOString());
+  }
+
+  function atendRenderLista() {
+    ATEND.chatAberto = null;
+    rodape.classList.add('szc-hidden');
+    const abertos = ATEND.chats.filter((c) => c.status === 'ABERTO');
+    corpo.innerHTML = '<div class="szc-aviso">💬 Chats de suporte — toque pra atender. A gestão completa fica em <b>Chamados TI</b>.</div>' + (abertos.map((c) => {
+      const msgs = c.mensagens || [];
+      const ultima = msgs[msgs.length - 1];
+      const aguarda = !!ultimaMsgVisitante(c);
+      return `<button type="button" class="szc-input" style="text-align:left;cursor:pointer;${aguarda ? 'border-color:#ff5c5c;' : ''}" data-atend-chat="${esc(c.id)}">
+        <b style="font-size:12.5px;">${aguarda ? '🔴 ' : ''}${esc(c.nome)}</b>
+        <span style="display:block;font-size:11px;color:#7d8896;">${esc((ultima && ultima.texto || '').slice(0, 60))}</span>
+      </button>`;
+    }).join('') || '<div class="szc-fim">Nenhuma conversa aberta. 🎉</div>') +
+    '<button type="button" class="szc-link" id="szc-ir-tecnico" style="margin-top:4px;">abrir a tela de Chamados TI →</button>';
+    corpo.querySelectorAll('[data-atend-chat]').forEach((b) => b.addEventListener('click', () => {
+      const c = ATEND.chats.find((x) => x.id === b.dataset.atendChat);
+      if (c) atendRenderConversa(c);
+    }));
+    corpo.querySelector('#szc-ir-tecnico').addEventListener('click', () => { location.href = '/tecnico.html'; });
+  }
+
+  function atendRenderConversa(chat, manterScroll) {
+    ATEND.chatAberto = chat.id;
+    rodape.classList.add('szc-hidden');
+    const noFim = !manterScroll || corpo.scrollTop + corpo.clientHeight >= corpo.scrollHeight - 30;
+    corpo.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+        <button type="button" class="szc-link" id="szc-atend-voltar">← conversas</button>
+        <span style="font-size:11px;color:#7d8896;">${esc(chat.nome)} · ${esc(chat.contato || '')}</span>
+      </div>` +
+      (chat.mensagens || []).map((m) => `
+      <div class="szc-msg ${m.de === 'visitante' ? 'suporte' : 'visitante'}">
+        <span class="szc-quem">${m.de === 'visitante' ? esc(chat.nome || 'Visitante') : 'Suporte' + (m.autorEmail ? ' · ' + esc(m.autorEmail) : '')}</span>${esc(m.texto)}
+      </div>`).join('') + `
+      <div style="display:flex;gap:6px;">
+        <input type="text" class="szc-input" id="szc-atend-msg" placeholder="responder..." maxlength="1000" style="flex:1;">
+        <button type="button" class="szc-enviar" id="szc-atend-enviar">➤</button>
+      </div>`;
+    atendMarcarVisto(chat);
+    atendAtualizarBadge();
+    corpo.querySelector('#szc-atend-voltar').addEventListener('click', () => {
+      if (ATEND.ehMaster) atendRenderLista();
+      else { aberto = false; panel.classList.add('szc-hidden'); }
+    });
+    const input = corpo.querySelector('#szc-atend-msg');
+    const enviar = async () => {
+      const texto = input.value.trim();
+      if (!texto) return;
+      const b = corpo.querySelector('#szc-atend-enviar');
+      b.disabled = true;
+      try {
+        const r = await rawFetch(`/api/suporte-chats/${encodeURIComponent(chat.id)}/responder`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ texto }),
+        });
+        if (r.ok) {
+          const atualizado = await r.json();
+          const i = ATEND.chats.findIndex((c) => c.id === atualizado.id);
+          if (i >= 0) ATEND.chats[i] = atualizado;
+          atendMarcarVisto(atualizado);
+          atendRenderConversa(atualizado);
+        }
+      } finally { b.disabled = false; }
+    };
+    corpo.querySelector('#szc-atend-enviar').addEventListener('click', enviar);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); enviar(); } });
+    if (noFim) corpo.scrollTop = corpo.scrollHeight;
+    input.focus();
+  }
+
+  function atendAtualizarBadge() {
+    const fila = atendAguardando();
+    badge.textContent = fila.length;
+    badge.style.display = fila.length ? 'block' : 'none';
+  }
+
+  // fechar no X tambem salva o "visto" da conversa aberta - o popup nao
+  // volta pra mesma mensagem; mensagem NOVA reabre
+  panel.querySelector('.szc-x').addEventListener('click', () => {
+    if (ATEND.chatAberto) {
+      const c = ATEND.chats.find((x) => x.id === ATEND.chatAberto);
+      if (c) atendMarcarVisto(c);
+      ATEND.chatAberto = null;
+    }
+  });
+
+  async function atendInit() {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+    try {
+      const r = await rawFetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) return;
+      const me = await r.json();
+      const secoes = (me.permissions && me.permissions.sections) || [];
+      if (!(me.role === 'master' || me.isAdmin || secoes.includes('suporte'))) return;
+      ATEND.ativo = true;
+      ATEND.ehMaster = me.role === 'master';
+      btn.title = 'Chats de suporte';
+      await atendCarregar();
+      ATEND.timer = setInterval(atendCarregar, 25 * 1000);
+      // SSE: mensagem nova chega na hora (o poll fica de rede de seguranca)
+      try {
+        const es = new EventSource('/api/stream?token=' + encodeURIComponent(token));
+        es.addEventListener('suporte-chat', () => { atendCarregar(); });
+      } catch (e) { /* sem SSE, o poll resolve */ }
+    } catch (e) { /* segue como widget de visitante */ }
+  }
+  atendInit();
 })();
