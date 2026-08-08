@@ -654,6 +654,18 @@ async function cardChamados(){
   </div>`);
 }
 
+async function cardManutencao(){
+  const rows = await fetch('/api/chamados-manutencao').then(r=>r.json());
+  const abertos = rows.filter(c=>c.status==='ABERTO');
+  const agendados = rows.filter(c=>c.status==='ACEITO');
+  const emExecucao = rows.filter(c=>c.status==='INICIADO' || c.status==='EM_ESPERA');
+  return pcardWrap('🔧','Manutenção','/manutencao.html', `<div class="pstats">
+    ${statRow('Aguardando aceite', abertos.length, abertos.length ? 'warn' : '')}
+    ${statRow('Agendados', agendados.length)}
+    ${statRow('Em execução', emExecucao.length)}
+  </div>`);
+}
+
 async function cardIfood(){
   const hoje = hojeBrasilia();
   const rows = await fetch('/api/ifood/vendas').then(r=>r.json());
@@ -830,21 +842,24 @@ function dataBrasiliaAb(iso){
   return new Date(iso).toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
 }
 
+// ordem definida pelo Master: Saltiverso, Monitor, Abastecimento, Chamados
+// TI, Central, Manutenção, Estoque, Fechamentos, iFood (Entregas no fim)
 const CARDS_POR_SECAO = [
   { secao:'parque', build:cardParque },
   { secao:'monitor', build:cardMonitor },
-  { secao:'fechamentos', build:cardFechamentos },
-  { secao:'entregas', build:cardEntregas },
+  // indicadores do Abastecimento: SO Master/Admin (a equipe do balcao nao
+  // pode ver os tempos monitorados)
+  { soMasterAdmin:true, build:cardAbastecimento },
+  { secao:'tecnico', build:cardChamados },
   // tecnico/manutencao tambem podem ter cards da Central atribuidos a eles
   // (ver "Atribuir responsável" em central-historico.html) - por isso o
   // card de Central tambem aparece pra eles, nao so quem tem 'solicitacoes'
   { secoes:['solicitacoes','manutencao','tecnico'], build:cardCentral },
-  { secao:'tecnico', build:cardChamados },
-  { secao:'ifood', build:cardIfood },
+  { secao:'manutencao', build:cardManutencao },
   { secao:'inventario', build:cardEstoque },
-  // indicadores do Abastecimento: SO Master/Admin (a equipe do balcao nao
-  // pode ver os tempos monitorados)
-  { soMasterAdmin:true, build:cardAbastecimento },
+  { secao:'fechamentos', build:cardFechamentos },
+  { secao:'ifood', build:cardIfood },
+  { secao:'entregas', build:cardEntregas },
 ];
 
 async function boot(){
@@ -855,7 +870,7 @@ async function boot(){
   ME_GLOBAL = ME;
   IS_MASTER_GLOBAL = isMaster;
   IS_ADMIN_GLOBAL = !!ME.isAdmin;
-  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
+  const secoes = isMaster ? ['monitor','disputas','cofre','fechamentos','lancamento','sangria','entregas','entregas-lancamento','ifood','solicitacoes','tecnico','manutencao','inventario','parque','parque-checkin','festas'] : (ME.permissions?.sections||[]);
   if(secoes.includes('solicitacoes')) iniciarNotificacoesCentral();
 
   document.getElementById('nav-monitor').classList.remove('hidden');
