@@ -175,6 +175,8 @@ function toPublicUser(id, user) {
     role: user.role,
     permissions: user.role === 'master' ? null : user.permissions || emptyPermissions(),
     precisaTrocarSenha: !!user.precisaTrocarSenha,
+    // a tag de cargo define a tela inicial da pessoa (ver index.html)
+    cargo: user.role === 'master' ? null : user.cargo || null,
   };
 }
 
