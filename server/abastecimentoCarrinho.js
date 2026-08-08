@@ -12,14 +12,140 @@
 //
 // O saldo "Ontem/Hoje" por sabor (o card de resumo do AppSheet antigo) e
 // calculado na tela a partir dos envios - aqui so guardamos os registros.
+const bcrypt = require('bcryptjs');
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
 
 const COLLECTION = db.collection('abastecimentoCarrinho');
 const CATALOGO = db.collection('abastecimentoInsumos');
+const OPERADORES = db.collection('abastecimentoOperadores');
 
 const TIPOS = ['PEDIDO', 'ENVIO'];
 const SABORES = ['calabresa', 'pepperoni', 'mussarela'];
+
+// ---------- operadores locais (login de balcao) ----------
+// Cadastro LOCAL da propria pagina de Abastecimento, no espirito do
+// usuario/senha que a equipe ja usava na planilha - so que seguro:
+// - usuario: exatamente 4 LETRAS; senha: exatamente 4 NUMEROS (bcrypt);
+// - cada operador tem um PAPEL: 'pedido' (quem pede, carrinho) ou 'envio'
+//   (quem envia, loja) - o lancamento so aceita o papel certo;
+// - mesma dinamica de bloqueio do login principal: 3 senhas erradas
+//   seguidas -> bloqueado; SO O MASTER desbloqueia (redefinindo a senha),
+//   igual ao desbloqueio do login principal.
+// Esse login NAO da acesso a nada alem de assinar pedido/envio - a pagina
+// continua atras do login normal do Zenith + secoes por ponta.
+const PAPEIS_OPERADOR = ['pedido', 'envio'];
+const MAX_TENTATIVAS_OPERADOR = 3;
+
+function validarUsuarioOperador(usuario) {
+  const limpo = String(usuario || '').trim().toLowerCase();
+  if (!/^[a-z]{4}$/.test(limpo)) throw new Error('Usuário do operador deve ter exatamente 4 letras.');
+  return limpo;
+}
+function validarSenhaOperador(senha) {
+  const limpa = String(senha || '').trim();
+  if (!/^[0-9]{4}$/.test(limpa)) throw new Error('Senha do operador deve ter exatamente 4 números.');
+  return limpa;
+}
+function operadorPublico(op) {
+  if (!op) return null;
+  const { senhaHash, ...resto } = op;
+  return resto;
+}
+
+async function listarOperadoresUncached() {
+  const snap = await OPERADORES.orderBy('usuario').get();
+  return snap.docs.map((d) => d.data());
+}
+const operadoresCache = createCache(listarOperadoresUncached, 15 * 1000);
+async function listarOperadores() {
+  return (await operadoresCache.cached()).map(operadorPublico);
+}
+
+async function criarOperador({ usuario, senha, nome, papel, criadoPorEmail }) {
+  const usuarioLimpo = validarUsuarioOperador(usuario);
+  const senhaLimpa = validarSenhaOperador(senha);
+  if (!PAPEIS_OPERADOR.includes(papel)) throw new Error("Papel inválido: use 'pedido' (carrinho) ou 'envio' (loja).");
+  const existentes = await operadoresCache.cached();
+  if (existentes.some((o) => o.usuario === usuarioLimpo)) throw new Error('Já existe um operador com esse usuário.');
+  const doc = OPERADORES.doc();
+  const registro = {
+    id: doc.id,
+    usuario: usuarioLimpo,
+    senhaHash: await bcrypt.hash(senhaLimpa, 12),
+    nome: String(nome || '').trim().slice(0, 80) || usuarioLimpo,
+    papel,
+    ativo: true,
+    bloqueado: false,
+    tentativasErradas: 0,
+    criadoEm: new Date().toISOString(),
+    criadoPorEmail: criadoPorEmail || null,
+  };
+  await doc.set(registro);
+  operadoresCache.invalidar();
+  return operadorPublico(registro);
+}
+
+async function atualizarOperador(id, { nome, papel, ativo }) {
+  const snap = await OPERADORES.doc(id).get();
+  if (!snap.exists) throw new Error('Operador não encontrado.');
+  const patch = {};
+  if (nome != null) patch.nome = String(nome).trim().slice(0, 80) || snap.data().usuario;
+  if (papel != null) {
+    if (!PAPEIS_OPERADOR.includes(papel)) throw new Error("Papel inválido: use 'pedido' ou 'envio'.");
+    patch.papel = papel;
+  }
+  if (ativo != null) patch.ativo = !!ativo;
+  await OPERADORES.doc(id).update(patch);
+  operadoresCache.invalidar();
+  const atualizado = await OPERADORES.doc(id).get();
+  return operadorPublico(atualizado.data());
+}
+
+// desbloqueio do Master: mesma dinamica do login principal - desbloqueia
+// redefinindo a senha (o Master informa a nova senha de 4 numeros)
+async function desbloquearOperador(id, { novaSenha }) {
+  const snap = await OPERADORES.doc(id).get();
+  if (!snap.exists) throw new Error('Operador não encontrado.');
+  const senhaLimpa = validarSenhaOperador(novaSenha);
+  await OPERADORES.doc(id).update({
+    senhaHash: await bcrypt.hash(senhaLimpa, 12),
+    bloqueado: false,
+    tentativasErradas: 0,
+  });
+  operadoresCache.invalidar();
+  const atualizado = await OPERADORES.doc(id).get();
+  return operadorPublico(atualizado.data());
+}
+
+// valida o login local na hora do lancamento: papel certo pro tipo, senha
+// via bcrypt, bloqueio apos 3 erradas (identico ao login principal)
+async function validarOperador({ usuario, senha, papel }) {
+  const usuarioLimpo = String(usuario || '').trim().toLowerCase();
+  const todos = await operadoresCache.cached();
+  const op = todos.find((o) => o.usuario === usuarioLimpo);
+  if (!op || op.ativo === false) throw new Error('Operador não encontrado. Confira o usuário (4 letras).');
+  if (op.bloqueado) throw new Error('Login do operador bloqueado após 3 senhas erradas. Peça ao Master pra desbloquear.');
+  const ok = await bcrypt.compare(String(senha || '').trim(), op.senhaHash);
+  if (!ok) {
+    const tentativas = (op.tentativasErradas || 0) + 1;
+    const bloqueou = tentativas >= MAX_TENTATIVAS_OPERADOR;
+    await OPERADORES.doc(op.id).update({ tentativasErradas: tentativas, bloqueado: bloqueou });
+    operadoresCache.invalidar();
+    if (bloqueou) throw new Error('Login do operador bloqueado após 3 senhas erradas. Peça ao Master pra desbloquear.');
+    throw new Error(`Senha do operador errada (${tentativas}/${MAX_TENTATIVAS_OPERADOR}).`);
+  }
+  if (op.tentativasErradas) {
+    await OPERADORES.doc(op.id).update({ tentativasErradas: 0 });
+    operadoresCache.invalidar();
+  }
+  if (op.papel !== papel) {
+    throw new Error(papel === 'pedido'
+      ? `O operador "${op.usuario}" é de ENVIO (loja) - não pode fazer pedido.`
+      : `O operador "${op.usuario}" é de PEDIDO (carrinho) - não pode registrar envio.`);
+  }
+  return operadorPublico(op);
+}
 
 // ---------- catalogo de insumos ----------
 // Padroniza o que vai pro carrinho: em vez de texto livre (a planilha antiga
@@ -160,7 +286,7 @@ async function resolverInsumos(lista) {
   return resultado;
 }
 
-async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criadoPorId, criadoPorEmail, criadoPorNome }) {
+async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criadoPorId, criadoPorEmail, criadoPorNome, operador }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo inválido (use PEDIDO ou ENVIO).');
   const pizzasLimpas = sanitizarPizzas(pizzas);
   const insumosLimpos = await resolverInsumos(insumos);
@@ -207,6 +333,9 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criado
     criadoPorId: criadoPorId || null,
     criadoPorEmail: criadoPorEmail || null,
     criadoPorNome: criadoPorNome || null,
+    // operador local (login de balcao de 4 letras) que assinou o lancamento
+    operadorUsuario: operador ? operador.usuario : null,
+    operadorNome: operador ? operador.nome : null,
     criadoEm: agora,
   };
   await doc.set(registro);
@@ -301,4 +430,8 @@ async function listAllUncached() {
 const cache = createCache(listAllUncached, 15 * 1000);
 const listAll = cache.cached;
 
-module.exports = { TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem, listarInsumos, criarInsumo, atualizarInsumo };
+module.exports = {
+  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem,
+  listarInsumos, criarInsumo, atualizarInsumo,
+  listarOperadores, criarOperador, atualizarOperador, desbloquearOperador, validarOperador,
+};
