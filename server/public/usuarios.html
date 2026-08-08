@@ -73,6 +73,7 @@
   .badge.gerente{background:#0f2f22;color:var(--ok);border:1px solid var(--line);}
   .badge.tecnico{background:#1e2733;color:#8ab4f8;border:1px solid var(--line);}
   .badge.manutencao{background:#3d2f0f;color:#e0b84c;border:1px solid var(--line);}
+  .badge.suporte{background:#2a2033;color:#c9a2ff;border:1px solid var(--line);}
   .btn-acoes{font-family:var(--sans);font-size:11.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;white-space:nowrap;}
   .btn-acoes:hover{border-color:var(--accent);}
   .acoes-lista{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
@@ -449,7 +450,7 @@ function initNavDrawerAccordion(){
 }
 initNavDrawerAccordion();
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['suporte','Suporte de TI (atendimento remoto)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
 // os 7 tipos de card que aparecem na Central - mesma lista/rotulo de
 // TIPOS_INFO em central.html/central-historico.html
 const TIPOS_SOLICITACAO = [ ['estorno','💳 Estorno'], ['ajuste-fechamento','🧾 Ajuste de fechamento'], ['compra','🛒 Compra'], ['manutencao','🔧 Manutenção'], ['suporte-ti','💻 Suporte de TI'], ['pagamento','💸 Pagamento (despesa)'], ['nota','📄 Solicitação de Nota'], ['quebra-caixa','⚠️ Quebra de caixa'] ];
@@ -783,7 +784,7 @@ function renderUsers(){
       ? { cor:'bad', texto:'bloqueado' }
       : (u.active ? { cor:'ok', texto:'ativo' } : { cor:'off', texto:'desativado' });
     const tags = [`<span class="badge ${u.role}">${u.role}</span>`];
-    if (u.cargo) tags.push(`<span class="badge ${u.cargo}" title="Tag de cargo - também define a tela inicial da pessoa ao entrar no app">${({loja:'🏬 loja', gerente:'👔 gerente', tecnico:'🔧 técnico', manutencao:'🛠️ manutenção'})[u.cargo]||u.cargo}</span>`);
+    if (u.cargo) tags.push(`<span class="badge ${u.cargo}" title="Tag de cargo - também define a tela inicial da pessoa ao entrar no app">${({loja:'🏬 loja', gerente:'👔 gerente', tecnico:'🔧 técnico', suporte:'🎧 suporte', manutencao:'🛠️ manutenção'})[u.cargo]||u.cargo}</span>`);
     if (u.isAdmin) tags.push(`<span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>`);
     if (u.podeCatalogoEstoque) tags.push(`<span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque">📦 catálogo</span>`);
     if (horario && horario.ativo) tags.push(`<span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>`);
@@ -832,6 +833,7 @@ function abrirAcoes(id){
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='tecnico' ? 'null' : `'tecnico'`})">${u.cargo==='tecnico'?'🔧 Remover tag Técnico':'🔧 Marcar como Técnico'}</button>
+    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='suporte' ? 'null' : `'suporte'`})">${u.cargo==='suporte'?'🎧 Remover tag Suporte':'🎧 Marcar como Suporte'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='manutencao' ? 'null' : `'manutencao'`})">${u.cargo==='manutencao'?'🛠️ Remover tag Manutenção':'🛠️ Marcar como Manutenção'}</button>
     <div class="acoes-sep">Conta</div>
     <button type="button" class="danger" onclick="fecharAcoes();alternarAtivo('${u.id}', ${!u.active})">${u.active?'🚫 Desativar acesso':'✅ Reativar acesso'}</button>

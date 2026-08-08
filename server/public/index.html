@@ -99,7 +99,7 @@ let AUTH_TOKEN = localStorage.getItem('authToken') || null;
 // direto no Historico de Solicitacoes, Tecnico nos Chamados TI, Manutencao
 // na tela de Manutencao - quem nao tem tag (ou e Master) vai pro Painel
 function paginaInicial(cargo){
-  return { loja: '/central-historico.html', tecnico: '/tecnico.html', manutencao: '/manutencao.html' }[cargo] || '/painel.html';
+  return { loja: '/central-historico.html', tecnico: '/tecnico.html', suporte: '/tecnico.html', manutencao: '/manutencao.html' }[cargo] || '/painel.html';
 }
 
 async function boot(){

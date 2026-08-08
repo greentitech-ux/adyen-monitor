@@ -10,7 +10,7 @@ const sessions = require('./sessions');
 
 const usersRef = db.collection('users');
 
-const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'manutencao', 'inventario', 'parque', 'parque-checkin', 'festas'];
+const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'suporte', 'manutencao', 'inventario', 'parque', 'parque-checkin', 'festas'];
 
 // os 7 tipos de card que aparecem na Central - mesma lista de TIPOS_INFO em
 // central.html/central-historico.html. Igual ao cofre (vaultSubgroups) e
@@ -209,10 +209,10 @@ async function updatePodeCatalogoEstoque(id, valor) {
 // Parque, e a tag define a TELA INICIAL da pessoa ao entrar no app (ver
 // index.html): Loja -> Historico de Solicitacoes, Tecnico -> Chamados TI,
 // Manutencao -> Manutencao; sem tag -> Painel.
-const CARGOS_VALIDOS = ['loja', 'gerente', 'tecnico', 'manutencao'];
+const CARGOS_VALIDOS = ['loja', 'gerente', 'tecnico', 'suporte', 'manutencao'];
 async function updateCargo(id, cargo) {
   const limpo = cargo ? String(cargo).toLowerCase() : null;
-  if (limpo && !CARGOS_VALIDOS.includes(limpo)) throw new Error('Tag inválida. Use "loja", "gerente", "tecnico" ou "manutencao".');
+  if (limpo && !CARGOS_VALIDOS.includes(limpo)) throw new Error('Tag inválida. Use "loja", "gerente", "tecnico", "suporte" ou "manutencao".');
   const ref = usersRef.doc(id);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Acesso não encontrado.');
