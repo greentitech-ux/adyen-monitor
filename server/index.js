@@ -42,6 +42,7 @@ const ifoodSync = require('./ifoodSync');
 const solicitacoes = require('./solicitacoes');
 const chamadosTI = require('./chamadosTI');
 const chamadosManutencao = require('./chamadosManutencao');
+const suporteChat = require('./suporteChat');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 const inventario = require('./inventario');
@@ -124,10 +125,18 @@ const ROTAS_PUBLICAS_SEM_DASHBOARD = new Set([
   '/decidir.html',
   '/api/solicitacoes/decidir-info',
   '/api/solicitacoes/decidir',
+  '/suporte-chat.js',
 ]);
+// o chat de suporte do site tem rotas com id dinamico (/api/suporte-chat/:id
+// e /api/suporte-chat/:id/mensagem) - liberadas por prefixo. So o lado
+// PUBLICO (singular "suporte-chat/"); o lado do atendimento e
+// /api/suporte-chats (plural), que continua atras do login normal
+function rotaPublicaSemDashboard(path) {
+  return ROTAS_PUBLICAS_SEM_DASHBOARD.has(path) || path.startsWith('/api/suporte-chat/');
+}
 if (DASHBOARD_USER && DASHBOARD_PASSWORD) {
   app.use((req, res, next) => {
-    if (ROTAS_PUBLICAS_SEM_DASHBOARD.has(req.path)) return next();
+    if (rotaPublicaSemDashboard(req.path)) return next();
     const header = req.headers.authorization || '';
     const [scheme, encoded] = header.split(' ');
     if (scheme === 'Basic' && encoded) {
@@ -3600,6 +3609,101 @@ app.post('/api/chamados', auth.requireAuth, async (req, res) => {
     });
     broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- Chat de suporte do site (widget 💬 em todas as telas) ----------
+// Lado PUBLICO (sem login): o visitante cria a conversa e recebe {id, token};
+// o token e a chave dele pra ler/escrever depois. Lado do atendimento
+// (Master/Admin/secao "suporte"): lista, responde, gera chamado remoto
+// vinculado e finaliza - tudo na tela de Chamados TI.
+app.post('/api/suporte-chat/iniciar', async (req, res) => {
+  try {
+    const chat = await suporteChat.criar({ nome: req.body.nome, contato: req.body.contato, texto: req.body.texto });
+    broadcast('suporte-chat', { id: chat.id }, 'suporte');
+    push.notifySolicitacao('💬 Novo chat de suporte', `${chat.nome} · ${chat.contato}`, chat.id);
+    res.json({ id: chat.id, token: chat.token });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/suporte-chat/:id', async (req, res) => {
+  const chat = await suporteChat.getPublico(req.params.id, req.query.token);
+  if (!chat) return res.sendStatus(404);
+  res.json(chat);
+});
+
+app.post('/api/suporte-chat/:id/mensagem', async (req, res) => {
+  try {
+    const chat = await suporteChat.adicionarMensagem(req.params.id, { de: 'visitante', texto: req.body.texto, token: req.body.token });
+    broadcast('suporte-chat', { id: chat.id }, 'suporte');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ----- lado do atendimento -----
+app.get('/api/suporte-chats', auth.requireAuth, async (req, res) => {
+  if (!ehTimeSuporte(req)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+  const todos = await suporteChat.listAll();
+  // token do visitante nunca sai pro atendimento - nao precisa
+  res.json(todos.map(({ token, ...resto }) => resto));
+});
+
+app.post('/api/suporte-chats/:id/responder', auth.requireAuth, async (req, res) => {
+  try {
+    if (!ehTimeSuporte(req)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    const chat = await suporteChat.adicionarMensagem(req.params.id, { de: 'suporte', texto: req.body.texto, autorEmail: req.user.email });
+    broadcast('suporte-chat', { id: chat.id }, 'suporte');
+    const { token, ...resto } = chat;
+    res.json(resto);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/suporte-chats/:id/finalizar', auth.requireAuth, async (req, res) => {
+  try {
+    if (!ehTimeSuporte(req)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    const chat = await suporteChat.finalizar(req.params.id, { autorEmail: req.user.email });
+    broadcast('suporte-chat', { id: chat.id }, 'suporte');
+    const { token, ...resto } = chat;
+    res.json(resto);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// transforma a conversa num chamado REMOTO vinculado (registro/evidencia da
+// atuacao) - o responsavel e quem esta atendendo; se a atuacao ja acabou,
+// jaResolvido abre e fecha na hora
+app.post('/api/suporte-chats/:id/gerar-chamado', auth.requireAuth, async (req, res) => {
+  try {
+    if (!ehTimeSuporte(req)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    const chat = await suporteChat.getOne(req.params.id);
+    if (!chat) return res.status(404).json({ error: 'Conversa não encontrada.' });
+    if (chat.chamadoId) return res.status(400).json({ error: 'Essa conversa já tem um chamado vinculado.' });
+    const chamado = await chamadosTI.create({
+      unidade: req.body.unidade || 'Suporte remoto',
+      unidadeNome: req.body.unidade || 'Suporte remoto',
+      titulo: `Chat do site · ${chat.nome}`,
+      descricao: `Contato: ${chat.contato}\n\nPrimeira mensagem: ${chat.mensagens?.[0]?.texto || ''}`,
+      modalidade: 'remoto',
+      prioridade: req.body.prioridade,
+      jaResolvido: !!req.body.jaResolvido,
+      observacaoResolucao: req.body.observacaoResolucao,
+      tecnicoId: req.user.id,
+      tecnicoEmail: req.user.email,
+      criadoPorEmail: req.user.email,
+    });
+    await suporteChat.vincularChamado(chat.id, chamado.id);
+    broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
+    broadcast('suporte-chat', { id: chat.id }, 'suporte');
+    res.json({ chamado });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
