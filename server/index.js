@@ -3646,19 +3646,20 @@ app.get('/api/abastecimento', requireAnySection('abastecimento-carrinho', 'abast
 
 app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
   try {
-    if (req.body.tipo === 'PEDIDO' && !podePedirAbastecimento(req)) {
+    // CONTAGEM e o inventario do turno do carrinho - mesma ponta de quem pede
+    if ((req.body.tipo === 'PEDIDO' || req.body.tipo === 'CONTAGEM') && !podePedirAbastecimento(req)) {
       return res.status(403).json({ error: 'Você não tem a permissão de PEDIDO (lado do carrinho).' });
     }
     if (req.body.tipo === 'ENVIO' && !podeEnviarAbastecimento(req)) {
       return res.status(403).json({ error: 'Você não tem a permissão de ENVIO (lado da loja).' });
     }
     // login LOCAL de operador (4 letras + 4 numeros, cadastrado na propria
-    // pagina): obrigatorio em todo pedido/envio, e o papel do operador tem
+    // pagina): obrigatorio em todo lancamento, e o papel do operador tem
     // que bater com o tipo - e a assinatura de QUEM fez, no balcao
     const operador = await abastecimentoCarrinho.validarOperador({
       usuario: req.body.operadorUsuario,
       senha: req.body.operadorSenha,
-      papel: req.body.tipo === 'PEDIDO' ? 'pedido' : 'envio',
+      papel: req.body.tipo === 'ENVIO' ? 'envio' : 'pedido',
     });
     const registro = await abastecimentoCarrinho.criar({
       operador,
@@ -3723,6 +3724,41 @@ app.post('/api/abastecimento/:id/mensagem', auth.requireAuth, async (req, res) =
     });
     broadcast('abastecimento-atualizado', { id: registro.id });
     res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// confirmacao de recebimento pelo carrinho: o envio nao finaliza sozinho -
+// quem recebe confere quantidades (falta diminui/zera; "a mais" que o
+// pedido exige confirmacao explicita)
+app.post('/api/abastecimento/:id/recebimento', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podePedirAbastecimento(req)) return res.status(403).json({ error: 'Você não tem a permissão de PEDIDO (lado do carrinho).' });
+    const registro = await abastecimentoCarrinho.confirmarRecebimento(req.params.id, {
+      pizzas: req.body.pizzas,
+      insumos: req.body.insumos,
+      confirmaExtras: !!req.body.confirmaExtras,
+      porEmail: req.user.email,
+      porNome: req.user.username || req.user.email,
+    });
+    broadcast('abastecimento-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ----- config (Master define os horarios do popup de contagem) -----
+app.get('/api/abastecimento-config', requireAnySection('abastecimento-carrinho', 'abastecimento-loja'), async (req, res) => {
+  res.json(await abastecimentoCarrinho.getConfig());
+});
+
+app.put('/api/abastecimento-config', auth.requireMaster, async (req, res) => {
+  try {
+    const config = await abastecimentoCarrinho.salvarConfig({ horasContagem: req.body.horasContagem });
+    broadcast('abastecimento-atualizado', { config: true });
+    res.json(config);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -20,8 +20,28 @@ const COLLECTION = db.collection('abastecimentoCarrinho');
 const CATALOGO = db.collection('abastecimentoInsumos');
 const OPERADORES = db.collection('abastecimentoOperadores');
 
-const TIPOS = ['PEDIDO', 'ENVIO'];
+const TIPOS = ['PEDIDO', 'ENVIO', 'CONTAGEM'];
 const SABORES = ['calabresa', 'pepperoni', 'mussarela'];
+
+// ---------- config do abastecimento (Master) ----------
+// por enquanto so os HORARIOS em que o popup de contagem aparece pro lado
+// do carrinho (quem assume o turno lanca a contagem como primeira coisa)
+const CONFIG_DOC = db.collection('abastecimentoConfig').doc('config');
+
+async function getConfig() {
+  const snap = await CONFIG_DOC.get();
+  const data = snap.exists ? snap.data() : {};
+  return { horasContagem: Array.isArray(data.horasContagem) ? data.horasContagem : [] };
+}
+
+async function salvarConfig({ horasContagem }) {
+  const limpas = (Array.isArray(horasContagem) ? horasContagem : [])
+    .map((h) => String(h || '').trim())
+    .filter((h) => /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(h))
+    .slice(0, 6);
+  await CONFIG_DOC.set({ horasContagem: limpas }, { merge: true });
+  return getConfig();
+}
 
 // ---------- operadores locais (login de balcao) ----------
 // Cadastro LOCAL da propria pagina de Abastecimento, no espirito do
@@ -291,7 +311,8 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criado
   const pizzasLimpas = sanitizarPizzas(pizzas);
   const insumosLimpos = await resolverInsumos(insumos);
   const temPizza = SABORES.some((s) => pizzasLimpas[s] > 0);
-  if (!temPizza && !insumosLimpos.length) throw new Error('Informe ao menos uma pizza ou um insumo.');
+  // CONTAGEM pode ser toda zerada (carrinho vazio no inicio do turno)
+  if (tipo !== 'CONTAGEM' && !temPizza && !insumosLimpos.length) throw new Error('Informe ao menos uma pizza ou um insumo.');
 
   let pedidoAtendido = null;
   if (atendePedidoId) {
@@ -306,9 +327,9 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criado
   const registro = {
     id: doc.id,
     tipo,
-    // a ponta que registra: pedido vem do carrinho, envio sai da loja -
-    // mesma convencao da planilha antiga (coluna UNIDADE)
-    origem: tipo === 'PEDIDO' ? 'CARRINHO' : 'LOJA',
+    // a ponta que registra: pedido e contagem vem do carrinho, envio sai
+    // da loja - mesma convencao da planilha antiga (coluna UNIDADE)
+    origem: tipo === 'ENVIO' ? 'LOJA' : 'CARRINHO',
     pizzas: pizzasLimpas,
     insumos: insumosLimpos,
     observacao: String(observacao || '').trim().slice(0, 500),
@@ -336,6 +357,10 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criado
     // operador local (login de balcao de 4 letras) que assinou o lancamento
     operadorUsuario: operador ? operador.usuario : null,
     operadorNome: operador ? operador.nome : null,
+    // ENVIO: confirmacao de recebimento pelo carrinho (o ciclo so fecha
+    // quando o carrinho confere o que chegou - ver confirmarRecebimento)
+    recebidoEm: null,
+    recebimento: null,
     criadoEm: agora,
   };
   await doc.set(registro);
@@ -408,6 +433,82 @@ async function adicionarMensagem(id, { de, texto, autorEmail, autorNome }) {
   return getOne(id);
 }
 
+// confirmacao de recebimento pelo CARRINHO: o envio nao finaliza sozinho -
+// quem recebe confere o que chegou.
+// - recebido por item: no maximo o que foi enviado (faltou -> diminui/zera;
+//   sobrar em relacao ao ENVIO nao existe - a mais e tratado contra o PEDIDO);
+// - faltas = enviado - recebido (> 0) ficam registradas item a item;
+// - extras = itens em que o ENVIO veio ACIMA do PEDIDO vinculado (ex: pediu
+//   1 calabresa, enviaram 2): o carrinho precisa confirmar que o "a mais"
+//   confere com o que realmente esta no lancamento (confirmaExtras).
+async function confirmarRecebimento(envioId, { pizzas, insumos, confirmaExtras, porEmail, porNome }) {
+  const envio = await getOne(envioId);
+  if (!envio) throw new Error('Envio não encontrado.');
+  if (envio.tipo !== 'ENVIO') throw new Error('Só envio tem confirmação de recebimento.');
+  if (envio.recebidoEm) return envio;
+
+  const pedido = envio.atendePedidoId ? await getOne(envio.atendePedidoId) : null;
+
+  const recebidoPizzas = {};
+  const faltas = [];
+  for (const sabor of SABORES) {
+    const enviada = num((envio.pizzas || {})[sabor]);
+    // ausente/null = "recebi como enviado"; so um numero informado conta
+    const informado = pizzas && pizzas[sabor] != null && pizzas[sabor] !== '';
+    let recebida = informado ? Number(pizzas[sabor]) : enviada;
+    if (!Number.isFinite(recebida) || recebida < 0) recebida = enviada;
+    recebida = Math.min(Math.round(recebida), enviada);
+    recebidoPizzas[sabor] = recebida;
+    if (recebida < enviada) faltas.push({ item: sabor, enviada, recebida });
+  }
+  const recebidoInsumos = (envio.insumos || []).map((ins, idx) => {
+    const enviada = ins.insumoId ? Number(ins.quantidade) || 0 : null;
+    if (enviada == null) return { ...ins }; // texto livre legado: sem conferencia numerica
+    const informadoIns = insumos && insumos[idx] && insumos[idx].quantidade != null && insumos[idx].quantidade !== '';
+    let recebida = informadoIns ? Number(insumos[idx].quantidade) : enviada;
+    if (!Number.isFinite(recebida) || recebida < 0) recebida = enviada;
+    recebida = Math.min(Math.round(recebida), enviada);
+    if (recebida < enviada) faltas.push({ item: ins.nome, enviada, recebida });
+    return { ...ins, quantidadeRecebida: recebida };
+  });
+
+  // "a mais": envio acima do PEDIDO vinculado - registrado sempre, e o
+  // carrinho declara se o extra confere com o que chegou de verdade
+  const extras = [];
+  if (pedido) {
+    for (const sabor of SABORES) {
+      const pedida = num((pedido.pizzas || {})[sabor]);
+      const enviada = num((envio.pizzas || {})[sabor]);
+      if (enviada > pedida) extras.push({ item: sabor, pedida, enviada });
+    }
+    const pedidoPorInsumo = new Map((pedido.insumos || []).filter((i) => i.insumoId).map((i) => [i.insumoId, Number(i.quantidade) || 0]));
+    for (const ins of envio.insumos || []) {
+      if (!ins.insumoId) continue;
+      const pedida = pedidoPorInsumo.get(ins.insumoId) || 0;
+      const enviada = Number(ins.quantidade) || 0;
+      if (enviada > pedida) extras.push({ item: ins.nome, pedida, enviada });
+    }
+  }
+  if (extras.length && !confirmaExtras) {
+    throw new Error('O envio veio com itens a mais que o pedido - confirme que o "a mais" confere com o que chegou.');
+  }
+
+  const agora = new Date().toISOString();
+  const recebimento = {
+    em: agora,
+    porEmail: porEmail || null,
+    porNome: porNome || null,
+    confere: !faltas.length,
+    faltas,
+    extras,
+    extrasConfirmados: extras.length ? true : null,
+    recebido: { pizzas: recebidoPizzas, insumos: recebidoInsumos },
+  };
+  await COLLECTION.doc(envioId).update({ recebidoEm: agora, recebimento });
+  cache.invalidar();
+  return getOne(envioId);
+}
+
 // so o Master apaga (registro errado). Se era um envio que atendia um
 // pedido, o pedido volta pra fila de "aguardando envio"
 async function remover(id) {
@@ -431,7 +532,7 @@ const cache = createCache(listAllUncached, 15 * 1000);
 const listAll = cache.cached;
 
 module.exports = {
-  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem,
+  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem, confirmarRecebimento, getConfig, salvarConfig,
   listarInsumos, criarInsumo, atualizarInsumo,
   listarOperadores, criarOperador, atualizarOperador, desbloquearOperador, validarOperador,
 };
