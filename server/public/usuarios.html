@@ -790,6 +790,7 @@ function renderUsers(){
     if (u.isAdmin) tags.push(`<span class="badge admin" title="Pode aprovar/rejeitar solicitações da Central, junto com o Master">⭐ admin</span>`);
     if (u.podeCatalogoEstoque) tags.push(`<span class="badge catalogo" title="Pode gerenciar o Catálogo do Estoque">📦 catálogo</span>`);
     if (u.podeCatalogoInsumos) tags.push(`<span class="badge catalogo" title="Pode gerenciar o cadastro de insumos do Abastecimento do Carrinho">🥤 insumos</span>`);
+    if (u.podeCadastrarOperadores) tags.push(`<span class="badge catalogo" title="Pode cadastrar operadores (login local) do Abastecimento do Carrinho">👥 operadores</span>`);
     if (horario && horario.ativo) tags.push(`<span class="badge horario" title="Acesso liberado só nesse intervalo, todo dia">🕐 ${horario.inicio}–${horario.fim}</span>`);
     tags.push(`<span class="badge ${u.online?'on':'off'}" style="cursor:pointer;" onclick="abrirSessoes('${u.id}')" title="${u.ultimaAtividadeEm ? 'Última atividade: '+formatarRelativo(u.ultimaAtividadeEm) : 'Nunca fez login'} - clique pra ver os locais">${u.online?'🟢':'⚪'} ${u.sessoesAtivas} ${u.sessoesAtivas===1?'local':'locais'}</span>`);
     const detalhe = isMaster
@@ -834,6 +835,7 @@ function abrirAcoes(id){
     <button type="button" onclick="fecharAcoes();alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'⭐ Remover tag Admin':'⭐ Tornar Admin'}</button>
     <button type="button" onclick="fecharAcoes();alternarCatalogoEstoque('${u.id}', ${!u.podeCatalogoEstoque})">${u.podeCatalogoEstoque?'📦 Remover acesso ao Catálogo':'📦 Liberar Catálogo do Estoque'}</button>
     <button type="button" onclick="fecharAcoes();alternarCatalogoInsumos('${u.id}', ${!u.podeCatalogoInsumos})">${u.podeCatalogoInsumos?'🥤 Remover cadastro de Insumos':'🥤 Liberar cadastro de Insumos (Carrinho)'}</button>
+    <button type="button" onclick="fecharAcoes();alternarCadastrarOperadores('${u.id}', ${!u.podeCadastrarOperadores})">${u.podeCadastrarOperadores?'👥 Remover cadastro de Operadores':'👥 Liberar cadastro de Operadores (Carrinho)'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
     <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='tecnico' ? 'null' : `'tecnico'`})">${u.cargo==='tecnico'?'🔧 Remover tag Técnico':'🔧 Marcar como Técnico'}</button>
@@ -1038,6 +1040,12 @@ async function alternarAdmin(id, isAdmin){
   await carregarUsuarios();
 }
 
+async function alternarCadastrarOperadores(id, podeCadastrarOperadores){
+  const res = await fetch('/api/users/'+id+'/cadastrar-operadores', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCadastrarOperadores})});
+  const data = await res.json();
+  if(!res.ok){ alert(data.error || 'Erro ao salvar.'); return; }
+  await carregarUsuarios();
+}
 async function alternarCatalogoInsumos(id, podeCatalogoInsumos){
   const res = await fetch('/api/users/'+id+'/catalogo-insumos', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoInsumos})});
   const data = await res.json();

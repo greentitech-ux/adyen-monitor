@@ -1660,7 +1660,7 @@ async function boot(){
   document.querySelector('.btn-acao.pedido').classList.toggle('hidden', !TEM_PEDIDO);
   document.querySelector('.acoes-topo .btn-acao.envio').classList.toggle('hidden', !TEM_ENVIO);
   document.getElementById('btn-catalogo').classList.toggle('hidden', !PODE_CATALOGO);
-  document.getElementById('btn-operadores').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
+  document.getElementById('btn-operadores').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin || ME.podeCadastrarOperadores));
   document.getElementById('btn-contagem').classList.toggle('hidden', !TEM_PEDIDO);
   document.getElementById('root').classList.remove('hidden');
   await carregarConfig();
