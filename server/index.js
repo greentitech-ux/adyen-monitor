@@ -3138,6 +3138,11 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
           unidadeNome: atual.unidadeNome,
           titulo: atual.titulo,
           descricao: atual.observacao,
+          // quem aprova escolhe a modalidade (padrao: presencial, o fluxo
+          // classico de visita); a prioridade herda a da solicitacao se o
+          // aprovador nao escolher outra
+          modalidade: req.body.modalidade,
+          prioridade: req.body.prioridade || atual.prioridade,
           tecnicoId,
           tecnicoEmail,
           solicitacaoId: atual.id,
@@ -3534,20 +3539,66 @@ async function processarAssinatura(file, chamadoId, pastaStorage) {
   return { nome: file.originalname, path, tipo: file.mimetype || 'image/png' };
 }
 
-// ---------- Chamados de TI (secao "tecnico") - o tecnico so ve os chamados
-// atribuidos a ele; Master ve/cria todos. Nasce vinculado a uma solicitacao
-// de Suporte de TI aprovada (rota acima) ou criado direto pelo Master ----------
-app.get('/api/chamados', requireSection('tecnico'), async (req, res) => {
+// ---------- Chamados de TI - duas modalidades (ver chamadosTI.js):
+// 'presencial' (tecnico vai a loja, check-in/checkout) e 'remoto' (time de
+// Suporte resolve a distancia, pode nascer ja concluido pra registro
+// retroativo). Visibilidade: Master/Admin ve tudo; quem tem a secao
+// "suporte" ve todos os remotos + os atribuidos a ele; tecnico (secao
+// "tecnico") ve so os atribuidos a ele. Nasce vinculado a uma solicitacao
+// de Suporte de TI aprovada (rota acima) ou aberto direto pelo
+// Master/Admin/Suporte (POST abaixo) ----------
+function ehTimeSuporte(req) {
+  return req.isMaster || req.isAdmin || auth.hasSection(req, 'suporte');
+}
+
+app.get('/api/chamados', requireAnySection('tecnico', 'suporte'), async (req, res) => {
   const todos = await chamadosTI.listAll();
-  if (req.isMaster) return res.json(todos);
+  if (req.isMaster || req.isAdmin) return res.json(todos);
+  if (auth.hasSection(req, 'suporte')) {
+    return res.json(todos.filter((c) => chamadosTI.modalidadeDe(c) === 'remoto' || c.tecnicoId === req.user.id));
+  }
   res.json(todos.filter((c) => c.tecnicoId === req.user.id));
 });
 
-app.post('/api/chamados', auth.requireMaster, async (req, res) => {
+// abertura direta de chamado. Master/Admin abre qualquer modalidade e escolhe
+// o responsavel; o time de Suporte abre so REMOTO e sempre no proprio nome -
+// o objetivo e nunca perder registro de atuacao ("abrir e ja fechar" via
+// jaResolvido + observacaoResolucao)
+app.post('/api/chamados', auth.requireAuth, async (req, res) => {
   try {
-    const { unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail } = req.body;
-    const chamado = await chamadosTI.create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, criadoPorEmail: req.user.email });
+    if (!ehTimeSuporte(req)) return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    const { unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, modalidade, prioridade, jaResolvido, observacaoResolucao } = req.body;
+    const ehGestor = req.isMaster || req.isAdmin;
+    const chamado = await chamadosTI.create({
+      unidade,
+      unidadeNome,
+      titulo,
+      descricao,
+      modalidade: ehGestor ? modalidade : 'remoto',
+      prioridade,
+      jaResolvido,
+      observacaoResolucao,
+      tecnicoId: ehGestor ? (tecnicoId || req.user.id) : req.user.id,
+      tecnicoEmail: ehGestor ? (tecnicoId ? tecnicoEmail : req.user.email) : req.user.email,
+      criadoPorEmail: req.user.email,
+    });
     broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// concluir chamado REMOTO (sem visita): responsavel pelo chamado ou
+// Master/Admin fechando por ele - so a observacao do que foi feito
+app.post('/api/chamados/:id/concluir-remoto', requireAnySection('tecnico', 'suporte'), async (req, res) => {
+  try {
+    const chamado = await chamadosTI.concluirRemoto(req.params.id, {
+      observacaoTecnico: req.body.observacaoTecnico,
+      tecnicoId: req.user.id,
+      ehGestor: req.isMaster || req.isAdmin,
+    });
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
   } catch (err) {
     res.status(400).json({ error: err.message });
