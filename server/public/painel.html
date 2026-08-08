@@ -797,6 +797,39 @@ async function cardParque(){
   `);
 }
 
+// indicadores do Abastecimento do Carrinho (Dom Aeroporto): tempos e
+// ocorrencias saem DAQUI de proposito - a equipe do balcao nao ve esses
+// numeros na pagina de lancamento; so Master/Admin, no Painel
+async function cardAbastecimento(){
+  const regs = await fetch('/api/abastecimento').then(r=>r.json());
+  const hoje = hojeBrasilia();
+  const doDia = (lista)=>lista.filter(r=>r.criadoEm && dataBrasiliaAb(r.criadoEm)===hoje);
+  const porId = {}; regs.forEach(x=>{ porId[x.id]=x; });
+  const enviosVinc = regs.filter(r=>r.tipo==='ENVIO' && r.atendePedidoId && porId[r.atendePedidoId]);
+  const recebidos = regs.filter(r=>r.tipo==='ENVIO' && r.recebidoEm);
+  const mediaMin = (vals)=>vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length/60000 : null;
+  const fmtMin = (min)=>min==null ? '—' : (min>=60 ? `${Math.floor(min/60)}h${String(Math.round(min%60)).padStart(2,'0')}` : `${Math.round(min)} min`);
+  const tPedido = (lista)=>mediaMin(lista.map(e=>new Date(e.criadoEm)-new Date(porId[e.atendePedidoId].criadoEm)));
+  const tEnvio = (lista)=>mediaMin(lista.map(e=>new Date(e.recebidoEm)-new Date(e.criadoEm)));
+  const comFalta = recebidos.filter(r=>r.recebimento && !r.recebimento.confere && !r.recebimento.divergencia);
+  const comExtra = recebidos.filter(r=>r.recebimento && (r.recebimento.extras||[]).length);
+  const divergencias = recebidos.filter(r=>r.recebimento && r.recebimento.divergencia);
+  const aguardando = regs.filter(r=>r.tipo==='ENVIO' && !r.recebidoEm).length;
+  return pcardWrap('🛒','Abastecimento Carrinho (indicadores)','/abastecimento.html', `<div class="pstats">
+    ${statRow('⏱️ Pedido → envio (hoje)', fmtMin(tPedido(doDia(enviosVinc))))}
+    ${statRow('⏱️ Pedido → envio (geral)', fmtMin(tPedido(enviosVinc)))}
+    ${statRow('📦 Envio → confirmação (geral)', fmtMin(tEnvio(recebidos)))}
+    ${statRow('Pedidos hoje', doDia(regs.filter(r=>r.tipo==='PEDIDO')).length)}
+    ${statRow('Aguardando confirmação', aguardando, aguardando ? 'warn' : '')}
+    ${statRow('Recebidos com falta', comFalta.length, comFalta.length ? 'warn' : '')}
+    ${statRow('Com item a mais', comExtra.length, comExtra.length ? 'warn' : '')}
+    ${statRow('🎫 Divergências (ticket)', divergencias.length, divergencias.length ? 'warn' : '')}
+  </div>`);
+}
+function dataBrasiliaAb(iso){
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+}
+
 const CARDS_POR_SECAO = [
   { secao:'parque', build:cardParque },
   { secao:'monitor', build:cardMonitor },
@@ -809,6 +842,9 @@ const CARDS_POR_SECAO = [
   { secao:'tecnico', build:cardChamados },
   { secao:'ifood', build:cardIfood },
   { secao:'inventario', build:cardEstoque },
+  // indicadores do Abastecimento: SO Master/Admin (a equipe do balcao nao
+  // pode ver os tempos monitorados)
+  { soMasterAdmin:true, build:cardAbastecimento },
 ];
 
 async function boot(){
@@ -846,7 +882,9 @@ async function boot(){
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(isMaster || IS_ADMIN_GLOBAL));
   if(new URLSearchParams(location.search).get('resetSenha') && (isMaster || IS_ADMIN_GLOBAL)) abrirResetSenha();
 
-  const aplicaveis = CARDS_POR_SECAO.filter(c=>(c.secoes||[c.secao]).some(s=>secoes.includes(s)));
+  const aplicaveis = CARDS_POR_SECAO.filter(c=>c.soMasterAdmin
+    ? (isMaster || IS_ADMIN_GLOBAL)
+    : (c.secoes||[c.secao]).some(s=>secoes.includes(s)));
   document.getElementById('painel-loading').classList.add('hidden');
 
   if(!aplicaveis.length){

@@ -457,10 +457,16 @@ const TOPICOS = [
     <p>No card de um pedido aguardando envio, o botão <b>⚡ Envio rápido</b> registra o envio com <b>exatamente</b> o que foi pedido, em um clique (com confirmação). Pra ajustar quantidades, use o "🚚 Registrar envio" normal — que também já vem preenchido.</p>
     <h3>🥤 Insumos por catálogo</h3>
     <p>Os insumos são escolhidos de um <b>cadastro padrão</b> (nada de digitar "coca zero" de 5 jeitos): selecione o <b>insumo</b> → a <b>embalagem</b> (Unidade, ou Caixa quando o cadastro define a quantidade por caixa — esse número é travado, ninguém altera na hora) → a <b>quantidade</b>. A tela mostra o total em unidades ("2 cx × 12 = 24 unidades"). Quem tem a permissão <b>🥤 cadastro de Insumos</b> (ou Master/Admin) adiciona/edita itens pelo botão <b>⚙️ Cadastro de insumos</b>.</p>
+    <h3>📦 Confirmação de recebimento (carrinho)</h3>
+    <p>Quando o envio chega, o carrinho confirma com um dos três botões: <b>✅ Tudo certo — como pedi</b>; <b>⚠️ Faltou item</b> (libera o ajuste das quantidades recebidas); ou <b>➕ Itens a mais</b>. Se o envio foi registrado com "a mais" que o pedido, a tela mostra o que é e pergunta <b>"São esses?"</b> — confirmou, fica registrado; se o que chegou <b>não bate</b> com o lançamento (ou chegou item fora da lista), a conferência fecha como divergência e um <b>Ticket de análise</b> é gerado automaticamente na Central.</p>
+    <h3>👤 Operador de balcão</h3>
+    <p>Todo lançamento é assinado pelo login local (usuário 4 letras + senha 4 números — <b>ENTER</b> na senha já envia). O papel (PEDE/ENVIA) pode ser trocado <b>pelo próprio operador</b>: errou a ponta, aparece o botão "Sou eu mesmo — mudar meu papel" e ele troca com a própria senha. 3 senhas erradas bloqueiam e <b>geram um ticket pro Master</b>, que desbloqueia mantendo ou trocando a senha. Ativar/desativar e remover operador: só Master.</p>
+    <h3>📋 Contagem</h3>
+    <p>No formulário de contagem, <b>todos os insumos do cadastro já aparecem listados</b> — é só preencher as quantidades (o que ficar em branco não entra no lançamento).</p>
     <h3>🔐 Permissões por ponta</h3>
     <p>São duas permissões separadas na tela de Usuários: <b>PEDIDOS (carrinho)</b> pra quem pede e <b>ENVIOS (loja)</b> pra quem envia — cada um vê só o próprio botão de lançamento. Master/Admin fazem os dois.</p>
     <h3>📊 Resumo do dia</h3>
-    <p>O topo da tela mostra o total <b>enviado hoje e ontem por sabor</b> (o antigo card "Ont/HJ") e quantos pedidos ainda aguardam envio. A lista é agrupada por dia e dá pra filtrar por Pedidos, Envios ou só os que aguardam envio.</p>
+    <p>O topo da tela mostra o total <b>enviado hoje e ontem por sabor</b> (o antigo card "Ont/HJ") e quantos pedidos ainda aguardam envio. A lista é agrupada por dia e dá pra filtrar por Pedidos, Envios ou só os que aguardam envio. Os indicadores de tempo (pedido→envio, envio→confirmação, faltas/extras/divergências) ficam no <b>Painel principal</b>, visíveis só pra Master/Admin.</p>
     <div class="dica"><b>Registro errado?</b> Só o Master exclui — e se era um envio vinculado, o pedido volta sozinho pra fila de aguardando envio.</div>
   `},
   { id:'ativos-ti', icone:'🖥️', secoes:['ativos-ti'], titulo:'Ativos de TI (inventário das lojas)', corpo:`

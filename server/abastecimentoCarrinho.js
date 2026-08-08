@@ -122,49 +122,85 @@ async function atualizarOperador(id, { nome, papel, ativo }) {
   return operadorPublico(atualizado.data());
 }
 
-// desbloqueio do Master: mesma dinamica do login principal - desbloqueia
-// redefinindo a senha (o Master informa a nova senha de 4 numeros)
+// remocao e SO do Master (rota) - apaga o login local de vez
+async function removerOperador(id) {
+  const snap = await OPERADORES.doc(id).get();
+  if (!snap.exists) throw new Error('Operador não encontrado.');
+  await OPERADORES.doc(id).delete();
+  operadoresCache.invalidar();
+}
+
+// desbloqueio do Master (via ticket que o bloqueio gera): mesma dinamica do
+// login principal, mas a senha e OPCIONAL - em branco mantem a mesma senha,
+// preenchida (4 numeros) redefine
 async function desbloquearOperador(id, { novaSenha }) {
   const snap = await OPERADORES.doc(id).get();
   if (!snap.exists) throw new Error('Operador não encontrado.');
-  const senhaLimpa = validarSenhaOperador(novaSenha);
-  await OPERADORES.doc(id).update({
-    senhaHash: await bcrypt.hash(senhaLimpa, 12),
-    bloqueado: false,
-    tentativasErradas: 0,
-  });
+  const patch = { bloqueado: false, tentativasErradas: 0 };
+  if (novaSenha != null && String(novaSenha).trim() !== '') {
+    patch.senhaHash = await bcrypt.hash(validarSenhaOperador(novaSenha), 12);
+  }
+  await OPERADORES.doc(id).update(patch);
   operadoresCache.invalidar();
   const atualizado = await OPERADORES.doc(id).get();
   return operadorPublico(atualizado.data());
 }
 
-// valida o login local na hora do lancamento: papel certo pro tipo, senha
-// via bcrypt, bloqueio apos 3 erradas (identico ao login principal)
-async function validarOperador({ usuario, senha, papel }) {
+// autentica usuario+senha do operador com o mesmo bloqueio do login
+// principal (3 erradas -> bloqueado). Quando o bloqueio ACONTECE nesta
+// tentativa, o erro sai marcado (err.operadorBloqueado) pra rota gerar o
+// ticket de desbloqueio pro Master
+async function autenticarOperador({ usuario, senha }) {
   const usuarioLimpo = String(usuario || '').trim().toLowerCase();
   const todos = await operadoresCache.cached();
   const op = todos.find((o) => o.usuario === usuarioLimpo);
   if (!op || op.ativo === false) throw new Error('Operador não encontrado. Confira o usuário (4 letras).');
-  if (op.bloqueado) throw new Error('Login do operador bloqueado após 3 senhas erradas. Peça ao Master pra desbloquear.');
+  if (op.bloqueado) throw new Error('Login do operador bloqueado após 3 senhas erradas. O Master desbloqueia pelo ticket.');
   const ok = await bcrypt.compare(String(senha || '').trim(), op.senhaHash);
   if (!ok) {
     const tentativas = (op.tentativasErradas || 0) + 1;
     const bloqueou = tentativas >= MAX_TENTATIVAS_OPERADOR;
     await OPERADORES.doc(op.id).update({ tentativasErradas: tentativas, bloqueado: bloqueou });
     operadoresCache.invalidar();
-    if (bloqueou) throw new Error('Login do operador bloqueado após 3 senhas erradas. Peça ao Master pra desbloquear.');
+    if (bloqueou) {
+      const err = new Error('Login do operador bloqueado após 3 senhas erradas. Um ticket foi gerado pro Master desbloquear.');
+      err.operadorBloqueado = operadorPublico(op);
+      throw err;
+    }
     throw new Error(`Senha do operador errada (${tentativas}/${MAX_TENTATIVAS_OPERADOR}).`);
   }
   if (op.tentativasErradas) {
     await OPERADORES.doc(op.id).update({ tentativasErradas: 0 });
     operadoresCache.invalidar();
   }
+  return op;
+}
+
+// valida o login local na hora do lancamento: papel certo pro tipo. Papel
+// errado sai marcado (err.papelErrado) - a tela oferece "trocar meu papel"
+async function validarOperador({ usuario, senha, papel }) {
+  const op = await autenticarOperador({ usuario, senha });
   if (op.papel !== papel) {
-    throw new Error(papel === 'pedido'
+    const err = new Error(papel === 'pedido'
       ? `O operador "${op.usuario}" é de ENVIO (loja) - não pode fazer pedido.`
       : `O operador "${op.usuario}" é de PEDIDO (carrinho) - não pode registrar envio.`);
+    err.papelErrado = true;
+    throw err;
   }
   return operadorPublico(op);
+}
+
+// o PROPRIO operador troca seu papel (pede <-> envia) autenticando com a
+// propria senha - sem depender do Master pra mudar de ponta
+async function trocarPapelOperador({ usuario, senha, papel }) {
+  if (!PAPEIS_OPERADOR.includes(papel)) throw new Error("Papel inválido: use 'pedido' ou 'envio'.");
+  const op = await autenticarOperador({ usuario, senha });
+  if (op.papel !== papel) {
+    await OPERADORES.doc(op.id).update({ papel });
+    operadoresCache.invalidar();
+  }
+  const atualizado = await OPERADORES.doc(op.id).get();
+  return operadorPublico(atualizado.data());
 }
 
 // ---------- catalogo de insumos ----------
@@ -509,6 +545,36 @@ async function confirmarRecebimento(envioId, { pizzas, insumos, confirmaExtras, 
   return getOne(envioId);
 }
 
+// recebimento que NAO bate de um jeito que o popup nao resolve (ex: chegou
+// item que nem esta na lista do envio, ou o "a mais" registrado nao e o que
+// chegou): encerra a conferencia marcando DIVERGENCIA e amarra o numero do
+// ticket de analise gerado pro Master (a rota cria o ticket)
+async function registrarDivergencia(envioId, { motivo, detalhe, numeroTicket, porEmail, porNome }) {
+  const envio = await getOne(envioId);
+  if (!envio) throw new Error('Envio não encontrado.');
+  if (envio.tipo !== 'ENVIO') throw new Error('Só envio tem confirmação de recebimento.');
+  if (envio.recebidoEm) return envio;
+  const agora = new Date().toISOString();
+  await COLLECTION.doc(envioId).update({
+    recebidoEm: agora,
+    recebimento: {
+      em: agora,
+      porEmail: porEmail || null,
+      porNome: porNome || null,
+      confere: false,
+      divergencia: true,
+      motivo: String(motivo || 'divergencia').slice(0, 60),
+      detalhe: String(detalhe || '').trim().slice(0, 500),
+      numeroTicket: numeroTicket != null ? numeroTicket : null,
+      faltas: [],
+      extras: [],
+      recebido: null,
+    },
+  });
+  cache.invalidar();
+  return getOne(envioId);
+}
+
 // so o Master apaga (registro errado). Se era um envio que atendia um
 // pedido, o pedido volta pra fila de "aguardando envio"
 async function remover(id) {
@@ -532,7 +598,7 @@ const cache = createCache(listAllUncached, 15 * 1000);
 const listAll = cache.cached;
 
 module.exports = {
-  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem, confirmarRecebimento, getConfig, salvarConfig,
+  TIPOS, SABORES, criar, getOne, remover, listAll, marcarVisto, marcarPreparo, adicionarMensagem, confirmarRecebimento, registrarDivergencia, getConfig, salvarConfig,
   listarInsumos, criarInsumo, atualizarInsumo,
-  listarOperadores, criarOperador, atualizarOperador, desbloquearOperador, validarOperador,
+  listarOperadores, criarOperador, atualizarOperador, removerOperador, desbloquearOperador, validarOperador, trocarPapelOperador,
 };
