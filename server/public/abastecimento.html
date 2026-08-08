@@ -375,9 +375,12 @@
     <div class="alarme-itens" id="al-itens"></div>
     <div class="alarme-timer ok" id="al-timer">5:00</div>
     <div class="alarme-timer-label" id="al-timer-label">pra confirmar que a loja viu</div>
-    <button type="button" class="alarme-ok hidden" id="al-btn-visto" onclick="confirmarVisto()">✓ OK, VISTO — vamos preparar</button>
-    <button type="button" class="alarme-ok hidden" id="al-btn-preparo" onclick="confirmarPreparo()">👨‍🍳 SENDO PREPARADO</button>
-    <button type="button" class="alarme-ok hidden" id="al-btn-lembrete" onclick="adiarLembrete()">✓ OK — lembrar de novo em 5 min</button>
+    <!-- o botao VERDE e sempre "Estamos preparando": no pedido novo ele ja
+         marca visto + preparo de uma vez (o carrinho ve "preparando" na
+         hora); no lembrete so silencia por 5 min (ja esta preparando) -->
+    <button type="button" class="alarme-ok hidden" id="al-btn-visto" onclick="confirmarPreparo()">👨‍🍳 OK — Estamos preparando</button>
+    <button type="button" class="alarme-ok hidden" id="al-btn-preparo" onclick="confirmarPreparo()">👨‍🍳 Estamos preparando</button>
+    <button type="button" class="alarme-ok hidden" id="al-btn-lembrete" onclick="adiarLembrete()">👨‍🍳 Estamos preparando — lembrar em 5 min</button>
     <button type="button" class="alarme-btn2 hidden" id="al-btn-rapido" onclick="envioRapidoDoAlarme()">⚡ Envio rápido — mandar agora o que foi pedido</button>
   </div>
 </div>
@@ -1683,5 +1686,6 @@ boot();
 </script>
 <script src="/notif-central.js"></script>
 <script src="/suporte-chat.js"></script>
+<script src="/nav-gate.js"></script>
 </body>
 </html>
