@@ -517,6 +517,45 @@ async function redirecionarEdicao(id, { direcionadoParaId, direcionadoParaEmail,
 // exclui so o PEDIDO de ajuste (o registro na fila de solicitacoes) - poder
 // do Master de limpar a fila. Se o pedido ja tinha sido aprovado, o
 // fechamento em si (ja alterado por decidirEdicao) nao e desfeito; pra
+// Master muda a UNIDADE e/ou a DATA de um fechamento ja lancado, direto e
+// sem fila de aprovacao. Como o ID do documento e derivado de unidade+data
+// (ver docId), mudar qualquer um dos dois significa MOVER o registro: grava
+// uma copia com o ID novo (com entrada no historico) e apaga o antigo -
+// mesmo padrao da correcao de data aprovada (decidirEdicao tipo 'data').
+async function moverFechamento({ fechamentoId, novaUnidade, novaUnidadeNome, novaData, motivo, editadoPorEmail }) {
+  const ref = COLLECTION.doc(fechamentoId);
+  const doc = await ref.get();
+  if (!doc.exists) throw new Error('Fechamento não encontrado.');
+  const atual = doc.data();
+  const unidade = novaUnidade || atual.unidade;
+  const data = novaData || atual.data;
+  if (!DATA_RE_SIMPLES.test(data)) throw new Error('Data inválida (use AAAA-MM-DD).');
+  if (unidade === atual.unidade && data === atual.data) throw new Error('Unidade e data são as mesmas do lançamento atual.');
+  const novoId = docId(unidade, data);
+  const colisao = await COLLECTION.doc(novoId).get();
+  if (colisao.exists) throw new Error('Já existe um fechamento lançado para essa unidade nessa data.');
+  const historico = [...(atual.historico || []), {
+    em: new Date().toISOString(),
+    por: editadoPorEmail,
+    motivo: motivo || 'Unidade/data corrigidas pelo Master',
+    valoresAnteriores: { unidade: atual.unidade, data: atual.data },
+    valoresNovos: { unidade, data },
+  }];
+  const novo = {
+    ...atual,
+    id: novoId,
+    unidade,
+    unidadeNome: unidade === atual.unidade ? atual.unidadeNome : (novaUnidadeNome || unidade),
+    data,
+    historico,
+    atualizadoEm: new Date().toISOString(),
+  };
+  await COLLECTION.doc(novoId).set(novo);
+  await ref.delete();
+  fechamentosCache.invalidar();
+  return novo;
+}
+
 // corrigir o fechamento depois disso o Master usa editarDireto normalmente.
 async function removerEdicao(id) {
   await EDITS.doc(id).delete();
@@ -632,6 +671,6 @@ function invalidarCache() {
 
 module.exports = {
   CAMPOS_NUMERICOS, create, listAll, listByUnidades, getOne, solicitarEdicao, listarEdicoes, getEdicao,
-  decidirEdicao, editarDireto, removerEdicao, remove, invalidarCache, marcarNotificacaoVistaEdicao, redirecionarEdicao,
+  decidirEdicao, editarDireto, moverFechamento, removerEdicao, remove, invalidarCache, marcarNotificacaoVistaEdicao, redirecionarEdicao,
   backfillQuebraCaixa,
 };

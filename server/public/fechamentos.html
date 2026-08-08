@@ -354,6 +354,12 @@
     <div class="fech-msg hidden" id="fech-aviso-sangria" style="background:var(--warn-dim);color:var(--warn);"></div>
     <div id="fech-sangrias-dia-lista"></div>
 
+    <div class="secao-titulo">Unidade e data</div>
+    <div class="fech-grid">
+      <div><label>Unidade</label><select id="ef-unidade"></select></div>
+      <div><label>Data</label><input type="date" id="ef-data"></div>
+    </div>
+
     <div class="secao-titulo">Responsável</div>
     <label>Gerente</label>
     <input type="text" id="ef-gerente">
@@ -1578,6 +1584,7 @@ function renderTabela(rows){
 // logica). So sobra aqui o que nao faz parte dessas 3 secoes.
 const CAMPOS_EDICAO_FECHAMENTO = ['caixaInicial','caixaFinal','adyen','adyenPos','totalSaida','quebra','entradaDinheiro','deposito'];
 let FECHAMENTO_EDITANDO_ID = null;
+let FECHAMENTO_EDITANDO_ORIG = null; // { unidade, data } originais, pra detectar mudança (mover)
 // grupos (franquias) cadastrados em /grupos.html - cada loja so mostra os
 // campos que o Master cadastrou pro grupo dela (ver grupos.js/fechamentosLive.js)
 let GRUPOS_KPI = [];
@@ -1636,8 +1643,15 @@ async function abrirEdicaoFechamento(id){
     return;
   }
   FECHAMENTO_EDITANDO_ID = id;
+  FECHAMENTO_EDITANDO_ORIG = { unidade: d.unidade, data: d.data };
   document.getElementById('fech-modal-titulo').textContent = `Editar fechamento`;
   document.getElementById('fech-modal-sub').textContent = `${UNIDADES_NOMES[d.unidade]||d.unidade} · ${fmtData(d.data)}`;
+  // Unidade/Data editaveis pelo Master - mudar qualquer um move o registro
+  // (o ID e unidade+data), ver salvarEdicaoFechamento
+  const unidadesOrd = Object.keys(UNIDADES_NOMES).sort((a,b)=>(UNIDADES_NOMES[a]||a).localeCompare(UNIDADES_NOMES[b]||b,'pt-BR'));
+  document.getElementById('ef-unidade').innerHTML = unidadesOrd.map(u=>
+    `<option value="${escapeHtml(u)}" ${u===d.unidade?'selected':''}>${escapeHtml(UNIDADES_NOMES[u]||u)}</option>`).join('');
+  document.getElementById('ef-data').value = d.data || '';
   document.getElementById('ef-gerente').value = d.gerente || '';
   CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ document.getElementById('ef-'+c).value = d[c] ?? 0; });
   document.getElementById('ef-observacao').value = d.observacao || '';
@@ -1759,6 +1773,31 @@ async function salvarEdicaoFechamento(){
   if(!FECHAMENTO_EDITANDO_ID) return;
   const msg = document.getElementById('fech-msg');
   msg.classList.add('hidden');
+
+  // unidade/data mudaram? move o registro primeiro (o ID e unidade+data) e
+  // segue a edicao dos demais campos ja em cima do ID novo
+  const novaUnidade = document.getElementById('ef-unidade').value;
+  const novaData = document.getElementById('ef-data').value;
+  if(FECHAMENTO_EDITANDO_ORIG && (novaUnidade !== FECHAMENTO_EDITANDO_ORIG.unidade || novaData !== FECHAMENTO_EDITANDO_ORIG.data)){
+    try{
+      const respMover = await fetch(`/api/fechamentos/${FECHAMENTO_EDITANDO_ID}/mover`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          novaUnidade: novaUnidade !== FECHAMENTO_EDITANDO_ORIG.unidade ? novaUnidade : null,
+          novaData: novaData !== FECHAMENTO_EDITANDO_ORIG.data ? novaData : null,
+          motivo: document.getElementById('ef-motivo').value,
+        }),
+      });
+      const movido = await respMover.json();
+      if(!respMover.ok) throw new Error(movido.error || 'Erro ao mudar unidade/data.');
+      FECHAMENTO_EDITANDO_ID = movido.id;
+      FECHAMENTO_EDITANDO_ORIG = { unidade: movido.unidade, data: movido.data };
+    }catch(err){
+      msg.textContent = err.message; msg.className = 'fech-msg err'; msg.classList.remove('hidden');
+      return;
+    }
+  }
+
   const mudancas = { gerente: document.getElementById('ef-gerente').value, observacao: document.getElementById('ef-observacao').value };
   CAMPOS_EDICAO_FECHAMENTO.forEach(c=>{ mudancas[c] = document.getElementById('ef-'+c).value; });
   const mudancasKpis = {};
