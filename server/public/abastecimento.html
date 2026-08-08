@@ -373,7 +373,7 @@
     <h2 id="al-titulo">🛒 NOVO PEDIDO DO CARRINHO!</h2>
     <div class="alarme-sub" id="al-sub"></div>
     <div class="alarme-itens" id="al-itens"></div>
-    <div class="alarme-timer ok" id="al-timer">5:00</div>
+    <div class="alarme-timer ok" id="al-timer">10:00</div>
     <div class="alarme-timer-label" id="al-timer-label">pra confirmar que a loja viu</div>
     <!-- o botao VERDE e sempre "Estamos preparando": no pedido novo ele ja
          marca visto + preparo de uma vez (o carrinho ve "preparando" na
@@ -1263,6 +1263,9 @@ let ALARME_AUDIO_CTX = null;
 let ALARME_SOM_TIMER = null;
 
 const CINCO_MIN = 5*60*1000;
+// primeiro alerta apos o pedido LANCADO: 10 minutos regressivos pra loja
+// confirmar (os lembretes seguintes continuam de 5 em 5)
+const DEZ_MIN = 10*60*1000;
 function pedidoNaoVisto(r){ return pendente(r) && !r.vistoEm; }
 // escalonamento: apos o OK (visto), a loja tem 5min pra marcar SENDO
 // PREPARADO; estourou, vira alarme de PEDIDO ATRASADO
@@ -1335,9 +1338,9 @@ function atualizarTimerAlarme(){
     return;
   }
   el.classList.remove('hidden');
-  // 'novo': regressivo de 5:00 desde a criacao do pedido, pra apertar OK
+  // 'novo': regressivo de 10:00 desde a criacao do pedido, pra apertar OK
   const base = new Date(ALARME_PEDIDO.criadoEm).getTime();
-  const resta = Math.round((base + CINCO_MIN - Date.now())/1000);
+  const resta = Math.round((base + DEZ_MIN - Date.now())/1000);
   if(resta >= 0){
     el.textContent = `${Math.floor(resta/60)}:${String(resta%60).padStart(2,'0')}`;
     el.className = 'alarme-timer ok';
