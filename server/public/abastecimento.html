@@ -257,12 +257,6 @@
   <button type="button" class="filtro-chip hidden" id="btn-operadores" onclick="abrirOperadores()">👥 Operadores</button>
 </div>
 
-<!-- painel de indicadores: tempos e ocorrencias calculados dos registros -->
-<div class="panel">
-  <h2>📊 Indicadores <span style="font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400;">hoje · geral</span></h2>
-  <div class="resumo-grid" id="indicadores-grid"></div>
-</div>
-
 <div class="panel">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
     <h2 style="margin:0;">Movimentações <span id="lista-count" style="font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:400;"></span></h2>
@@ -279,13 +273,45 @@
     <h2 style="color:var(--envio);text-align:center;">📦 CHEGOU! Confirme o recebimento</h2>
     <div class="alarme-sub" id="rc-sub" style="text-align:center;"></div>
     <div id="rc-itens" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
-    <div id="rc-extras" class="hidden" style="background:var(--warn-dim);border:1px solid rgba(242,179,61,.5);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;">
-      <div style="color:var(--warn);font-weight:700;margin-bottom:6px;">⚠️ Veio A MAIS que o pedido:</div>
-      <div id="rc-extras-lista"></div>
-      <label class="check-linha" style="margin-top:8px;"><input type="checkbox" id="rc-confirma-extras"> Confirmo que o "a mais" confere com o que chegou</label>
+    <!-- etapa inicial: 3 caminhos -->
+    <div id="rc-etapa-inicio">
+      <button type="button" class="alarme-ok" onclick="rcTudoCerto()">✅ Tudo certo — como pedi</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button type="button" class="alarme-btn2" style="margin-top:8px;" onclick="rcFaltouItem()">⚠️ Faltou item</button>
+        <button type="button" class="alarme-btn2" style="margin-top:8px;" onclick="rcItensAMais()">➕ Itens a mais</button>
+      </div>
     </div>
-    <button type="button" class="alarme-ok" onclick="confirmarRecebimento(true)">✅ Tudo certo — recebido como enviado</button>
-    <button type="button" class="alarme-btn2" onclick="confirmarRecebimento(false)">⚠️ Salvar com os ajustes acima (faltou item)</button>
+    <!-- "tem certeza?" quando marcou FALTOU mas o envio registra A MAIS -->
+    <div id="rc-etapa-certeza" class="hidden">
+      <div style="background:var(--warn-dim);border:1px solid rgba(242,179,61,.5);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;">
+        <b style="color:var(--warn);">Tem certeza?</b> Esse envio foi registrado com itens <b>a mais</b> que o pedido.
+      </div>
+      <button type="button" class="alarme-ok" onclick="rcEtapa('faltou')">Sim — faltou item, ajustar quantidades</button>
+      <button type="button" class="alarme-btn2" onclick="rcEtapa('inicio')">Não — voltar</button>
+    </div>
+    <!-- ajuste de quantidades (faltou item) -->
+    <div id="rc-etapa-faltou" class="hidden">
+      <button type="button" class="alarme-ok" onclick="confirmarRecebimento(false)">Salvar — recebi com falta</button>
+      <button type="button" class="alarme-btn2" onclick="rcEtapa('inicio')">Voltar</button>
+    </div>
+    <!-- itens a mais REGISTRADOS no envio: confirma se sao esses -->
+    <div id="rc-etapa-extras" class="hidden">
+      <div style="background:var(--warn-dim);border:1px solid rgba(242,179,61,.5);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;">
+        <div style="color:var(--warn);font-weight:700;margin-bottom:6px;">➕ O envio registra A MAIS que o pedido:</div>
+        <div id="rc-extras-lista"></div>
+      </div>
+      <button type="button" class="alarme-ok" onclick="confirmarRecebimento(true)">✓ São esses — confirmar recebimento</button>
+      <button type="button" class="alarme-btn2" onclick="rcDivergencia('extras-nao-conferem')">✗ Não — mandar pra análise</button>
+    </div>
+    <!-- itens a mais SEM registro no envio: vira ticket de analise -->
+    <div id="rc-etapa-fora" class="hidden">
+      <div style="background:var(--warn-dim);border:1px solid rgba(242,179,61,.5);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;">
+        O envio <b>não registra</b> itens a mais que o pedido. Se chegou coisa fora da lista, isso vai pra <b>análise</b> (gera um ticket).
+      </div>
+      <input type="text" id="rc-fora-detalhe" maxlength="200" placeholder="o que chegou a mais? (ex: 2 Coca lata)" style="width:100%;margin-bottom:8px;">
+      <button type="button" class="alarme-ok" onclick="rcDivergencia('itens-fora-da-lista')">Gerar ticket de análise</button>
+      <button type="button" class="alarme-btn2" onclick="rcEtapa('inicio')">Voltar</button>
+    </div>
     <button type="button" class="link-btn" style="display:block;margin:10px auto 0;color:var(--muted);background:none;border:none;cursor:pointer;font-size:11.5px;" onclick="adiarRecebimento()">ver depois (5 min)</button>
     <div class="msg hidden" id="msg-receb"></div>
   </div>
@@ -324,7 +350,7 @@
       </div>
       <label>Insumos (bebidas, embalagens...)</label>
       <div id="f-insumos"></div>
-      <button type="button" class="btn-add" onclick="adicionarInsumo()">+ Adicionar insumo</button>
+      <button type="button" class="btn-add" id="btn-add-insumo" onclick="adicionarInsumo()">+ Adicionar insumo</button>
       <label>Observação</label>
       <textarea id="f-obs" placeholder="ex: urgência / 1 lata avariada"></textarea>
       <!-- login LOCAL de operador: quem esta no balcao assina o lancamento
@@ -349,7 +375,6 @@
     <div class="alarme-itens" id="al-itens"></div>
     <div class="alarme-timer ok" id="al-timer">5:00</div>
     <div class="alarme-timer-label" id="al-timer-label">pra confirmar que a loja viu</div>
-    <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin:-8px 0 14px;">tempo total do pedido: <b id="al-total" style="color:var(--text);">—</b></div>
     <button type="button" class="alarme-ok hidden" id="al-btn-visto" onclick="confirmarVisto()">✓ OK, VISTO — vamos preparar</button>
     <button type="button" class="alarme-ok hidden" id="al-btn-preparo" onclick="confirmarPreparo()">👨‍🍳 SENDO PREPARADO</button>
     <button type="button" class="alarme-ok hidden" id="al-btn-lembrete" onclick="adiarLembrete()">✓ OK — lembrar de novo em 5 min</button>
@@ -398,7 +423,7 @@
     <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharOperadores()">✕</span>
     <div class="sheet">
       <h3>👥 Operadores (login local)</h3>
-      <div class="sub">usuário de 4 letras + senha de 4 números · papel define quem PEDE e quem ENVIA · 3 senhas erradas bloqueiam e só o Master desbloqueia (redefinindo a senha)</div>
+      <div class="sub">usuário de 4 letras + senha de 4 números · papel define quem PEDE e quem ENVIA (o próprio operador troca na hora do lançamento, com a senha dele) · 3 senhas erradas bloqueiam e geram um ticket — só o Master desbloqueia (mantendo ou trocando a senha), ativa/desativa e remove</div>
       <div id="op-lista"></div>
       <label style="margin-top:16px;">Cadastrar operador</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -556,43 +581,16 @@ function renderResumo(){
     </div>`;
 }
 
-// ---------- indicadores: tempos e ocorrencias ----------
-function mediaMin(valores){
-  if(!valores.length) return null;
-  return valores.reduce((a,b)=>a+b,0) / valores.length / 60000;
-}
-function fmtMin(min){
-  if(min==null) return '—';
-  return min >= 60 ? `${Math.floor(min/60)}h${String(Math.round(min%60)).padStart(2,'0')}` : `${Math.round(min)} min`;
-}
-function renderIndicadores(){
-  const hoje = dataBrasilia(new Date().toISOString());
-  const porId = {}; REGS.forEach(x=>{ porId[x.id]=x; });
-  const enviosVinc = REGS.filter(r=>r.tipo==='ENVIO' && r.atendePedidoId && porId[r.atendePedidoId]);
-  const doDia = (lista)=>lista.filter(r=>dataBrasilia(r.criadoEm)===hoje);
-  // tempo de pedido = criacao do pedido -> envio; tempo de envio = envio -> confirmacao do carrinho
-  const tPedido = (lista)=>mediaMin(lista.map(e=>new Date(e.criadoEm)-new Date(porId[e.atendePedidoId].criadoEm)));
-  const recebidos = REGS.filter(r=>r.tipo==='ENVIO' && r.recebidoEm);
-  const tEnvio = (lista)=>mediaMin(lista.map(e=>new Date(e.recebidoEm)-new Date(e.criadoEm)));
-  const comFalta = recebidos.filter(r=>r.recebimento && !r.recebimento.confere);
-  const comExtra = recebidos.filter(r=>r.recebimento && (r.recebimento.extras||[]).length);
-  const card = (rotulo, hojeV, geralV, destaque)=>`
-    <div class="resumo-card${destaque?' pend':''}">
-      <div class="sabor">${rotulo}</div>
-      <div class="nums"><span class="hoje">${hojeV}</span><span class="ontem">geral ${geralV}</span></div>
-    </div>`;
-  document.getElementById('indicadores-grid').innerHTML =
-    card('⏱️ Pedido → envio', fmtMin(tPedido(doDia(enviosVinc))), fmtMin(tPedido(enviosVinc))) +
-    card('📦 Envio → confirmação', fmtMin(tEnvio(doDia(recebidos))), fmtMin(tEnvio(recebidos))) +
-    card('🛒 Pedidos', doDia(REGS.filter(r=>r.tipo==='PEDIDO')).length, REGS.filter(r=>r.tipo==='PEDIDO').length) +
-    card('⚠️ Com falta', doDia(comFalta).length, comFalta.length, comFalta.length>0) +
-    card('➕ Com extra', doDia(comExtra).length, comExtra.length, comExtra.length>0);
-}
+// (os indicadores de tempo/ocorrencias sairam desta tela de proposito -
+// ficam no Painel principal, visiveis so pra Master/Admin)
 
 // ---------- confirmacao de recebimento (lado do carrinho) ----------
 // envio sem confirmacao dispara o popup pra quem pediu conferir o que
-// chegou: falta diminui/zera; "a mais" que o pedido exige o check explicito
+// chegou. Tres caminhos: Tudo certo (como pedi) / Faltou item (ajusta
+// quantidades) / Itens a mais (confirma o "a mais" registrado - ou, se nao
+// bate, vira TICKET de analise)
 let RECEB_ENVIO = null;
+let RECEB_EXTRAS = [];   // "a mais" vs o pedido, do envio na tela
 let RECEB_SNOOZE = {}; // envioId -> quando pode voltar
 function envioAguardandoConfirmacao(r){
   return r.tipo==='ENVIO' && !r.recebidoEm && (RECEB_SNOOZE[r.id]||0) <= Date.now();
@@ -610,8 +608,9 @@ function verificarRecebimento(){
   RECEB_ENVIO = alvo;
   const porId = {}; REGS.forEach(x=>{ porId[x.id]=x; });
   const pedido = alvo.atendePedidoId ? porId[alvo.atendePedidoId] : null;
-  document.getElementById('rc-sub').textContent = `envio de ${fmtHora(alvo.criadoEm)} · por ${alvo.operadorNome||alvo.criadoPorNome||'—'} — ajuste as quantidades se faltou`;
-  // itens do envio com quantidade editavel (max = enviado)
+  document.getElementById('rc-sub').textContent = `envio de ${fmtHora(alvo.criadoEm)} · por ${alvo.operadorNome||alvo.criadoPorNome||'—'} — o que chegou:`;
+  // itens do envio com quantidade editavel (max = enviado) - os inputs so
+  // aparecem na etapa "faltou item"
   let html = '';
   SABORES.forEach(s=>{
     const enviada = Number(alvo.pizzas?.[s])||0;
@@ -632,26 +631,69 @@ function verificarRecebimento(){
     </div>`;
   });
   document.getElementById('rc-itens').innerHTML = html || '<div class="empty" style="padding:8px;">—</div>';
-  // "a mais" em relacao ao PEDIDO: mostra e exige confirmacao explicita
-  const extras = [];
+  // "a mais" em relacao ao PEDIDO vinculado (usado nos fluxos das etapas)
+  RECEB_EXTRAS = [];
   if(pedido){
     SABORES.forEach(s=>{
       const pedida = Number(pedido.pizzas?.[s])||0, enviada = Number(alvo.pizzas?.[s])||0;
-      if(enviada > pedida) extras.push(`+${enviada-pedida} ${SABOR_LABEL[s]} (pediu ${pedida}, veio ${enviada})`);
+      if(enviada > pedida) RECEB_EXTRAS.push(`+${enviada-pedida} ${SABOR_LABEL[s]} (pediu ${pedida}, veio ${enviada})`);
     });
     const pedidoIns = new Map((pedido.insumos||[]).filter(i=>i.insumoId).map(i=>[i.insumoId, Number(i.quantidade)||0]));
     (alvo.insumos||[]).forEach(ins=>{
       if(!ins.insumoId) return;
       const pedida = pedidoIns.get(ins.insumoId)||0, enviada = Number(ins.quantidade)||0;
-      if(enviada > pedida) extras.push(`+${enviada-pedida} ${escapeHtml(ins.nome)} (pediu ${pedida}, veio ${enviada})`);
+      if(enviada > pedida) RECEB_EXTRAS.push(`+${enviada-pedida} ${escapeHtml(ins.nome)} (pediu ${pedida}, veio ${enviada})`);
     });
   }
-  document.getElementById('rc-extras').classList.toggle('hidden', !extras.length);
-  document.getElementById('rc-extras-lista').innerHTML = extras.join('<br>');
-  document.getElementById('rc-confirma-extras').checked = false;
+  document.getElementById('rc-extras-lista').innerHTML = RECEB_EXTRAS.join('<br>');
+  document.getElementById('rc-fora-detalhe').value = '';
   document.getElementById('msg-receb').classList.add('hidden');
+  rcEtapa('inicio');
   document.getElementById('receb-overlay').classList.remove('hidden');
   iniciarSomAlarme();
+}
+
+// etapas do popup de recebimento; quantidades so editaveis em "faltou"
+function rcEtapa(etapa){
+  ['inicio','certeza','faltou','extras','fora'].forEach(e=>{
+    document.getElementById('rc-etapa-'+e).classList.toggle('hidden', e!==etapa);
+  });
+  document.querySelectorAll('#rc-itens input').forEach(inp=>{ inp.disabled = etapa!=='faltou'; });
+}
+function rcTudoCerto(){
+  // com "a mais" registrado, "como pedi" nao fecha sozinho: mostra o extra
+  // pra pessoa confirmar (ou mandar pra analise)
+  if(RECEB_EXTRAS.length){ rcEtapa('extras'); return; }
+  confirmarRecebimento(true);
+}
+function rcFaltouItem(){
+  // envio registrado com A MAIS + reclamacao de falta = conferir primeiro
+  rcEtapa(RECEB_EXTRAS.length ? 'certeza' : 'faltou');
+}
+function rcItensAMais(){
+  rcEtapa(RECEB_EXTRAS.length ? 'extras' : 'fora');
+}
+// nao bateu de um jeito que o popup nao resolve: fecha a conferencia como
+// divergencia e gera o Ticket de analise pro Master
+async function rcDivergencia(motivo){
+  if(!RECEB_ENVIO) return;
+  const msg = document.getElementById('msg-receb');
+  msg.classList.add('hidden');
+  try{
+    const resp = await fetch(`/api/abastecimento/${RECEB_ENVIO.id}/divergencia`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ motivo, detalhe: document.getElementById('rc-fora-detalhe').value }),
+    });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao gerar o ticket.');
+    RECEB_ENVIO = null;
+    document.getElementById('receb-overlay').classList.add('hidden');
+    pararSomAlarme();
+    alert(`Ticket #${data.numeroTicket} gerado pra análise. O recebimento ficou registrado como divergência.`);
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
 }
 function adiarRecebimento(){
   if(!RECEB_ENVIO) return;
@@ -669,10 +711,13 @@ async function confirmarRecebimento(tudoCerto){
     document.querySelectorAll('#rc-itens [data-rc-pizza]').forEach(inp=>{ pizzas[inp.dataset.rcPizza] = tudoCerto ? undefined : inp.value; });
     const insumos = [];
     document.querySelectorAll('#rc-itens [data-rc-insumo]').forEach(inp=>{ insumos[Number(inp.dataset.rcInsumo)] = { quantidade: tudoCerto ? undefined : inp.value }; });
+    // confirmaExtras: as etapas ja fizeram a pessoa olhar o "a mais" (Sao
+    // esses? / Tem certeza?) - chegar aqui e estar ciente; o que NAO confere
+    // vai pelo caminho da divergencia (ticket), nunca por este
     const body = {
       pizzas: tudoCerto ? null : pizzas,
       insumos: tudoCerto ? null : insumos,
-      confirmaExtras: document.getElementById('rc-confirma-extras').checked || document.getElementById('rc-extras').classList.contains('hidden'),
+      confirmaExtras: true,
     };
     const resp = await fetch(`/api/abastecimento/${RECEB_ENVIO.id}/recebimento`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await resp.json();
@@ -779,6 +824,7 @@ function regCardHtml(r){
     }
     // ciclo do envio so fecha com a confirmacao do carrinho
     if(!r.recebidoEm) statusBadge += ' <span class="badge aguardando">📦 aguardando confirmação do carrinho</span>';
+    else if(r.recebimento && r.recebimento.divergencia) statusBadge += ` <span class="badge" style="background:var(--bad-dim);color:var(--bad);">🎫 em análise${r.recebimento.numeroTicket ? ' · Ticket #'+r.recebimento.numeroTicket : ''}</span>`;
     else if(r.recebimento && !r.recebimento.confere) statusBadge += ` <span class="badge" style="background:var(--bad-dim);color:var(--bad);">⚠️ recebido com falta ${fmtHora(r.recebidoEm)}</span>`;
     else statusBadge += ` <span class="badge atendido">✅ recebido ${fmtHora(r.recebidoEm)}</span>`;
     if(r.recebimento && r.recebimento.extras && r.recebimento.extras.length) statusBadge += ' <span class="badge visto">➕ extra confirmado</span>';
@@ -835,7 +881,6 @@ async function carregar(){
   REGS = await fetch('/api/abastecimento').then(r=>r.json());
   REGS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
   renderResumo();
-  renderIndicadores();
   renderLista();
   atualizarDatalistOperadores();
   verificarAlarme();
@@ -895,6 +940,19 @@ function renderInsumos(){
     document.getElementById('f-insumos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Nenhum insumo no cadastro ainda.</div>';
     return;
   }
+  // CONTAGEM: o catalogo INTEIRO ja vem listado (nome fixo) - a pessoa so
+  // preenche as quantidades; linha sem quantidade fica de fora do lancamento
+  if(TIPO_FORM==='CONTAGEM'){
+    document.getElementById('f-insumos').innerHTML = INSUMOS.map(it=>{
+      const cad = insumoCadastro(it.insumoId);
+      return `
+      <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding:7px 0;">
+        <span style="flex:1;font-size:13px;">${escapeHtml(cad ? cad.nome : '')}</span>
+        <input type="number" min="0" inputmode="numeric" value="${escapeHtml(it.quantidade)}" oninput="mudarQtdInsumo(${it.id}, this.value)" placeholder="qtde" style="width:84px;padding:7px 8px;">
+      </div>`;
+    }).join('');
+    return;
+  }
   document.getElementById('f-insumos').innerHTML = INSUMOS.map(it=>{
     const cad = insumoCadastro(it.insumoId);
     const podeCaixa = !!(cad && cad.qtdPorCaixa);
@@ -926,7 +984,12 @@ function abrirForm(tipo){
     'o que a loja está mandando pro carrinho';
   ['f-calabresa','f-pepperoni','f-mussarela'].forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('f-obs').value = '';
-  INSUMOS = []; renderInsumos();
+  // contagem: todos os itens do catalogo ja aparecem, so preencher a qtde
+  INSUMOS = tipo==='CONTAGEM'
+    ? insumosAtivos().map(c=>({ id: ++SEQ, insumoId: c.id, embalagem: 'unidade', quantidade: '' }))
+    : [];
+  document.getElementById('btn-add-insumo').classList.toggle('hidden', tipo==='CONTAGEM');
+  renderInsumos();
   document.getElementById('msg-form').classList.add('hidden');
   document.getElementById('btn-salvar').textContent =
     tipo==='PEDIDO' ? 'Enviar pedido' : (tipo==='CONTAGEM' ? 'Registrar contagem' : 'Registrar envio');
@@ -982,7 +1045,21 @@ async function salvar(){
     };
     const resp = await fetch('/api/abastecimento', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await resp.json();
-    if(!resp.ok){ document.getElementById('f-op-senha').value=''; throw new Error(data.error || 'Erro ao salvar.'); }
+    if(!resp.ok){
+      const senhaDigitada = body.operadorSenha;
+      document.getElementById('f-op-senha').value='';
+      // papel errado pro tipo: o PROPRIO operador pode trocar o papel com a
+      // propria senha e lancar de novo, sem depender de ninguem
+      if(data.papelErrado){
+        mostrarBotaoTrocaPapel(msg, body.operadorUsuario, senhaDigitada, TIPO_FORM==='ENVIO'?'envio':'pedido', ()=>{
+          document.getElementById('f-op-usuario').value = body.operadorUsuario;
+          document.getElementById('f-op-senha').value = senhaDigitada;
+          salvar();
+        }, data.error);
+        return;
+      }
+      throw new Error(data.error || 'Erro ao salvar.');
+    }
     lembrarOperadorUsado(body.operadorUsuario);
     fecharForm();
     await carregar();
@@ -990,6 +1067,30 @@ async function salvar(){
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }finally{
     btn.disabled = false; btn.textContent = txt;
+  }
+}
+
+// ---------- troca de papel pelo proprio operador ----------
+// o erro de "papel errado" vira um botao: autentica com a MESMA senha
+// digitada, troca o papel (pede <-> envia) e refaz o lancamento
+let TROCA_PAPEL_PENDENTE = null;
+function mostrarBotaoTrocaPapel(msgEl, usuario, senha, papel, aposTrocar, textoErro){
+  TROCA_PAPEL_PENDENTE = { usuario, senha, papel, aposTrocar, msgEl };
+  msgEl.className = 'msg err'; msgEl.classList.remove('hidden');
+  msgEl.innerHTML = `${escapeHtml(textoErro||'Papel errado pro tipo de lançamento.')}<br>
+    <button type="button" class="btn-add" style="margin-top:8px;width:100%;" onclick="executarTrocaPapel()">🔁 Sou eu mesmo — mudar meu papel pra ${papel==='envio'?'🚚 ENVIA (loja)':'🛒 PEDE (carrinho)'} e lançar</button>`;
+}
+async function executarTrocaPapel(){
+  const t = TROCA_PAPEL_PENDENTE;
+  if(!t) return;
+  try{
+    const resp = await fetch('/api/abastecimento-operadores/trocar-papel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ usuario: t.usuario, senha: t.senha, papel: t.papel }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao trocar o papel.');
+    TROCA_PAPEL_PENDENTE = null;
+    t.aposTrocar();
+  }catch(err){
+    t.msgEl.textContent = err.message; t.msgEl.className = 'msg err'; t.msgEl.classList.remove('hidden');
   }
 }
 
@@ -1033,7 +1134,19 @@ async function confirmarEnvioRapido(){
     };
     const resp = await fetch('/api/abastecimento', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro no envio rápido.');
+    if(!resp.ok){
+      const senhaDigitada = body.operadorSenha;
+      document.getElementById('pin-senha').value = '';
+      if(data.papelErrado){
+        mostrarBotaoTrocaPapel(msg, operadorUsuario, senhaDigitada, 'envio', ()=>{
+          document.getElementById('pin-usuario').value = operadorUsuario;
+          document.getElementById('pin-senha').value = senhaDigitada;
+          confirmarEnvioRapido();
+        }, data.error);
+        return;
+      }
+      throw new Error(data.error || 'Erro no envio rápido.');
+    }
     lembrarOperadorUsado(operadorUsuario);
     fecharPin();
     await carregar();
@@ -1051,20 +1164,38 @@ async function carregarOperadores(){
   OPERADORES = await fetch('/api/abastecimento-operadores').then(r=>r.ok?r.json():[]);
 }
 function renderOperadores(){
+  // ativar/desativar, trocar papel na lista e remover: SO Master (Admin ve
+  // a lista e cadastra). O papel tambem muda pelo proprio operador na hora
+  // do lancamento (com a senha dele)
   document.getElementById('op-lista').innerHTML = OPERADORES.map(o=>`
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding:9px 0;${o.ativo===false?'opacity:.45;':''}">
       <span style="font-family:var(--mono);color:var(--accent);">@${escapeHtml(o.usuario)}</span>
       <span style="font-size:12.5px;flex:1;">${escapeHtml(o.nome||'')}</span>
+      ${IS_MASTER ? `
       <select onchange="salvarOperador('${o.id}', { papel: this.value })" style="width:auto;padding:5px 8px;font-size:11.5px;">
         <option value="pedido" ${o.papel==='pedido'?'selected':''}>🛒 PEDE</option>
         <option value="envio" ${o.papel==='envio'?'selected':''}>🚚 ENVIA</option>
-      </select>
+      </select>` : `<span class="badge">${o.papel==='pedido'?'🛒 PEDE':'🚚 ENVIA'}</span>`}
       ${o.bloqueado
         ? (IS_MASTER
           ? `<button type="button" class="cat-toggle off" onclick="desbloquearOperador('${o.id}')">🔓 desbloquear</button>`
           : '<span class="badge" style="background:var(--bad-dim);color:var(--bad);">bloqueado</span>')
-        : `<button type="button" class="cat-toggle ${o.ativo===false?'off':'on'}" onclick="salvarOperador('${o.id}', { ativo: ${o.ativo===false} })">${o.ativo===false?'inativo':'ativo'}</button>`}
+        : (IS_MASTER
+          ? `<button type="button" class="cat-toggle ${o.ativo===false?'off':'on'}" onclick="salvarOperador('${o.id}', { ativo: ${o.ativo===false} })">${o.ativo===false?'inativo':'ativo'}</button>`
+          : `<span class="badge" style="${o.ativo===false?'background:var(--bad-dim);color:var(--bad);':'background:var(--ok-dim,rgba(61,220,151,.12));color:var(--ok,#3ddc97);'}">${o.ativo===false?'inativo':'ativo'}</span>`)}
+      ${IS_MASTER ? `<button type="button" class="btn-remover" title="remover operador" onclick="removerOperador('${o.id}','${escapeHtml(o.usuario)}')">🗑</button>` : ''}
     </div>`).join('') || '<div class="empty">Nenhum operador cadastrado.</div>';
+}
+// remover: SO Master
+async function removerOperador(id, usuario){
+  if(!confirm(`Remover o operador @${usuario}? O login local dele deixa de existir.`)) return;
+  try{
+    const resp = await fetch(`/api/abastecimento-operadores/${id}`, { method:'DELETE' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao remover.');
+    await carregarOperadores();
+    renderOperadores();
+  }catch(err){ erroOperadores(err.message); }
 }
 async function abrirOperadores(){
   document.getElementById('msg-operadores').classList.add('hidden');
@@ -1104,10 +1235,10 @@ async function salvarOperador(id, patch){
     renderOperadores();
   }catch(err){ erroOperadores(err.message); }
 }
-// mesma dinamica do desbloqueio do login principal: o Master desbloqueia
-// redefinindo a senha (4 numeros) e repassa pra pessoa
+// desbloqueio do Master (o bloqueio gera um ticket avisando): a senha e
+// OPCIONAL - em branco mantem a mesma, preenchida (4 numeros) redefine
 async function desbloquearOperador(id){
-  const novaSenha = prompt('Nova senha do operador (4 números):');
+  const novaSenha = prompt('Desbloquear operador — nova senha (4 números), ou deixe VAZIO pra manter a mesma senha:');
   if(novaSenha === null) return;
   try{
     const resp = await fetch(`/api/abastecimento-operadores/${id}/desbloquear`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ novaSenha }) });
@@ -1143,7 +1274,7 @@ function resumoPedidoHtml(p){
 }
 
 // pos-preparo: enquanto o ENVIO nao sai, o lembrete volta de 5 em 5 minutos
-// (snooze por pedido) sempre mostrando o tempo total
+// (snooze por pedido) - em tom neutro, sem cronometro na cara da equipe
 let LEMBRETE_SNOOZE = {}; // pedidoId -> timestamp de quando pode voltar
 function pedidoLembrete(r){
   return pendente(r) && r.preparoEm && (LEMBRETE_SNOOZE[r.id]||0) <= Date.now();
@@ -1167,11 +1298,13 @@ function verificarAlarme(){
   if(ALARME_PEDIDO && ALARME_PEDIDO.id === alvo.id && ALARME_MODO === modo){ ALARME_PEDIDO = alvo; return; }
   ALARME_PEDIDO = alvo;
   ALARME_MODO = modo;
+  // fora do "novo", o tom e sempre neutro ("em preparo") - lembra de enviar
+  // sem expor cronometro de cobranca pra equipe
   document.getElementById('al-titulo').textContent =
     modo==='novo' ? '🛒 NOVO PEDIDO DO CARRINHO!' :
-    modo==='atrasado' ? '🚨 PEDIDO ATRASADO — ENVIE IMEDIATAMENTE!' :
-    '⏳ PEDIDO AINDA NÃO ENVIADO!';
-  document.getElementById('alarme-card').classList.toggle('atrasado', modo!=='novo');
+    modo==='atrasado' ? '🍕 PEDIDO EM PREPARO — marque o preparo' :
+    '🍕 PEDIDO EM PREPARO — falta enviar';
+  document.getElementById('alarme-card').classList.toggle('atrasado', false);
   document.getElementById('al-sub').textContent = `${fmtHora(alvo.criadoEm)} · por ${alvo.criadoPorNome||alvo.criadoPorEmail||'—'}`;
   document.getElementById('al-itens').innerHTML = resumoPedidoHtml(alvo);
   document.getElementById('al-btn-visto').classList.toggle('hidden', modo!=='novo');
@@ -1189,20 +1322,20 @@ function atualizarTimerAlarme(){
   if(!ALARME_PEDIDO) return;
   const el = document.getElementById('al-timer');
   const lbl = document.getElementById('al-timer-label');
-  // tempo TOTAL desde a criacao do pedido - visivel em todos os modos
-  document.getElementById('al-total').textContent = fmtDuracao(Date.now() - new Date(ALARME_PEDIDO.criadoEm).getTime());
-  if(ALARME_MODO==='lembrete'){
-    // lembrete: o relogio grande E o tempo total do pedido, subindo
-    el.textContent = fmtDuracao(Date.now() - new Date(ALARME_PEDIDO.criadoEm).getTime());
-    el.className = 'alarme-timer estourado';
-    lbl.textContent = '⚠️ tempo total sem envio — mande o quanto antes';
+  // fora do "novo" o relogio some: o lembrete e neutro (pedido em preparo,
+  // falta enviar) - os tempos ficam so nos indicadores do Painel
+  if(ALARME_MODO!=='novo'){
+    el.classList.add('hidden');
+    lbl.textContent = ALARME_MODO==='atrasado'
+      ? 'marque "sendo preparado" pra avisar o carrinho'
+      : 'quando sair, registre o envio';
     return;
   }
-  // 'novo': regressivo de 5:00 desde a criacao do pedido, pra apertar OK;
-  // 'atrasado': cronometro subindo desde que estourou o prazo de preparo
-  const base = ALARME_MODO==='novo' ? new Date(ALARME_PEDIDO.criadoEm).getTime() : new Date(ALARME_PEDIDO.vistoEm).getTime();
+  el.classList.remove('hidden');
+  // 'novo': regressivo de 5:00 desde a criacao do pedido, pra apertar OK
+  const base = new Date(ALARME_PEDIDO.criadoEm).getTime();
   const resta = Math.round((base + CINCO_MIN - Date.now())/1000);
-  if(ALARME_MODO==='novo' && resta >= 0){
+  if(resta >= 0){
     el.textContent = `${Math.floor(resta/60)}:${String(resta%60).padStart(2,'0')}`;
     el.className = 'alarme-timer ok';
     lbl.textContent = 'pra confirmar que a loja viu';
@@ -1210,7 +1343,7 @@ function atualizarTimerAlarme(){
     const passou = -resta;
     el.textContent = `-${Math.floor(passou/60)}:${String(passou%60).padStart(2,'0')}`;
     el.className = 'alarme-timer estourado';
-    lbl.textContent = ALARME_MODO==='novo' ? '⚠️ tempo esgotado — confirme AGORA' : '⚠️ atrasado — envie IMEDIATAMENTE';
+    lbl.textContent = '⚠️ tempo esgotado — confirme AGORA';
   }
 }
 
@@ -1253,6 +1386,15 @@ function pararSomAlarme(){
   if(ALARME_SOM_TIMER){ clearInterval(ALARME_SOM_TIMER); ALARME_SOM_TIMER = null; }
 }
 document.addEventListener('click', ()=>{ if(ALARME_AUDIO_CTX && ALARME_AUDIO_CTX.state==='suspended') ALARME_AUDIO_CTX.resume(); });
+
+// ENTER no campo de senha autentica/envia direto (balcao agil, sem mouse);
+// no usuario, ENTER pula pra senha
+[['f-op-senha', ()=>salvar()], ['pin-senha', ()=>confirmarEnvioRapido()], ['op-novo-senha', ()=>adicionarOperador()]].forEach(([id, fn])=>{
+  document.getElementById(id).addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); fn(); } });
+});
+[['f-op-usuario','f-op-senha'], ['pin-usuario','pin-senha'], ['op-novo-usuario','op-novo-senha']].forEach(([de, para])=>{
+  document.getElementById(de).addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById(para).focus(); } });
+});
 
 function fecharAlarme(){
   pararSomAlarme();

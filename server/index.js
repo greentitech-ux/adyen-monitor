@@ -3676,9 +3676,36 @@ function podeEnviarAbastecimento(req) {
   return req.isAdmin || auth.hasSection(req, 'abastecimento-loja');
 }
 
-app.get('/api/abastecimento', requireAnySection('abastecimento-carrinho', 'abastecimento-loja'), async (req, res) => {
+// leitura: qualquer ponta - e tambem Master/Admin (indicadores no Painel)
+app.get('/api/abastecimento', auth.requireAuth, async (req, res) => {
+  if (!podePedirAbastecimento(req) && !podeEnviarAbastecimento(req)) {
+    return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+  }
   res.json(await abastecimentoCarrinho.listAll());
 });
+
+// operador bloqueou AGORA (3 senhas erradas): gera o ticket pro Master
+// desbloquear - a pessoa do balcao nao precisa correr atras de ninguem
+async function abrirTicketBloqueioOperador(op, req) {
+  try {
+    const registro = await solicitacoes.create({
+      tipo: 'suporte-ti',
+      unidade: "Domino's Carrinho Aeroporto Recife",
+      unidadeNome: 'Dom Car Aero Recife',
+      titulo: `Abastecimento: desbloquear operador @${op.usuario}`,
+      observacao: `O operador local @${op.usuario}${op.nome ? ` (${op.nome})` : ''} do Abastecimento do Carrinho foi bloqueado após 3 senhas erradas.\n\nSó o Master desbloqueia: página Abastecimento → 👥 Operadores → 🔓 desbloquear (dá pra manter a mesma senha ou definir uma nova de 4 números).`,
+      prioridade: 'alta',
+      criadoPorId: req.user?.id || null,
+      criadoPorEmail: req.user?.email || 'abastecimento (bloqueio automático)',
+      direcionadoParaId: null,
+      direcionadoParaEmail: null,
+    });
+    broadcast('solicitacao-criada', registro, 'solicitacoes');
+    push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Operador bloqueado (Abastecimento)`, `@${op.usuario} · 3 senhas erradas — Master desbloqueia`, registro.id);
+  } catch (e) {
+    console.error('Falha ao abrir ticket de bloqueio de operador:', e.message);
+  }
+}
 
 app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
   try {
@@ -3714,7 +3741,8 @@ app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
     }
     res.json(registro);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err.operadorBloqueado) abrirTicketBloqueioOperador(err.operadorBloqueado, req);
+    res.status(400).json({ error: err.message, papelErrado: !!err.papelErrado });
   }
 });
 
@@ -3785,6 +3813,53 @@ app.post('/api/abastecimento/:id/recebimento', auth.requireAuth, async (req, res
   }
 });
 
+// recebimento que NAO bate e o popup nao resolve (chegou item fora da
+// lista do envio, ou o "a mais" registrado nao e o que chegou de verdade):
+// encerra a conferencia como DIVERGENCIA e gera um Ticket de analise
+app.post('/api/abastecimento/:id/divergencia', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podePedirAbastecimento(req)) return res.status(403).json({ error: 'Você não tem a permissão de PEDIDO (lado do carrinho).' });
+    const envio = await abastecimentoCarrinho.getOne(req.params.id);
+    if (!envio || envio.tipo !== 'ENVIO') return res.status(404).json({ error: 'Envio não encontrado.' });
+    if (envio.recebidoEm) return res.status(400).json({ error: 'Esse envio já foi conferido.' });
+    const MOTIVOS = {
+      'extras-nao-conferem': 'o "a mais" registrado no envio NÃO é o que chegou',
+      'itens-fora-da-lista': 'chegaram itens que não estão na lista do envio',
+    };
+    const motivo = MOTIVOS[req.body.motivo] ? req.body.motivo : 'divergencia';
+    const enviouTxt = abastecimentoCarrinho.SABORES
+      .filter((s) => Number(envio.pizzas?.[s]) > 0).map((s) => `${envio.pizzas[s]} ${s}`)
+      .concat((envio.insumos || []).map((i) => i.insumoId ? `${i.nome} (${i.quantidade} ${i.embalagem === 'caixa' ? 'cx' : 'un'})` : i.descricao))
+      .join(', ') || '—';
+    const detalhe = String(req.body.detalhe || '').trim().slice(0, 500);
+    const ticket = await solicitacoes.create({
+      tipo: 'suporte-ti',
+      unidade: "Domino's Carrinho Aeroporto Recife",
+      unidadeNome: 'Dom Car Aero Recife',
+      titulo: `Abastecimento: divergência no recebimento (envio ${new Date(envio.criadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})`,
+      observacao: `O carrinho NÃO conseguiu bater o recebimento com o envio registrado.\n\nProblema: ${MOTIVOS[motivo] || 'divergência no recebimento'}.\nEnvio registrado: ${enviouTxt}.\nOperador do envio: ${envio.operadorUsuario ? '@' + envio.operadorUsuario : envio.criadoPorNome || '—'}.\nQuem conferiu no carrinho: ${req.user.username || req.user.email}.${detalhe ? `\nDetalhe informado: ${detalhe}` : ''}\n\nAnalisar o lançamento na página Abastecimento (Movimentações) e ajustar com a equipe.`,
+      prioridade: 'alta',
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+      direcionadoParaId: null,
+      direcionadoParaEmail: null,
+    });
+    broadcast('solicitacao-criada', ticket, 'solicitacoes');
+    push.notifySolicitacao(`Ticket #${ticket.numeroTicket} · Divergência no Abastecimento`, `${MOTIVOS[motivo] || 'recebimento não bate com o envio'}`, ticket.id);
+    const registro = await abastecimentoCarrinho.registrarDivergencia(req.params.id, {
+      motivo,
+      detalhe,
+      numeroTicket: ticket.numeroTicket,
+      porEmail: req.user.email,
+      porNome: req.user.username || req.user.email,
+    });
+    broadcast('abastecimento-atualizado', { id: registro.id });
+    res.json({ registro, numeroTicket: ticket.numeroTicket });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ----- config (Master define os horarios do popup de contagem) -----
 app.get('/api/abastecimento-config', requireAnySection('abastecimento-carrinho', 'abastecimento-loja'), async (req, res) => {
   res.json(await abastecimentoCarrinho.getConfig());
@@ -3801,10 +3876,29 @@ app.put('/api/abastecimento-config', auth.requireMaster, async (req, res) => {
 });
 
 // ----- operadores locais (login de balcao 4 letras + 4 numeros) -----
-// cadastro: Master/Admin, na propria pagina; DESBLOQUEIO: so Master (mesma
-// dinamica do login principal - desbloqueia redefinindo a senha)
+// cadastro: Master/Admin, na propria pagina; ativar/desativar, remover e
+// DESBLOQUEIO: SO Master. A senha so muda no desbloqueio (opcional - da pra
+// manter a mesma); o proprio operador troca o papel autenticando a senha
 app.get('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req, res) => {
   res.json(await abastecimentoCarrinho.listarOperadores());
+});
+
+// o PROPRIO operador troca seu papel (pede <-> envia) com a propria senha -
+// qualquer usuario logado das duas pontas pode acionar do balcao
+app.post('/api/abastecimento-operadores/trocar-papel', auth.requireAuth, async (req, res) => {
+  try {
+    if (!podePedirAbastecimento(req) && !podeEnviarAbastecimento(req)) {
+      return res.status(403).json({ error: 'Você não tem acesso a essa área.' });
+    }
+    res.json(await abastecimentoCarrinho.trocarPapelOperador({
+      usuario: req.body.usuario,
+      senha: req.body.senha,
+      papel: req.body.papel,
+    }));
+  } catch (err) {
+    if (err.operadorBloqueado) abrirTicketBloqueioOperador(err.operadorBloqueado, req);
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req, res) => {
@@ -3822,7 +3916,8 @@ app.post('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req,
   }
 });
 
-app.patch('/api/abastecimento-operadores/:id', auth.requireMasterOrAdmin, async (req, res) => {
+// editar (ativar/desativar, papel, nome): SO Master
+app.patch('/api/abastecimento-operadores/:id', auth.requireMaster, async (req, res) => {
   try {
     res.json(await abastecimentoCarrinho.atualizarOperador(req.params.id, { nome: req.body.nome, papel: req.body.papel, ativo: req.body.ativo }));
   } catch (err) {
@@ -3830,6 +3925,18 @@ app.patch('/api/abastecimento-operadores/:id', auth.requireMasterOrAdmin, async 
   }
 });
 
+// remover: SO Master
+app.delete('/api/abastecimento-operadores/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await abastecimentoCarrinho.removerOperador(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// desbloqueio (via ticket gerado no bloqueio): senha opcional - em branco
+// mantem a mesma, preenchida redefine
 app.post('/api/abastecimento-operadores/:id/desbloquear', auth.requireMaster, async (req, res) => {
   try {
     res.json(await abastecimentoCarrinho.desbloquearOperador(req.params.id, { novaSenha: req.body.novaSenha }));
