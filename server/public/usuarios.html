@@ -182,6 +182,7 @@
   <div class="nav-drawer-grupo">Solicitações</div>
   <a class="back" href="/central.html">📋 Central</a>
   <a class="back" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back" id="nav-ativos-ti" href="/ativos-ti.html">🖥️ Ativos de TI</a>
   <a class="back" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back active" href="/usuarios.html">👤 Usuários</a>
@@ -451,7 +452,7 @@ function initNavDrawerAccordion(){
 }
 initNavDrawerAccordion();
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['suporte','Suporte de TI (atendimento remoto)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'], ['abastecimento-carrinho','Abastec. Carrinho - PEDIDOS (carrinho Dom Aeroporto)'], ['abastecimento-loja','Abastec. Carrinho - ENVIOS (loja Dom Aeroporto)'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['suporte','Suporte de TI (atendimento remoto)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'], ['abastecimento-carrinho','Abastec. Carrinho - PEDIDOS (carrinho Dom Aeroporto)'], ['abastecimento-loja','Abastec. Carrinho - ENVIOS (loja Dom Aeroporto)'], ['ativos-ti','Ativos de TI (inventário das lojas)'] ];
 // os 7 tipos de card que aparecem na Central - mesma lista/rotulo de
 // TIPOS_INFO em central.html/central-historico.html
 const TIPOS_SOLICITACAO = [ ['estorno','💳 Estorno'], ['ajuste-fechamento','🧾 Ajuste de fechamento'], ['compra','🛒 Compra'], ['manutencao','🔧 Manutenção'], ['suporte-ti','💻 Suporte de TI'], ['pagamento','💸 Pagamento (despesa)'], ['nota','📄 Solicitação de Nota'], ['quebra-caixa','⚠️ Quebra de caixa'] ];

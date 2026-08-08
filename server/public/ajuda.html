@@ -125,6 +125,7 @@
   <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
   <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
   <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back" id="nav-ativos-ti" href="/ativos-ti.html">🖥️ Ativos de TI</a>
   <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
   <div class="nav-drawer-grupo">Administração</div>
   <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
@@ -461,6 +462,19 @@ const TOPICOS = [
     <h3>📊 Resumo do dia</h3>
     <p>O topo da tela mostra o total <b>enviado hoje e ontem por sabor</b> (o antigo card "Ont/HJ") e quantos pedidos ainda aguardam envio. A lista é agrupada por dia e dá pra filtrar por Pedidos, Envios ou só os que aguardam envio.</p>
     <div class="dica"><b>Registro errado?</b> Só o Master exclui — e se era um envio vinculado, o pedido volta sozinho pra fila de aguardando envio.</div>
+  `},
+  { id:'ativos-ti', icone:'🖥️', secoes:['ativos-ti'], titulo:'Ativos de TI (inventário das lojas)', corpo:`
+    <p>Inventário do que existe de TI em cada loja: monitores, CPUs, pin pads, impressoras e o rack (roteador, switch, DVR, câmeras...). Funciona por <b>vistoria</b>: sempre que um técnico visita a loja, ele registra o que encontrou — e o <b>inventário atual</b> da loja é sempre a vistoria mais recente. As anteriores ficam no histórico, então dá pra ver o que mudou entre visitas.</p>
+    <h3>📋 Registrar uma vistoria</h3>
+    <ol>
+      <li>Clique em <b>📋 Nova vistoria de ativos</b> e escolha a loja.</li>
+      <li>Se a loja já tem vistoria, use <b>⬇️ Começar da última vistoria</b>: o formulário vem preenchido com o inventário anterior e você só confere e ajusta o que mudou.</li>
+      <li>Os ativos são organizados por <b>área</b> (o padrão é "Loja" e "Rack", mas dá pra renomear e adicionar outras). Em cada área, lance o ativo, a quantidade e, se precisar, uma observação ("confirmar", nº de série, "HD cheio"...).</li>
+      <li>Salve — a loja passa a mostrar esse levantamento como inventário atual.</li>
+    </ol>
+    <h3>🔐 Quem acessa</h3>
+    <p>A aba é liberada por permissão: o Master concede a seção <b>Ativos de TI</b> na tela de Usuários pro técnico que vai fazer a visita. Master e Admin sempre veem. Excluir vistoria do histórico é só o Master.</p>
+    <div class="dica"><b>⚠️ antiga:</b> quando a última vistoria de uma loja tem mais de 90 dias, o card mostra o aviso — hora de revisitar. As dúvidas do levantamento aparecem com ⚠️ na frente do item (ex: quantidade de câmeras a confirmar).</div>
   `},
   { id:'parque-checkin', icone:'🤸', secoes:['parque-checkin'], titulo:'Check-in do Parque (Saltiverso)', corpo:`
     <h3>Passo a passo</h3>

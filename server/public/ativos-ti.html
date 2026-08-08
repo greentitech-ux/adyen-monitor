@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Ativos de TI · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:720px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hidden{display:none!important;}
+  .hamburger-btn{position:sticky;top:14px;z-index:997;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer-grupo{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:12px 10px 4px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
+  .nav-drawer-grupo .ndg-seta{transition:transform .15s ease;font-size:9px;flex:none;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet-wrap{position:relative;width:100%;max-width:720px;}
+  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:720px;max-height:90vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+  .btn-primary{width:100%;margin-top:16px;background:var(--accent);color:#06202b;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+
+  .btn-vistoria{font-family:var(--sans);font-size:13px;font-weight:800;color:#06202b;background:var(--accent);border:none;border-radius:10px;padding:12px 16px;cursor:pointer;width:100%;margin-bottom:14px;}
+  .resumo-lojas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-bottom:14px;}
+  .loja-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;cursor:pointer;}
+  .loja-card:hover{border-color:var(--accent);}
+  .loja-card.sel{border-color:var(--accent);background:rgba(92,200,255,.07);}
+  .loja-card .nome{font-size:13px;font-weight:700;}
+  .loja-card .meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;}
+  .loja-card .total{font-size:19px;font-weight:800;color:var(--accent);margin-top:4px;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.antiga{background:var(--warn-dim);color:var(--warn);}
+
+  .area-bloco{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-top:10px;background:var(--panel2);}
+  .area-nome{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+  .item-linha{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0;border-top:1px solid rgba(35,42,51,.6);}
+  .item-linha:first-of-type{border-top:none;}
+  .item-linha .qtd{font-family:var(--mono);font-weight:800;color:var(--text);flex:none;}
+  .item-linha .obs{font-size:11px;color:var(--warn);}
+  details.vistoria-hist{border:1px solid var(--line);border-radius:10px;margin-top:8px;overflow:hidden;}
+  details.vistoria-hist summary{list-style:none;cursor:pointer;padding:10px 13px;font-size:12.5px;display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);color:var(--muted);}
+  details.vistoria-hist summary::-webkit-details-marker{display:none;}
+  details.vistoria-hist .corpo{padding:0 13px 12px;}
+  .f-area{border:1px solid var(--line);border-radius:10px;padding:11px;margin-top:10px;background:var(--panel2);}
+  .f-item{display:grid;grid-template-columns:1.5fr 64px 1fr auto;gap:6px;margin-top:6px;}
+  .f-item input{padding:8px 9px;font-size:13px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Solutions Ti Tech</div>
+        <h1>🖥️ Ativos de TI das lojas</h1>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <div class="nav-drawer-grupo">Operação diária</div>
+  <a class="back" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-abastecimento" href="/abastecimento.html">🛒 Abastec. Carrinho</a>
+  <div class="nav-drawer-grupo">Monitoramento</div>
+  <a class="back" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <div class="nav-drawer-grupo" id="nav-grupo-saltiverso">Saltiverso</div>
+  <a class="back" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
+  <a class="back" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <a class="back" id="nav-mensalistas" href="/mensalistas.html">📅 Mensalistas</a>
+  <div class="nav-drawer-grupo">Solicitações</div>
+  <a class="back" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back active" id="nav-ativos-ti" href="/ativos-ti.html">🖥️ Ativos de TI</a>
+  <a class="back" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
+  <div class="nav-drawer-grupo">Administração</div>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <a class="back hidden" id="nav-reset-senha" href="/painel.html?resetSenha=1">🔑 Reset senha</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso aos Ativos de TI. Peça ao Master pra liberar a seção "Ativos de TI".</div>
+
+<div id="root" class="hidden">
+<button type="button" class="btn-vistoria" onclick="abrirVistoria()">📋 Nova vistoria de ativos</button>
+
+<div class="panel">
+  <h2>Lojas <span style="font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400;">toque pra ver o inventário</span></h2>
+  <div class="resumo-lojas" id="resumo-lojas"></div>
+</div>
+
+<div class="panel hidden" id="painel-inventario">
+  <h2 id="inv-titulo"></h2>
+  <div id="inv-meta" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:6px;"></div>
+  <div id="inv-areas"></div>
+  <div id="inv-obs" class="hidden" style="margin-top:10px;font-size:12px;color:var(--muted);border-left:2px solid var(--line);padding-left:8px;"></div>
+  <h2 style="margin-top:16px;">Histórico de vistorias</h2>
+  <div id="inv-historico"></div>
+</div>
+</div>
+
+<!-- nova vistoria: areas dinamicas (Loja/Rack/...), cada uma com itens
+     descricao + quantidade + observacao -->
+<div class="overlay hidden" id="overlay-vistoria">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharVistoria()">✕</span>
+    <div class="sheet">
+      <h3>📋 Nova vistoria de ativos</h3>
+      <div class="sub">registre o que encontrou na loja — o inventário atual vira esta vistoria</div>
+      <label>Loja</label>
+      <select id="v-unidade" onchange="prefillDisponivel()"></select>
+      <button type="button" class="btn-add hidden" id="btn-prefill" onclick="copiarUltimaVistoria()">⬇️ Começar da última vistoria dessa loja</button>
+      <div id="v-areas"></div>
+      <button type="button" class="btn-add" onclick="adicionarArea()">＋ Adicionar área (ex: Rack, Cozinha...)</button>
+      <label>Observação geral</label>
+      <textarea id="v-obs" placeholder="ex: DVR com HD cheio / faltou conferir câmeras"></textarea>
+      <button type="button" class="btn-primary" id="btn-salvar-vistoria" onclick="salvarVistoria()">Salvar vistoria</button>
+      <div class="msg hidden" id="msg-vistoria"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+function initNavDrawerAccordion(){
+  const nav = document.getElementById('nav-drawer');
+  if(!nav || nav.dataset.ndgInit) return;
+  nav.dataset.ndgInit = '1';
+  [...nav.querySelectorAll(':scope > .nav-drawer-grupo')].forEach(g=>{
+    const nomeGrupo = g.textContent.trim();
+    const itens = [];
+    let el = g.nextElementSibling;
+    while(el && !el.classList.contains('nav-drawer-grupo') && !el.classList.contains('nav-drawer-sep')){
+      const prox = el.nextElementSibling;
+      itens.push(el);
+      el = prox;
+    }
+    if(!itens.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'ndg-wrap';
+    g.after(wrap);
+    itens.forEach(it=>wrap.appendChild(it));
+    g.innerHTML = `<span>${nomeGrupo}</span><span class="ndg-seta">▾</span>`;
+    const atualizarVazio = ()=>{
+      const temVisivel = itens.some(it=>!it.classList.contains('hidden'));
+      g.classList.toggle('hidden', !temVisivel);
+    };
+    atualizarVazio();
+    new MutationObserver(atualizarVazio).observe(wrap, { attributes:true, attributeFilter:['class'], subtree:true });
+    const key = 'ndgAberto:' + nomeGrupo;
+    const temAtivo = itens.some(it=>it.classList.contains('active'));
+    const aberto = temAtivo || localStorage.getItem(key) === '1';
+    g.querySelector('.ndg-seta').style.transform = aberto ? '' : 'rotate(-90deg)';
+    wrap.classList.toggle('hidden', !aberto);
+    g.addEventListener('click', ()=>{
+      const abrirAgora = wrap.classList.contains('hidden');
+      wrap.classList.toggle('hidden', !abrirAgora);
+      g.querySelector('.ndg-seta').style.transform = abrirAgora ? '' : 'rotate(-90deg)';
+      localStorage.setItem(key, abrirAgora ? '1' : '0');
+    });
+  });
+}
+initNavDrawerAccordion();
+
+// mesma tabela de unidades da Central
+const ARCFOOD_UNIDADES = { '19821':'Dom Sao Miguel', '19855':'Dom Carrão', '19888':'Dom Mooca', '19889':'Dom Tatuape' };
+const BRAVO_UNIDADES_NOMES = {
+  "Domino's Carrinho Aeroporto Recife": 'Dom Car Aero Recife',
+  'Dominos Bessa': 'Dom Bessa',
+  'Dominos Campina Grande': 'Dom Campina Grande',
+  'Dominos Caruaru': 'Dom Caruaru',
+  'Dominos Garanhuns': 'Dom Garanhuns',
+  'Dominos Praça Aeroporto Recife': 'Dom Praça Aero Recife',
+  'Dominos Tirol': 'Dom Tirol',
+  'Milky Moo Tirol': 'MilkyMoo Tirol',
+  'Spoleto Praça Aeroporto Recife': 'Spo Praça Aero Recife',
+  'Spoleto Shopping Recife': 'Spo Shop Recife',
+  'Spoleto Shopping Tacaruna': 'Spo Shop Tacaruna',
+  'São Braz IL': 'Sao Braz Ilha',
+};
+const UNIDADES_NOMES = { ...ARCFOOD_UNIDADES, ...BRAVO_UNIDADES_NOMES };
+
+let ME = null;
+let IS_MASTER = false;
+let VISTORIAS = [];
+let UNIDADE_SEL = null;
+let AREAS_FORM = [];
+let SEQ = 0;
+
+const FUSO_BR = 'America/Sao_Paulo';
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtData(iso){ return new Date(iso).toLocaleDateString('pt-BR',{timeZone:FUSO_BR}); }
+function fmtDataHora(iso){ return new Date(iso).toLocaleString('pt-BR',{timeZone:FUSO_BR,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+function porUnidade(){
+  const mapa = new Map();
+  for(const v of VISTORIAS){
+    if(!mapa.has(v.unidade)) mapa.set(v.unidade, []);
+    mapa.get(v.unidade).push(v);
+  }
+  return mapa;
+}
+
+// vistoria com mais de 90 dias merece o aviso de "antiga" - hora de revisitar
+function vistoriaAntiga(v){ return (Date.now() - new Date(v.criadoEm).getTime()) > 90*24*3600*1000; }
+
+function renderLojas(){
+  const mapa = porUnidade();
+  document.getElementById('resumo-lojas').innerHTML = [...mapa.entries()].map(([unidade, lista])=>{
+    const atual = lista[0];
+    return `
+    <div class="loja-card ${unidade===UNIDADE_SEL?'sel':''}" onclick="selecionarLoja('${escapeHtml(unidade)}')">
+      <div class="nome">${escapeHtml(atual.unidadeNome||unidade)}</div>
+      <div class="total">${atual.totalAtivos} <span style="font-size:11px;color:var(--muted);font-weight:400;">ativos</span></div>
+      <div class="meta">última vistoria ${fmtData(atual.criadoEm)} ${vistoriaAntiga(atual)?'<span class="badge antiga">⚠️ antiga</span>':''}</div>
+    </div>`;
+  }).join('') || '<div class="empty">Nenhuma vistoria registrada ainda.</div>';
+}
+
+function areasHtml(v){
+  return (v.areas||[]).map(a=>`
+    <div class="area-bloco">
+      <div class="area-nome">${escapeHtml(a.nome)} · ${a.itens.reduce((s,i)=>s+i.quantidade,0)} ativos</div>
+      ${a.itens.map(i=>`
+        <div class="item-linha">
+          <span>${escapeHtml(i.descricao)}${i.observacao?`<div class="obs">⚠️ ${escapeHtml(i.observacao)}</div>`:''}</span>
+          <span class="qtd">${i.quantidade}</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function selecionarLoja(unidade){
+  UNIDADE_SEL = unidade;
+  renderLojas();
+  const lista = porUnidade().get(unidade) || [];
+  if(!lista.length){ document.getElementById('painel-inventario').classList.add('hidden'); return; }
+  const atual = lista[0];
+  document.getElementById('inv-titulo').textContent = `🖥️ ${atual.unidadeNome||unidade} — inventário atual`;
+  document.getElementById('inv-meta').textContent = `vistoria de ${fmtDataHora(atual.criadoEm)} · por ${atual.criadoPorNome||atual.criadoPorEmail||'—'} · ${atual.totalAtivos} ativos`;
+  document.getElementById('inv-areas').innerHTML = areasHtml(atual);
+  const obs = document.getElementById('inv-obs');
+  obs.classList.toggle('hidden', !atual.observacao);
+  obs.textContent = atual.observacao || '';
+  document.getElementById('inv-historico').innerHTML = lista.slice(1).map(v=>`
+    <details class="vistoria-hist">
+      <summary><span>${fmtDataHora(v.criadoEm)} · ${escapeHtml(v.criadoPorNome||'—')}</span><span>${v.totalAtivos} ativos</span></summary>
+      <div class="corpo">${areasHtml(v)}${IS_MASTER?`<button type="button" class="btn-add" style="color:var(--bad);border-color:rgba(255,92,92,.4);" onclick="excluirVistoria('${v.id}')">🗑 Excluir esta vistoria</button>`:''}</div>
+    </details>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Só existe esta vistoria.</div>';
+  document.getElementById('painel-inventario').classList.remove('hidden');
+}
+
+async function carregar(){
+  VISTORIAS = await fetch('/api/ativos-ti').then(r=>r.json());
+  VISTORIAS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
+  renderLojas();
+  if(UNIDADE_SEL) selecionarLoja(UNIDADE_SEL);
+}
+
+// ---------- nova vistoria ----------
+function adicionarArea(nome){
+  AREAS_FORM.push({ id: ++SEQ, nome: nome||'', itens: [] });
+  renderAreasForm();
+}
+function removerArea(id){ AREAS_FORM = AREAS_FORM.filter(a=>a.id!==id); renderAreasForm(); }
+function adicionarItem(areaId, descricao, quantidade, observacao){
+  const a = AREAS_FORM.find(x=>x.id===areaId);
+  if(!a) return;
+  a.itens.push({ id: ++SEQ, descricao: descricao||'', quantidade: quantidade!=null?quantidade:'', observacao: observacao||'' });
+  renderAreasForm();
+}
+function removerItem(areaId, itemId){
+  const a = AREAS_FORM.find(x=>x.id===areaId);
+  if(a){ a.itens = a.itens.filter(i=>i.id!==itemId); renderAreasForm(); }
+}
+function renderAreasForm(){
+  document.getElementById('v-areas').innerHTML = AREAS_FORM.map(a=>`
+    <div class="f-area">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="text" value="${escapeHtml(a.nome)}" oninput="AREAS_FORM.find(x=>x.id===${a.id}).nome=this.value" placeholder="nome da área (ex: Loja, Rack)" style="flex:1;">
+        <button type="button" class="btn-remover" onclick="removerArea(${a.id})">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1.5fr 64px 1fr auto;gap:6px;font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:8px;"><span>ativo</span><span>qtde</span><span>observação</span><span></span></div>
+      ${a.itens.map(i=>`
+        <div class="f-item">
+          <input type="text" value="${escapeHtml(i.descricao)}" oninput="AREAS_FORM.find(x=>x.id===${a.id}).itens.find(y=>y.id===${i.id}).descricao=this.value" placeholder="ex: Monitor">
+          <input type="number" min="0" inputmode="numeric" value="${escapeHtml(i.quantidade)}" oninput="AREAS_FORM.find(x=>x.id===${a.id}).itens.find(y=>y.id===${i.id}).quantidade=this.value" placeholder="0">
+          <input type="text" value="${escapeHtml(i.observacao)}" oninput="AREAS_FORM.find(x=>x.id===${a.id}).itens.find(y=>y.id===${i.id}).observacao=this.value" placeholder="ex: confirmar / nº série">
+          <button type="button" class="btn-remover" onclick="removerItem(${a.id},${i.id})">✕</button>
+        </div>`).join('')}
+      <button type="button" class="btn-add" onclick="adicionarItem(${a.id})">＋ item</button>
+    </div>`).join('');
+}
+
+function abrirVistoria(){
+  AREAS_FORM = [];
+  adicionarArea('Loja');
+  adicionarArea('Rack');
+  document.getElementById('v-obs').value = '';
+  document.getElementById('msg-vistoria').classList.add('hidden');
+  const unidades = new Set([...Object.keys(UNIDADES_NOMES), ...VISTORIAS.map(v=>v.unidade)]);
+  document.getElementById('v-unidade').innerHTML = [...unidades].map(u=>
+    `<option value="${escapeHtml(u)}" ${u===UNIDADE_SEL?'selected':''}>${escapeHtml(UNIDADES_NOMES[u]||porUnidade().get(u)?.[0]?.unidadeNome||u)}</option>`).join('');
+  prefillDisponivel();
+  document.getElementById('overlay-vistoria').classList.remove('hidden');
+}
+function fecharVistoria(){ document.getElementById('overlay-vistoria').classList.add('hidden'); }
+
+function prefillDisponivel(){
+  const unidade = document.getElementById('v-unidade').value;
+  document.getElementById('btn-prefill').classList.toggle('hidden', !(porUnidade().get(unidade)||[]).length);
+}
+// copia a ultima vistoria da loja pro formulario - o tecnico so confere e
+// ajusta o que mudou desde a visita anterior
+function copiarUltimaVistoria(){
+  const unidade = document.getElementById('v-unidade').value;
+  const atual = (porUnidade().get(unidade)||[])[0];
+  if(!atual) return;
+  AREAS_FORM = [];
+  for(const a of atual.areas||[]){
+    adicionarArea(a.nome);
+    const alvo = AREAS_FORM[AREAS_FORM.length-1];
+    for(const i of a.itens) adicionarItem(alvo.id, i.descricao, i.quantidade, i.observacao);
+  }
+  renderAreasForm();
+}
+
+async function salvarVistoria(){
+  const msg = document.getElementById('msg-vistoria');
+  const btn = document.getElementById('btn-salvar-vistoria');
+  msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try{
+    const unidade = document.getElementById('v-unidade').value;
+    const body = {
+      unidade,
+      unidadeNome: UNIDADES_NOMES[unidade] || (porUnidade().get(unidade)||[])[0]?.unidadeNome || unidade,
+      areas: AREAS_FORM.map(a=>({ nome: a.nome, itens: a.itens.map(i=>({ descricao: i.descricao, quantidade: i.quantidade, observacao: i.observacao })) })),
+      observacao: document.getElementById('v-obs').value,
+    };
+    const resp = await fetch('/api/ativos-ti', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar vistoria.');
+    fecharVistoria();
+    UNIDADE_SEL = unidade;
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Salvar vistoria';
+  }
+}
+
+async function excluirVistoria(id){
+  if(!confirm('Excluir essa vistoria do histórico?')) return;
+  const resp = await fetch(`/api/ativos-ti/${id}`, { method:'DELETE' });
+  if(resp.ok) await carregar();
+}
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  IS_MASTER = ME.role==='master';
+  const secoes = ME.permissions?.sections||[];
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
+  if(!IS_MASTER && !ME.isAdmin && !secoes.includes('ativos-ti')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+  const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
+  es.addEventListener('ativos-ti-atualizado', ()=>{ carregar(); });
+}
+boot();
+</script>
+<script src="/notif-central.js"></script>
+<script src="/suporte-chat.js"></script>
+</body>
+</html>

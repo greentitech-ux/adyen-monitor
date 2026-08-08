@@ -10,7 +10,7 @@ const sessions = require('./sessions');
 
 const usersRef = db.collection('users');
 
-const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'suporte', 'manutencao', 'inventario', 'parque', 'parque-checkin', 'festas', 'abastecimento-carrinho', 'abastecimento-loja'];
+const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'suporte', 'manutencao', 'inventario', 'parque', 'parque-checkin', 'festas', 'abastecimento-carrinho', 'abastecimento-loja', 'ativos-ti'];
 
 // os 7 tipos de card que aparecem na Central - mesma lista de TIPOS_INFO em
 // central.html/central-historico.html. Igual ao cofre (vaultSubgroups) e
