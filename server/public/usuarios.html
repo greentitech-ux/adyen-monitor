@@ -240,6 +240,12 @@
         <div class="checks" id="c-tipos-solicitacao"></div>
       </fieldset>
 
+      <fieldset>
+        <legend>Tags</legend>
+        <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">Já cria o acesso com essas tags marcadas - dá pra ajustar depois em Ações → Permissões e tags.</div>
+        <div id="c-tags"></div>
+      </fieldset>
+
       <p class="err hidden" id="create-err"></p>
       <button type="submit" class="primary">Criar acesso</button>
     </form>
@@ -350,10 +356,14 @@
       <div style="font-size:10.5px;color:var(--muted);margin:-4px 0 8px;">Nenhum marcado = vê todos os tipos (padrão). Marcando algum, só esses ficam visíveis na Central.</div>
       <div class="checks" id="p-tipos-solicitacao"></div>
     </fieldset>
+    <fieldset style="margin-top:10px;">
+      <legend>Tags</legend>
+      <div id="p-tags"></div>
+    </fieldset>
     <p class="err hidden" id="perm-err"></p>
     <div class="modal-actions">
       <button type="button" id="perm-cancel">Cancelar</button>
-      <button type="submit" class="primary">Salvar permissões</button>
+      <button type="submit" class="primary">Salvar permissões e tags</button>
     </div>
   </form>
 </div>
@@ -521,6 +531,50 @@ function caminhoSubgrupo(id){
   return (g?g.name+' / ':'')+s.name;
 }
 
+// ---------- Tags: cargo (exclusivo) + acessos extras (independentes) -
+// junta num so bloco reaproveitado no formulario de criacao e no modal de
+// Permissoes, pra nao ter que criar o acesso "pelado" e so depois ir ate
+// Acoes marcar cada tag uma por uma ----------
+const CARGOS = [ ['','Sem cargo'], ['loja','🏬 Loja'], ['gerente','👔 Gerente'], ['tecnico','🔧 Técnico'], ['suporte','🎧 Suporte'], ['manutencao','🛠️ Manutenção'] ];
+function tagsFieldsetHtml(prefixo, tags){
+  tags = tags || { cargo:null, isAdmin:false, podeCatalogoEstoque:false, podeCatalogoInsumos:false, podeCadastrarOperadores:false };
+  const cargoHtml = CARGOS.map(([v,l])=>{
+    const marcado = (tags.cargo||'')===v;
+    return `<label><input type="radio" name="${prefixo}-cargo" value="${v}" ${marcado?'checked':''}> ${l}</label>`;
+  }).join('');
+  return `
+    <div class="group-heading">Cargo <span style="text-transform:none;color:var(--muted);">— rótulo + tela inicial ao entrar</span></div>
+    <div class="checks">${cargoHtml}</div>
+    <div class="group-heading" style="margin-top:10px;">Acessos extras <span style="text-transform:none;color:var(--muted);">— liberam uma ação sem precisar dar Admin</span></div>
+    <div class="checks">
+      <label><input type="checkbox" id="${prefixo}-tag-admin" ${tags.isAdmin?'checked':''}> ⭐ Admin (aprova/recusa na Central)</label>
+      <label><input type="checkbox" id="${prefixo}-tag-catalogo-estoque" ${tags.podeCatalogoEstoque?'checked':''}> 📦 Catálogo do Estoque</label>
+      <label><input type="checkbox" id="${prefixo}-tag-catalogo-insumos" ${tags.podeCatalogoInsumos?'checked':''}> 🥤 Insumos (Abastec. Carrinho)</label>
+      <label><input type="checkbox" id="${prefixo}-tag-operadores" ${tags.podeCadastrarOperadores?'checked':''}> 👥 Operadores (Abastec. Carrinho)</label>
+    </div>`;
+}
+function lerTagsForm(prefixo){
+  return {
+    cargo: (document.querySelector(`input[name="${prefixo}-cargo"]:checked`)||{}).value || null,
+    isAdmin: document.getElementById(prefixo+'-tag-admin').checked,
+    podeCatalogoEstoque: document.getElementById(prefixo+'-tag-catalogo-estoque').checked,
+    podeCatalogoInsumos: document.getElementById(prefixo+'-tag-catalogo-insumos').checked,
+    podeCadastrarOperadores: document.getElementById(prefixo+'-tag-operadores').checked,
+  };
+}
+async function salvarTagsUsuario(id, tags){
+  const respostas = await Promise.all([
+    fetch('/api/users/'+id+'/cargo', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cargo: tags.cargo})}),
+    fetch('/api/users/'+id+'/is-admin', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({isAdmin: tags.isAdmin})}),
+    fetch('/api/users/'+id+'/catalogo-estoque', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoEstoque: tags.podeCatalogoEstoque})}),
+    fetch('/api/users/'+id+'/catalogo-insumos', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoInsumos: tags.podeCatalogoInsumos})}),
+    fetch('/api/users/'+id+'/cadastrar-operadores', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCadastrarOperadores: tags.podeCadastrarOperadores})}),
+  ]);
+  for(const r of respostas){
+    if(!r.ok){ const d = await r.json().catch(()=>({})); throw new Error(d.error || 'Erro ao salvar as tags.'); }
+  }
+}
+
 async function boot(){
   const meRes = await fetch('/api/me');
   if(!meRes.ok){ logout(); return; }
@@ -540,6 +594,7 @@ async function boot(){
   document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
   document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
   document.getElementById('c-tipos-solicitacao').innerHTML = checksHtml('tiposSolicitacao', TIPOS_SOLICITACAO, o=>o[0], o=>o[1], new Set());
+  document.getElementById('c-tags').innerHTML = tagsFieldsetHtml('c', null);
 
   await carregarUsuarios();
   await carregarBackups();
@@ -827,20 +882,10 @@ function abrirAcoes(id){
   if(!u) return;
   document.getElementById('acoes-titulo').textContent = u.email;
   document.getElementById('acoes-lista').innerHTML = `
-    <button type="button" onclick="fecharAcoes();editarPermissoes('${u.id}')">🔑 Permissões</button>
+    <button type="button" onclick="fecharAcoes();editarPermissoes('${u.id}')">🔑 Permissões e tags</button>
     <button type="button" onclick="fecharAcoes();abrirHorario('${u.id}')">🕐 Horário de acesso</button>
     <button type="button" onclick="fecharAcoes();resetarSenha('${u.id}')">🔒 Nova senha</button>
     <button type="button" onclick="fecharAcoes();definirUsername('${u.id}', '${escapeHtml(u.username||'')}')">🆔 ${u.username?'Editar usuário':'Definir usuário'}</button>
-    <div class="acoes-sep">Tags</div>
-    <button type="button" onclick="fecharAcoes();alternarAdmin('${u.id}', ${!u.isAdmin})">${u.isAdmin?'⭐ Remover tag Admin':'⭐ Tornar Admin'}</button>
-    <button type="button" onclick="fecharAcoes();alternarCatalogoEstoque('${u.id}', ${!u.podeCatalogoEstoque})">${u.podeCatalogoEstoque?'📦 Remover acesso ao Catálogo':'📦 Liberar Catálogo do Estoque'}</button>
-    <button type="button" onclick="fecharAcoes();alternarCatalogoInsumos('${u.id}', ${!u.podeCatalogoInsumos})">${u.podeCatalogoInsumos?'🥤 Remover cadastro de Insumos':'🥤 Liberar cadastro de Insumos (Carrinho)'}</button>
-    <button type="button" onclick="fecharAcoes();alternarCadastrarOperadores('${u.id}', ${!u.podeCadastrarOperadores})">${u.podeCadastrarOperadores?'👥 Remover cadastro de Operadores':'👥 Liberar cadastro de Operadores (Carrinho)'}</button>
-    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='loja' ? 'null' : `'loja'`})">${u.cargo==='loja'?'🏬 Remover tag Loja':'🏬 Marcar como Loja'}</button>
-    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='gerente' ? 'null' : `'gerente'`})">${u.cargo==='gerente'?'👔 Remover tag Gerente':'👔 Marcar como Gerente'}</button>
-    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='tecnico' ? 'null' : `'tecnico'`})">${u.cargo==='tecnico'?'🔧 Remover tag Técnico':'🔧 Marcar como Técnico'}</button>
-    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='suporte' ? 'null' : `'suporte'`})">${u.cargo==='suporte'?'🎧 Remover tag Suporte':'🎧 Marcar como Suporte'}</button>
-    <button type="button" onclick="fecharAcoes();definirCargo('${u.id}', ${u.cargo==='manutencao' ? 'null' : `'manutencao'`})">${u.cargo==='manutencao'?'🛠️ Remover tag Manutenção':'🛠️ Marcar como Manutenção'}</button>
     <div class="acoes-sep">Conta</div>
     <button type="button" class="danger" onclick="fecharAcoes();alternarAtivo('${u.id}', ${!u.active})">${u.active?'🚫 Desativar acesso':'✅ Reativar acesso'}</button>
     <button type="button" class="danger" onclick="fecharAcoes();excluirUsuario('${u.id}','${escapeHtml(u.email)}')">🗑️ Excluir acesso</button>
@@ -905,13 +950,6 @@ async function encerrarSessao(userId, sessionId){
   await carregarUsuarios();
 }
 
-async function definirCargo(id, cargo){
-  const res = await fetch('/api/users/'+id+'/cargo', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cargo})});
-  const data = await res.json();
-  if(!res.ok){ alert(data.error||'Erro ao definir a tag.'); return; }
-  await carregarUsuarios();
-}
-
 document.getElementById('create-form').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const errEl = document.getElementById('create-err');
@@ -927,15 +965,18 @@ document.getElementById('create-form').addEventListener('submit', async (e)=>{
       tiposSolicitacao: readChecked(document.getElementById('c-tipos-solicitacao')),
     },
   };
+  const tags = lerTagsForm('c');
   try{
     const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Erro ao criar acesso.');
+    await salvarTagsUsuario(data.id, tags);
     document.getElementById('create-form').reset();
     document.getElementById('c-sections').innerHTML = checksHtml('sections', SECTIONS, o=>o[0], o=>o[1], new Set());
     document.getElementById('c-unidades').innerHTML = unidadesChecksHtml(new Set());
     document.getElementById('c-groups').innerHTML = subgroupChecksHtml(new Set());
     document.getElementById('c-tipos-solicitacao').innerHTML = checksHtml('tiposSolicitacao', TIPOS_SOLICITACAO, o=>o[0], o=>o[1], new Set());
+    document.getElementById('c-tags').innerHTML = tagsFieldsetHtml('c', null);
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
 });
@@ -951,6 +992,7 @@ function editarPermissoes(id){
   document.getElementById('p-unidades').innerHTML = unidadesChecksHtml(new Set(perms.unidades));
   document.getElementById('p-groups').innerHTML = subgroupChecksHtml(new Set(perms.vaultSubgroups));
   document.getElementById('p-tipos-solicitacao').innerHTML = checksHtml('tiposSolicitacao', TIPOS_SOLICITACAO, o=>o[0], o=>o[1], new Set(perms.tiposSolicitacao||[]));
+  document.getElementById('p-tags').innerHTML = tagsFieldsetHtml('p', { cargo: u.cargo||null, isAdmin: !!u.isAdmin, podeCatalogoEstoque: !!u.podeCatalogoEstoque, podeCatalogoInsumos: !!u.podeCatalogoInsumos, podeCadastrarOperadores: !!u.podeCadastrarOperadores });
   document.getElementById('perm-err').classList.add('hidden');
   permOverlay.classList.add('show');
 }
@@ -1004,6 +1046,7 @@ document.getElementById('perm-form').addEventListener('submit', async (e)=>{
     const res = await fetch('/api/users/'+EDITING_USER+'/permissions', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({permissions})});
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Erro ao salvar.');
+    await salvarTagsUsuario(EDITING_USER, lerTagsForm('p'));
     permOverlay.classList.remove('show');
     await carregarUsuarios();
   }catch(err){ errEl.textContent = err.message; errEl.classList.remove('hidden'); }
@@ -1030,33 +1073,6 @@ async function definirUsername(id, atual){
 
 async function alternarAtivo(id, active){
   await fetch('/api/users/'+id+'/active', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
-  await carregarUsuarios();
-}
-
-async function alternarAdmin(id, isAdmin){
-  const res = await fetch('/api/users/'+id+'/is-admin', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({isAdmin})});
-  const data = await res.json();
-  if(!res.ok){ alert(data.error||'Erro ao atualizar tag admin.'); return; }
-  await carregarUsuarios();
-}
-
-async function alternarCadastrarOperadores(id, podeCadastrarOperadores){
-  const res = await fetch('/api/users/'+id+'/cadastrar-operadores', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCadastrarOperadores})});
-  const data = await res.json();
-  if(!res.ok){ alert(data.error || 'Erro ao salvar.'); return; }
-  await carregarUsuarios();
-}
-async function alternarCatalogoInsumos(id, podeCatalogoInsumos){
-  const res = await fetch('/api/users/'+id+'/catalogo-insumos', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoInsumos})});
-  const data = await res.json();
-  if(!res.ok){ alert(data.error || 'Erro ao atualizar permissão.'); return; }
-  await carregarUsuarios();
-}
-
-async function alternarCatalogoEstoque(id, podeCatalogoEstoque){
-  const res = await fetch('/api/users/'+id+'/catalogo-estoque', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({podeCatalogoEstoque})});
-  const data = await res.json();
-  if(!res.ok){ alert(data.error||'Erro ao atualizar permissão do Catálogo do Estoque.'); return; }
   await carregarUsuarios();
 }
 
