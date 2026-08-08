@@ -410,6 +410,14 @@ const TOPICOS = [
     <p>Quem tem a seção <b>Suporte</b> abre chamados <b>remotos no próprio nome</b> (o objetivo é nunca perder registro de atuação). Master/Admin abrem qualquer modalidade e escolhem o responsável.</p>
     <h3>💬 Chats de suporte do site</h3>
     <p>O time de Suporte também atende por aqui as conversas iniciadas no widget 💬 do site: responda o visitante, use <b>🎫 Gerar chamado remoto</b> pra registrar a atuação vinculada à conversa e <b>✔ Finalizar</b> quando resolver.</p>
+    <h3>🎫 Ticket #, data de execução e SLA de triagem</h3>
+    <p>Todo chamado tem um <b>Ticket #</b> (mesma numeração da Central). O <b>SLA cobre a triagem</b>: vale até o chamado ser atribuído e ganhar a <b>📅 data de execução</b> — quem define é o técnico responsável (ou o Master). Com a data marcada, o combinado passa a ser essa data e o relógio de SLA sai do card.</p>
+    <h3>💬 Chat do chamado</h3>
+    <p>Cada chamado tem seu próprio chat (texto + 📷 foto): dá pra loja mandar observação e foto <b>antes da ida do técnico</b>, e o time combinar detalhes por ali.</p>
+    <h3>🧾 Orçamento de peças e 💰 Cobrança</h3>
+    <p>Em qualquer modalidade (remoto ou presencial) dá pra registrar o <b>orçamento de peças</b> (peça + valor). A <b>cobrança</b> do atendimento é opcional — o chamado pode se resolver sem custo, ou ganhar valor depois (reembolso no remoto, valor do serviço no presencial): informe o valor, a observação e <b>anexe o boleto</b>; o botão <b>📤 Enviar</b> gera um ticket de <b>Pagamento</b> na Central com a <b>mesma numeração</b> do chamado — os dois tickets se juntam pelo número, então dá pra saber do que se trata cada pagamento.</p>
+    <h3>⚙️ Edição do Master</h3>
+    <p>O Master edita qualquer chamado: muda a modalidade (Presencial ⇄ Remoto), o status (ativo, concluído, cancelado ou reaberto) e a prioridade.</p>
   `},
   { id:'manutencao', icone:'🔧', secoes:['manutencao'], titulo:'Manutenção', corpo:`
     <p>Fila de chamados de manutenção - nasce automaticamente quando uma solicitação de Manutenção é aprovada na Central (quem aprova escolhe 1 ou mais responsáveis), ou pode ser criada direto pelo Master.</p>
@@ -420,7 +428,9 @@ const TOPICOS = [
       <li>Se faltar peça ou precisar pausar, use <b>⏸ Em espera</b> - depois é só <b>▶ Retomar execução</b> pra continuar de onde parou.</li>
       <li>Ao terminar, clique em <b>✓ Finalizar</b>, registrando peças compradas, observação e foto do serviço feito.</li>
     </ul>
-    <div class="dica"><b>Master tem autonomia total:</b> pode editar título, descrição, data de execução e responsáveis, ou excluir o chamado inteiro, em qualquer momento do fluxo (botões <b>✎ Editar chamado</b> / <b>🗑 Excluir chamado</b> dentro do chamado).</div>
+    <h3>🎫 Ticket #, chat e cobrança</h3>
+    <p>Todo chamado tem um <b>Ticket #</b> (mesma numeração da Central) e um <b>💬 chat próprio</b> (texto + foto) — dá pra mandar observação/foto antes da ida da manutenção. Também dá pra registrar <b>🧾 orçamento de peças</b> e a <b>💰 cobrança</b> do serviço: valor + observação + <b>boleto anexado</b>, e o <b>📤 Enviar</b> gera um ticket de <b>Pagamento</b> na Central com a <b>mesma numeração</b> do chamado — os dois se juntam pelo número.</p>
+    <div class="dica"><b>Master tem autonomia total:</b> pode editar título, descrição, <b>status</b>, data de execução e responsáveis, ou excluir o chamado inteiro, em qualquer momento do fluxo (botões <b>✎ Editar chamado</b> / <b>🗑 Excluir chamado</b> dentro do chamado).</div>
   `},
   { id:'relatorios', icone:'📊', secoes:['disputas'], titulo:'Relatórios de disputa', corpo:`
     <p>Acompanhamento das disputas/chargebacks abertos pela operadora, com prazo de resposta e status.</p>

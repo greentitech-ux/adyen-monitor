@@ -244,6 +244,47 @@
       <div id="v-assinatura"></div>
     </div>
 
+    <!-- orcamento de pecas -->
+    <div id="bloco-orcamento" class="hidden bloco-sep">
+      <label>🧾 Orçamento de peças</label>
+      <div id="lista-orcamento"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-add" style="flex:1;" onclick="adicionarOrcItem()">+ Adicionar peça</button>
+        <button type="button" class="btn-add" style="flex:1;" onclick="salvarOrcamento()">💾 Salvar orçamento</button>
+      </div>
+    </div>
+
+    <!-- cobranca: valor + observacao + boleto; Enviar gera o ticket de
+         PAGAMENTO com a MESMA numeracao -->
+    <div id="bloco-cobranca" class="hidden bloco-sep">
+      <label>💰 Cobrança do serviço</label>
+      <div id="cb-enviada" class="hidden" style="background:var(--warn-dim);border:1px solid rgba(242,179,61,.4);border-radius:10px;padding:10px 12px;font-size:12.5px;"></div>
+      <div id="cb-form">
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;">
+          <input type="number" min="0" step="0.01" inputmode="decimal" id="cb-valor" placeholder="valor (R$)">
+          <input type="text" id="cb-obs" maxlength="500" placeholder="observação (ex: reembolso de peça / valor do serviço)">
+        </div>
+        <label style="margin-top:8px;">Boleto da cobrança</label>
+        <input type="file" id="cb-boleto" accept="application/pdf,image/*">
+        <div id="cb-boleto-atual" class="sub hidden"></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn-add" style="flex:1;" onclick="salvarCobranca(false)">💾 Salvar</button>
+          <button type="button" class="btn-primary" style="flex:1;margin-top:10px;" id="btn-enviar-cobranca" onclick="salvarCobranca(true)">📤 Enviar — gerar ticket de Pagamento</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- chat do chamado: observacao/foto antes da ida, combinados etc -->
+    <div class="bloco-sep">
+      <label>💬 Chat do chamado</label>
+      <div id="chat-msgs" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="text" id="chat-texto" placeholder="mensagem pro chamado..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarChatChamado();}">
+        <label class="foto-btn" title="anexar foto"><span id="chat-foto-icone">📷</span><input type="file" accept="image/*" hidden id="chat-foto" onchange="document.getElementById('chat-foto-icone').textContent = this.files[0] ? '✅' : '📷';"></label>
+        <button type="button" class="btn-add" style="margin-top:0;width:auto;padding:8px 14px;" onclick="enviarChatChamado()">Enviar</button>
+      </div>
+    </div>
+
     <!-- Master: autonomia total (editar/excluir), qualquer status -->
     <div id="bloco-master" class="hidden bloco-sep">
       <button type="button" class="link-btn" onclick="abrirEditar()">✎ Editar chamado</button>
@@ -253,6 +294,16 @@
         <input type="text" id="ed-titulo">
         <label>Descrição</label>
         <textarea id="ed-descricao"></textarea>
+        <label>Status</label>
+        <select id="ed-status">
+          <option value="ABERTO">ABERTO (ativo)</option>
+          <option value="ACEITO">ACEITO</option>
+          <option value="INICIADO">INICIADO</option>
+          <option value="EM_ESPERA">EM ESPERA</option>
+          <option value="CONCLUIDO">CONCLUÍDO</option>
+          <option value="RECUSADO">RECUSADO</option>
+          <option value="CANCELADO">CANCELADO</option>
+        </select>
         <label>Data de execução</label>
         <input type="date" id="ed-data-execucao">
         <label>Responsável(is)</label>
@@ -354,7 +405,7 @@ function renderLista(){
   document.getElementById('lista-cards').innerHTML = CHAMADOS.length ? CHAMADOS.map(c=>`
     <div class="card" onclick="abrirDetalhe('${c.id}')">
       <div class="linha1">
-        <span>${escapeHtml(c.titulo)}</span>
+        <span>${c.numeroTicket!=null?`<span style="font-family:var(--mono);color:var(--accent);">#${c.numeroTicket}</span> `:''}${escapeHtml(c.titulo)}</span>
         <span class="badge ${c.status}">${STATUS_LABEL[c.status]||c.status}</span>
       </div>
       <div class="sub">${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtDataHora(c.criadoEm)}</div>
@@ -452,7 +503,7 @@ function abrirDetalhe(id){
   if(!c) return;
   DETALHE_ATUAL = c;
   document.getElementById('d-titulo').textContent = c.titulo;
-  document.getElementById('d-sub').textContent = `${c.unidadeNome||c.unidade} · ${fmtDataHora(c.criadoEm)}`;
+  document.getElementById('d-sub').innerHTML = `${c.numeroTicket!=null?`<span style="font-family:var(--mono);color:var(--accent);">Ticket #${c.numeroTicket}</span> · `:''}${escapeHtml(c.unidadeNome||c.unidade)} · ${fmtDataHora(c.criadoEm)}${c.cobranca&&c.cobranca.enviadaEm?' · 💰 cobrança enviada':''}`;
   document.getElementById('d-descricao').textContent = c.descricao || '';
   document.getElementById('d-responsaveis').textContent = 'Responsável(is): ' + (c.responsaveis||[]).map(r=>r.email).join(', ');
 
@@ -503,10 +554,141 @@ function abrirDetalhe(id){
 
   document.getElementById('bloco-master').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('bloco-editar').classList.add('hidden');
+
+  // orcamento de pecas + cobranca: responsavel ou Master
+  const podeFinanceiro = souResponsavel(c) || IS_MASTER;
+  document.getElementById('bloco-orcamento').classList.toggle('hidden', !podeFinanceiro);
+  document.getElementById('bloco-cobranca').classList.toggle('hidden', !podeFinanceiro);
+  if(podeFinanceiro){
+    ORC_ITENS = [];
+    (c.orcamentoPecas||[]).forEach(p=>adicionarOrcItem(p.descricao, p.valor));
+    renderOrcamento();
+    preencherCobranca(c);
+  }
+
+  // chat do chamado (texto + foto)
+  document.getElementById('chat-texto').value = '';
+  document.getElementById('chat-foto').value = '';
+  document.getElementById('chat-foto-icone').textContent = '📷';
+  document.getElementById('chat-msgs').innerHTML = '<div style="color:var(--muted);font-size:12px;">carregando conversa...</div>';
+  carregarChatChamado();
+
   document.getElementById('msg-detalhe').classList.add('hidden');
   document.getElementById('overlay-detalhe').classList.remove('hidden');
 }
 function fecharDetalhe(){ document.getElementById('overlay-detalhe').classList.add('hidden'); DETALHE_ATUAL = null; }
+
+function erroDetalhe(texto){
+  const msg = document.getElementById('msg-detalhe');
+  msg.textContent = texto; msg.className = 'msg err'; msg.classList.remove('hidden');
+}
+function okDetalhe(texto){
+  const msg = document.getElementById('msg-detalhe');
+  msg.textContent = texto; msg.className = 'msg ok'; msg.classList.remove('hidden');
+}
+
+// ---------- orcamento de pecas ----------
+let ORC_ITENS = [];
+function adicionarOrcItem(descricao, valor){ ORC_ITENS.push({ id: ++SEQ, descricao: descricao||'', valor: valor!=null?valor:'' }); renderOrcamento(); }
+function removerOrcItem(id){ ORC_ITENS = ORC_ITENS.filter(i=>i.id!==id); renderOrcamento(); }
+function renderOrcamento(){
+  document.getElementById('lista-orcamento').innerHTML = ORC_ITENS.map(it=>`
+    <div style="display:grid;grid-template-columns:1fr 110px auto;gap:6px;margin-top:6px;">
+      <input type="text" value="${escapeHtml(it.descricao)}" oninput="ORC_ITENS.find(x=>x.id===${it.id}).descricao=this.value" placeholder="peça (ex: resistência da estufa)">
+      <input type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(it.valor)}" oninput="ORC_ITENS.find(x=>x.id===${it.id}).valor=this.value" placeholder="R$">
+      <button type="button" class="btn-remover" onclick="removerOrcItem(${it.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma peça orçada.</div>';
+}
+async function salvarOrcamento(){
+  if(!DETALHE_ATUAL) return;
+  try{
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/orcamento-pecas`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      orcamentoPecas: ORC_ITENS.map(i=>({ descricao: i.descricao, valor: i.valor })),
+    }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar o orçamento.');
+    okDetalhe('Orçamento salvo.');
+    await carregarChamados();
+  }catch(err){ erroDetalhe(err.message); }
+}
+
+// ---------- cobranca -> ticket de PAGAMENTO com a mesma numeracao ----------
+async function salvarCobranca(enviar){
+  if(!DETALHE_ATUAL) return;
+  const btn = document.getElementById('btn-enviar-cobranca');
+  try{
+    if(enviar && !confirm('Enviar a cobrança? Isso gera um ticket de PAGAMENTO na Central com a mesma numeração do chamado.')) return;
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('valor', document.getElementById('cb-valor').value);
+    fd.append('descricao', document.getElementById('cb-obs').value);
+    if(enviar) fd.append('enviar', '1');
+    const boleto = document.getElementById('cb-boleto').files[0];
+    if(boleto) fd.append('boleto', boleto);
+    const resp = await fetch(`/api/chamados-manutencao/${DETALHE_ATUAL.id}/cobranca`, { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro na cobrança.');
+    await carregarChamados();
+    if(enviar){
+      alert(`Cobrança enviada! Ticket de Pagamento #${data.numeroTicket} criado na Central — mesma numeração do chamado.`);
+      fecharDetalhe();
+    } else {
+      okDetalhe('Cobrança salva (ainda não enviada).');
+      DETALHE_ATUAL = CHAMADOS.find(x=>x.id===DETALHE_ATUAL.id) || DETALHE_ATUAL;
+      preencherCobranca(DETALHE_ATUAL);
+    }
+  }catch(err){ erroDetalhe(err.message); }
+  finally{ btn.disabled = false; }
+}
+function preencherCobranca(c){
+  const enviada = c.cobranca && c.cobranca.enviadaEm;
+  document.getElementById('cb-enviada').classList.toggle('hidden', !enviada);
+  document.getElementById('cb-form').classList.toggle('hidden', !!enviada);
+  if(enviada){
+    document.getElementById('cb-enviada').innerHTML = `💰 Cobrança de <b>${fmtMoney(c.cobranca.valor)}</b> enviada em ${fmtDataHora(c.cobranca.enviadaEm)} — ticket de Pagamento <b>#${c.numeroTicket}</b> na Central (mesma numeração do chamado).`;
+    return;
+  }
+  document.getElementById('cb-valor').value = c.cobranca?.valor || '';
+  document.getElementById('cb-obs').value = c.cobranca?.descricao || '';
+  document.getElementById('cb-boleto').value = '';
+  const atual = document.getElementById('cb-boleto-atual');
+  atual.classList.toggle('hidden', !c.cobranca?.boleto);
+  if(c.cobranca?.boleto) atual.innerHTML = `boleto anexado: <a href="/api/chamados-manutencao/${c.id}/cobranca/boleto?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank">${escapeHtml(c.cobranca.boleto.nome)}</a>`;
+}
+
+// ---------- chat do chamado (texto + foto) ----------
+async function carregarChatChamado(){
+  if(!DETALHE_ATUAL) return;
+  try{
+    const msgs = await fetch(`/api/central/chamado-manutencao/${DETALHE_ATUAL.id}/chat`).then(r=>r.ok?r.json():[]);
+    document.getElementById('chat-msgs').innerHTML = msgs.map(m=>`
+      <div style="background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:7px 10px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);">${escapeHtml(m.autorUsername||m.autorEmail||'—')} · ${fmtDataHora(m.criadoEm||m.em)}</div>
+        ${m.texto?`<div style="font-size:12.5px;white-space:pre-wrap;">${escapeHtml(m.texto)}</div>`:''}
+        ${m.imagem?`<a href="/api/central/chat/foto/${m.id}?token=${encodeURIComponent(AUTH_TOKEN)}" target="_blank"><img src="/api/central/chat/foto/${m.id}?token=${encodeURIComponent(AUTH_TOKEN)}" style="max-width:160px;border-radius:8px;border:1px solid var(--line);margin-top:4px;"></a>`:''}
+      </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhuma mensagem ainda — dá pra mandar observação/foto antes da ida da manutenção.</div>';
+    const box = document.getElementById('chat-msgs');
+    box.scrollTop = box.scrollHeight;
+  }catch(e){ /* chat indisponivel nao derruba o detalhe */ }
+}
+async function enviarChatChamado(){
+  if(!DETALHE_ATUAL) return;
+  const texto = document.getElementById('chat-texto').value.trim();
+  const foto = document.getElementById('chat-foto').files[0];
+  if(!texto && !foto) return;
+  try{
+    const fd = new FormData();
+    fd.append('texto', texto);
+    if(foto) fd.append('imagem', foto);
+    const resp = await fetch(`/api/central/chamado-manutencao/${DETALHE_ATUAL.id}/chat`, { method:'POST', body: fd });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao enviar mensagem.');
+    document.getElementById('chat-texto').value = '';
+    document.getElementById('chat-foto').value = '';
+    document.getElementById('chat-foto-icone').textContent = '📷';
+    await carregarChatChamado();
+  }catch(err){ erroDetalhe(err.message); }
+}
 
 async function aceitarChamado(){
   if(!DETALHE_ATUAL) return;
@@ -640,6 +822,7 @@ function abrirEditar(){
   const c = DETALHE_ATUAL;
   document.getElementById('ed-titulo').value = c.titulo || '';
   document.getElementById('ed-descricao').value = c.descricao || '';
+  document.getElementById('ed-status').value = c.status || 'ABERTO';
   document.getElementById('ed-data-execucao').value = c.dataExecucao || '';
   document.getElementById('ed-responsaveis').innerHTML = PESSOAS_MANUTENCAO.map(p=>`
     <label class="checkbox-linha"><input type="checkbox" value="${p.id}" data-email="${escapeHtml(p.email)}" ${(c.responsaveis||[]).some(r=>r.id===p.id)?'checked':''}> ${escapeHtml(p.email)}</label>
@@ -657,6 +840,7 @@ async function salvarEdicao(){
     const body = {
       titulo: document.getElementById('ed-titulo').value,
       descricao: document.getElementById('ed-descricao').value,
+      status: document.getElementById('ed-status').value,
       dataExecucao: document.getElementById('ed-data-execucao').value || null,
       responsaveis,
     };

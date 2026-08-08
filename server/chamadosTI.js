@@ -18,6 +18,7 @@
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
 const prioridades = require('./prioridades');
+const ticketCounter = require('./ticketCounter');
 
 const COLLECTION = db.collection('chamadosTI');
 
@@ -53,7 +54,7 @@ function sanitizarItensComFoto(lista) {
     .filter((item) => item.descricao || item.foto);
 }
 
-async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, solicitacaoId, criadoPorEmail, modalidade, prioridade, jaResolvido, observacaoResolucao }) {
+async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecnicoEmail, solicitacaoId, criadoPorEmail, modalidade, prioridade, jaResolvido, observacaoResolucao, numeroTicket }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o chamado.');
   if (!tecnicoId) throw new Error('Escolha o responsável pelo chamado.');
@@ -68,6 +69,10 @@ async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecn
   const prio = prioridades.sanitizarPrioridade(prioridade);
   const registro = {
     id: doc.id,
+    // Ticket # global (mesma sequencia da Central): herdado da solicitacao
+    // que originou o chamado, ou novo - e o elo que junta o chamado com o
+    // ticket de PAGAMENTO gerado pela cobranca (mesma numeracao)
+    numeroTicket: numeroTicket != null ? numeroTicket : await ticketCounter.proximoTicket(),
     unidade,
     unidadeNome: unidadeNome || unidade,
     titulo: String(titulo).trim().slice(0, 200),
@@ -83,9 +88,17 @@ async function create({ unidade, unidadeNome, titulo, descricao, tecnicoId, tecn
     itensDepois: [],
     observacaoTecnico: jaResolvido ? String(observacaoResolucao).trim().slice(0, 2000) : '',
     pecas: [],
+    // orcamento de peca (qualquer modalidade) e cobranca do atendimento -
+    // ver salvarOrcamentoPecas/salvarCobranca
+    orcamentoPecas: [],
+    cobranca: null,
     assinaturaNomeLoja: null,
     assinatura: null,
     resolvidoNaAbertura: !!jaResolvido,
+    // data de execucao: quando o tecnico (ou Master) diz que a visita/atuacao
+    // vai acontecer. O SLA cobre a TRIAGEM (ate o chamado ser atribuido e
+    // ganhar essa data); a partir daqui o combinado passa a ser essa data
+    dataExecucao: null,
     criadoPorEmail,
     criadoEm: agora,
     iniciadoEm: null,
@@ -168,6 +181,96 @@ async function concluirRemoto(id, { observacaoTecnico, tecnicoId, ehGestor }) {
   return getOne(id);
 }
 
+// chamados antigos (de antes do Ticket #) ganham numero na primeira vez que
+// precisam de um - ex: na hora de enviar a cobranca
+async function garantirTicket(id) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  if (atual.numeroTicket != null) return atual;
+  await COLLECTION.doc(id).update({ numeroTicket: await ticketCounter.proximoTicket() });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// edicao do Master: modalidade (presencial <-> remoto), status (ativo,
+// concluido, cancelado, reaberto...) e prioridade - autonomia total pra
+// corrigir qualquer chamado, em qualquer momento
+async function editarMaster(id, { modalidade, status, prioridade }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  const merge = {};
+  if (modalidade !== undefined) {
+    if (!MODALIDADES.includes(modalidade)) throw new Error("Modalidade inválida: use 'presencial' ou 'remoto'.");
+    merge.modalidade = modalidade;
+  }
+  if (status !== undefined) {
+    if (!STATUSES.includes(status)) throw new Error('Status inválido.');
+    merge.status = status;
+    if (status === 'CONCLUIDO' && !atual.concluidoEm) merge.concluidoEm = new Date().toISOString();
+    if (status === 'ABERTO') { merge.concluidoEm = null; merge.iniciadoEm = null; }
+    if (status === 'INICIADO' && !atual.iniciadoEm) merge.iniciadoEm = new Date().toISOString();
+  }
+  if (prioridade !== undefined) {
+    const prio = prioridades.sanitizarPrioridade(prioridade);
+    merge.prioridade = prio;
+    merge.slaPrazo = prioridades.slaPrazo(prio, atual.criadoEm);
+  }
+  if (!Object.keys(merge).length) throw new Error('Nada pra alterar.');
+  await COLLECTION.doc(id).update(merge);
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// data de execucao: o tecnico responsavel (ou Master/Admin) diz quando a
+// visita/atuacao vai acontecer - isso encerra a fase de triagem do SLA
+async function definirDataExecucao(id, { dataExecucao, tecnicoId, ehGestor }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  if (!ehGestor && atual.tecnicoId !== tecnicoId) throw new Error('Esse chamado não é seu.');
+  if (dataExecucao && !/^\d{4}-\d{2}-\d{2}$/.test(dataExecucao)) throw new Error('Informe a data de execução válida (AAAA-MM-DD).');
+  await COLLECTION.doc(id).update({ dataExecucao: dataExecucao || null });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// orcamento de peca: pode existir em qualquer modalidade (remoto tambem -
+// ex: diagnostico a distancia que aponta a peca a comprar)
+async function salvarOrcamentoPecas(id, lista) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  await COLLECTION.doc(id).update({ orcamentoPecas: sanitizarPecas(lista) });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// cobranca do atendimento: valor + observacao + boleto anexado. O chamado
+// pode se resolver sem custo (fica sem cobranca), ou ganhar valor depois -
+// reembolso no remoto, valor fechado no presencial. Enviar a cobranca gera
+// o ticket de PAGAMENTO na Central com a MESMA numeracao (ver rota)
+async function salvarCobranca(id, { valor, descricao, boleto }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  if (atual.cobranca && atual.cobranca.enviadaEm) throw new Error('A cobrança desse chamado já foi enviada pra pagamento.');
+  const cobranca = {
+    ...(atual.cobranca || {}),
+    valor: num(valor),
+    descricao: String(descricao || '').trim().slice(0, 500),
+    atualizadoEm: new Date().toISOString(),
+  };
+  if (boleto && boleto.path) cobranca.boleto = { nome: String(boleto.nome || 'boleto'), path: boleto.path, tipo: boleto.tipo || 'application/octet-stream' };
+  await COLLECTION.doc(id).update({ cobranca });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+async function marcarCobrancaEnviada(id, { pagamentoId }) {
+  const atual = await getOne(id);
+  if (!atual || !atual.cobranca) throw new Error('Chamado sem cobrança.');
+  await COLLECTION.doc(id).update({ cobranca: { ...atual.cobranca, enviadaEm: new Date().toISOString(), pagamentoId: pagamentoId || null } });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
 async function cancelar(id, { motivo }) {
   await COLLECTION.doc(id).update({ status: 'CANCELADO', motivoCancelamento: motivo || null });
   chamadosCache.invalidar();
@@ -186,4 +289,7 @@ async function reatribuir(id, { tecnicoId, tecnicoEmail }) {
   return getOne(id);
 }
 
-module.exports = { STATUSES, MODALIDADES, modalidadeDe, create, listAll, getOne, iniciar, concluir, concluirRemoto, cancelar, reatribuir };
+module.exports = {
+  STATUSES, MODALIDADES, modalidadeDe, create, listAll, getOne, iniciar, concluir, concluirRemoto, cancelar, reatribuir,
+  garantirTicket, editarMaster, definirDataExecucao, salvarOrcamentoPecas, salvarCobranca, marcarCobrancaEnviada,
+};

@@ -16,6 +16,7 @@
 // chamado inteiro, em qualquer status.
 const db = require('./firestore');
 const { createCache } = require('./liveCache');
+const ticketCounter = require('./ticketCounter');
 
 const COLLECTION = db.collection('chamadosManutencao');
 
@@ -58,7 +59,7 @@ function sanitizarResponsaveis(lista) {
     .filter((r) => r.id);
 }
 
-async function create({ unidade, unidadeNome, titulo, descricao, responsaveis, solicitacaoId, criadoPorEmail }) {
+async function create({ unidade, unidadeNome, titulo, descricao, responsaveis, solicitacaoId, criadoPorEmail, numeroTicket }) {
   if (!unidade) throw new Error('Unidade é obrigatória.');
   if (!titulo || !String(titulo).trim()) throw new Error('Descreva o chamado.');
   const responsaveisOk = sanitizarResponsaveis(responsaveis);
@@ -68,6 +69,10 @@ async function create({ unidade, unidadeNome, titulo, descricao, responsaveis, s
   const agora = new Date().toISOString();
   const registro = {
     id: doc.id,
+    // Ticket # global (mesma sequencia da Central) - herdado da solicitacao
+    // que originou o chamado, ou novo. E o elo com o ticket de PAGAMENTO
+    // gerado pela cobranca (mesma numeracao)
+    numeroTicket: numeroTicket != null ? numeroTicket : await ticketCounter.proximoTicket(),
     unidade,
     unidadeNome: unidadeNome || unidade,
     titulo: String(titulo).trim().slice(0, 200),
@@ -82,6 +87,10 @@ async function create({ unidade, unidadeNome, titulo, descricao, responsaveis, s
     itensDepois: [],
     observacaoResponsavel: '',
     pecas: [],
+    // orcamento de peca e cobranca do servico - ver salvarOrcamentoPecas/
+    // salvarCobranca (mesma mecanica dos chamados de TI)
+    orcamentoPecas: [],
+    cobranca: null,
     assinaturaNomeLoja: null,
     assinatura: null,
     criadoPorEmail,
@@ -238,4 +247,53 @@ async function remover(id) {
   chamadosCache.invalidar();
 }
 
-module.exports = { STATUSES, create, listAll, getOne, aceitar, recusar, iniciar, marcarEmEspera, retomar, concluir, atualizar, remover };
+// chamados antigos (de antes do Ticket #) ganham numero na primeira vez que
+// precisam de um - ex: na hora de enviar a cobranca
+async function garantirTicket(id) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  if (atual.numeroTicket != null) return atual;
+  await COLLECTION.doc(id).update({ numeroTicket: await ticketCounter.proximoTicket() });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// orcamento de peca: registrado a qualquer momento do fluxo
+async function salvarOrcamentoPecas(id, lista) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  await COLLECTION.doc(id).update({ orcamentoPecas: sanitizarPecas(lista) });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+// cobranca do servico: valor + observacao + boleto anexado. Enviar gera o
+// ticket de PAGAMENTO na Central com a MESMA numeracao (ver rota)
+async function salvarCobranca(id, { valor, descricao, boleto }) {
+  const atual = await getOne(id);
+  if (!atual) throw new Error('Chamado não encontrado.');
+  if (atual.cobranca && atual.cobranca.enviadaEm) throw new Error('A cobrança desse chamado já foi enviada pra pagamento.');
+  const cobranca = {
+    ...(atual.cobranca || {}),
+    valor: num(valor),
+    descricao: String(descricao || '').trim().slice(0, 500),
+    atualizadoEm: new Date().toISOString(),
+  };
+  if (boleto && boleto.path) cobranca.boleto = { nome: String(boleto.nome || 'boleto'), path: boleto.path, tipo: boleto.tipo || 'application/octet-stream' };
+  await COLLECTION.doc(id).update({ cobranca });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+async function marcarCobrancaEnviada(id, { pagamentoId }) {
+  const atual = await getOne(id);
+  if (!atual || !atual.cobranca) throw new Error('Chamado sem cobrança.');
+  await COLLECTION.doc(id).update({ cobranca: { ...atual.cobranca, enviadaEm: new Date().toISOString(), pagamentoId: pagamentoId || null } });
+  chamadosCache.invalidar();
+  return getOne(id);
+}
+
+module.exports = {
+  STATUSES, create, listAll, getOne, aceitar, recusar, iniciar, marcarEmEspera, retomar, concluir, atualizar, remover,
+  garantirTicket, salvarOrcamentoPecas, salvarCobranca, marcarCobrancaEnviada,
+};
