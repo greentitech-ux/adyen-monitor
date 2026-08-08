@@ -392,9 +392,12 @@
     <button type="button" class="alarme-ok hidden" id="al-btn-lembrete" onclick="adiarLembrete()">👨‍🍳 Estamos preparando — lembrar em 5 min</button>
     <button type="button" class="alarme-btn2 hidden" id="al-btn-rapido" onclick="envioRapidoDoAlarme()">⚡ Envio rápido — mandar agora o que foi pedido</button>
     <!-- pedido "ja recebido" (lancamento atrasado do carrinho): nada a
-         preparar, so registrar a baixa - assinada pela senha do operador -->
-    <div class="alarme-sub hidden" id="al-aviso-baixa" style="margin-top:10px;color:var(--warn);">⚠️ O carrinho marcou que <b>JÁ RECEBEU</b> este material (lançamento atrasado — internet/sistema fora na hora). Não precisa preparar nada: só dê a baixa pra fechar o registro.</div>
-    <button type="button" class="alarme-ok hidden" id="al-btn-baixa" onclick="baixaDoAlarme()">✔️ Dar baixa — material já entregue</button>
+         preparar. A loja responde qual e o caso, sempre com a senha do
+         operador: o envio JA FOI lancado antes (fecha sem duplicar) ou
+         ainda nao foi (lanca o envio agora e fecha o ciclo) -->
+    <div class="alarme-sub hidden" id="al-aviso-baixa" style="margin-top:10px;color:var(--warn);">⚠️ O carrinho avisou: <b>"NÃO PRECISA ENVIAR — JÁ RECEBI"</b> (lançamento atrasado, internet/sistema fora na hora). O envio já foi lançado no sistema?</div>
+    <button type="button" class="alarme-ok hidden" id="al-btn-ja-lancei" onclick="jaLanceiDoAlarme()">✅ Já lancei — não gerar outro envio</button>
+    <button type="button" class="alarme-btn2 hidden" id="al-btn-baixa" onclick="baixaDoAlarme()">🚚 Lançar envio — ainda não lancei, fechar o ciclo</button>
   </div>
 </div>
 
@@ -573,8 +576,9 @@ function fmtDia(dataSv){
   return `${d}/${m}/${y}`;
 }
 
-// pedido aguardando envio = PEDIDO sem envio vinculado
-function pendente(r){ return r.tipo==='PEDIDO' && !r.atendidoPorEnvioId; }
+// pedido aguardando envio = PEDIDO sem envio vinculado e sem a baixa
+// "ja lancei" (pedido retroativo cujo envio ja existia antes)
+function pendente(r){ return r.tipo==='PEDIDO' && !r.atendidoPorEnvioId && !r.jaLancadoEm; }
 
 // resumo: total ENVIADO hoje/ontem por sabor + contagem de pedidos pendentes
 function renderResumo(){
@@ -864,7 +868,9 @@ function regCardHtml(r){
   if(r.tipo==='PEDIDO'){
     statusBadge = r.atendidoPorEnvioId
       ? `<span class="badge atendido">✓ atendido${porId[r.atendidoPorEnvioId] ? ' às '+fmtHora(porId[r.atendidoPorEnvioId].criadoEm) : ''}</span>`
-      : '<span class="badge aguardando">⏳ aguardando envio</span>';
+      : r.jaLancadoEm
+        ? `<span class="badge atendido" title="A loja confirmou que o envio já tinha sido lançado antes - nenhum envio novo foi criado">✔️ baixado — envio já lançado ${fmtHora(r.jaLancadoEm)}${r.jaLancadoPorOperadorUsuario ? ' · @'+escapeHtml(r.jaLancadoPorOperadorUsuario) : ''}</span>`
+        : '<span class="badge aguardando">⏳ aguardando envio</span>';
   } else if(r.tipo==='ENVIO') {
     if(r.atendePedidoId){
       const p = porId[r.atendePedidoId];
@@ -885,7 +891,7 @@ function regCardHtml(r){
   // pedido ja visto pela loja (OK do alarme) - quem pediu enxerga daqui;
   // "sendo preparado" e o retorno seguinte que o carrinho espera. Pedido
   // "ja recebido" (lancamento atrasado) nao passa por preparo: so a baixa
-  if(r.tipo==='PEDIDO' && !r.atendidoPorEnvioId){
+  if(r.tipo==='PEDIDO' && !r.atendidoPorEnvioId && !r.jaLancadoEm){
     if(r.jaRecebido) statusBadge += ' <span class="badge aguardando">📦 já recebido — falta a baixa da loja</span>';
     else if(r.preparoEm) statusBadge += ` <span class="badge preparando">👨‍🍳 preparando ${fmtHora(r.preparoEm)}</span>`;
     else if(r.vistoEm) statusBadge += ` <span class="badge visto">👁 visto pela loja ${fmtHora(r.vistoEm)}</span>`;
@@ -1154,23 +1160,30 @@ async function executarTrocaPapel(){
 }
 
 // ---------- envio rapido: espelho do pedido, assinado pelo operador ----------
-// abre o mini-overlay de PIN (usuario 4 letras + senha 4 numeros) e envia
+// abre o mini-overlay de PIN (usuario 4 letras + senha 4 numeros) e envia.
+// modo 'ja-lancei': mesmo PIN, mas em vez de criar envio so confirma que o
+// envio JA FOI lancado antes (fecha o ciclo sem duplicar)
 let PIN_PEDIDO_ID = null;
-function envioRapido(pedidoId){
+let PIN_MODO = 'envio';
+function envioRapido(pedidoId, modo){
   const p = REGS.find(x=>x.id===pedidoId);
   if(!p) return;
   PIN_PEDIDO_ID = pedidoId;
+  PIN_MODO = modo === 'ja-lancei' ? 'ja-lancei' : 'envio';
   const resumo = SABORES.filter(s=>Number(p.pizzas?.[s])>0).map(s=>`${p.pizzas[s]} ${SABOR_LABEL[s]}`)
     .concat((p.insumos||[]).map(i=>i.insumoId ? `${i.nome} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : i.descricao));
   document.getElementById('pin-resumo').textContent =
-    (p.jaRecebido ? 'dar baixa (material já entregue): ' : 'mandar exatamente: ') + (resumo.join(', ') || '—');
+    (PIN_MODO==='ja-lancei' ? 'confirmar que o envio JÁ FOI LANÇADO antes (não cria outro envio): '
+      : p.jaRecebido ? 'dar baixa (material já entregue): '
+      : 'mandar exatamente: ') + (resumo.join(', ') || '—');
+  document.getElementById('btn-pin-ok').textContent = PIN_MODO==='ja-lancei' ? 'Confirmar — já lancei' : 'Enviar agora';
   document.getElementById('pin-usuario').value = localStorage.getItem('abastOperadorUsuario') || '';
   document.getElementById('pin-senha').value = '';
   document.getElementById('msg-pin').classList.add('hidden');
   document.getElementById('overlay-pin').classList.remove('hidden');
   document.getElementById(document.getElementById('pin-usuario').value ? 'pin-senha' : 'pin-usuario').focus();
 }
-function fecharPin(){ document.getElementById('overlay-pin').classList.add('hidden'); PIN_PEDIDO_ID = null; }
+function fecharPin(){ document.getElementById('overlay-pin').classList.add('hidden'); PIN_PEDIDO_ID = null; PIN_MODO = 'envio'; }
 
 async function confirmarEnvioRapido(){
   const p = REGS.find(x=>x.id===PIN_PEDIDO_ID);
@@ -1178,9 +1191,34 @@ async function confirmarEnvioRapido(){
   const btn = document.getElementById('btn-pin-ok');
   const msg = document.getElementById('msg-pin');
   msg.classList.add('hidden');
+  const txtBtn = btn.textContent;
   btn.disabled = true; btn.textContent = 'Enviando...';
   try{
     const operadorUsuario = document.getElementById('pin-usuario').value.trim().toLowerCase();
+    // "ja lancei": nao cria envio nenhum - so a confirmacao assinada
+    if(PIN_MODO==='ja-lancei'){
+      const respJL = await fetch(`/api/abastecimento/${p.id}/ja-lancei`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+        operadorUsuario, operadorSenha: document.getElementById('pin-senha').value.trim(),
+      }) });
+      const dataJL = await respJL.json();
+      if(!respJL.ok){
+        const senhaDigitadaJL = document.getElementById('pin-senha').value.trim();
+        document.getElementById('pin-senha').value = '';
+        if(dataJL.papelErrado){
+          mostrarBotaoTrocaPapel(msg, operadorUsuario, senhaDigitadaJL, 'envio', ()=>{
+            document.getElementById('pin-usuario').value = operadorUsuario;
+            document.getElementById('pin-senha').value = senhaDigitadaJL;
+            confirmarEnvioRapido();
+          }, dataJL.error);
+          return;
+        }
+        throw new Error(dataJL.error || 'Erro ao confirmar.');
+      }
+      lembrarOperadorUsado(operadorUsuario);
+      fecharPin();
+      await carregar();
+      return;
+    }
     const body = {
       tipo: 'ENVIO',
       pizzas: p.pizzas || {},
@@ -1214,7 +1252,7 @@ async function confirmarEnvioRapido(){
     document.getElementById('pin-senha').value = '';
     msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
   }finally{
-    btn.disabled = false; btn.textContent = 'Enviar agora';
+    btn.disabled = false; btn.textContent = txtBtn;
   }
 }
 
@@ -1399,6 +1437,7 @@ function verificarAlarme(){
   document.getElementById('al-btn-lembrete').classList.toggle('hidden', soBaixa || modo!=='lembrete');
   document.getElementById('al-btn-rapido').classList.toggle('hidden', soBaixa || modo==='novo');
   document.getElementById('al-aviso-baixa').classList.toggle('hidden', !soBaixa);
+  document.getElementById('al-btn-ja-lancei').classList.toggle('hidden', !soBaixa);
   document.getElementById('al-btn-baixa').classList.toggle('hidden', !soBaixa);
   document.getElementById('alarme-overlay').classList.remove('hidden');
   atualizarTimerAlarme();
@@ -1532,14 +1571,24 @@ async function envioRapidoDoAlarme(){
   await envioRapido(id);
 }
 
-// baixa do pedido "ja recebido": mesmo fluxo do envio rapido (PIN com a
-// senha do operador) - o backend fecha o ciclo sozinho (o envio ja nasce
-// recebido, sem popup de confirmacao no carrinho)
+// pedido "ja recebido": a loja NAO tinha lancado o envio - lanca agora
+// (PIN com a senha do operador) e o backend fecha o ciclo sozinho (o envio
+// ja nasce recebido, sem popup de confirmacao no carrinho)
 async function baixaDoAlarme(){
   if(!ALARME_PEDIDO) return;
   const id = ALARME_PEDIDO.id;
   fecharAlarme();
   await envioRapido(id);
+}
+
+// pedido "ja recebido": o envio JA FOI lancado antes (ex: avulso na hora) -
+// fecha o ciclo SEM criar outro envio, evitando duplicar nos totais.
+// Tambem exige a senha do operador
+async function jaLanceiDoAlarme(){
+  if(!ALARME_PEDIDO) return;
+  const id = ALARME_PEDIDO.id;
+  fecharAlarme();
+  await envioRapido(id, 'ja-lancei');
 }
 
 // ---------- conversa lateral do pedido ----------
