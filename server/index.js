@@ -2882,6 +2882,29 @@ app.get('/api/fechamentos/edicoes/anexo/:edicaoId/:index', requireSection('lanca
 // upload.any(): so entra em acao quando o Master troca o arquivo de um KPI
 // extra tipo "arquivo" (ver fechamentos.html/central-historico.html) -
 // requisicao JSON normal passa direto.
+// Master corrige a UNIDADE e/ou a DATA de um fechamento ja lancado - por
+// baixo o registro e movido (o ID e unidade+data, ver moverFechamento).
+// Devolve o registro novo, inclusive o id novo, pro cliente continuar
+// editando os demais campos em cima dele
+app.patch('/api/fechamentos/:id/mover', auth.requireMaster, async (req, res) => {
+  try {
+    const { novaUnidade, novaData, motivo } = req.body;
+    const registro = await fechamentosLive.moverFechamento({
+      fechamentoId: req.params.id,
+      novaUnidade,
+      novaUnidadeNome: novaUnidade ? nomeCanonicoUnidade(novaUnidade) : null,
+      novaData,
+      motivo,
+      editadoPorEmail: req.user.email,
+    });
+    broadcast('fechamento-editado-direto', registro, 'lancamento');
+    broadcast('fechamento-editado-direto', registro, 'fechamentos');
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.patch('/api/fechamentos/:id/editar-direto', auth.requireMaster, upload.any(), async (req, res) => {
   try {
     const body = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
