@@ -3168,6 +3168,7 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
           tecnicoId,
           tecnicoEmail,
           solicitacaoId: atual.id,
+          numeroTicket: atual.numeroTicket,
           criadoPorEmail: req.user.email,
         });
         await solicitacoes.vincularChamado(atual.id, chamado.id);
@@ -3181,6 +3182,7 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
         descricao: atual.observacao,
         responsaveis,
         solicitacaoId: atual.id,
+        numeroTicket: atual.numeroTicket,
         criadoPorEmail: req.user.email,
       });
       await solicitacoes.vincularChamado(atual.id, chamado.id);
@@ -3353,6 +3355,17 @@ async function buscarCardCru(tipo, id) {
     const r = await fechamentosLive.getEdicao(id);
     return r && { criadoPorId: r.solicitadoPorId, direcionadoParaId: r.direcionadoParaId, atribuidosIds: r.atribuidosIds };
   }
+  // chat direto no CHAMADO (TI/Manutencao): quem enxerga o kanban conversa -
+  // chatLivre libera o podeVerCard pra qualquer um que passou no guard de
+  // secao da rota (tecnico/suporte/manutencao/Master)
+  if (tipo === 'chamado-ti') {
+    const r = await chamadosTI.getOne(id);
+    return r && { criadoPorId: null, direcionadoParaId: r.tecnicoId, atribuidosIds: [], chatLivre: true };
+  }
+  if (tipo === 'chamado-manutencao') {
+    const r = await chamadosManutencao.getOne(id);
+    return r && { criadoPorId: null, direcionadoParaId: null, atribuidosIds: (r.responsaveis || []).map((x) => x.id), chatLivre: true };
+  }
   const r = await solicitacoes.getOne(id);
   return r && { criadoPorId: r.criadoPorId, direcionadoParaId: r.direcionadoParaId, atribuidosIds: r.atribuidosIds };
 }
@@ -3362,6 +3375,7 @@ async function buscarCardCru(tipo, id) {
 // todosCardsCentral(), usado tambem pro chat e pelos anexos/comprovante
 function podeVerCard(req, card) {
   if (req.isMaster) return true;
+  if (card.chatLivre) return true;
   if (card.criadoPorId === req.user.id) return true;
   if (card.direcionadoParaId === req.user.id) return true;
   if (Array.isArray(card.atribuidosIds) && card.atribuidosIds.includes(req.user.id)) return true;
@@ -3371,24 +3385,24 @@ function podeVerCard(req, card) {
 // chat de uma solicitacao da Central - quem criou o pedido, quem foi
 // atribuido, ou o Master podem ver/participar (pra questionar antes de
 // decidir, e pra quem pediu poder responder)
-app.get('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
+app.get('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico', 'suporte'), async (req, res) => {
   try {
     const card = await buscarCardCru(req.params.tipo, req.params.id);
     if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
     if (!podeVerCard(req, card)) return res.sendStatus(404);
-    if (card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
+    if (!card.chatLivre && card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
     res.json(await centralChat.listByCard(req.params.tipo, req.params.id));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), upload.single('imagem'), async (req, res) => {
+app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manutencao', 'tecnico', 'suporte'), upload.single('imagem'), async (req, res) => {
   try {
     const card = await buscarCardCru(req.params.tipo, req.params.id);
     if (!card) return res.status(404).json({ error: 'Solicitação não encontrada.' });
     if (!podeVerCard(req, card)) return res.sendStatus(404);
-    if (card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
+    if (!card.chatLivre && card.criadoPorId !== req.user.id && !req.isMaster && tipoBloqueado(req, req.params.tipo)) return res.sendStatus(404);
     let imagem = null;
     if (req.file) {
       const path = await storage.salvarArquivo(req.params.id, req.file, 'central-chat');
@@ -3403,7 +3417,16 @@ app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manut
       texto: req.body.texto,
       imagem,
     });
-    broadcast('central-chat-nova', mensagem, 'solicitacoes');
+    // chat de CHAMADO alcanca as pontas certas (tecnico/suporte/manutencao),
+    // que nao necessariamente tem a secao 'solicitacoes'
+    if (req.params.tipo === 'chamado-ti') {
+      broadcast('central-chat-nova', mensagem, 'tecnico');
+      broadcast('central-chat-nova', mensagem, 'suporte');
+    } else if (req.params.tipo === 'chamado-manutencao') {
+      broadcast('central-chat-nova', mensagem, 'manutencao');
+    } else {
+      broadcast('central-chat-nova', mensagem, 'solicitacoes');
+    }
     res.json(mensagem);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3413,7 +3436,7 @@ app.post('/api/central/:tipo/:id/chat', requireAnySection('solicitacoes', 'manut
 // foto anexada a uma mensagem do chat - mesmo gate de acesso do card (dono
 // do pedido, atribuido, ou Master), resolvido a partir do card que a
 // mensagem pertence
-app.get('/api/central/chat/foto/:messageId', requireAnySection('solicitacoes', 'manutencao', 'tecnico'), async (req, res) => {
+app.get('/api/central/chat/foto/:messageId', requireAnySection('solicitacoes', 'manutencao', 'tecnico', 'suporte'), async (req, res) => {
   const mensagem = await centralChat.getMessage(req.params.messageId);
   if (!mensagem || !mensagem.imagem) return res.sendStatus(404);
   const card = await buscarCardCru(mensagem.tipo, mensagem.cardId);
@@ -4124,6 +4147,108 @@ app.patch('/api/chamados/:id', auth.requireMaster, async (req, res) => {
   }
 });
 
+// edicao do Master: modalidade (presencial <-> remoto), status (concluido,
+// ativo, cancelado, reaberto) e prioridade - autonomia total
+app.patch('/api/chamados/:id/editar', auth.requireMaster, async (req, res) => {
+  try {
+    const chamado = await chamadosTI.editarMaster(req.params.id, {
+      modalidade: req.body.modalidade,
+      status: req.body.status,
+      prioridade: req.body.prioridade,
+    });
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// data de execucao: o tecnico responsavel (ou Master/Admin) diz quando vai
+// atuar - o SLA cobre so a TRIAGEM (atribuir + marcar essa data); a partir
+// daqui o combinado passa a ser a data marcada
+app.post('/api/chamados/:id/data-execucao', requireAnySection('tecnico', 'suporte'), async (req, res) => {
+  try {
+    const chamado = await chamadosTI.definirDataExecucao(req.params.id, {
+      dataExecucao: req.body.dataExecucao,
+      tecnicoId: req.user.id,
+      ehGestor: req.isMaster || req.isAdmin,
+    });
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// orcamento de peca (qualquer modalidade): lista descricao + valor
+app.put('/api/chamados/:id/orcamento-pecas', requireAnySection('tecnico', 'suporte'), async (req, res) => {
+  try {
+    const chamado = await chamadosTI.salvarOrcamentoPecas(req.params.id, req.body.orcamentoPecas);
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// cobranca de chamado (TI ou Manutencao): salvar e/ou ENVIAR - enviar gera o
+// ticket de PAGAMENTO na Central com a MESMA numeracao do chamado, juntando
+// os dois lados da historia (o servico e a cobranca dele)
+async function enviarCobrancaChamado({ modulo, chamadoId, origem, req }) {
+  let chamado = await modulo.garantirTicket(chamadoId);
+  if (!chamado.cobranca || !(chamado.cobranca.valor > 0)) throw new Error('Informe o valor da cobrança antes de enviar.');
+  if (chamado.cobranca.enviadaEm) throw new Error('A cobrança desse chamado já foi enviada.');
+  if (!chamado.cobranca.boleto) throw new Error('Anexe o boleto da cobrança antes de enviar.');
+  const ticket = await solicitacoes.create({
+    tipo: 'pagamento',
+    numeroTicket: chamado.numeroTicket,
+    unidade: chamado.unidade,
+    unidadeNome: chamado.unidadeNome,
+    titulo: `Cobrança ${origem} · ${chamado.titulo}`,
+    valorEstimado: chamado.cobranca.valor,
+    observacao: `Cobrança gerada do chamado de ${origem} (Ticket #${chamado.numeroTicket} — "${chamado.titulo}", ${chamado.unidadeNome}).${chamado.cobranca.descricao ? `\n\nObservação: ${chamado.cobranca.descricao}` : ''}\n\nBoleto anexado. Os dois tickets compartilham a numeração #${chamado.numeroTicket}.`,
+    itens: [],
+    anexos: [chamado.cobranca.boleto],
+    ehOrcamento: false,
+    criadoPorId: req.user.id,
+    criadoPorEmail: req.user.email,
+    direcionadoParaId: null,
+    direcionadoParaEmail: null,
+  });
+  chamado = await modulo.marcarCobrancaEnviada(chamadoId, { pagamentoId: ticket.id });
+  broadcast('solicitacao-criada', ticket, 'solicitacoes');
+  push.notifySolicitacao(`Ticket #${ticket.numeroTicket} · Cobrança de ${origem}`, `${chamado.titulo} · R$ ${Number(chamado.cobranca.valor).toFixed(2)}`, ticket.id);
+  return { chamado, ticket };
+}
+
+app.post('/api/chamados/:id/cobranca', requireAnySection('tecnico', 'suporte'), upload.single('boleto'), async (req, res) => {
+  try {
+    let boleto = null;
+    if (req.file) {
+      const path = await storage.salvarArquivo(req.params.id, req.file, 'chamados-cobranca');
+      boleto = { nome: req.file.originalname, path, tipo: req.file.mimetype || 'application/octet-stream' };
+    }
+    let chamado = await chamadosTI.salvarCobranca(req.params.id, { valor: req.body.valor, descricao: req.body.descricao, boleto });
+    let numeroTicket = null;
+    if (req.body.enviar === '1' || req.body.enviar === true) {
+      const r = await enviarCobrancaChamado({ modulo: chamadosTI, chamadoId: req.params.id, origem: 'TI', req });
+      chamado = r.chamado;
+      numeroTicket = r.ticket.numeroTicket;
+    }
+    broadcast('chamado-atualizado', { id: chamado.id }, 'tecnico');
+    res.json({ chamado, numeroTicket });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// boleto anexado a cobranca - mesmo publico que enxerga o kanban
+app.get('/api/chamados/:id/cobranca/boleto', requireAnySection('tecnico', 'suporte'), async (req, res) => {
+  const chamado = await chamadosTI.getOne(req.params.id);
+  if (!chamado || !chamado.cobranca || !chamado.cobranca.boleto) return res.sendStatus(404);
+  storage.streamArquivo(chamado.cobranca.boleto.path, chamado.cobranca.boleto.tipo, res);
+});
+
 // check-in: tecnico chegou na loja, registra os itens (descricao + foto) de
 // como esta antes de mexer
 app.post('/api/chamados/:id/iniciar', requireSection('tecnico'), upload.array('fotosAntes', 6), async (req, res) => {
@@ -4282,6 +4407,46 @@ app.post('/api/chamados-manutencao/:id/concluir', requireSection('manutencao'), 
 });
 
 // Master: autonomia total pra corrigir titulo/descricao/data/responsaveis/status
+// orcamento de peca do chamado de manutencao
+app.put('/api/chamados-manutencao/:id/orcamento-pecas', requireSection('manutencao'), async (req, res) => {
+  try {
+    const chamado = await chamadosManutencao.salvarOrcamentoPecas(req.params.id, req.body.orcamentoPecas);
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
+    res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// cobranca do chamado de manutencao: salvar e/ou enviar (gera o ticket de
+// PAGAMENTO com a mesma numeracao - ver enviarCobrancaChamado)
+app.post('/api/chamados-manutencao/:id/cobranca', requireSection('manutencao'), upload.single('boleto'), async (req, res) => {
+  try {
+    let boleto = null;
+    if (req.file) {
+      const path = await storage.salvarArquivo(req.params.id, req.file, 'chamados-cobranca');
+      boleto = { nome: req.file.originalname, path, tipo: req.file.mimetype || 'application/octet-stream' };
+    }
+    let chamado = await chamadosManutencao.salvarCobranca(req.params.id, { valor: req.body.valor, descricao: req.body.descricao, boleto });
+    let numeroTicket = null;
+    if (req.body.enviar === '1' || req.body.enviar === true) {
+      const r = await enviarCobrancaChamado({ modulo: chamadosManutencao, chamadoId: req.params.id, origem: 'Manutenção', req });
+      chamado = r.chamado;
+      numeroTicket = r.ticket.numeroTicket;
+    }
+    broadcast('chamado-manutencao-atualizado', { id: chamado.id }, 'manutencao');
+    res.json({ chamado, numeroTicket });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/chamados-manutencao/:id/cobranca/boleto', requireSection('manutencao'), async (req, res) => {
+  const chamado = await chamadosManutencao.getOne(req.params.id);
+  if (!chamado || !chamado.cobranca || !chamado.cobranca.boleto) return res.sendStatus(404);
+  storage.streamArquivo(chamado.cobranca.boleto.path, chamado.cobranca.boleto.tipo, res);
+});
+
 app.patch('/api/chamados-manutencao/:id', auth.requireMaster, async (req, res) => {
   try {
     const chamado = await chamadosManutencao.atualizar(req.params.id, req.body);
