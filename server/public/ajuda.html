@@ -231,6 +231,15 @@ const TOPICOS = [
     <h3>🔑 Reset Senha (Master/Admin)</h3>
     <p>Master e Admin encontram no menu (☰) do Painel a opção <b>🔑 Reset Senha</b> - um jeito rápido de redefinir a senha de qualquer acesso, sem precisar abrir a tela de Usuários: basta informar o usuário (login) ou e-mail da pessoa, digitar a senha nova e confirmar. A pessoa é obrigada a trocar por uma senha própria no próximo login, e os outros locais logados com a senha antiga são desconectados.</p>
   `},
+  { id:'chat-suporte', icone:'💬', secoes:null, titulo:'Chat de suporte (balãozinho 💬)', corpo:`
+    <p>Em toda tela do Zenith - inclusive na tela de login - existe um balãozinho <b>💬 no canto inferior direito</b>. É o canal direto com o time de Suporte pra qualquer problema de <b>computador, sistema ou acesso</b>.</p>
+    <ol>
+      <li>Clique no 💬 e conte o que está acontecendo (nome, contato e mensagem - <b>não precisa estar logado</b>; logado, nome e e-mail já vêm preenchidos).</li>
+      <li>A conversa fica salva no seu navegador: pode fechar a janela e voltar depois pra ver a resposta.</li>
+      <li>O Suporte responde ali mesmo e finaliza quando resolver - se precisar de novo, é só iniciar outra conversa.</li>
+    </ol>
+    <div class="dica"><b>Não consegue nem entrar?</b> É exatamente pra isso que o chat funciona sem login - use o balãozinho na tela de entrada.</div>
+  `},
   { id:'painel', icone:'🏠', secoes:null, titulo:'Painel (visão geral)', corpo:`
     <p>É a primeira tela depois do login: mostra um resumo rápido de cada área que você tem acesso (Monitor do dia, Fechamentos de ontem, Entregas de ontem, Central de Solicitações pendentes, Chamados de TI, iFood).</p>
     <ol>
@@ -309,6 +318,8 @@ const TOPICOS = [
       <li>Se quiser, escolha em <b>Direcionar para</b> qual Master/Admin deve olhar esse pedido primeiro (não impede outros de decidirem também, é só um atalho).</li>
       <li>Envie - a solicitação cai na fila de aprovação.</li>
     </ol>
+    <h3>⏱️ Prioridade e prazo (SLA)</h3>
+    <p>Ao lançar, escolha a <b>Prioridade</b> - ela define o prazo-alvo de resolução: 🔴 Crítica 4h · 🟠 Alta 8h · 🟡 Média 24h (padrão) · 🟢 Baixa 72h. No Histórico, cada card mostra o chip da prioridade e o relógio do SLA ("⏳ SLA 5h" / "🔥 SLA estourado"), e a fila de cada coluna ordena os mais urgentes primeiro. Use a prioridade com critério: Crítica é pra operação parada.</p>
     <h3>🔗 Link público (pra quem não tem acesso ao Zenith)</h3>
     <p>No formulário de Estorno, Compra, Manutenção, Suporte de TI, Pagamento ou Nota tem um botão <b>"🔗 Copiar link"</b> - gera um link (já com a loja e o tipo selecionados) que qualquer pessoa consegue preencher sem precisar de login. Útil pra mandar pro cliente preencher o pedido de estorno sozinho, ou pro Beniboy (ou outro atendimento) mandar quando o assunto precisar virar um ticket de verdade, sem ter que ensinar a pessoa a usar o sistema inteiro. A solicitação cai na Central normalmente, marcada como vinda do formulário público.</p>
     <h3>Acompanhar (página Histórico)</h3>
@@ -343,22 +354,6 @@ const TOPICOS = [
     <h3>✓ Aprovar / rejeitar</h3>
     <p>Só Master e usuários com a <span class="tagpill admin">⭐ tag Admin</span> conseguem aprovar ou rejeitar, marcar Comprada e ver todas as solicitações. Editar ou excluir uma solicitação continua sendo só do <span class="tagpill master">Master</span>.</p>
   `},
-  { id:'admin-tag', icone:'⭐', secoes:'master', titulo:'Tag Admin: o que é e como usar', corpo:`
-    <p>A tag Admin dá pra um usuário comum o poder de aprovar/rejeitar solicitações da Central, sem precisar virar Master (que tem acesso a tudo, incluindo gestão de usuários).</p>
-    <h3>Como o Master ativa</h3>
-    <ol>
-      <li>Abra <b>Usuários</b>.</li>
-      <li>Na linha da pessoa, clique em <b>Tornar admin</b>.</li>
-      <li>O badge <span class="tagpill admin">⭐ admin</span> aparece na linha dela.</li>
-    </ol>
-    <h3>O que quem tem a tag Admin pode fazer</h3>
-    <ul>
-      <li>Ver todas as solicitações da Central (não só as próprias).</li>
-      <li>Aprovar ou rejeitar Estorno, Ajuste de Fechamento, Compra, Manutenção e Suporte de TI.</li>
-      <li>Participar do chat de qualquer solicitação.</li>
-    </ul>
-    <div class="dica">Admin <b>não</b> pode editar/excluir solicitações direto, nem gerenciar outros usuários - isso continua exclusivo do Master.</div>
-  `},
   { id:'cofre', icone:'🔐', secoes:['cofre'], titulo:'Cofre de senhas', corpo:`
     <p>Guarda de forma organizada as senhas de sistemas usados pela operação, divididas por Grupo → Subgrupo.</p>
     <ol>
@@ -366,55 +361,6 @@ const TOPICOS = [
       <li>Clique no ícone de olho pra revelar a senha, ou no de copiar pra copiar direto.</li>
     </ol>
     <div class="dica">Você só vê os subgrupos liberados pelo Master pro seu acesso.</div>
-  `},
-  { id:'usuarios', icone:'👤', secoes:'master', titulo:'Usuários (Master)', corpo:`
-    <p>Tela exclusiva do Master pra criar e administrar todos os acessos do sistema.</p>
-    <h3>Criar um acesso novo</h3>
-    <ol>
-      <li>Preencha e-mail, senha temporária e, se quiser, um <b>usuário</b> (login curto, tipo "jn") no formulário do topo.</li>
-      <li>Marque as seções, lojas, subgrupos do Cofre e, se quiser restringir, os <b>tipos de solicitação</b> da Central que a pessoa vai poder usar.</li>
-      <li>Clique em <b>Criar acesso</b>.</li>
-    </ol>
-    <div class="dica">A senha que você digitou é só a temporária - no primeiro login a pessoa é obrigada a trocar por uma nova antes de usar o resto do app.</div>
-    <h3>🎫 Tipos de solicitação (Central)</h3>
-    <p>Quem tem a seção Central de Solicitações vê, por padrão, todos os tipos (Estorno, Ajuste de fechamento, Compra, Manutenção, Suporte de TI, Pagamento, Nota). Se você marcar algum tipo específico nessa permissão, a pessoa passa a ver e agir <b>só</b> nesses tipos - útil pra um Admin que cuida só de um assunto (ex: liberar só "Suporte de TI" pra quem coordena os chamados de TI, sem ele ver os pedidos de Estorno e Compra de todo mundo).</p>
-    <h3>Gerenciar um acesso existente</h3>
-    <ul>
-      <li><b>Permissões</b>: muda seções/lojas/subgrupos liberados.</li>
-      <li><b>Horário</b>: restringe o login a um intervalo do dia.</li>
-      <li><b>Tornar admin / Remover admin</b>: dá ou tira o poder de aprovar solicitações da Central.</li>
-      <li><b>Liberar Catálogo do Estoque</b>: deixa a pessoa organizar setor/tipo, ajustar custo de referência e ativar/desativar item no Catálogo do Estoque, sem precisar virar Master nem Admin - útil pra um gerente que cuida disso no dia a dia da loja dele.</li>
-      <li><b>Tag de cargo (Loja/Gerente)</b>: além de ser um rótulo de organização na lista, a tag <b>Gerente</b> agora também é usada de verdade no Saltiverso - só quem tem essa tag (na loja certa) ou Master/Admin pode aprovar um check-out antecipado do parque.</li>
-      <li><b>Definir/Editar usuário</b>: define o login curto (usuário) da pessoa, alternativa ao e-mail na tela de login.</li>
-      <li><b>Nova senha</b>: troca a senha (e destrava a conta, se estiver bloqueada) - a pessoa é obrigada a trocar de novo no próximo login.</li>
-      <li><b>Ativar/Desativar</b>: liga ou desliga o acesso sem excluir.</li>
-      <li><b>Excluir</b>: remove o acesso de vez.</li>
-    </ul>
-    <h3>Definir o "usuário" em massa</h3>
-    <p>No painel <b>"Atualizar usuários em massa"</b>, mais abaixo na mesma tela, cole uma lista no formato <code>email,usuário</code> (uma linha por acesso, pode copiar de uma planilha) e clique em <b>Aplicar</b> - o sistema processa linha por linha e mostra o resultado de cada uma, sem parar se alguma der erro.</p>
-  `},
-  { id:'grupos', icone:'🏷️', secoes:'master', titulo:'Grupos (Master)', corpo:`
-    <p>Organiza as lojas em franquias/grupos e permite configurar, por grupo, tudo que muda de loja pra loja: seções do Fechamento, campos extras e quem recebe as notificações da Central.</p>
-    <h3>Criar/editar um grupo</h3>
-    <ol>
-      <li>Crie ou edite um grupo, associando as lojas que fazem parte dele.</li>
-      <li>Escolha os <b>Responsáveis</b> (Master/Admin) que aparecem como opção de "Direcionar para" quando alguém dessa unidade abre uma solicitação na Central.</li>
-    </ol>
-    <h3>Seções do Fechamento</h3>
-    <p>Dá pra habilitar ou desabilitar, por grupo:</p>
-    <ul>
-      <li><b>Caixa</b> - caixa inicial, caixa final, entrada de dinheiro, depósito.</li>
-      <li><b>Maquininhas</b> - inclusive trocar o nome padrão delas (ex: "Maquininha 1, 2, 3..." vira "Getnet 1, 2, 3...").</li>
-      <li><b>Saídas</b> - saída de dinheiro do caixa.</li>
-    </ul>
-    <h3>Canais de venda / Formas de pagamento extras</h3>
-    <p>Além dos campos fixos, dá pra criar campos extras próprios do grupo. Pra cada campo extra, escolha:</p>
-    <ul>
-      <li><b>Soma ou subtrai</b> no total da própria seção.</li>
-      <li><b>Também soma no outro total</b> - ex: TEF Crédito é um Canal de venda, mas já é uma forma de pagamento validada, então também soma no Total Declarado (senão dava "falta no caixa" à toa, mesmo estando tudo certo).</li>
-    </ul>
-    <h3>KPI's extras</h3>
-    <p>Campos extras que aparecem no fim do Fechamento, cada um com a unidade de medida certa: <b>Quantidade</b>, <b>R$</b>, <b>Kg</b>, <b>Arquivo</b> (upload de foto/comprovante) ou <b>Texto</b>.</p>
   `},
   { id:'estoque', icone:'📦', secoes:['inventario'], titulo:'Estoque (Inventário/CMV)', corpo:`
     <p>Controle de estoque físico da loja (insumos, bebidas, embalagens) por setor, com contagem diária, recebimento de mercadoria e cálculo de diferenças (CMV).</p>
@@ -442,13 +388,26 @@ const TOPICOS = [
     <p>Lista de todos os itens cadastrados, com setor, tipo, unidade de medida e custo de referência. Dá pra ativar/desativar um item (sem apagar o histórico de contagens/recebimentos já feitos com ele) e editar setor/tipo/custo.</p>
     <div class="dica"><b>Quem pode organizar o Catálogo?</b> O <span class="tagpill master">Master</span> sempre pode. Pra liberar isso pra um gerente específico sem dar acesso Master completo, o Master ativa a permissão <span class="tagpill admin">📦 Catálogo do Estoque</span> pra quem escolher (veja o tópico Usuários). Cadastrar um item <b>novo</b> - por exemplo direto na Contagem - não precisa dessa permissão: qualquer um com acesso ao Estoque pode.</div>
   `},
-  { id:'tecnico', icone:'🔧', secoes:['tecnico'], titulo:'Chamados de TI', corpo:`
-    <p>Fila de atendimento técnico - nasce automaticamente quando uma solicitação de Suporte de TI é aprovada na Central, ou pode ser criada direto pelo Master.</p>
-    <ul>
-      <li>O técnico responsável vê só os chamados atribuídos a ele.</li>
-      <li>Ao chegar na loja, ele clica em <b>Iniciar chamado</b>.</li>
-      <li>Ao terminar, clica em <b>Concluir chamado</b> e pode anexar foto do serviço feito.</li>
-    </ul>
+  { id:'tecnico', icone:'🔧', secoes:['tecnico','suporte'], titulo:'Chamados de TI (Presencial e Remoto)', corpo:`
+    <p>Fila de atendimento técnico. Um chamado nasce quando uma solicitação de Suporte de TI é aprovada na Central, ou é aberto direto na própria tela (botão <b>➕ Abrir chamado</b>). Todo chamado tem uma <b>modalidade</b>, bem marcada no card:</p>
+    <h3>🚗 Presencial - o técnico vai à loja</h3>
+    <ol>
+      <li>O técnico responsável vê o chamado atribuído a ele.</li>
+      <li>Ao chegar na loja, clica em <b>📍 Fazer check-in</b> e registra os itens de como está <b>antes</b> (descrição + foto).</li>
+      <li>Ao terminar, clica em <b>✓ Concluir</b>: itens de como ficou <b>depois</b>, observação do serviço, peças compradas (se precisou) e a <b>assinatura de quem recebeu</b> na loja.</li>
+    </ol>
+    <h3>🎧 Remoto - o time de Suporte resolve a distância</h3>
+    <ol>
+      <li>Sem visita, sem check-in e sem assinatura: o atendimento acontece por telefone/acesso remoto/sistema.</li>
+      <li>Pra fechar, é só <b>🎧 Concluir atendimento remoto</b> com o registro do que foi feito.</li>
+      <li>Se a atuação já aconteceu antes do ticket existir, marque <b>"✅ Já resolvido"</b> na abertura - o chamado nasce e fecha na hora, mas o registro fica no banco de evidências. <b>Toda atuação vira ticket</b>, nem que seja abrir e já fechar.</li>
+    </ol>
+    <h3>⏱️ Prioridade e SLA</h3>
+    <p>Todo chamado tem prioridade (🔴 Crítica 4h · 🟠 Alta 8h · 🟡 Média 24h · 🟢 Baixa 72h) e o card mostra o relógio do prazo ("⏳ SLA vence em 5h" / "🔥 SLA estourado"). A fila ordena sozinha: ativos primeiro, por prioridade e prazo mais apertado; concluídos ficam embaixo. Os filtros do topo (Ativos / Presencial / Remoto / Concluídos) ajudam no alto volume.</p>
+    <h3>➕ Abrir chamado direto</h3>
+    <p>Quem tem a seção <b>Suporte</b> abre chamados <b>remotos no próprio nome</b> (o objetivo é nunca perder registro de atuação). Master/Admin abrem qualquer modalidade e escolhem o responsável.</p>
+    <h3>💬 Chats de suporte do site</h3>
+    <p>O time de Suporte também atende por aqui as conversas iniciadas no widget 💬 do site: responda o visitante, use <b>🎫 Gerar chamado remoto</b> pra registrar a atuação vinculada à conversa e <b>✔ Finalizar</b> quando resolver.</p>
   `},
   { id:'manutencao', icone:'🔧', secoes:['manutencao'], titulo:'Manutenção', corpo:`
     <p>Fila de chamados de manutenção - nasce automaticamente quando uma solicitação de Manutenção é aprovada na Central (quem aprova escolhe 1 ou mais responsáveis), ou pode ser criada direto pelo Master.</p>
@@ -553,7 +512,7 @@ function renderSecoes(filtro){
   document.getElementById('busca-vazio').classList.toggle('hidden', visiveis.length>0);
   document.getElementById('lista-secoes').innerHTML = visiveis.map(t=>`
     <details class="secao-ajuda" id="${t.id}" ${termo?'open':''}>
-      <summary><span class="icone">${t.icone}</span> ${escapeHtml(t.titulo)}</summary>
+      <summary><span class="icone">${t.icone}</span> ${escapeHtml(t.titulo)}${t.secoes==='master' ? ' <span class="tagpill master">só Master/Admin</span>' : ''}</summary>
       <div class="secao-corpo">${t.corpo}${RODAPE_SUPORTE}</div>
     </details>
   `).join('');
@@ -591,6 +550,16 @@ async function boot(){
   document.getElementById('nav-inventario').classList.remove('hidden');
   document.getElementById('nav-parque-checkin').classList.remove('hidden');
   document.getElementById('nav-festas').classList.remove('hidden');
+
+  // topicos exclusivos de Master/Admin vem do BACKEND (docsMaster.js) - o
+  // conteudo de gestao nao viaja pro navegador de quem nao e Master/Admin,
+  // que e o objetivo da documentacao separada por publico
+  if(PODE_TUDO){
+    try{
+      const topicosMaster = await fetch('/api/ajuda/topicos-master').then(r=>r.ok?r.json():[]);
+      for(const t of topicosMaster){ if(!TOPICOS.some(x=>x.id===t.id)) TOPICOS.push(t); }
+    }catch(e){ /* sem eles a Ajuda geral continua funcionando */ }
+  }
 
   renderToc();
   renderSecoes('');
