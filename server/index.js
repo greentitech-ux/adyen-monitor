@@ -3772,7 +3772,9 @@ app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
     });
     broadcast('abastecimento-atualizado', { id: registro.id, tipo: registro.tipo });
     if (registro.tipo === 'PEDIDO') {
-      push.notifySolicitacao('🛒 Carrinho pediu abastecimento', `${registro.criadoPorNome} · pizzas/insumos aguardando envio`, registro.id);
+      // aviso operacional do balcao: vai so pra quem opera a loja (secao
+      // abastecimento-loja) - Master/Admin nao recebem esse push
+      push.notifyAbastecimento('🛒 Carrinho pediu abastecimento', `${registro.criadoPorNome} · pizzas/insumos aguardando envio`, registro.id, 'abastecimento-loja');
     }
     res.json(registro);
   } catch (err) {

@@ -147,6 +147,29 @@ async function notifySolicitacao(title, body, tag) {
   }
 }
 
+// pedidos/envios do Abastecimento do Carrinho: notifica SO quem opera a
+// ponta (secao informada) - Master/Admin ficam de fora de proposito, o
+// alarme e assunto do balcao, nao da gestao
+async function notifyAbastecimento(title, body, tag, secao) {
+  if (!PUBLIC_KEY || !PRIVATE_KEY) return;
+  const payload = JSON.stringify({ title, body, tag });
+  const subs = await loadSubs();
+  for (const sub of subs) {
+    const meta = sub.meta;
+    if (!meta || meta.isMaster || meta.isAdmin) continue;
+    if (!(meta.sections || []).includes(secao)) continue;
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        await removeSubscription(sub.endpoint);
+      } else {
+        console.error('Erro ao enviar push (abastecimento):', err.message);
+      }
+    }
+  }
+}
+
 // aviso de check-in automatico do parque (ninguem confirmou a entrada
 // fisica ate o horario previsto - ver rodarAutoCheckins em parque.js)
 async function notifyParqueAutoCheckin(title, body, tag, unidade) {
@@ -168,5 +191,5 @@ async function notifyParqueAutoCheckin(title, body, tag, unidade) {
 }
 
 module.exports = {
-  addSubscription, removeSubscription, notify, notifyRaw, notifySolicitacao, notifyParqueAutoCheckin, PUBLIC_KEY,
+  addSubscription, removeSubscription, notify, notifyRaw, notifySolicitacao, notifyAbastecimento, notifyParqueAutoCheckin, PUBLIC_KEY,
 };
