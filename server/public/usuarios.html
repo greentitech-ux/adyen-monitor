@@ -207,22 +207,6 @@
 
 <div id="root" class="hidden">
   <div class="panel">
-    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <span>Acessos cadastrados</span>
-      <span style="display:flex;gap:4px;">
-        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('csv')">📄 CSV</button>
-        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('pdf')">📄 PDF</button>
-      </span>
-    </h2>
-    <div class="users-toolbar">
-      <input type="search" id="users-busca" placeholder="🔍 pesquisar por email, usuário, cargo, seção, unidade..." oninput="filtrarBuscaUsuarios()">
-      <div class="users-filtros" id="users-filtros"></div>
-    </div>
-    <div class="users-contagem" id="users-contagem"></div>
-    <div class="users-list" id="users-list"></div>
-  </div>
-
-  <div class="panel">
     <h2>Criar novo acesso</h2>
     <form class="create" id="create-form">
       <label>Email<input type="email" id="c-email" required></label>
@@ -260,6 +244,22 @@
       <p class="err hidden" id="create-err"></p>
       <button type="submit" class="primary">Criar acesso</button>
     </form>
+  </div>
+
+  <div class="panel">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>Acessos cadastrados</span>
+      <span style="display:flex;gap:4px;">
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('csv')">📄 CSV</button>
+        <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('pdf')">📄 PDF</button>
+      </span>
+    </h2>
+    <div class="users-toolbar">
+      <input type="search" id="users-busca" placeholder="🔍 pesquisar por email, usuário, cargo, seção, unidade..." oninput="filtrarBuscaUsuarios()">
+      <div class="users-filtros" id="users-filtros"></div>
+    </div>
+    <div class="users-contagem" id="users-contagem"></div>
+    <div class="users-list" id="users-list"></div>
   </div>
 
   <div class="panel">
