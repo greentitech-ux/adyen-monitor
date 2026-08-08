@@ -43,6 +43,7 @@ const solicitacoes = require('./solicitacoes');
 const chamadosTI = require('./chamadosTI');
 const chamadosManutencao = require('./chamadosManutencao');
 const suporteChat = require('./suporteChat');
+const docsMaster = require('./docsMaster');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 const inventario = require('./inventario');
@@ -3612,6 +3613,13 @@ app.post('/api/chamados', auth.requireAuth, async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// topicos da Ajuda exclusivos de Master/Admin - servidos pelo backend de
+// proposito (ver docsMaster.js): conteudo que so a gestao pode conhecer nao
+// viaja pro navegador de quem nao e Master/Admin
+app.get('/api/ajuda/topicos-master', auth.requireMasterOrAdmin, (req, res) => {
+  res.json(docsMaster.TOPICOS_MASTER);
 });
 
 // ---------- Chat de suporte do site (widget 💬 em todas as telas) ----------
