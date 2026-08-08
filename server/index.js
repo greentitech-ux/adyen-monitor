@@ -45,6 +45,7 @@ const chamadosManutencao = require('./chamadosManutencao');
 const suporteChat = require('./suporteChat');
 const docsMaster = require('./docsMaster');
 const abastecimentoCarrinho = require('./abastecimentoCarrinho');
+const ativosTI = require('./ativosTI');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 const inventario = require('./inventario');
@@ -3620,6 +3621,41 @@ app.post('/api/chamados', auth.requireAuth, async (req, res) => {
     });
     broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- Inventario de ATIVOS DE TI das lojas (secao 'ativos-ti') ----------
+// o tecnico que visita a loja registra a vistoria (areas Loja/Rack, item +
+// quantidade + observacao); o inventario atual = vistoria mais recente.
+// Master concede a secao pro tecnico; Master/Admin sempre podem
+app.get('/api/ativos-ti', requireSection('ativos-ti'), async (req, res) => {
+  res.json(await ativosTI.listAll());
+});
+
+app.post('/api/ativos-ti', requireSection('ativos-ti'), async (req, res) => {
+  try {
+    const registro = await ativosTI.criar({
+      unidade: req.body.unidade,
+      unidadeNome: req.body.unidadeNome,
+      areas: req.body.areas,
+      observacao: req.body.observacao,
+      criadoPorEmail: req.user.email,
+      criadoPorNome: req.user.username || req.user.email,
+    });
+    broadcast('ativos-ti-atualizado', { id: registro.id });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/ativos-ti/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await ativosTI.remover(req.params.id);
+    broadcast('ativos-ti-atualizado', { id: req.params.id, excluido: true });
+    res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
