@@ -189,6 +189,39 @@
   </div>
   <div id="lista-cards"><div class="empty">carregando...</div></div>
 </div>
+
+<!-- atendimento dos chats do widget 💬 do site (visitantes, logados ou nao) -
+     so pro time de Suporte/Master/Admin. Responder, gerar chamado remoto
+     vinculado (banco de evidencias) e finalizar -->
+<div class="panel hidden" id="painel-chats">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+    <h2 style="margin:0;">💬 Chats de suporte do site <span class="sub" id="chats-count" style="font-family:var(--mono);color:var(--muted);"></span></h2>
+    <button type="button" class="filtro-chip" id="btn-chats-finalizados" onclick="toggleChatsFinalizados()">ver finalizados</button>
+  </div>
+  <div id="lista-chats"><div class="empty">carregando...</div></div>
+</div>
+</div>
+
+<div class="overlay hidden" id="overlay-chat">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharChat()">✕</span>
+    <div class="sheet">
+      <h3 id="ch-titulo"></h3>
+      <div class="sub" id="ch-sub"></div>
+      <div id="ch-mensagens" style="display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow-y:auto;margin-bottom:10px;"></div>
+      <div id="ch-acoes-abertas">
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="ch-resposta" placeholder="responder ao visitante..." maxlength="1000" style="flex:1;">
+          <button type="button" class="btn-abrir-chamado" id="btn-ch-responder" onclick="responderChat()">➤</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          <button type="button" class="btn-add" style="width:auto;flex:1;" id="btn-ch-chamado" onclick="gerarChamadoDoChat()">🎫 Gerar chamado remoto</button>
+          <button type="button" class="btn-add" style="width:auto;flex:1;color:var(--ok);" onclick="finalizarChat()">✔ Finalizar conversa</button>
+        </div>
+      </div>
+      <div class="msg hidden" id="msg-chat"></div>
+    </div>
+  </div>
 </div>
 
 <!-- abertura direta de chamado: Master/Admin (qualquer modalidade, escolhe o
@@ -745,6 +778,127 @@ async function criarChamado(){
   }
 }
 
+// ---------- atendimento dos chats de suporte do site ----------
+let CHATS = [];
+let CHAT_ATUAL = null;
+let MOSTRAR_CHATS_FINALIZADOS = false;
+let PODE_ATENDER_CHATS = false;
+
+function toggleChatsFinalizados(){
+  MOSTRAR_CHATS_FINALIZADOS = !MOSTRAR_CHATS_FINALIZADOS;
+  document.getElementById('btn-chats-finalizados').classList.toggle('ativo', MOSTRAR_CHATS_FINALIZADOS);
+  renderChats();
+}
+
+function renderChats(){
+  const abertos = CHATS.filter(c=>c.status==='ABERTO');
+  const visiveis = MOSTRAR_CHATS_FINALIZADOS ? CHATS : abertos;
+  document.getElementById('chats-count').textContent = `${abertos.length} aberto${abertos.length===1?'':'s'}`;
+  document.getElementById('lista-chats').innerHTML = visiveis.length ? visiveis.map(c=>{
+    const ultima = (c.mensagens||[])[c.mensagens.length-1];
+    const aguardando = c.status==='ABERTO' && ultima && ultima.de==='visitante';
+    return `
+    <div class="card" onclick="abrirChat('${c.id}')">
+      <div class="linha1">
+        <span>${escapeHtml(c.nome)} <span class="sub" style="font-weight:400;">· ${escapeHtml(c.contato)}</span></span>
+        <span class="badge ${c.status==='ABERTO' ? (aguardando?'ABERTO':'INICIADO') : 'CONCLUIDO'}">${c.status==='ABERTO' ? (aguardando?'AGUARDANDO RESPOSTA':'EM CONVERSA') : 'FINALIZADO'}</span>
+      </div>
+      <div class="sub">${ultima ? escapeHtml(ultima.texto.slice(0,90)) : ''}</div>
+      <div class="sub">${fmtDataHora(c.atualizadoEm||c.criadoEm)}${c.chamadoId?' · 🎫 chamado vinculado':''}</div>
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum chat por aqui.</div>';
+}
+
+async function carregarChats(){
+  if(!PODE_ATENDER_CHATS) return;
+  try{
+    CHATS = await fetch('/api/suporte-chats').then(r=>r.ok?r.json():[]);
+    CHATS.sort((a,b)=>String(b.atualizadoEm||b.criadoEm||'').localeCompare(String(a.atualizadoEm||a.criadoEm||'')));
+    renderChats();
+    if(CHAT_ATUAL){
+      const atualizado = CHATS.find(c=>c.id===CHAT_ATUAL.id);
+      if(atualizado){ CHAT_ATUAL = atualizado; renderChatDetalhe(); }
+    }
+  }catch(e){ /* tenta no proximo ciclo */ }
+}
+
+function renderChatDetalhe(){
+  const c = CHAT_ATUAL;
+  document.getElementById('ch-titulo').textContent = `💬 ${c.nome}`;
+  document.getElementById('ch-sub').textContent = `${c.contato} · iniciado em ${fmtDataHora(c.criadoEm)}${c.atendidoPorEmail?(' · atendido por '+c.atendidoPorEmail):''}`;
+  document.getElementById('ch-mensagens').innerHTML = (c.mensagens||[]).map(m=>`
+    <div style="max-width:85%;${m.de==='visitante'?'align-self:flex-start;background:var(--panel2);border:1px solid var(--line);':'align-self:flex-end;background:#12303a;border:1px solid rgba(92,200,255,.25);'}border-radius:10px;padding:7px 10px;font-size:12.5px;white-space:pre-wrap;word-break:break-word;">
+      <div class="sub" style="margin:0 0 2px;">${m.de==='visitante'?escapeHtml(c.nome):('Suporte'+(m.autorEmail?(' · '+escapeHtml(m.autorEmail)):''))}</div>${escapeHtml(m.texto)}
+    </div>`).join('');
+  document.getElementById('ch-acoes-abertas').classList.toggle('hidden', c.status!=='ABERTO');
+  document.getElementById('btn-ch-chamado').classList.toggle('hidden', !!c.chamadoId);
+  const box = document.getElementById('ch-mensagens');
+  box.scrollTop = box.scrollHeight;
+}
+
+function abrirChat(id){
+  CHAT_ATUAL = CHATS.find(c=>c.id===id);
+  if(!CHAT_ATUAL) return;
+  document.getElementById('ch-resposta').value = '';
+  document.getElementById('msg-chat').classList.add('hidden');
+  renderChatDetalhe();
+  document.getElementById('overlay-chat').classList.remove('hidden');
+}
+function fecharChat(){ document.getElementById('overlay-chat').classList.add('hidden'); CHAT_ATUAL = null; }
+
+function erroChat(texto){
+  const msg = document.getElementById('msg-chat');
+  msg.textContent = texto; msg.className = 'msg err'; msg.classList.remove('hidden');
+}
+
+async function responderChat(){
+  if(!CHAT_ATUAL) return;
+  const input = document.getElementById('ch-resposta');
+  const texto = input.value.trim();
+  if(!texto) return;
+  const btn = document.getElementById('btn-ch-responder');
+  btn.disabled = true;
+  try{
+    const resp = await fetch(`/api/suporte-chats/${CHAT_ATUAL.id}/responder`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ texto }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao responder.');
+    input.value = '';
+    CHAT_ATUAL = data;
+    renderChatDetalhe();
+    carregarChats();
+  }catch(err){ erroChat(err.message); }
+  finally{ btn.disabled = false; }
+}
+
+async function finalizarChat(){
+  if(!CHAT_ATUAL) return;
+  if(!confirm('Finalizar essa conversa? O visitante ainda consegue ler, mas não escreve mais.')) return;
+  try{
+    const resp = await fetch(`/api/suporte-chats/${CHAT_ATUAL.id}/finalizar`, { method:'POST' });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao finalizar.');
+    CHAT_ATUAL = data;
+    renderChatDetalhe();
+    carregarChats();
+  }catch(err){ erroChat(err.message); }
+}
+
+// vira chamado REMOTO vinculado, no nome de quem esta atendendo - registro
+// da atuacao no banco de evidencias mesmo quando resolve pelo proprio chat
+async function gerarChamadoDoChat(){
+  if(!CHAT_ATUAL) return;
+  if(!confirm('Gerar um chamado remoto vinculado a essa conversa, atribuído a você?')) return;
+  try{
+    const resp = await fetch(`/api/suporte-chats/${CHAT_ATUAL.id}/gerar-chamado`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao gerar chamado.');
+    await carregarChats();
+    await carregarChamados();
+    const msg = document.getElementById('msg-chat');
+    msg.textContent = '🎫 Chamado remoto criado e vinculado.'; msg.className = 'msg ok'; msg.classList.remove('hidden');
+  }catch(err){ erroChat(err.message); }
+}
+
 async function boot(){
   const res = await fetch('/api/me');
   if(!res.ok){ logout(); return; }
@@ -788,7 +942,15 @@ async function boot(){
   const selUnidadeNovo = document.getElementById('n-unidade');
   if(selUnidadeNovo) selUnidadeNovo.addEventListener('change', ()=>{ if(EH_GESTOR) carregarResponsaveisNovo(); });
   document.getElementById('root').classList.remove('hidden');
+  // painel de atendimento dos chats do site - mesmo grupo que pode abrir
+  // chamado direto (Master/Admin/Suporte)
+  PODE_ATENDER_CHATS = podeAbrir;
+  document.getElementById('painel-chats').classList.toggle('hidden', !PODE_ATENDER_CHATS);
   await carregarChamados();
+  if(PODE_ATENDER_CHATS){
+    await carregarChats();
+    setInterval(carregarChats, 10000); // fallback do SSE (novas mensagens de visitante)
+  }
   iniciarStreamChamados();
 }
 
@@ -799,10 +961,12 @@ function iniciarStreamChamados(){
   ['chamado-criado','chamado-atualizado'].forEach(evento=>{
     es.addEventListener(evento, ()=>{ carregarChamados(); });
   });
+  es.addEventListener('suporte-chat', ()=>{ carregarChats(); });
 }
 
 boot();
 </script>
 <script src="/notif-central.js"></script>
+<script src="/suporte-chat.js"></script>
 </body>
 </html>
