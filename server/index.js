@@ -5043,16 +5043,32 @@ app.use((err, req, res, next) => {
       backup.rodarBackup().catch((err) => console.error('Erro no backup automático:', err.message));
     }, 24 * 60 * 60 * 1000);
 
-    // sincroniza os fechamentos com as planilhas do Google Sheets: roda no
-    // start e depois periodicamente (15min por padrao - ajustavel via
-    // SHEETS_SYNC_INTERVAL_MS). O Master tambem pode forçar pela tela.
+    // planilhas do Google Sheets (fechamentos + entregas): SEM intervalo
+    // continuo. Roda 1x no boot (o historico vive em memoria - sem isso as
+    // telas ficariam vazias a cada reinicio) e depois so nas janelas fixas
+    // de 05:00 e 18:00 de Brasilia. Se o servidor estiver dormindo no
+    // horario, a primeira checagem depois de acordar faz o catch-up da
+    // janela perdida. Fora isso, o Master sincroniza manualmente pela tela
+    // (botoes de "sincronizar planilha", que continuam funcionando igual).
     sincronizarPlanilhasFechamento();
-    const intervaloSync = Number(process.env.SHEETS_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
-    setInterval(sincronizarPlanilhasFechamento, intervaloSync);
-
-    // mesma logica pro historico de entregas (planilha "MOTOS BRAVO" do AppSheet)
     sincronizarPlanilhaEntregas();
-    setInterval(sincronizarPlanilhaEntregas, intervaloSync);
+    const SYNC_SLOTS_HORAS = [5, 18];
+    const msUltimoSlotSync = () => {
+      const partes = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+      const o = {};
+      partes.forEach((p) => { if (p.type !== 'literal') o[p.type] = Number(p.value); });
+      const minutosAgora = (o.hour === 24 ? 0 : o.hour) * 60 + o.minute;
+      const passados = SYNC_SLOTS_HORAS.filter((h) => h * 60 <= minutosAgora);
+      const slotHora = passados.length ? Math.max(...passados) : Math.max(...SYNC_SLOTS_HORAS);
+      const minutosAtras = passados.length ? minutosAgora - slotHora * 60 : minutosAgora + (24 * 60 - slotHora * 60);
+      return Date.now() - minutosAtras * 60 * 1000;
+    };
+    const aindaNaoSincronizouNoSlot = (status) => !status.sincronizando
+      && (!status.ultimaEm || new Date(status.ultimaEm).getTime() < msUltimoSlotSync());
+    setInterval(() => {
+      if (aindaNaoSincronizouNoSlot(statusSincronizacaoPlanilhas)) sincronizarPlanilhasFechamento();
+      if (aindaNaoSincronizouNoSlot(statusSincronizacaoEntregas)) sincronizarPlanilhaEntregas();
+    }, 10 * 60 * 1000);
 
     // sincroniza as vendas do iFood (Sales API - so leitura, ver
     // server/ifoodClient.js): roda no start e depois periodicamente. Padrao
