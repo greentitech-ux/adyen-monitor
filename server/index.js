@@ -3652,7 +3652,16 @@ app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
     if (req.body.tipo === 'ENVIO' && !podeEnviarAbastecimento(req)) {
       return res.status(403).json({ error: 'Você não tem a permissão de ENVIO (lado da loja).' });
     }
+    // login LOCAL de operador (4 letras + 4 numeros, cadastrado na propria
+    // pagina): obrigatorio em todo pedido/envio, e o papel do operador tem
+    // que bater com o tipo - e a assinatura de QUEM fez, no balcao
+    const operador = await abastecimentoCarrinho.validarOperador({
+      usuario: req.body.operadorUsuario,
+      senha: req.body.operadorSenha,
+      papel: req.body.tipo === 'PEDIDO' ? 'pedido' : 'envio',
+    });
     const registro = await abastecimentoCarrinho.criar({
+      operador,
       tipo: req.body.tipo,
       pizzas: req.body.pizzas,
       insumos: req.body.insumos,
@@ -3714,6 +3723,44 @@ app.post('/api/abastecimento/:id/mensagem', auth.requireAuth, async (req, res) =
     });
     broadcast('abastecimento-atualizado', { id: registro.id });
     res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ----- operadores locais (login de balcao 4 letras + 4 numeros) -----
+// cadastro: Master/Admin, na propria pagina; DESBLOQUEIO: so Master (mesma
+// dinamica do login principal - desbloqueia redefinindo a senha)
+app.get('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req, res) => {
+  res.json(await abastecimentoCarrinho.listarOperadores());
+});
+
+app.post('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const registro = await abastecimentoCarrinho.criarOperador({
+      usuario: req.body.usuario,
+      senha: req.body.senha,
+      nome: req.body.nome,
+      papel: req.body.papel,
+      criadoPorEmail: req.user.email,
+    });
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/abastecimento-operadores/:id', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    res.json(await abastecimentoCarrinho.atualizarOperador(req.params.id, { nome: req.body.nome, papel: req.body.papel, ativo: req.body.ativo }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/abastecimento-operadores/:id/desbloquear', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await abastecimentoCarrinho.desbloquearOperador(req.params.id, { novaSenha: req.body.novaSenha }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

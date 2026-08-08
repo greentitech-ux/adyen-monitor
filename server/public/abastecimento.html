@@ -251,6 +251,7 @@
     <button type="button" class="filtro-chip" data-filtro="PEDIDO" onclick="filtrar('PEDIDO')">🛒 Pedidos</button>
     <button type="button" class="filtro-chip" data-filtro="ENVIO" onclick="filtrar('ENVIO')">🚚 Envios</button>
     <button type="button" class="filtro-chip hidden" id="btn-catalogo" onclick="abrirCatalogo()">⚙️ Cadastro de insumos</button>
+    <button type="button" class="filtro-chip hidden" id="btn-operadores" onclick="abrirOperadores()">👥 Operadores</button>
   </div>
   <div id="lista-regs"><div class="empty">carregando...</div></div>
 </div>
@@ -279,6 +280,13 @@
       <button type="button" class="btn-add" onclick="adicionarInsumo()">+ Adicionar insumo</button>
       <label>Observação</label>
       <textarea id="f-obs" placeholder="ex: urgência / 1 lata avariada"></textarea>
+      <!-- login LOCAL de operador: quem esta no balcao assina o lancamento
+           (usuario 4 letras + senha 4 numeros, cadastro na propria pagina) -->
+      <label>Quem está lançando? <span style="text-transform:none;letter-spacing:0;">(login do operador)</span></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <input type="text" id="f-op-usuario" maxlength="4" autocomplete="off" placeholder="usuário (4 letras)" style="text-transform:lowercase;">
+        <input type="password" id="f-op-senha" maxlength="4" inputmode="numeric" autocomplete="off" placeholder="senha (4 números)">
+      </div>
       <button type="button" class="btn-primary" id="btn-salvar" onclick="salvar()"></button>
       <div class="msg hidden" id="msg-form"></div>
     </div>
@@ -315,6 +323,49 @@
   <div class="conversa-rodape">
     <input type="text" id="conversa-input" maxlength="500" placeholder="escreva sua mensagem...">
     <button type="button" class="btn-abrir-chamado" id="conversa-enviar" onclick="enviarMensagemConversa()">➤</button>
+  </div>
+</div>
+
+<!-- PIN do envio rapido: confirma o operador antes de mandar o espelho do pedido -->
+<div class="overlay hidden" id="overlay-pin" style="align-items:center;">
+  <div class="sheet-wrap" style="max-width:340px;">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharPin()">✕</span>
+    <div class="sheet" style="border-radius:14px;">
+      <h3>⚡ Envio rápido</h3>
+      <div class="sub" id="pin-resumo"></div>
+      <label>Operador (4 letras)</label>
+      <input type="text" id="pin-usuario" maxlength="4" autocomplete="off" style="text-transform:lowercase;">
+      <label>Senha (4 números)</label>
+      <input type="password" id="pin-senha" maxlength="4" inputmode="numeric" autocomplete="off">
+      <button type="button" class="btn-primary" id="btn-pin-ok" onclick="confirmarEnvioRapido()">Enviar agora</button>
+      <div class="msg hidden" id="msg-pin"></div>
+    </div>
+  </div>
+</div>
+
+<!-- gestao de operadores (login local de balcao) - Master/Admin -->
+<div class="overlay hidden" id="overlay-operadores">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharOperadores()">✕</span>
+    <div class="sheet">
+      <h3>👥 Operadores (login local)</h3>
+      <div class="sub">usuário de 4 letras + senha de 4 números · papel define quem PEDE e quem ENVIA · 3 senhas erradas bloqueiam e só o Master desbloqueia (redefinindo a senha)</div>
+      <div id="op-lista"></div>
+      <label style="margin-top:16px;">Cadastrar operador</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <input type="text" id="op-novo-usuario" maxlength="4" autocomplete="off" placeholder="usuário (4 letras)" style="text-transform:lowercase;">
+        <input type="password" id="op-novo-senha" maxlength="4" inputmode="numeric" autocomplete="off" placeholder="senha (4 números)">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+        <input type="text" id="op-novo-nome" maxlength="80" placeholder="nome (opcional)">
+        <select id="op-novo-papel">
+          <option value="pedido">🛒 PEDE (carrinho)</option>
+          <option value="envio">🚚 ENVIA (loja)</option>
+        </select>
+      </div>
+      <button type="button" class="btn-add" onclick="adicionarOperador()">＋ Cadastrar operador</button>
+      <div class="msg hidden" id="msg-operadores"></div>
+    </div>
   </div>
 </div>
 
@@ -510,7 +561,7 @@ function regCardHtml(r){
       ${insumosHtml}
       ${r.observacao ? `<div class="reg-obs">${escapeHtml(r.observacao)}</div>` : ''}
       ${pendente(r) && TEM_ENVIO ? `<button type="button" class="btn-acao envio" style="margin-top:8px;padding:9px 10px;font-size:12.5px;min-width:0;width:100%;" onclick="envioRapido('${r.id}')">⚡ Envio rápido — mandar exatamente o que foi pedido</button>` : ''}
-      <div class="reg-quem"><span>por ${escapeHtml(r.criadoPorNome||r.criadoPorEmail||'—')}</span>${IS_MASTER?`<button type="button" class="btn-excluir" onclick="excluir('${r.id}')">🗑 excluir</button>`:''}</div>
+      <div class="reg-quem"><span>por ${escapeHtml(r.operadorNome||r.criadoPorNome||r.criadoPorEmail||'—')}${r.operadorUsuario?` <span style="font-family:var(--mono);color:var(--accent);">@${escapeHtml(r.operadorUsuario)}</span>`:''}</span>${IS_MASTER?`<button type="button" class="btn-excluir" onclick="excluir('${r.id}')">🗑 excluir</button>`:''}</div>
     </div>`;
 }
 
@@ -626,6 +677,9 @@ function abrirForm(tipo){
   INSUMOS = []; renderInsumos();
   document.getElementById('msg-form').classList.add('hidden');
   document.getElementById('btn-salvar').textContent = tipo==='PEDIDO' ? 'Enviar pedido' : 'Registrar envio';
+  // lembra so o USUARIO do ultimo operador (a senha nunca fica salva)
+  document.getElementById('f-op-usuario').value = localStorage.getItem('abastOperadorUsuario') || '';
+  document.getElementById('f-op-senha').value = '';
   // envio: escolher qual pedido pendente esta sendo atendido (opcional) -
   // selecionar preenche as quantidades do pedido pra so conferir/ajustar
   const bloco = document.getElementById('f-bloco-pedido-atende');
@@ -670,10 +724,13 @@ async function salvar(){
       insumos: INSUMOS.filter(i=>i.insumoId && i.quantidade).map(i=>({ insumoId: i.insumoId, embalagem: i.embalagem, quantidade: i.quantidade })),
       observacao: document.getElementById('f-obs').value,
       atendePedidoId: TIPO_FORM==='ENVIO' ? (document.getElementById('f-atende').value || null) : null,
+      operadorUsuario: document.getElementById('f-op-usuario').value.trim().toLowerCase(),
+      operadorSenha: document.getElementById('f-op-senha').value.trim(),
     };
     const resp = await fetch('/api/abastecimento', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await resp.json();
-    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    if(!resp.ok){ document.getElementById('f-op-senha').value=''; throw new Error(data.error || 'Erro ao salvar.'); }
+    localStorage.setItem('abastOperadorUsuario', body.operadorUsuario);
     fecharForm();
     await carregar();
   }catch(err){
@@ -683,14 +740,33 @@ async function salvar(){
   }
 }
 
-// ---------- envio rapido: 1 clique manda exatamente o que o pedido pediu ----------
-async function envioRapido(pedidoId){
+// ---------- envio rapido: espelho do pedido, assinado pelo operador ----------
+// abre o mini-overlay de PIN (usuario 4 letras + senha 4 numeros) e envia
+let PIN_PEDIDO_ID = null;
+function envioRapido(pedidoId){
   const p = REGS.find(x=>x.id===pedidoId);
   if(!p) return;
+  PIN_PEDIDO_ID = pedidoId;
   const resumo = SABORES.filter(s=>Number(p.pizzas?.[s])>0).map(s=>`${p.pizzas[s]} ${SABOR_LABEL[s]}`)
     .concat((p.insumos||[]).map(i=>i.insumoId ? `${i.nome} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : i.descricao));
-  if(!confirm(`⚡ Envio rápido: registrar o envio de\n\n${resumo.join(', ')}\n\nexatamente como pedido?`)) return;
+  document.getElementById('pin-resumo').textContent = 'mandar exatamente: ' + (resumo.join(', ') || '—');
+  document.getElementById('pin-usuario').value = localStorage.getItem('abastOperadorUsuario') || '';
+  document.getElementById('pin-senha').value = '';
+  document.getElementById('msg-pin').classList.add('hidden');
+  document.getElementById('overlay-pin').classList.remove('hidden');
+  document.getElementById(document.getElementById('pin-usuario').value ? 'pin-senha' : 'pin-usuario').focus();
+}
+function fecharPin(){ document.getElementById('overlay-pin').classList.add('hidden'); PIN_PEDIDO_ID = null; }
+
+async function confirmarEnvioRapido(){
+  const p = REGS.find(x=>x.id===PIN_PEDIDO_ID);
+  if(!p) return;
+  const btn = document.getElementById('btn-pin-ok');
+  const msg = document.getElementById('msg-pin');
+  msg.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Enviando...';
   try{
+    const operadorUsuario = document.getElementById('pin-usuario').value.trim().toLowerCase();
     const body = {
       tipo: 'ENVIO',
       pizzas: p.pizzas || {},
@@ -699,12 +775,92 @@ async function envioRapido(pedidoId){
       insumos: (p.insumos||[]).map(i=>i.insumoId ? ({ insumoId: i.insumoId, embalagem: i.embalagem, quantidade: i.quantidade }) : ({ descricao: i.descricao, quantidade: i.quantidade })),
       observacao: 'Envio rápido (igual ao pedido)',
       atendePedidoId: p.id,
+      operadorUsuario,
+      operadorSenha: document.getElementById('pin-senha').value.trim(),
     };
     const resp = await fetch('/api/abastecimento', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro no envio rápido.');
+    localStorage.setItem('abastOperadorUsuario', operadorUsuario);
+    fecharPin();
     await carregar();
-  }catch(err){ alert(err.message); }
+  }catch(err){
+    document.getElementById('pin-senha').value = '';
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Enviar agora';
+  }
+}
+
+// ---------- gestao de operadores (Master/Admin) ----------
+let OPERADORES = [];
+async function carregarOperadores(){
+  OPERADORES = await fetch('/api/abastecimento-operadores').then(r=>r.ok?r.json():[]);
+}
+function renderOperadores(){
+  document.getElementById('op-lista').innerHTML = OPERADORES.map(o=>`
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding:9px 0;${o.ativo===false?'opacity:.45;':''}">
+      <span style="font-family:var(--mono);color:var(--accent);">@${escapeHtml(o.usuario)}</span>
+      <span style="font-size:12.5px;flex:1;">${escapeHtml(o.nome||'')}</span>
+      <select onchange="salvarOperador('${o.id}', { papel: this.value })" style="width:auto;padding:5px 8px;font-size:11.5px;">
+        <option value="pedido" ${o.papel==='pedido'?'selected':''}>🛒 PEDE</option>
+        <option value="envio" ${o.papel==='envio'?'selected':''}>🚚 ENVIA</option>
+      </select>
+      ${o.bloqueado
+        ? (IS_MASTER
+          ? `<button type="button" class="cat-toggle off" onclick="desbloquearOperador('${o.id}')">🔓 desbloquear</button>`
+          : '<span class="badge" style="background:var(--bad-dim);color:var(--bad);">bloqueado</span>')
+        : `<button type="button" class="cat-toggle ${o.ativo===false?'off':'on'}" onclick="salvarOperador('${o.id}', { ativo: ${o.ativo===false} })">${o.ativo===false?'inativo':'ativo'}</button>`}
+    </div>`).join('') || '<div class="empty">Nenhum operador cadastrado.</div>';
+}
+async function abrirOperadores(){
+  document.getElementById('msg-operadores').classList.add('hidden');
+  await carregarOperadores();
+  renderOperadores();
+  document.getElementById('overlay-operadores').classList.remove('hidden');
+}
+function fecharOperadores(){ document.getElementById('overlay-operadores').classList.add('hidden'); }
+function erroOperadores(texto){
+  const msg = document.getElementById('msg-operadores');
+  msg.textContent = texto; msg.className = 'msg err'; msg.classList.remove('hidden');
+}
+async function adicionarOperador(){
+  try{
+    const body = {
+      usuario: document.getElementById('op-novo-usuario').value,
+      senha: document.getElementById('op-novo-senha').value,
+      nome: document.getElementById('op-novo-nome').value,
+      papel: document.getElementById('op-novo-papel').value,
+    };
+    const resp = await fetch('/api/abastecimento-operadores', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao cadastrar operador.');
+    ['op-novo-usuario','op-novo-senha','op-novo-nome'].forEach(id=>{ document.getElementById(id).value=''; });
+    await carregarOperadores();
+    renderOperadores();
+  }catch(err){ erroOperadores(err.message); }
+}
+async function salvarOperador(id, patch){
+  try{
+    const resp = await fetch(`/api/abastecimento-operadores/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar operador.');
+    await carregarOperadores();
+    renderOperadores();
+  }catch(err){ erroOperadores(err.message); }
+}
+// mesma dinamica do desbloqueio do login principal: o Master desbloqueia
+// redefinindo a senha (4 numeros) e repassa pra pessoa
+async function desbloquearOperador(id){
+  const novaSenha = prompt('Nova senha do operador (4 números):');
+  if(novaSenha === null) return;
+  try{
+    const resp = await fetch(`/api/abastecimento-operadores/${id}/desbloquear`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ novaSenha }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao desbloquear.');
+    await carregarOperadores();
+    renderOperadores();
+  }catch(err){ erroOperadores(err.message); }
 }
 
 // ---------- ALARME de pedido novo (lado da loja) ----------
@@ -1027,6 +1183,7 @@ async function boot(){
   document.querySelector('.btn-acao.pedido').classList.toggle('hidden', !TEM_PEDIDO);
   document.querySelector('.acoes-topo .btn-acao.envio').classList.toggle('hidden', !TEM_ENVIO);
   document.getElementById('btn-catalogo').classList.toggle('hidden', !PODE_CATALOGO);
+  document.getElementById('btn-operadores').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
   document.getElementById('root').classList.remove('hidden');
   await carregarCatalogo();
   await carregar();
