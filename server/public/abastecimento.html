@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Abastecimento Carrinho · Zenith Ops</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#181d24; --line:#232a33;
+    --text:#e7ecf1; --muted:#7d8896;
+    --ok:#3ddc97; --ok-dim:#1c3a2e;
+    --warn:#f2b33d; --warn-dim:#3a2e14;
+    --bad:#ff5c5c; --bad-dim:#3a1616;
+    --accent:#5cc8ff;
+    --pedido:#ff8a80; --pedido-dim:#3a1d1a;
+    --envio:#8ab4f8; --envio-dim:#1a2540;
+    --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;min-width:0;}
+  html{overflow-x:hidden;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 12px 60px;max-width:680px;margin-inline:auto;overflow-x:hidden;}
+  h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0;}
+  h2{font-size:13.5px;font-weight:700;margin:0 0 4px;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+  header{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .header-nav{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  a.back,button.back{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-decoration:none;padding:5px 9px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  a.back:hover,button.back:hover{color:var(--text);border-color:var(--accent);}
+  a.back.active{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+  .btn-notif{font-size:14px;line-height:1;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .btn-notif:hover{border-color:var(--accent);color:var(--text);}
+  .btn-sair{color:var(--bad);}
+  .btn-sair:hover{border-color:var(--bad);color:var(--bad);}
+  .nav-divider{width:1px;align-self:stretch;background:var(--line);margin:2px 2px;}
+  .hidden{display:none!important;}
+  .hamburger-btn{position:sticky;top:14px;z-index:997;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:border-color .15s ease;}
+  .hamburger-btn:hover{border-color:var(--accent);}
+  .nav-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:998;}
+  .nav-drawer-overlay.hidden{display:none!important;}
+  .nav-drawer{position:fixed;top:0;left:0;bottom:0;width:250px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);z-index:999;padding:14px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .nav-drawer.hidden{display:none!important;}
+  .nav-drawer-titulo{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 12px;}
+  .nav-drawer-grupo{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:12px 10px 4px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
+  .nav-drawer-grupo .ndg-seta{transition:transform .15s ease;font-size:9px;flex:none;}
+  .nav-drawer a.back,.nav-drawer button.back{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;text-align:left;padding:9px 10px;font-size:12.5px;box-sizing:border-box;}
+  .nav-drawer .nav-drawer-sep{height:1px;background:var(--line);margin:8px 2px;flex:none;}
+  .empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-family:var(--mono);}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--sans);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:56px;}
+  .msg{margin-top:10px;font-size:12.5px;padding:10px 12px;border-radius:8px;word-break:break-word;}
+  .msg.ok{background:var(--ok-dim);color:var(--ok);}
+  .msg.err{background:var(--bad-dim);color:var(--bad);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.hidden{display:none!important;}
+  .sheet-wrap{position:relative;width:100%;max-width:680px;}
+  .sheet-fechar-flutuante{position:absolute;top:-14px;right:-6px;width:32px;height:32px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;z-index:5;}
+  .sheet-fechar-flutuante:hover{color:var(--text);border-color:var(--accent);}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:16px 14px 22px;width:100%;max-width:680px;max-height:88vh;overflow-y:auto;}
+  .sheet h3{margin:0 0 4px;font-size:14px;}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;}
+
+  /* resumo Ontem/Hoje por sabor (o card de saldo do AppSheet antigo) */
+  .resumo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;}
+  .resumo-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .resumo-card .sabor{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+  .resumo-card .nums{display:flex;gap:10px;margin-top:6px;align-items:baseline;}
+  .resumo-card .hoje{font-size:20px;font-weight:800;}
+  .resumo-card .ontem{font-size:11.5px;color:var(--muted);font-family:var(--mono);}
+  .resumo-card.pend{border-color:rgba(242,179,61,.4);}
+  .resumo-card.pend .hoje{color:var(--warn);}
+
+  .acoes-topo{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .btn-acao{flex:1;min-width:180px;border:none;border-radius:10px;padding:13px 12px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-acao.pedido{background:var(--pedido-dim);color:var(--pedido);border:1px solid rgba(255,138,128,.4);}
+  .btn-acao.envio{background:var(--envio-dim);color:var(--envio);border:1px solid rgba(138,180,248,.4);}
+  .btn-acao:hover{filter:brightness(1.15);}
+
+  .filtros-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .filtro-chip{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:5px 10px;border-radius:16px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  .filtro-chip.ativo{color:var(--accent);border-color:var(--accent);background:rgba(92,200,255,.1);font-weight:600;}
+
+  .dia-header{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;display:flex;align-items:center;gap:8px;}
+  .dia-header::after{content:'';flex:1;height:1px;background:var(--line);}
+  .reg-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-top:8px;border-left:3px solid var(--line);}
+  .reg-card.PEDIDO{border-left-color:var(--pedido);}
+  .reg-card.ENVIO{border-left-color:var(--envio);}
+  .reg-linha1{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+  .reg-tipo{font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px;}
+  .reg-tipo.PEDIDO{color:var(--pedido);}
+  .reg-tipo.ENVIO{color:var(--envio);}
+  .reg-hora{font-family:var(--mono);font-size:10.5px;color:var(--muted);}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap;}
+  .badge.aguardando{background:var(--warn-dim);color:var(--warn);}
+  .badge.atendido{background:var(--ok-dim);color:var(--ok);}
+  .badge.vinculo{background:var(--panel);color:var(--muted);border:1px solid var(--line);}
+  .qtd-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}
+  .qtd-chip{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:8px;background:var(--panel);border:1px solid var(--line);}
+  .qtd-chip b{font-size:13px;}
+  .reg-insumos{margin-top:6px;font-size:12.5px;color:var(--text);}
+  .reg-insumos span{color:var(--muted);}
+  .reg-obs{margin-top:6px;font-size:12px;color:var(--muted);border-left:2px solid var(--line);padding-left:8px;white-space:pre-wrap;}
+  .reg-quem{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:7px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .btn-excluir{background:none;border:none;color:var(--bad);font-size:12px;cursor:pointer;padding:0;font-family:var(--sans);}
+
+  .sabores-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .sabores-grid label{margin-top:0;}
+  .linha-item{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
+  .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
+  .btn-primary{width:100%;margin-top:16px;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);background:var(--accent);color:#06202b;}
+  .btn-primary:disabled{opacity:.5;cursor:default;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <button type="button" class="hamburger-btn" id="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu" title="Menu">☰</button>
+      <div>
+        <div class="eyebrow">Zenith Ops · Dominos Aeroporto</div>
+        <h1>🛒 Abastecimento do Carrinho</h1>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <button class="btn-notif" onclick="location.reload()" title="Atualizar página">🔄</button>
+    <div class="nav-divider"></div>
+    <button class="btn-notif btn-sair" onclick="logout()" title="Sair">🚪</button>
+  </div>
+</header>
+
+<div class="nav-drawer-overlay hidden" id="nav-drawer-overlay" onclick="fecharMenu()"></div>
+<nav class="nav-drawer hidden" id="nav-drawer">
+  <div class="nav-drawer-titulo">Zenith Ops</div>
+  <a class="back" id="nav-painel" href="/painel.html">🏠 Painel</a>
+  <div class="nav-drawer-grupo">Operação diária</div>
+  <a class="back hidden" id="nav-lancamento" href="/lancamento.html">🧾 Fechamento</a>
+  <a class="back hidden" id="nav-entrega-lancamento" href="/entrega-lancamento.html">📦 Lançar entrega</a>
+  <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
+  <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
+  <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back active" id="nav-abastecimento" href="/abastecimento.html">🛒 Abastec. Carrinho</a>
+  <div class="nav-drawer-grupo">Monitoramento</div>
+  <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
+  <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
+  <a class="back hidden" id="nav-ifood" href="/ifood.html">🍔 iFood</a>
+  <div class="nav-drawer-grupo" id="nav-grupo-saltiverso">Saltiverso</div>
+  <a class="back hidden" id="nav-parque-checkin" href="/parque-checkin.html">🤸 Check-in Parque</a>
+  <a class="back hidden" id="nav-parque" href="/parque.html">🤸 Parque (painel)</a>
+  <a class="back hidden" id="nav-festas" href="/festas.html">🎉 Festas</a>
+  <a class="back hidden" id="nav-mensalistas" href="/mensalistas.html">📅 Mensalistas</a>
+  <div class="nav-drawer-grupo">Solicitações</div>
+  <a class="back hidden" id="nav-solicitacoes" href="/central.html">📋 Central</a>
+  <a class="back hidden" id="nav-historico" href="/central-historico.html">📜 Histórico</a>
+  <a class="back hidden" id="nav-tecnico" href="/tecnico.html">🔧 Chamados TI</a>
+  <a class="back hidden" id="nav-manutencao" href="/manutencao.html">🔧 Manutenção</a>
+  <div class="nav-drawer-grupo">Administração</div>
+  <a class="back hidden" id="nav-usuarios" href="/usuarios.html">👤 Usuários</a>
+  <a class="back hidden" id="nav-grupos" href="/grupos.html">🏷️ Grupos</a>
+  <a class="back hidden" id="nav-entregas-regras" href="/entregas-regras.html">⚙️ Regras de Entregas</a>
+  <a class="back hidden" id="nav-cofre" href="/cofre.html">🔐 Cofre</a>
+  <a class="back" id="nav-ajuda" href="/ajuda.html">❓ Ajuda</a>
+  <a class="back hidden" id="nav-reset-senha" href="/painel.html?resetSenha=1">🔑 Reset senha</a>
+  <div class="nav-drawer-sep"></div>
+  <button type="button" class="back" style="color:var(--bad);cursor:pointer;" onclick="logout()">🚪 Sair</button>
+  <div class="nav-drawer-sep"></div>
+  <a class="back" href="https://wa.me/5581995148654" target="_blank" rel="noopener" style="color:var(--accent);">💬 Dúvidas? Suporte (81) 99514-8654</a>
+</nav>
+
+<div id="sem-acesso" class="empty hidden">Você não tem acesso ao Abastecimento do Carrinho. Fale com o administrador (Master).</div>
+
+<div id="root" class="hidden">
+
+<!-- saldo do dia: total ENVIADO hoje x ontem por sabor (o card "73 Ont/HJ 3"
+     do AppSheet antigo) + pedidos aguardando envio -->
+<div class="panel">
+  <h2>Enviado ao carrinho <span style="font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400;">hoje · ontem</span></h2>
+  <div class="resumo-grid" id="resumo-grid"></div>
+</div>
+
+<div class="acoes-topo">
+  <button type="button" class="btn-acao pedido" onclick="abrirForm('PEDIDO')">🛒 Novo pedido <span style="font-weight:400;font-size:11px;">(carrinho)</span></button>
+  <button type="button" class="btn-acao envio" onclick="abrirForm('ENVIO')">🚚 Registrar envio <span style="font-weight:400;font-size:11px;">(loja)</span></button>
+</div>
+
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+    <h2 style="margin:0;">Movimentações <span id="lista-count" style="font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:400;"></span></h2>
+  </div>
+  <div class="filtros-chips" id="filtros-chips">
+    <button type="button" class="filtro-chip ativo" data-filtro="todos" onclick="filtrar('todos')">Todos</button>
+    <button type="button" class="filtro-chip" data-filtro="pendentes" onclick="filtrar('pendentes')">⏳ Aguardando envio</button>
+    <button type="button" class="filtro-chip" data-filtro="PEDIDO" onclick="filtrar('PEDIDO')">🛒 Pedidos</button>
+    <button type="button" class="filtro-chip" data-filtro="ENVIO" onclick="filtrar('ENVIO')">🚚 Envios</button>
+  </div>
+  <div id="lista-regs"><div class="empty">carregando...</div></div>
+</div>
+</div>
+
+<!-- formulario de pedido/envio - pizzas por sabor + insumos dinamicos, no
+     lugar dos 6 pares fixos INSUMO I..VI da planilha antiga -->
+<div class="overlay hidden" id="overlay-form">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharForm()">✕</span>
+    <div class="sheet">
+      <h3 id="f-titulo"></h3>
+      <div class="sub" id="f-sub"></div>
+      <div id="f-bloco-pedido-atende" class="hidden">
+        <label>Atende qual pedido? (opcional)</label>
+        <select id="f-atende" onchange="prefillDoPedido()"></select>
+      </div>
+      <label>Pizzas</label>
+      <div class="sabores-grid">
+        <div><label>Calabresa</label><input type="number" min="0" inputmode="numeric" id="f-calabresa" placeholder="0"></div>
+        <div><label>Pepperoni</label><input type="number" min="0" inputmode="numeric" id="f-pepperoni" placeholder="0"></div>
+        <div><label>Mussarela</label><input type="number" min="0" inputmode="numeric" id="f-mussarela" placeholder="0"></div>
+      </div>
+      <label>Insumos (bebidas, embalagens...)</label>
+      <div id="f-insumos"></div>
+      <button type="button" class="btn-add" onclick="adicionarInsumo()">+ Adicionar insumo</button>
+      <label>Observação</label>
+      <textarea id="f-obs" placeholder="ex: urgência / 1 lata avariada"></textarea>
+      <button type="button" class="btn-primary" id="btn-salvar" onclick="salvar()"></button>
+      <div class="msg hidden" id="msg-form"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let AUTH_TOKEN = localStorage.getItem('authToken') || null;
+if(!AUTH_TOKEN){ location.href = '/'; }
+
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts = {}) => {
+  if (typeof url === 'string' && url.startsWith('/api/') && AUTH_TOKEN) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + AUTH_TOKEN } };
+  }
+  return _rawFetch(url, opts).then((res) => { if (res.status === 401) logout(); return res; });
+};
+function logout(){ localStorage.removeItem('authToken'); location.href = '/'; }
+function abrirMenu(){ document.getElementById('nav-drawer').classList.remove('hidden'); document.getElementById('nav-drawer-overlay').classList.remove('hidden'); }
+function fecharMenu(){ document.getElementById('nav-drawer').classList.add('hidden'); document.getElementById('nav-drawer-overlay').classList.add('hidden'); }
+
+// mesmo accordion de grupos do menu usado nas outras paginas
+function initNavDrawerAccordion(){
+  const nav = document.getElementById('nav-drawer');
+  if(!nav || nav.dataset.ndgInit) return;
+  nav.dataset.ndgInit = '1';
+  [...nav.querySelectorAll(':scope > .nav-drawer-grupo')].forEach(g=>{
+    const nomeGrupo = g.textContent.trim();
+    const itens = [];
+    let el = g.nextElementSibling;
+    while(el && !el.classList.contains('nav-drawer-grupo') && !el.classList.contains('nav-drawer-sep')){
+      const prox = el.nextElementSibling;
+      itens.push(el);
+      el = prox;
+    }
+    if(!itens.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'ndg-wrap';
+    g.after(wrap);
+    itens.forEach(it=>wrap.appendChild(it));
+    g.innerHTML = `<span>${nomeGrupo}</span><span class="ndg-seta">▾</span>`;
+    const atualizarVazio = ()=>{
+      const temVisivel = itens.some(it=>!it.classList.contains('hidden'));
+      g.classList.toggle('hidden', !temVisivel);
+    };
+    atualizarVazio();
+    new MutationObserver(atualizarVazio).observe(wrap, { attributes:true, attributeFilter:['class'], subtree:true });
+    const key = 'ndgAberto:' + nomeGrupo;
+    const temAtivo = itens.some(it=>it.classList.contains('active'));
+    const aberto = temAtivo || localStorage.getItem(key) === '1';
+    g.querySelector('.ndg-seta').style.transform = aberto ? '' : 'rotate(-90deg)';
+    wrap.classList.toggle('hidden', !aberto);
+    g.addEventListener('click', ()=>{
+      const abrirAgora = wrap.classList.contains('hidden');
+      wrap.classList.toggle('hidden', !abrirAgora);
+      g.querySelector('.ndg-seta').style.transform = abrirAgora ? '' : 'rotate(-90deg)';
+      localStorage.setItem(key, abrirAgora ? '1' : '0');
+    });
+  });
+}
+initNavDrawerAccordion();
+
+let ME = null;
+let IS_MASTER = false;
+let REGS = [];
+let FILTRO = 'todos';
+let TIPO_FORM = 'PEDIDO';
+let INSUMOS = [];
+let SEQ = 0;
+
+const SABORES = ['calabresa','pepperoni','mussarela'];
+const SABOR_LABEL = { calabresa:'Calabresa', pepperoni:'Pepperoni', mussarela:'Mussarela' };
+const FUSO_BR = 'America/Sao_Paulo';
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function dataBrasilia(iso){ return new Date(iso).toLocaleDateString('sv-SE', { timeZone: FUSO_BR }); }
+function fmtHora(iso){ return new Date(iso).toLocaleTimeString('pt-BR', { timeZone: FUSO_BR, hour:'2-digit', minute:'2-digit' }); }
+function fmtDia(dataSv){
+  const hoje = dataBrasilia(new Date().toISOString());
+  const ontem = dataBrasilia(new Date(Date.now()-86400000).toISOString());
+  const [y,m,d] = dataSv.split('-');
+  if(dataSv===hoje) return `Hoje · ${d}/${m}`;
+  if(dataSv===ontem) return `Ontem · ${d}/${m}`;
+  return `${d}/${m}/${y}`;
+}
+
+// pedido aguardando envio = PEDIDO sem envio vinculado
+function pendente(r){ return r.tipo==='PEDIDO' && !r.atendidoPorEnvioId; }
+
+// resumo: total ENVIADO hoje/ontem por sabor + contagem de pedidos pendentes
+function renderResumo(){
+  const hoje = dataBrasilia(new Date().toISOString());
+  const ontem = dataBrasilia(new Date(Date.now()-86400000).toISOString());
+  const tot = { hoje:{}, ontem:{} };
+  SABORES.forEach(s=>{ tot.hoje[s]=0; tot.ontem[s]=0; });
+  for(const r of REGS){
+    if(r.tipo!=='ENVIO') continue;
+    const dia = dataBrasilia(r.criadoEm);
+    const balde = dia===hoje ? tot.hoje : (dia===ontem ? tot.ontem : null);
+    if(!balde) continue;
+    SABORES.forEach(s=>{ balde[s] += Number(r.pizzas?.[s])||0; });
+  }
+  const pendentes = REGS.filter(pendente).length;
+  document.getElementById('resumo-grid').innerHTML = SABORES.map(s=>`
+    <div class="resumo-card">
+      <div class="sabor">${SABOR_LABEL[s]}</div>
+      <div class="nums"><span class="hoje">${tot.hoje[s]}</span><span class="ontem">ontem ${tot.ontem[s]}</span></div>
+    </div>`).join('') + `
+    <div class="resumo-card pend">
+      <div class="sabor">⏳ Aguardando envio</div>
+      <div class="nums"><span class="hoje">${pendentes}</span><span class="ontem">pedido${pendentes===1?'':'s'}</span></div>
+    </div>`;
+}
+
+function filtrar(f){
+  FILTRO = f;
+  document.querySelectorAll('#filtros-chips .filtro-chip').forEach(b=>b.classList.toggle('ativo', b.dataset.filtro===f));
+  renderLista();
+}
+function passaFiltro(r){
+  if(FILTRO==='pendentes') return pendente(r);
+  if(FILTRO==='PEDIDO' || FILTRO==='ENVIO') return r.tipo===FILTRO;
+  return true;
+}
+
+function chipsQtd(r){
+  const pizzas = SABORES.filter(s=>Number(r.pizzas?.[s])>0).map(s=>`<span class="qtd-chip"><b>${r.pizzas[s]}</b> ${SABOR_LABEL[s]}</span>`);
+  return pizzas.join('');
+}
+
+function regCardHtml(r){
+  const porId = {};
+  REGS.forEach(x=>{ porId[x.id]=x; });
+  let statusBadge = '';
+  if(r.tipo==='PEDIDO'){
+    statusBadge = r.atendidoPorEnvioId
+      ? `<span class="badge atendido">✓ atendido${porId[r.atendidoPorEnvioId] ? ' às '+fmtHora(porId[r.atendidoPorEnvioId].criadoEm) : ''}</span>`
+      : '<span class="badge aguardando">⏳ aguardando envio</span>';
+  } else if(r.atendePedidoId){
+    const p = porId[r.atendePedidoId];
+    statusBadge = `<span class="badge vinculo">→ atende pedido${p ? ' de '+fmtHora(p.criadoEm) : ''}</span>`;
+  }
+  const insumosHtml = (r.insumos||[]).length
+    ? `<div class="reg-insumos">${r.insumos.map(i=>`${escapeHtml(i.descricao)}${i.quantidade?` <span>· ${escapeHtml(i.quantidade)}</span>`:''}`).join(' &nbsp;•&nbsp; ')}</div>`
+    : '';
+  return `
+    <div class="reg-card ${r.tipo}">
+      <div class="reg-linha1">
+        <span class="reg-tipo ${r.tipo}">${r.tipo==='PEDIDO'?'🛒 PEDIDO':'🚚 ENVIO'} <span style="font-weight:400;font-size:10.5px;color:var(--muted);font-family:var(--mono);">${r.tipo==='PEDIDO'?'carrinho':'loja'}</span></span>
+        <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${statusBadge}<span class="reg-hora">${fmtHora(r.criadoEm)}</span></span>
+      </div>
+      <div class="qtd-chips">${chipsQtd(r)}</div>
+      ${insumosHtml}
+      ${r.observacao ? `<div class="reg-obs">${escapeHtml(r.observacao)}</div>` : ''}
+      <div class="reg-quem"><span>por ${escapeHtml(r.criadoPorNome||r.criadoPorEmail||'—')}</span>${IS_MASTER?`<button type="button" class="btn-excluir" onclick="excluir('${r.id}')">🗑 excluir</button>`:''}</div>
+    </div>`;
+}
+
+function renderLista(){
+  const visiveis = REGS.filter(passaFiltro);
+  document.getElementById('lista-count').textContent = visiveis.length;
+  if(!visiveis.length){
+    document.getElementById('lista-regs').innerHTML = '<div class="empty">Nenhuma movimentação nesse filtro.</div>';
+    return;
+  }
+  // agrupado por dia (mais recente primeiro), igual a lista do AppSheet
+  let html = '';
+  let diaAtual = null;
+  for(const r of visiveis){
+    const dia = dataBrasilia(r.criadoEm);
+    if(dia!==diaAtual){
+      const doDia = visiveis.filter(x=>dataBrasilia(x.criadoEm)===dia).length;
+      html += `<div class="dia-header">${fmtDia(dia)} <span style="font-family:var(--mono);">[${doDia}]</span></div>`;
+      diaAtual = dia;
+    }
+    html += regCardHtml(r);
+  }
+  document.getElementById('lista-regs').innerHTML = html;
+}
+
+async function carregar(){
+  REGS = await fetch('/api/abastecimento').then(r=>r.json());
+  REGS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
+  renderResumo();
+  renderLista();
+}
+
+// ---------- formulario ----------
+function adicionarInsumo(descricao, quantidade){
+  INSUMOS.push({ id: ++SEQ, descricao: descricao||'', quantidade: quantidade||'' });
+  renderInsumos();
+}
+function removerInsumo(id){ INSUMOS = INSUMOS.filter(i=>i.id!==id); renderInsumos(); }
+function renderInsumos(){
+  document.getElementById('f-insumos').innerHTML = INSUMOS.map(i=>`
+    <div class="linha-item">
+      <input type="text" value="${escapeHtml(i.descricao)}" oninput="INSUMOS.find(x=>x.id===${i.id}).descricao=this.value" placeholder="ex: coca zero">
+      <input type="text" value="${escapeHtml(i.quantidade)}" oninput="INSUMOS.find(x=>x.id===${i.id}).quantidade=this.value" placeholder="ex: 6 caixas">
+      <button type="button" class="btn-remover" onclick="removerInsumo(${i.id})">✕</button>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum insumo adicionado.</div>';
+}
+
+function abrirForm(tipo){
+  TIPO_FORM = tipo;
+  document.getElementById('f-titulo').textContent = tipo==='PEDIDO' ? '🛒 Novo pedido do carrinho' : '🚚 Registrar envio da loja';
+  document.getElementById('f-sub').textContent = tipo==='PEDIDO'
+    ? 'o que o carrinho precisa receber da loja'
+    : 'o que a loja está mandando pro carrinho';
+  ['f-calabresa','f-pepperoni','f-mussarela'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('f-obs').value = '';
+  INSUMOS = []; renderInsumos();
+  document.getElementById('msg-form').classList.add('hidden');
+  document.getElementById('btn-salvar').textContent = tipo==='PEDIDO' ? 'Enviar pedido' : 'Registrar envio';
+  // envio: escolher qual pedido pendente esta sendo atendido (opcional) -
+  // selecionar preenche as quantidades do pedido pra so conferir/ajustar
+  const bloco = document.getElementById('f-bloco-pedido-atende');
+  bloco.classList.toggle('hidden', tipo!=='ENVIO');
+  if(tipo==='ENVIO'){
+    const pendentes = REGS.filter(pendente).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
+    document.getElementById('f-atende').innerHTML = '<option value="">envio avulso (sem pedido)</option>' +
+      pendentes.map(p=>`<option value="${p.id}">${fmtDia(dataBrasilia(p.criadoEm))} ${fmtHora(p.criadoEm)} · ${SABORES.filter(s=>Number(p.pizzas?.[s])>0).map(s=>`${p.pizzas[s]} ${SABOR_LABEL[s]}`).join(', ')||'insumos'} · ${escapeHtml(p.criadoPorNome||'')}</option>`).join('');
+    if(pendentes.length){ document.getElementById('f-atende').value = pendentes[0].id; prefillDoPedido(); }
+  }
+  document.getElementById('overlay-form').classList.remove('hidden');
+}
+function fecharForm(){ document.getElementById('overlay-form').classList.add('hidden'); }
+
+function prefillDoPedido(){
+  const id = document.getElementById('f-atende').value;
+  const p = REGS.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('f-calabresa').value = p.pizzas?.calabresa || '';
+  document.getElementById('f-pepperoni').value = p.pizzas?.pepperoni || '';
+  document.getElementById('f-mussarela').value = p.pizzas?.mussarela || '';
+  INSUMOS = [];
+  (p.insumos||[]).forEach(i=>adicionarInsumo(i.descricao, i.quantidade));
+  renderInsumos();
+}
+
+async function salvar(){
+  const msg = document.getElementById('msg-form');
+  const btn = document.getElementById('btn-salvar');
+  msg.classList.add('hidden');
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Enviando...';
+  try{
+    const body = {
+      tipo: TIPO_FORM,
+      pizzas: {
+        calabresa: document.getElementById('f-calabresa').value,
+        pepperoni: document.getElementById('f-pepperoni').value,
+        mussarela: document.getElementById('f-mussarela').value,
+      },
+      insumos: INSUMOS.map(i=>({ descricao: i.descricao, quantidade: i.quantidade })),
+      observacao: document.getElementById('f-obs').value,
+      atendePedidoId: TIPO_FORM==='ENVIO' ? (document.getElementById('f-atende').value || null) : null,
+    };
+    const resp = await fetch('/api/abastecimento', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    fecharForm();
+    await carregar();
+  }catch(err){
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = txt;
+  }
+}
+
+async function excluir(id){
+  if(!confirm('Excluir esse registro? (se for um envio vinculado, o pedido volta pra fila)')) return;
+  const resp = await fetch(`/api/abastecimento/${id}`, { method:'DELETE' });
+  if(resp.ok) await carregar();
+}
+
+async function boot(){
+  const res = await fetch('/api/me');
+  if(!res.ok){ logout(); return; }
+  ME = await res.json();
+  IS_MASTER = ME.role==='master';
+  const secoes = IS_MASTER ? ['abastecimento-carrinho'] : (ME.permissions?.sections||[]);
+
+  // menu sempre visivel (politica do app) - so administracao continua restrita
+  ['nav-monitor','nav-lancamento','nav-fechamentos','nav-entregas','nav-entrega-lancamento','nav-cofre','nav-relatorios','nav-ifood','nav-parque','nav-mensalistas','nav-grupo-saltiverso','nav-solicitacoes','nav-historico','nav-tecnico','nav-manutencao','nav-inventario','nav-parque-checkin','nav-festas'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('hidden');
+  });
+  document.getElementById('nav-usuarios').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-grupos').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
+  document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
+
+  if(!secoes.includes('abastecimento-carrinho')){
+    document.getElementById('sem-acesso').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('root').classList.remove('hidden');
+  await carregar();
+  iniciarStream();
+}
+
+// ao vivo: pedido novo do carrinho aparece na loja sem F5 (e vice-versa)
+function iniciarStream(){
+  const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
+  es.addEventListener('abastecimento-atualizado', ()=>{ carregar(); });
+}
+
+boot();
+</script>
+<script src="/notif-central.js"></script>
+<script src="/suporte-chat.js"></script>
+</body>
+</html>

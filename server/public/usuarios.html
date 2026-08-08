@@ -169,6 +169,7 @@
   <a class="back" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back" href="/entregas.html">🛵 Entregas</a>
   <a class="back" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-abastecimento" href="/abastecimento.html">🛒 Abastec. Carrinho</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back" href="/">📈 Monitor</a>
   <a class="back" href="/relatorios.html">📊 Relatórios</a>
@@ -450,7 +451,7 @@ function initNavDrawerAccordion(){
 }
 initNavDrawerAccordion();
 
-const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['suporte','Suporte de TI (atendimento remoto)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'] ];
+const SECTIONS = [ ['monitor','Monitor'], ['disputas','Relatórios/Disputas'], ['cofre','Cofre de senhas'], ['fechamentos','Fechamentos (relatórios)'], ['lancamento','Lançamento de fechamento (loja)'], ['sangria','Sangria/Depósito (retirada de caixa)'], ['entregas','Entregas (relatórios)'], ['entregas-lancamento','Lançamento de entregas (loja)'], ['ifood','iFood (vendas)'], ['solicitacoes','Central de Solicitações'], ['tecnico','Chamados de TI (técnico)'], ['suporte','Suporte de TI (atendimento remoto)'], ['manutencao','Manutenção (equipe)'], ['inventario','Inventário (estoque/CMV)'], ['parque','Saltiverso - Parque (painel)'], ['parque-checkin','Saltiverso - Check-in do parque (loja)'], ['festas','Saltiverso - Festas'], ['abastecimento-carrinho','Abastecimento Carrinho (Dom Aeroporto)'] ];
 // os 7 tipos de card que aparecem na Central - mesma lista/rotulo de
 // TIPOS_INFO em central.html/central-historico.html
 const TIPOS_SOLICITACAO = [ ['estorno','💳 Estorno'], ['ajuste-fechamento','🧾 Ajuste de fechamento'], ['compra','🛒 Compra'], ['manutencao','🔧 Manutenção'], ['suporte-ti','💻 Suporte de TI'], ['pagamento','💸 Pagamento (despesa)'], ['nota','📄 Solicitação de Nota'], ['quebra-caixa','⚠️ Quebra de caixa'] ];

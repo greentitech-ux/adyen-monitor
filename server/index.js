@@ -44,6 +44,7 @@ const chamadosTI = require('./chamadosTI');
 const chamadosManutencao = require('./chamadosManutencao');
 const suporteChat = require('./suporteChat');
 const docsMaster = require('./docsMaster');
+const abastecimentoCarrinho = require('./abastecimentoCarrinho');
 const centralChat = require('./centralChat');
 const grupos = require('./grupos');
 const inventario = require('./inventario');
@@ -3610,6 +3611,46 @@ app.post('/api/chamados', auth.requireAuth, async (req, res) => {
     });
     broadcast('chamado-criado', { id: chamado.id }, 'tecnico');
     res.json(chamado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------- Abastecimento do carrinho Dominos Aeroporto (secao
+// "abastecimento-carrinho") - o CARRINHO abre um PEDIDO de pizzas/insumos e
+// a LOJA registra o ENVIO (de preferencia vinculado ao pedido que atende).
+// Substitui o AppSheet/planilha "AbastecimentoCarrinho" ----------
+app.get('/api/abastecimento', requireSection('abastecimento-carrinho'), async (req, res) => {
+  res.json(await abastecimentoCarrinho.listAll());
+});
+
+app.post('/api/abastecimento', requireSection('abastecimento-carrinho'), async (req, res) => {
+  try {
+    const registro = await abastecimentoCarrinho.criar({
+      tipo: req.body.tipo,
+      pizzas: req.body.pizzas,
+      insumos: req.body.insumos,
+      observacao: req.body.observacao,
+      atendePedidoId: req.body.atendePedidoId,
+      criadoPorId: req.user.id,
+      criadoPorEmail: req.user.email,
+      criadoPorNome: req.user.username || req.user.email,
+    });
+    broadcast('abastecimento-atualizado', { id: registro.id }, 'abastecimento-carrinho');
+    if (registro.tipo === 'PEDIDO') {
+      push.notifySolicitacao('🛒 Carrinho pediu abastecimento', `${registro.criadoPorNome} · pizzas/insumos aguardando envio`, registro.id);
+    }
+    res.json(registro);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/abastecimento/:id', auth.requireMaster, async (req, res) => {
+  try {
+    await abastecimentoCarrinho.remover(req.params.id);
+    broadcast('abastecimento-atualizado', { id: req.params.id, excluido: true }, 'abastecimento-carrinho');
+    res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

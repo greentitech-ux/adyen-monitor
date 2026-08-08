@@ -111,6 +111,7 @@
   <a class="back hidden" id="nav-fechamentos" href="/fechamentos.html">💰 Fechamentos</a>
   <a class="back hidden" id="nav-entregas" href="/entregas.html">🛵 Entregas</a>
   <a class="back hidden" id="nav-inventario" href="/estoque.html">📦 Estoque</a>
+  <a class="back" id="nav-abastecimento" href="/abastecimento.html">🛒 Abastec. Carrinho</a>
   <div class="nav-drawer-grupo">Monitoramento</div>
   <a class="back hidden" id="nav-monitor" href="/monitor.html">📈 Monitor</a>
   <a class="back hidden" id="nav-relatorios" href="/relatorios.html">📊 Relatórios</a>
@@ -433,6 +434,25 @@ const TOPICOS = [
       <li>Veja o resumo de vendas do dia e o histórico por período.</li>
       <li>Exporte as tabelas em CSV/PDF pelos botões no topo.</li>
     </ul>
+  `},
+  { id:'abastecimento', icone:'🛒', secoes:['abastecimento-carrinho'], titulo:'Abastecimento do Carrinho (Dom Aeroporto)', corpo:`
+    <p>Controle do abastecimento entre a <b>loja</b> da Dominos Aeroporto e o <b>carrinho</b>: o carrinho pede, a loja envia — tudo registrado com hora e quem fez (substitui a planilha/AppSheet antigos, sem precisar de usuário e senha à parte: seu login do Zenith já identifica você).</p>
+    <h3>🛒 Pedido (quem está no carrinho)</h3>
+    <ol>
+      <li>Clique em <b>🛒 Novo pedido</b>.</li>
+      <li>Informe quantas pizzas de cada sabor (Calabresa, Pepperoni, Mussarela) e/ou os insumos (bebidas, embalagens... quantos itens precisar, com quantidade livre tipo "6 caixas").</li>
+      <li>Use a observação pra urgência ou detalhe ("1 lata avariada") e envie.</li>
+      <li>O pedido aparece pra loja na hora com a etiqueta <b>⏳ aguardando envio</b>.</li>
+    </ol>
+    <h3>🚚 Envio (quem está na loja)</h3>
+    <ol>
+      <li>Clique em <b>🚚 Registrar envio</b>.</li>
+      <li>Escolha <b>qual pedido está atendendo</b> — as quantidades já vêm preenchidas pra você só conferir/ajustar pelo que realmente foi mandado. Envio sem pedido (avulso) também é permitido.</li>
+      <li>Ao salvar, o pedido vira <b>✓ atendido</b>.</li>
+    </ol>
+    <h3>📊 Resumo do dia</h3>
+    <p>O topo da tela mostra o total <b>enviado hoje e ontem por sabor</b> (o antigo card "Ont/HJ") e quantos pedidos ainda aguardam envio. A lista é agrupada por dia e dá pra filtrar por Pedidos, Envios ou só os que aguardam envio.</p>
+    <div class="dica"><b>Registro errado?</b> Só o Master exclui — e se era um envio vinculado, o pedido volta sozinho pra fila de aguardando envio.</div>
   `},
   { id:'parque-checkin', icone:'🤸', secoes:['parque-checkin'], titulo:'Check-in do Parque (Saltiverso)', corpo:`
     <h3>Passo a passo</h3>
