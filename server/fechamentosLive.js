@@ -16,12 +16,12 @@ const EDITS = db.collection('fechamentoEdicoes');
 
 // diferença (declarado - faturado) acima disso, pra qualquer lado, dispara
 // um ticket automatico de "Quebra de caixa" na Central pra alguem justificar/
-// aprovar (ver create() abaixo) - direcionado ao mesmo e-mail do relatorio
-// diario (RELATORIO_DIRECIONADO_EMAIL, ver relatorioMV.js), entao ja entra
-// no mesmo fluxo de aprovar/recusar por e-mail sem precisar duplicar nada
+// aprovar (ver create() abaixo). O ticket nasce SEM direcionamento: o e-mail
+// pro MV so sai se um Master/Admin direcionar o ticket ao MV na Central
+// (pedido do usuario - antes nascia ja direcionado e todo lancamento com
+// diferenca disparava e-mail automatico pro MV)
 const LIMITE_QUEBRA_CAIXA = 10;
 const DATA_RE_SIMPLES = /^\d{4}-\d{2}-\d{2}$/;
-const EMAIL_QUEBRA_CAIXA_DIRECIONADO = process.env.RELATORIO_DIRECIONADO_EMAIL || 'mv@grupobravoempresarial.com';
 function fmtMoneyQuebra(v) {
   const n = Number(v) || 0;
   return `${n < 0 ? '-' : ''}R$ ${Math.abs(n).toFixed(2).replace('.', ',')}`;
@@ -241,7 +241,7 @@ async function criarCardQuebraCaixa(registro) {
     criadoPorId: registro.criadoPorId,
     criadoPorEmail: registro.criadoPorEmail,
     direcionadoParaId: null,
-    direcionadoParaEmail: EMAIL_QUEBRA_CAIXA_DIRECIONADO,
+    direcionadoParaEmail: null,
   });
 }
 
