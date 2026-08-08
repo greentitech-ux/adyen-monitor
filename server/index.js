@@ -3018,7 +3018,7 @@ app.delete('/api/fechamentos/edicoes/:id', auth.requireMaster, async (req, res) 
 app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anexos', 4), async (req, res) => {
   try {
     const payload = req.is('multipart/form-data') ? JSON.parse(req.body.payload || '{}') : req.body;
-    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, fornecedor, vencimento, direcionadoParaId, direcionadoParaEmail } = payload;
+    const { tipo, unidade, unidadeNome, titulo, valorEstimado, observacao, itens, ehOrcamento, fornecedor, vencimento, direcionadoParaId, direcionadoParaEmail, prioridade } = payload;
     if (!req.isMaster && unidade && !(req.permissions.unidades || []).includes(unidade)) {
       return res.status(403).json({ error: 'Você não tem acesso a essa unidade.' });
     }
@@ -3037,6 +3037,7 @@ app.post('/api/solicitacoes', requireSection('solicitacoes'), upload.array('anex
       criadoPorEmail: req.user.email,
       direcionadoParaId,
       direcionadoParaEmail,
+      prioridade,
     });
     broadcast('solicitacao-criada', registro, 'solicitacoes');
     push.notifySolicitacao(`Ticket #${registro.numeroTicket} · Nova solicitação`, `${req.user.email} · ${registro.titulo || tipo || ''}`, registro.id);
@@ -3166,6 +3167,21 @@ app.patch('/api/solicitacoes/:id/status', auth.requireMasterOrAdmin, async (req,
     }
     broadcast('solicitacao-decidida', registro, 'solicitacoes');
     res.json({ ...registro, chamado, senhaPadrao, avisoSenha });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// re-priorizacao na triagem (Master/Admin): muda a prioridade e recalcula o
+// prazo de SLA a partir da criacao do ticket
+app.patch('/api/solicitacoes/:id/prioridade', auth.requireMasterOrAdmin, async (req, res) => {
+  try {
+    const atual = await solicitacoes.getOne(req.params.id);
+    if (!atual) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    if (tipoBloqueado(req, atual.tipo)) return res.status(403).json({ error: 'Você não tem acesso a esse tipo de solicitação.' });
+    const registro = await solicitacoes.atualizarPrioridade(req.params.id, req.body.prioridade);
+    broadcast('solicitacao-decidida', registro, 'solicitacoes');
+    res.json(registro);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

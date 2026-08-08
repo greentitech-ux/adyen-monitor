@@ -236,6 +236,14 @@
     </select></div>
     <div><label>De</label><input type="date" id="filtro-data-de" onchange="aplicarFiltrosExtra()"></div>
     <div><label>Até</label><input type="date" id="filtro-data-ate" onchange="aplicarFiltrosExtra()"></div>
+    <div><label>Prioridade</label><select id="filtro-prioridade" onchange="aplicarFiltrosExtra()">
+      <option value="">Todas</option>
+      <option value="critica">🔴 Crítica</option>
+      <option value="alta">🟠 Alta</option>
+      <option value="media">🟡 Média</option>
+      <option value="baixa">🟢 Baixa</option>
+      <option value="estourado">🔥 SLA estourado</option>
+    </select></div>
   </div>
   <button type="button" class="link-btn" style="margin:-4px 0 10px;" onclick="limparFiltrosExtra()">Limpar filtros de loja/grupo/data</button>
   <div class="kanban-board" id="kanban-board">
@@ -555,6 +563,7 @@ let FILTRO_UNIDADE = '';
 let FILTRO_GRUPO = '';
 let FILTRO_DATA_DE = '';
 let FILTRO_DATA_ATE = '';
+let FILTRO_PRIORIDADE = '';
 // filtro de tipo: vazio = todas; 1 item = clique normal no botao (exclusivo);
 // varios itens = marcados pelo check no canto do botao (uniao dos tipos)
 let FILTRO_TIPOS = new Set();
@@ -581,6 +590,7 @@ function aplicarFiltrosExtra(){
   FILTRO_GRUPO = document.getElementById('filtro-grupo').value;
   FILTRO_DATA_DE = document.getElementById('filtro-data-de').value;
   FILTRO_DATA_ATE = document.getElementById('filtro-data-ate').value;
+  FILTRO_PRIORIDADE = document.getElementById('filtro-prioridade').value;
   renderKanban();
 }
 function limparFiltrosExtra(){
@@ -588,6 +598,7 @@ function limparFiltrosExtra(){
   document.getElementById('filtro-grupo').value = '';
   document.getElementById('filtro-data-de').value = '';
   document.getElementById('filtro-data-ate').value = '';
+  document.getElementById('filtro-prioridade').value = '';
   aplicarFiltrosExtra();
 }
 
@@ -613,6 +624,34 @@ function badgeVencimento(c){
   return `<span class="tipo-badge" style="${vencido?'background:var(--bad-dim);color:var(--bad);font-weight:700;':'background:#12303a;color:var(--accent);'}">${vencido?'⚠️ venceu':'vence'} ${d}/${m}</span>`;
 }
 
+// prioridade + SLA (mesma tabela de server/prioridades.js). O SLA conta
+// enquanto o ticket ainda nao foi resolvido: Pendente sempre; Aprovado só
+// até o andamento virar Finalizado. Rejeitado/Convertido nao contam.
+const PRIORIDADES_INFO = { critica:{label:'Crítica',ordem:0,icone:'🔴'}, alta:{label:'Alta',ordem:1,icone:'🟠'}, media:{label:'Média',ordem:2,icone:'🟡'}, baixa:{label:'Baixa',ordem:3,icone:'🟢'} };
+function ordemPrioridade(c){ return (PRIORIDADES_INFO[c.prioridade]||PRIORIDADES_INFO.media).ordem; }
+function slaAtivo(c){
+  if(c.status==='PENDENTE') return true;
+  if(c.status==='APROVADO') return (c.execucaoStatus||'PENDENTE')!=='FINALIZADO';
+  return false;
+}
+function slaEstourado(c){ return !!c.slaPrazo && slaAtivo(c) && new Date(c.slaPrazo).getTime() <= Date.now(); }
+function chipPrioridade(c){
+  const info = PRIORIDADES_INFO[c.prioridade];
+  if(!info) return '';
+  const cores = { critica:'background:var(--bad-dim);color:var(--bad);', alta:'background:#3a2314;color:#ff9d5c;', media:'background:var(--warn-dim);color:var(--warn);', baixa:'background:#181d24;color:var(--muted);' };
+  return `<span class="tipo-badge" style="${cores[c.prioridade]}">${info.icone} ${info.label}</span>`;
+}
+function chipSla(c){
+  if(!c.slaPrazo || !slaAtivo(c)) return '';
+  const prazo = new Date(c.slaPrazo).getTime();
+  const criado = new Date(c.criadoEm||Date.now()).getTime();
+  const resta = prazo - Date.now();
+  const fmt = (ms)=>{ const h = Math.abs(ms)/3600000; return h>=48 ? Math.round(h/24)+'d' : h>=1 ? Math.round(h)+'h' : Math.max(1,Math.round(Math.abs(ms)/60000))+'min'; };
+  if(resta <= 0) return `<span class="tipo-badge" style="background:var(--bad-dim);color:var(--bad);font-weight:700;">🔥 SLA estourado há ${fmt(resta)}</span>`;
+  const perto = resta < (prazo - criado) * 0.25;
+  return `<span class="tipo-badge" style="${perto?'background:var(--warn-dim);color:var(--warn);':'background:#181d24;color:var(--muted);'}">⏳ SLA ${fmt(resta)}</span>`;
+}
+
 const STATUS_COLUNAS = ['PENDENTE','APROVADO','REJEITADO'];
 
 function kcardHtml(c){
@@ -629,6 +668,8 @@ function kcardHtml(c){
         ${c.comprada ? '<span class="tipo-badge" style="background:#0f2f22;color:var(--ok);">✅ comprada</span>' : ''}
         ${c.notificacaoVista ? '<span class="tipo-badge" style="background:#181d24;color:var(--muted);">👁 visto</span>' : ''}
         ${TIPOS_GERAIS.includes(c.tipo) && c.status==='APROVADO' ? `<span class="tipo-badge" style="background:#181d24;">${ANDAMENTO_INFO[c.execucaoStatus||'PENDENTE'].icone} ${ANDAMENTO_INFO[c.execucaoStatus||'PENDENTE'].label}</span>` : ''}
+        ${chipPrioridade(c)}
+        ${chipSla(c)}
         ${badgeVencimento(c)}
       </div>
       <div style="font-size:12.5px;font-weight:600;margin-top:4px;">${escapeHtml(c.titulo)}</div>
@@ -772,6 +813,8 @@ function renderKanban(){
   if(FILTRO_DATA_ATE) base = base.filter(c=>dataBrasilia(c.criadoEm) <= FILTRO_DATA_ATE);
   renderFiltroTipoRow(base);
   let filtradas = FILTRO_TIPOS.size ? base.filter(c=>FILTRO_TIPOS.has(c.tipo)) : base;
+  if(FILTRO_PRIORIDADE==='estourado') filtradas = filtradas.filter(slaEstourado);
+  else if(FILTRO_PRIORIDADE) filtradas = filtradas.filter(c=>(c.prioridade||'media')===FILTRO_PRIORIDADE);
   document.getElementById('lista-count').textContent = filtradas.length;
   CHAVES_VISIVEIS = filtradas.map(c=>c.tipo+'::'+c.id);
 
@@ -780,8 +823,13 @@ function renderKanban(){
     // Em andamento no meio, Finalizado SEMPRE embaixo (ja foi resolvido,
     // nao precisa disputar atencao com o que ainda esta aberto). O sort e
     // estavel, entao dentro do mesmo andamento a ordem original se mantem
+    // andamento manda primeiro (Finalizado sempre embaixo); dentro do mesmo
+    // andamento, prioridade mais urgente em cima; empatou, prazo de SLA mais
+    // apertado primeiro (fila de atendimento de verdade)
     const doColuna = filtradas.filter(c=>c.status===status)
-      .sort((a,b)=>ordemAndamento(a)-ordemAndamento(b));
+      .sort((a,b)=> (ordemAndamento(a)-ordemAndamento(b))
+        || (ordemPrioridade(a)-ordemPrioridade(b))
+        || String(a.slaPrazo||a.criadoEm||'').localeCompare(String(b.slaPrazo||b.criadoEm||'')));
     document.getElementById('kcount-'+status).textContent = doColuna.length;
     document.getElementById('kcards-'+status).innerHTML = doColuna.length
       ? doColuna.map(kcardHtml).join('')
@@ -812,6 +860,22 @@ async function carregarCentral(){
   renderKanban();
 }
 
+// Master/Admin muda a prioridade de um ticket ja aberto (triagem) - o prazo
+// de SLA e recalculado a partir da criacao do ticket
+async function mudarPrioridade(tipo, id, prioridade){
+  if(!prioridade) return;
+  try{
+    const resp = await fetch(`/api/solicitacoes/${id}/prioridade`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prioridade }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao mudar prioridade.');
+    await carregarCentral();
+    abrirDetalhe(tipo, id);
+  }catch(err){
+    const msg = document.getElementById('msg-detalhe');
+    msg.textContent = err.message; msg.className = 'msg err'; msg.classList.remove('hidden');
+  }
+}
+
 function abrirDetalhe(tipo, id){
   const c = CARDS.find(x=>x.tipo===tipo && x.id===id);
   if(!c) return;
@@ -825,6 +889,19 @@ function abrirDetalhe(tipo, id){
     corpo += `<div style="color:var(--accent);font-weight:600;">🔓 Ao aprovar, o acesso é desbloqueado e a senha é redefinida automaticamente para "inicial1" — a pessoa é obrigada a trocar no próximo login. Não precisa escolher técnico.</div>`;
   }
   corpo += `<div><b>${escapeHtml(c.titulo)}</b></div>`;
+  // prioridade + SLA do ticket; Master/Admin re-prioriza na triagem (recalcula
+  // o prazo a partir da criacao - rota PATCH /api/solicitacoes/:id/prioridade,
+  // que so existe pros tipos da colecao de solicitacoes)
+  const podePriorizar = (IS_MASTER || IS_ADMIN) && (TIPOS_GERAIS.includes(c.tipo) || c.tipo==='quebra-caixa') && c.status!=='CONVERTIDO';
+  if(c.prioridade || podePriorizar){
+    corpo += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      ${chipPrioridade(c)}${chipSla(c)}
+      ${podePriorizar ? `<select onchange="mudarPrioridade('${c.tipo}','${c.id}', this.value)" style="width:auto;padding:5px 8px;font-size:12px;">
+        <option value="" disabled ${!c.prioridade?'selected':''}>alterar prioridade…</option>
+        ${Object.entries(PRIORIDADES_INFO).map(([p,info])=>`<option value="${p}" ${c.prioridade===p?'selected':''}>${info.icone} ${info.label}</option>`).join('')}
+      </select>` : ''}
+    </div>`;
+  }
   if(c.fornecedor) corpo += `<div>Fornecedor: <b>${escapeHtml(c.fornecedor)}</b></div>`;
   if(c.vencimento) corpo += `<div>Vencimento: <b>${fmtData(c.vencimento)}</b></div>`;
   if(c.itens && c.itens.length){

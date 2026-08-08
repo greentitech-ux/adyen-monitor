@@ -184,6 +184,13 @@
       <div id="campos-comuns">
         <label>Unidade</label>
         <select id="f-unidade" required></select>
+        <label>Prioridade <span style="text-transform:none;letter-spacing:0;">(define o prazo-alvo de resolução)</span></label>
+        <select id="f-prioridade">
+          <option value="baixa">🟢 Baixa · prazo 72h</option>
+          <option value="media" selected>🟡 Média · prazo 24h</option>
+          <option value="alta">🟠 Alta · prazo 8h</option>
+          <option value="critica">🔴 Crítica · prazo 4h</option>
+        </select>
         <label>Direcionar para (opcional)</label>
         <select id="f-direcionado">
           <option value="">Qualquer Master/Admin do grupo</option>
@@ -617,6 +624,7 @@ document.getElementById('form-nova').addEventListener('submit', async (ev)=>{
         ehOrcamento: document.getElementById('g-orcamento').checked,
         fornecedor: ['pagamento','nota'].includes(TIPO_SELECIONADO) ? document.getElementById('g-fornecedor').value : null,
         vencimento: TIPO_SELECIONADO==='pagamento' ? (document.getElementById('g-vencimento').value || null) : null,
+        prioridade: document.getElementById('f-prioridade').value,
         direcionadoParaId, direcionadoParaEmail,
       }));
       for(const file of anexosInput.files) fd.append('anexos', file);
