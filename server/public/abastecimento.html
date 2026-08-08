@@ -595,8 +595,12 @@ function renderResumo(){
 let RECEB_ENVIO = null;
 let RECEB_EXTRAS = [];   // "a mais" vs o pedido, do envio na tela
 let RECEB_SNOOZE = {}; // envioId -> quando pode voltar
+// a loja acabou de enviar - da um respiro de 7 minutos pro material chegar
+// fisicamente no carrinho antes de cobrar a confirmacao de recebimento
+const SETE_MIN = 7*60*1000;
 function envioAguardandoConfirmacao(r){
-  return r.tipo==='ENVIO' && !r.recebidoEm && (RECEB_SNOOZE[r.id]||0) <= Date.now();
+  return r.tipo==='ENVIO' && !r.recebidoEm && (RECEB_SNOOZE[r.id]||0) <= Date.now()
+    && (Date.now() - new Date(r.criadoEm).getTime()) >= SETE_MIN;
 }
 function verificarRecebimento(){
   if(!TEM_PEDIDO) return;
