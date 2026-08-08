@@ -39,11 +39,13 @@ const COLUNAS_BASE = [
   { key: 'diferenca', label: 'Diferença', moeda: true, largura: 58 },
   { key: 'quebra', label: 'Quebra', moeda: true, largura: 56 },
 ];
-// schema antigo, de antes do grupo definir os proprios canais/formas - hoje
-// so fechamento importado de planilha usa; mesma regra da tela: so aparece
-// se alguma linha usa
+// schema antigo (planilha importada) - MAS "adyen" tambem e a soma da secao
+// "Maquininhas (cartao)" de todo lancamento do sistema, por isso o label nao
+// pode ser "Adyen" (colidia com a forma de pagamento "Adyen" definida pelo
+// grupo, saindo duas colunas "Adyen" no relatorio - ver mesmo fix em
+// fechamentos.html). Mesma regra da tela: so aparece se alguma linha usa
 const CAMPOS_FIXOS = [
-  { key: 'adyen', label: 'Adyen' }, { key: 'ifood', label: 'Ifood' }, { key: 'food99', label: '99Food' },
+  { key: 'adyen', label: 'Maquininhas (cartão)' }, { key: 'ifood', label: 'Ifood' }, { key: 'food99', label: '99Food' },
   { key: 'pix', label: 'Pix' }, { key: 'loja', label: 'Loja' },
 ];
 const COLUNA_OBSERVACAO = { key: 'observacao', label: 'Observação', largura: 75 };

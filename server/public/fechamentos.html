@@ -370,7 +370,7 @@
 
     <div class="secao-titulo">Formas de pagamento</div>
     <div class="fech-grid">
-      <div><label>Adyen</label><input type="number" step="0.01" id="ef-adyen"></div>
+      <div><label>Maquininhas (cartão)</label><input type="number" step="0.01" id="ef-adyen"></div>
       <div><label>Maquininha POS 01 (pós meia-noite)</label><input type="number" step="0.01" id="ef-adyenPos"></div>
     </div>
     <div class="fech-grid hidden" id="ef-formas-extras"></div>
@@ -1439,14 +1439,16 @@ function colunasExtras(rows, chave){
   return [...vistas.entries()].map(([campo,label])=>({campo,label}));
 }
 
-// os 5 campos "fixos" (Adyen/Ifood/99Food/Pix/Loja) sao o schema antigo, de
-// antes do grupo poder definir os proprios Canais de venda/Formas de
-// pagamento (ver grupos.html) - hoje so quem lanca fechamento importado de
-// planilha (sheetsSync.js) ainda usa esses campos; loja que lanca pelo
-// sistema usa exclusivamente as extras do proprio grupo. Mesma logica de
-// colunasExtras: so aparece se pelo menos uma linha do conjunto de fato usa
+// os 5 campos "fixos" sao o schema antigo (planilha importada) - MAS o campo
+// "adyen" tambem e preenchido por TODO lancamento do sistema: ele e a soma
+// da secao "Maquininhas (cartao)" do lancamento (ver lancamento.html/
+// CAMPOS_EDICAO_FECHAMENTO). Por isso o label dele NAO pode ser "Adyen":
+// colidia com a forma de pagamento "Adyen" que o grupo define em
+// /grupos.html e a tabela mostrava duas colunas "Adyen" com valores
+// diferentes (uma era a soma das maquininhas, a outra a forma do grupo).
+// Mesma logica de colunasExtras: so aparece se alguma linha de fato usa
 const CAMPOS_FIXOS = [
-  {campo:'adyen', label:'Adyen'}, {campo:'ifood', label:'Ifood'}, {campo:'food99', label:'99Food'},
+  {campo:'adyen', label:'Maquininhas (cartão)'}, {campo:'ifood', label:'Ifood'}, {campo:'food99', label:'99Food'},
   {campo:'pix', label:'Pix'}, {campo:'loja', label:'Loja'},
 ];
 function colunasFixasUsadas(rows){

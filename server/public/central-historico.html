@@ -1891,7 +1891,7 @@ function mostrarNotificacaoSolicitacao(card){
     <div class="ns-titulo">🔔 Nova solicitação</div>
     <div class="ns-corpo">${iconeTipo(card.tipo)} ${escapeHtml(TIPOS_INFO[card.tipo]?.label||card.tipo)} · ${escapeHtml(card.unidadeNome||card.unidade||'—')}<br>${escapeHtml(card.titulo||'')}</div>
     ${(card.atribuidosEmails && card.atribuidosEmails.length) ? `<div class="ns-direcionado">👤 atribuído a ${escapeHtml(card.atribuidosEmails.join(', '))}</div>` : (card.direcionadoParaEmail ? `<div class="ns-direcionado">👤 direcionado a ${escapeHtml(card.direcionadoParaEmail)}</div>` : '')}
-    <button type="button" class="ns-ok">✓ Sinalizar (já vi)</button>
+    <button type="button" class="ns-ok">✓ Visualizado</button>
   `;
   el.querySelector('.ns-ok').addEventListener('click', ()=>marcarVistoNotificacao(card.tipo, card.id));
   wrap.appendChild(el);
