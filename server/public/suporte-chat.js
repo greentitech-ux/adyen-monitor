@@ -382,7 +382,11 @@
       ATEND.ehMaster = me.role === 'master';
       btn.title = 'Chats de suporte';
       await atendCarregar();
-      ATEND.timer = setInterval(atendCarregar, 25 * 1000);
+      // aba em segundo plano nao busca (ninguem esta olhando e a requisicao
+      // so gastaria servidor/Firestore a toa) - ao voltar pra aba, atualiza
+      // na hora. O SSE continua ligado, entao mensagem nova ainda chega.
+      ATEND.timer = setInterval(() => { if (!document.hidden) atendCarregar(); }, 25 * 1000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && ATEND.ativo) atendCarregar(); });
       // SSE: mensagem nova chega na hora (o poll fica de rede de seguranca)
       try {
         const es = new EventSource('/api/stream?token=' + encodeURIComponent(token));

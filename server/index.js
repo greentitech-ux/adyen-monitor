@@ -1796,7 +1796,7 @@ app.get('/api/relatorios', auth.requireMaster, async (req, res) => {
 
 app.post('/api/relatorios/rodar', auth.requireMaster, async (req, res) => {
   try {
-    res.json(await relatorios.rodarRelatorio());
+    res.json(await relatorios.rodarRelatorio({ forcar: true }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -5044,7 +5044,14 @@ app.use((err, req, res, next) => {
     // dia com horarioPrevisto ja vencido e que ninguem confirmou na mao, o
     // relogio comeca sozinho nesse horario e a equipe recebe um aviso (nao
     // foi uma entrada fisica confirmada). Roda a cada 1 minuto.
+    // fora do horario de funcionamento do parque (shopping fechado) nao
+    // existe check-in pra iniciar - pular a varredura de madrugada corta
+    // ~1/3 das consultas diarias ao Firestore desse job e deixa o servidor
+    // quieto quando so ha abas esquecidas abertas
+    const horaBrasilia = () => Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }).format(new Date()).replace('24', '0'));
     const rodarAutoCheckinsParque = async () => {
+      const h = horaBrasilia();
+      if (h < 8 || h >= 23) return;
       const feitos = await parque.rodarAutoCheckins();
       for (const c of feitos) {
         broadcast('parque-checkin-automatico', c, 'parque');

@@ -1308,7 +1308,10 @@ async function boot(){
   await carregarChamados();
   if(PODE_ATENDER_CHATS){
     await carregarChats();
-    setInterval(carregarChats, 10000); // fallback do SSE (novas mensagens de visitante)
+    // fallback do SSE (novas mensagens de visitante) - aba escondida nao
+    // busca, e ao voltar pra aba atualiza na hora
+    setInterval(()=>{ if(!document.hidden) carregarChats(); }, 10000);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) carregarChats(); });
   }
   iniciarStreamChamados();
 }

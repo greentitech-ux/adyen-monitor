@@ -18,7 +18,29 @@ const INTERVALO_DIAS = Number(process.env.RELATORIO_INTERVALO_DIAS || 2);
 // pequenos e sao exatamente o "historico" que substitui a transacao crua
 const RETENCAO_RELATORIOS_DIAS = 180;
 
-async function rodarRelatorio() {
+// mesma protecao do backup.js: o job roda "no boot + a cada N dias", mas em
+// hospedagem com sleep (Render free) o boot acontece a cada acesso depois de
+// um periodo ocioso - sem guarda, CADA acordada gerava PDF+CSV, subia os 2
+// arquivos pro Storage e varria o bucket inteiro (limparAntigos). O cooldown
+// persiste a ultima tentativa num doc de meta e pula o job ate a janela do
+// intervalo quase fechar (folga de 2h pro timer do dia certo nao ser pulado).
+const COOLDOWN_MS = INTERVALO_DIAS * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000;
+const META_DOC = db.collection('meta').doc('relatorioStatus');
+
+// forcar:true ignora o cooldown - usado pelo botao "Gerar relatório agora"
+// do Master (POST /api/relatorios/rodar), que e uma acao explicita e rara
+async function rodarRelatorio({ forcar = false } = {}) {
+  if (!forcar) {
+    const statusSnap = await META_DOC.get();
+    const ultimaTentativaEm = statusSnap.exists ? statusSnap.data().ultimaTentativaEm : null;
+    if (ultimaTentativaEm && Date.now() - new Date(ultimaTentativaEm).getTime() < COOLDOWN_MS) {
+      return { pulou: true, motivo: 'Relatório já gerado dentro da janela - pulado pra não regerar a cada reinício do servidor.', ultimaTentativaEm };
+    }
+  }
+  // grava a tentativa ANTES de gerar - se o processo reiniciar no meio, o
+  // proximo boot nao repete o trabalho em seguida
+  await META_DOC.set({ ultimaTentativaEm: new Date().toISOString() }, { merge: true });
+
   const fim = new Date();
   const inicio = new Date(fim.getTime() - INTERVALO_DIAS * 24 * 60 * 60 * 1000);
 
