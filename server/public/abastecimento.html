@@ -353,6 +353,15 @@
       <button type="button" class="btn-add" id="btn-add-insumo" onclick="adicionarInsumo()">+ Adicionar insumo</button>
       <label>Observação</label>
       <textarea id="f-obs" placeholder="ex: urgência / 1 lata avariada"></textarea>
+      <!-- lancamento atrasado: o material JA chegou fisicamente mas o pedido
+           nao foi registrado na hora (internet/sistema/comunicacao fora) -
+           a loja so vai dar baixa, sem preparar nada -->
+      <div id="f-bloco-ja-recebido" class="hidden" style="margin-top:10px;">
+        <label style="display:flex;align-items:flex-start;gap:8px;text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--text);cursor:pointer;">
+          <input type="checkbox" id="f-ja-recebido" style="width:auto;margin-top:2px;">
+          <span>📦 <b>Já recebi este material</b> — lançamento atrasado (a loja já enviou, faltou registrar por falta de internet/sistema). A loja só vai <b>dar baixa</b>, sem preparar nada.</span>
+        </label>
+      </div>
       <!-- login LOCAL de operador: quem esta no balcao assina o lancamento
            (usuario 4 letras + senha 4 numeros, cadastro na propria pagina) -->
       <label>Quem está lançando? <span style="text-transform:none;letter-spacing:0;">(login do operador)</span></label>
@@ -382,6 +391,10 @@
     <button type="button" class="alarme-ok hidden" id="al-btn-preparo" onclick="confirmarPreparo()">👨‍🍳 Estamos preparando</button>
     <button type="button" class="alarme-ok hidden" id="al-btn-lembrete" onclick="adiarLembrete()">👨‍🍳 Estamos preparando — lembrar em 5 min</button>
     <button type="button" class="alarme-btn2 hidden" id="al-btn-rapido" onclick="envioRapidoDoAlarme()">⚡ Envio rápido — mandar agora o que foi pedido</button>
+    <!-- pedido "ja recebido" (lancamento atrasado do carrinho): nada a
+         preparar, so registrar a baixa - assinada pela senha do operador -->
+    <div class="alarme-sub hidden" id="al-aviso-baixa" style="margin-top:10px;color:var(--warn);">⚠️ O carrinho marcou que <b>JÁ RECEBEU</b> este material (lançamento atrasado — internet/sistema fora na hora). Não precisa preparar nada: só dê a baixa pra fechar o registro.</div>
+    <button type="button" class="alarme-ok hidden" id="al-btn-baixa" onclick="baixaDoAlarme()">✔️ Dar baixa — material já entregue</button>
   </div>
 </div>
 
@@ -865,13 +878,16 @@ function regCardHtml(r){
       : ' <span class="badge aguardando">📦 aguardando confirmação do carrinho</span>';
     else if(r.recebimento && r.recebimento.divergencia) statusBadge += ` <span class="badge" style="background:var(--bad-dim);color:var(--bad);">🎫 em análise${r.recebimento.numeroTicket ? ' · Ticket #'+r.recebimento.numeroTicket : ''}</span>`;
     else if(r.recebimento && !r.recebimento.confere) statusBadge += ` <span class="badge" style="background:var(--bad-dim);color:var(--bad);">⚠️ recebido com falta ${fmtHora(r.recebidoEm)}</span>`;
+    else if(r.recebimento && r.recebimento.baixaRetroativa) statusBadge += ` <span class="badge atendido">✔️ baixa — já entregue</span>`;
     else statusBadge += ` <span class="badge atendido">✅ recebido ${fmtHora(r.recebidoEm)}</span>`;
     if(r.recebimento && r.recebimento.extras && r.recebimento.extras.length) statusBadge += ' <span class="badge visto">➕ extra confirmado</span>';
   }
   // pedido ja visto pela loja (OK do alarme) - quem pediu enxerga daqui;
-  // "sendo preparado" e o retorno seguinte que o carrinho espera
+  // "sendo preparado" e o retorno seguinte que o carrinho espera. Pedido
+  // "ja recebido" (lancamento atrasado) nao passa por preparo: so a baixa
   if(r.tipo==='PEDIDO' && !r.atendidoPorEnvioId){
-    if(r.preparoEm) statusBadge += ` <span class="badge preparando">👨‍🍳 preparando ${fmtHora(r.preparoEm)}</span>`;
+    if(r.jaRecebido) statusBadge += ' <span class="badge aguardando">📦 já recebido — falta a baixa da loja</span>';
+    else if(r.preparoEm) statusBadge += ` <span class="badge preparando">👨‍🍳 preparando ${fmtHora(r.preparoEm)}</span>`;
     else if(r.vistoEm) statusBadge += ` <span class="badge visto">👁 visto pela loja ${fmtHora(r.vistoEm)}</span>`;
   }
   if(r.tipo==='PEDIDO' && (r.mensagens||[]).length){
@@ -1029,6 +1045,9 @@ function abrirForm(tipo){
     : [];
   document.getElementById('btn-add-insumo').classList.toggle('hidden', tipo==='CONTAGEM');
   renderInsumos();
+  // check "ja recebi" so faz sentido no PEDIDO (lancamento atrasado)
+  document.getElementById('f-bloco-ja-recebido').classList.toggle('hidden', tipo!=='PEDIDO');
+  document.getElementById('f-ja-recebido').checked = false;
   document.getElementById('msg-form').classList.add('hidden');
   document.getElementById('btn-salvar').textContent =
     tipo==='PEDIDO' ? 'Enviar pedido' : (tipo==='CONTAGEM' ? 'Registrar contagem' : 'Registrar envio');
@@ -1079,6 +1098,7 @@ async function salvar(){
       insumos: INSUMOS.filter(i=>i.insumoId && i.quantidade).map(i=>({ insumoId: i.insumoId, embalagem: i.embalagem, quantidade: i.quantidade })),
       observacao: document.getElementById('f-obs').value,
       atendePedidoId: TIPO_FORM==='ENVIO' ? (document.getElementById('f-atende').value || null) : null,
+      jaRecebido: TIPO_FORM==='PEDIDO' && document.getElementById('f-ja-recebido').checked,
       operadorUsuario: document.getElementById('f-op-usuario').value.trim().toLowerCase(),
       operadorSenha: document.getElementById('f-op-senha').value.trim(),
     };
@@ -1142,7 +1162,8 @@ function envioRapido(pedidoId){
   PIN_PEDIDO_ID = pedidoId;
   const resumo = SABORES.filter(s=>Number(p.pizzas?.[s])>0).map(s=>`${p.pizzas[s]} ${SABOR_LABEL[s]}`)
     .concat((p.insumos||[]).map(i=>i.insumoId ? `${i.nome} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : i.descricao));
-  document.getElementById('pin-resumo').textContent = 'mandar exatamente: ' + (resumo.join(', ') || '—');
+  document.getElementById('pin-resumo').textContent =
+    (p.jaRecebido ? 'dar baixa (material já entregue): ' : 'mandar exatamente: ') + (resumo.join(', ') || '—');
   document.getElementById('pin-usuario').value = localStorage.getItem('abastOperadorUsuario') || '';
   document.getElementById('pin-senha').value = '';
   document.getElementById('msg-pin').classList.add('hidden');
@@ -1166,7 +1187,7 @@ async function confirmarEnvioRapido(){
       // repassa como veio: itens de catalogo re-resolvidos pelo backend,
       // texto livre antigo segue como texto
       insumos: (p.insumos||[]).map(i=>i.insumoId ? ({ insumoId: i.insumoId, embalagem: i.embalagem, quantidade: i.quantidade }) : ({ descricao: i.descricao, quantidade: i.quantidade })),
-      observacao: 'Envio rápido (igual ao pedido)',
+      observacao: p.jaRecebido ? 'Baixa retroativa — material já entregue (lançamento atrasado)' : 'Envio rápido (igual ao pedido)',
       atendePedidoId: p.id,
       operadorUsuario,
       operadorSenha: document.getElementById('pin-senha').value.trim(),
@@ -1346,6 +1367,9 @@ function fmtDuracao(ms){
 
 function verificarAlarme(){
   if(!TEM_ENVIO || !SOU_OPERADOR_PONTA) return;
+  // com o overlay de PIN aberto (envio rapido/baixa em andamento), o alarme
+  // nao pode reabrir por cima do campo de senha
+  if(!document.getElementById('overlay-pin').classList.contains('hidden')) return;
   // prioridade: pedido novo sem OK > atrasado sem preparo > lembrete 5/5min
   const naoVistos = REGS.filter(pedidoNaoVisto).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
   const atrasados = REGS.filter(pedidoAtrasado).sort((a,b)=>(a.vistoEm||'').localeCompare(b.vistoEm||''));
@@ -1356,19 +1380,26 @@ function verificarAlarme(){
   if(ALARME_PEDIDO && ALARME_PEDIDO.id === alvo.id && ALARME_MODO === modo){ ALARME_PEDIDO = alvo; return; }
   ALARME_PEDIDO = alvo;
   ALARME_MODO = modo;
+  // pedido "ja recebido" (lancamento atrasado): nao ha nada a preparar -
+  // o unico caminho e a baixa (envio vinculado assinado pela senha do
+  // operador); os botoes de preparo/lembrete somem
+  const soBaixa = !!alvo.jaRecebido;
   // fora do "novo", o tom e sempre neutro ("em preparo") - lembra de enviar
   // sem expor cronometro de cobranca pra equipe
   document.getElementById('al-titulo').textContent =
+    soBaixa ? '📦 PEDIDO JÁ ENTREGUE — só dar baixa' :
     modo==='novo' ? '🛒 NOVO PEDIDO DO CARRINHO!' :
     modo==='atrasado' ? '🍕 PEDIDO EM PREPARO — marque o preparo' :
     '🍕 PEDIDO EM PREPARO — falta enviar';
   document.getElementById('alarme-card').classList.toggle('atrasado', false);
   document.getElementById('al-sub').textContent = `${fmtHora(alvo.criadoEm)} · por ${alvo.criadoPorNome||alvo.criadoPorEmail||'—'}`;
   document.getElementById('al-itens').innerHTML = resumoPedidoHtml(alvo);
-  document.getElementById('al-btn-visto').classList.toggle('hidden', modo!=='novo');
-  document.getElementById('al-btn-preparo').classList.toggle('hidden', modo!=='atrasado');
-  document.getElementById('al-btn-lembrete').classList.toggle('hidden', modo!=='lembrete');
-  document.getElementById('al-btn-rapido').classList.toggle('hidden', modo==='novo');
+  document.getElementById('al-btn-visto').classList.toggle('hidden', soBaixa || modo!=='novo');
+  document.getElementById('al-btn-preparo').classList.toggle('hidden', soBaixa || modo!=='atrasado');
+  document.getElementById('al-btn-lembrete').classList.toggle('hidden', soBaixa || modo!=='lembrete');
+  document.getElementById('al-btn-rapido').classList.toggle('hidden', soBaixa || modo==='novo');
+  document.getElementById('al-aviso-baixa').classList.toggle('hidden', !soBaixa);
+  document.getElementById('al-btn-baixa').classList.toggle('hidden', !soBaixa);
   document.getElementById('alarme-overlay').classList.remove('hidden');
   atualizarTimerAlarme();
   if(ALARME_TIMER) clearInterval(ALARME_TIMER);
@@ -1380,6 +1411,12 @@ function atualizarTimerAlarme(){
   if(!ALARME_PEDIDO) return;
   const el = document.getElementById('al-timer');
   const lbl = document.getElementById('al-timer-label');
+  // baixa retroativa: sem relogio de cobranca - so o lembrete da acao
+  if(ALARME_PEDIDO.jaRecebido){
+    el.classList.add('hidden');
+    lbl.textContent = 'dê a baixa com a senha do operador';
+    return;
+  }
   // fora do "novo" o relogio some: o lembrete e neutro (pedido em preparo,
   // falta enviar) - os tempos ficam so nos indicadores do Painel
   if(ALARME_MODO!=='novo'){
@@ -1489,6 +1526,16 @@ async function marcarPreparo(id){
   await carregar();
 }
 async function envioRapidoDoAlarme(){
+  if(!ALARME_PEDIDO) return;
+  const id = ALARME_PEDIDO.id;
+  fecharAlarme();
+  await envioRapido(id);
+}
+
+// baixa do pedido "ja recebido": mesmo fluxo do envio rapido (PIN com a
+// senha do operador) - o backend fecha o ciclo sozinho (o envio ja nasce
+// recebido, sem popup de confirmacao no carrinho)
+async function baixaDoAlarme(){
   if(!ALARME_PEDIDO) return;
   const id = ALARME_PEDIDO.id;
   fecharAlarme();

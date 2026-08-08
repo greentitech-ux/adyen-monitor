@@ -3766,6 +3766,7 @@ app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
       insumos: req.body.insumos,
       observacao: req.body.observacao,
       atendePedidoId: req.body.atendePedidoId,
+      jaRecebido: req.body.jaRecebido,
       criadoPorId: req.user.id,
       criadoPorEmail: req.user.email,
       criadoPorNome: req.user.username || req.user.email,
@@ -3774,7 +3775,11 @@ app.post('/api/abastecimento', auth.requireAuth, async (req, res) => {
     if (registro.tipo === 'PEDIDO') {
       // aviso operacional do balcao: vai so pra quem opera a loja (secao
       // abastecimento-loja) - Master/Admin nao recebem esse push
-      push.notifyAbastecimento('🛒 Carrinho pediu abastecimento', `${registro.criadoPorNome} · pizzas/insumos aguardando envio`, registro.id, 'abastecimento-loja');
+      push.notifyAbastecimento(
+        registro.jaRecebido ? '📦 Pedido já entregue — só dar baixa' : '🛒 Carrinho pediu abastecimento',
+        registro.jaRecebido ? `${registro.criadoPorNome} · lançamento atrasado, o material já chegou` : `${registro.criadoPorNome} · pizzas/insumos aguardando envio`,
+        registro.id, 'abastecimento-loja',
+      );
     }
     res.json(registro);
   } catch (err) {
