@@ -10,13 +10,18 @@
 // grava com .set() (nao .add()) - rodar a importacao de novo so atualiza os
 // mesmos documentos, nunca duplica.
 const db = require('./firestore');
-const { buscarAba, parseMoneyBR } = require('./sheetsSync');
+const { buscarAbaPorCandidatos, parseMoneyBR } = require('./sheetsSync');
 const parque = require('./parque');
 const festas = require('./festas');
 
 const SHEET_ID_SALTIVERSO = process.env.SHEET_ID_SALTIVERSO || '11TcOlMUBZ_bqL6FyFZFjgo-GRD78h0y3DqsaOzKVBpI';
-const ABA_ENTRADAS = 'Entradas';
-const ABA_FESTAS = 'Vendas de Festa';
+// a planilha real usa "BDClientes"/"BDFestas" (o app antigo chamava de
+// "Entradas"/"Vendas de Festa") - tenta os nomes conhecidos e, se renomearem
+// de novo, o buscarAbaPorCandidatos encontra a aba certa PELAS COLUNAS
+const ABAS_ENTRADAS = ['BDClientes', 'Entradas'];
+const COLUNAS_ENTRADAS = ['NomeCliente', 'DataUtilizacao', 'TimeInicial', 'NomeUtilizador01'];
+const ABAS_FESTAS = ['BDFestas', 'Vendas de Festa'];
+const COLUNAS_FESTAS = ['Codigo', 'DataDeUso', 'ValorTotal'];
 const UNIDADE_PADRAO = 'Saltiverso Patteo';
 
 function get(header, linha, nome) {
@@ -186,7 +191,7 @@ function linhaParaFesta(header, linha) {
 async function importar() {
   const resultado = { checkins: { lidos: 0, importados: 0 }, festas: { lidos: 0, importados: 0 } };
 
-  const valoresEntradas = await buscarAba(SHEET_ID_SALTIVERSO, ABA_ENTRADAS);
+  const { valores: valoresEntradas } = await buscarAbaPorCandidatos(SHEET_ID_SALTIVERSO, ABAS_ENTRADAS, COLUNAS_ENTRADAS);
   if (valoresEntradas.length) {
     const header = valoresEntradas[0];
     const batchCheckins = db.batch();
@@ -201,7 +206,7 @@ async function importar() {
     if (resultado.checkins.importados) await batchCheckins.commit();
   }
 
-  const valoresFestas = await buscarAba(SHEET_ID_SALTIVERSO, ABA_FESTAS);
+  const { valores: valoresFestas } = await buscarAbaPorCandidatos(SHEET_ID_SALTIVERSO, ABAS_FESTAS, COLUNAS_FESTAS);
   if (valoresFestas.length) {
     const header = valoresFestas[0];
     const colecaoFestas = db.collection('festas');

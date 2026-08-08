@@ -126,6 +126,35 @@ function normalizarNomeAba(s) {
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 }
 
+// busca DEFINITIVA por aba: tenta os nomes candidatos (com a tolerancia de
+// maiuscula/acento do buscarAba) e, se nenhum existir, varre TODAS as abas
+// da planilha e escolhe a que tem as colunas-chave no cabecalho - assim a
+// importacao sobrevive a aba renomeada (ex: "Entradas" -> "BDClientes")
+async function buscarAbaPorCandidatos(spreadsheetId, candidatos, colunasChave) {
+  let ultimoErro = null;
+  for (const nome of candidatos) {
+    try {
+      const valores = await buscarAba(spreadsheetId, nome);
+      if (valores.length) return { aba: nome, valores };
+    } catch (e) { ultimoErro = e; }
+  }
+  // nenhum candidato existe: detecta pela ESTRUTURA (colunas do cabecalho)
+  const token = await getAccessToken();
+  const abas = await listarAbas(spreadsheetId, token);
+  for (const titulo of abas) {
+    try {
+      const { ok, data } = await buscarValoresAba(spreadsheetId, titulo, token);
+      if (!ok) continue;
+      const header = (data.values || [])[0] || [];
+      if (colunasChave.every((c) => header.includes(c))) {
+        return { aba: titulo, valores: data.values || [] };
+      }
+    } catch (e) { /* tenta a proxima aba */ }
+  }
+  const listaAbas = abas.length ? ` Abas encontradas na planilha: ${abas.join(', ')}.` : '';
+  throw new Error(`Nenhuma aba da planilha ${spreadsheetId} tem as colunas esperadas (${colunasChave.join(', ')}) nem os nomes ${candidatos.map((c) => `"${c}"`).join('/')}.${ultimoErro ? ` Último erro: ${ultimoErro.message}` : ''}${listaAbas}`);
+}
+
 async function buscarAba(spreadsheetId, aba) {
   const token = await getAccessToken();
   let { ok, data } = await buscarValoresAba(spreadsheetId, aba, token);
@@ -481,6 +510,6 @@ async function enviarFechamentoArcfood(f) {
 }
 
 module.exports = {
-  sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, getAccessToken, buscarAba, mesclarLancamentosDoMesmoDia,
+  sincronizar, parseMoneyBR, parseDataArcfood, parseDataBravo, getAccessToken, buscarAba, buscarAbaPorCandidatos, mesclarLancamentosDoMesmoDia,
   enviarFechamentoArcfood,
 };
