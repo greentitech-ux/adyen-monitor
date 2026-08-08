@@ -10,7 +10,7 @@ const sessions = require('./sessions');
 
 const usersRef = db.collection('users');
 
-const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'suporte', 'manutencao', 'inventario', 'parque', 'parque-checkin', 'festas', 'abastecimento-carrinho'];
+const VALID_SECTIONS = ['monitor', 'disputas', 'cofre', 'fechamentos', 'lancamento', 'sangria', 'entregas', 'entregas-lancamento', 'ifood', 'solicitacoes', 'tecnico', 'suporte', 'manutencao', 'inventario', 'parque', 'parque-checkin', 'festas', 'abastecimento-carrinho', 'abastecimento-loja'];
 
 // os 7 tipos de card que aparecem na Central - mesma lista de TIPOS_INFO em
 // central.html/central-historico.html. Igual ao cofre (vaultSubgroups) e
@@ -204,6 +204,21 @@ async function updatePodeCatalogoEstoque(id, valor) {
   return toPublic(await ref.get());
 }
 
+// mesma ideia do Catalogo do Estoque, so que pro cadastro de INSUMOS do
+// Abastecimento do Carrinho (Dom Aeroporto): quem tem a permissao adiciona/
+// edita itens do catalogo (nome, quantidade por caixa, ativo) sem precisar
+// ser Master/Admin
+async function updatePodeCatalogoInsumos(id, valor) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master já pode tudo, não precisa dessa permissão.');
+  await ref.update({ podeCatalogoInsumos: !!valor });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
 // tag de cargo/funcao (Loja, Gerente, Tecnico, Manutencao). Alem de rotulo
 // na tela de Usuarios, algumas tem efeito real: Gerente aprova check-out do
 // Parque, e a tag define a TELA INICIAL da pessoa ao entrar no app (ver
@@ -290,6 +305,7 @@ function toPublic(doc) {
     horarioPermitido: data.role === 'master' ? null : data.horarioPermitido || { ativo: false, inicio: '', fim: '' },
     isAdmin: data.role === 'master' ? null : !!data.isAdmin,
     podeCatalogoEstoque: data.role === 'master' ? null : !!data.podeCatalogoEstoque,
+    podeCatalogoInsumos: data.role === 'master' ? null : !!data.podeCatalogoInsumos,
     cargo: data.role === 'master' ? null : data.cargo || null,
     createdAt: data.createdAt,
   };

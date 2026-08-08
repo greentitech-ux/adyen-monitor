@@ -114,8 +114,31 @@
 
   .sabores-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .sabores-grid label{margin-top:0;}
-  .linha-item{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin-top:6px;}
-  .linha-item input{padding:9px 10px;font-size:13.5px;}
+  /* linha de insumo por CATALOGO: item + embalagem (unidade/caixa) + qtde */
+  .linha-item{display:grid;grid-template-columns:minmax(120px,1.4fr) minmax(96px,1fr) 70px auto;gap:6px;align-items:center;margin-top:6px;}
+  .linha-item input,.linha-item select{padding:9px 8px;font-size:13px;}
+  .insumo-total{grid-column:1 / -1;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:-2px 0 2px 2px;}
+  .badge.visto{background:#12303a;color:var(--accent);}
+
+  /* ALARME de pedido novo (lado da loja): overlay acima de tudo, contagem
+     regressiva de 5min - so some quando alguem aperta OK */
+  .alarme-overlay{position:fixed;inset:0;background:rgba(10,4,4,.88);z-index:12000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .alarme-overlay.hidden{display:none!important;}
+  .alarme-card{background:var(--panel);border:2px solid var(--pedido);border-radius:16px;padding:26px 22px;width:100%;max-width:420px;text-align:center;box-shadow:0 0 60px rgba(255,138,128,.35);animation:alarmePulso 1s infinite;}
+  @keyframes alarmePulso{0%,100%{box-shadow:0 0 40px rgba(255,138,128,.25);}50%{box-shadow:0 0 90px rgba(255,138,128,.55);}}
+  .alarme-card h2{font-size:19px;color:var(--pedido);margin:0 0 4px;}
+  .alarme-card .alarme-sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px;}
+  .alarme-itens{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px;text-align:left;margin-bottom:14px;}
+  .alarme-timer{font-family:var(--mono);font-size:38px;font-weight:800;letter-spacing:.04em;margin:6px 0 2px;}
+  .alarme-timer.ok{color:var(--warn);}
+  .alarme-timer.estourado{color:var(--bad);}
+  .alarme-timer-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;}
+  .alarme-ok{width:100%;background:var(--ok);color:#06231a;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;font-family:var(--sans);}
+  .cat-linha{display:grid;grid-template-columns:1fr 92px 70px;gap:6px;align-items:center;margin-top:6px;}
+  .cat-linha input{padding:8px 9px;font-size:13px;}
+  .cat-toggle{font-family:var(--mono);font-size:10px;padding:6px 4px;border-radius:8px;border:1px solid var(--line);background:none;cursor:pointer;white-space:nowrap;}
+  .cat-toggle.on{color:var(--ok);border-color:rgba(61,220,151,.5);}
+  .cat-toggle.off{color:var(--bad);border-color:rgba(255,92,92,.5);}
   .btn-remover{background:var(--bad-dim);color:var(--bad);border:none;border-radius:6px;width:32px;height:36px;font-size:15px;cursor:pointer;flex:none;}
   .btn-add{margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;width:100%;}
   .btn-primary{width:100%;margin-top:16px;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);background:var(--accent);color:#06202b;}
@@ -204,6 +227,7 @@
     <button type="button" class="filtro-chip" data-filtro="pendentes" onclick="filtrar('pendentes')">⏳ Aguardando envio</button>
     <button type="button" class="filtro-chip" data-filtro="PEDIDO" onclick="filtrar('PEDIDO')">🛒 Pedidos</button>
     <button type="button" class="filtro-chip" data-filtro="ENVIO" onclick="filtrar('ENVIO')">🚚 Envios</button>
+    <button type="button" class="filtro-chip hidden" id="btn-catalogo" onclick="abrirCatalogo()">⚙️ Cadastro de insumos</button>
   </div>
   <div id="lista-regs"><div class="empty">carregando...</div></div>
 </div>
@@ -234,6 +258,39 @@
       <textarea id="f-obs" placeholder="ex: urgência / 1 lata avariada"></textarea>
       <button type="button" class="btn-primary" id="btn-salvar" onclick="salvar()"></button>
       <div class="msg hidden" id="msg-form"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ALARME: pedido novo do carrinho toca alto no lado da loja ate alguem
+     apertar OK (que sinaliza "visto" pra quem pediu) -->
+<div class="alarme-overlay hidden" id="alarme-overlay">
+  <div class="alarme-card">
+    <h2>🛒 NOVO PEDIDO DO CARRINHO!</h2>
+    <div class="alarme-sub" id="al-sub"></div>
+    <div class="alarme-itens" id="al-itens"></div>
+    <div class="alarme-timer ok" id="al-timer">5:00</div>
+    <div class="alarme-timer-label" id="al-timer-label">pra confirmar que a loja viu</div>
+    <button type="button" class="alarme-ok" onclick="confirmarVisto()">✓ OK, VISTO — vamos preparar</button>
+  </div>
+</div>
+
+<!-- gestao do catalogo de insumos (Master/Admin/permissao 🥤) -->
+<div class="overlay hidden" id="overlay-catalogo">
+  <div class="sheet-wrap">
+    <span class="sheet-fechar-flutuante" title="Fechar" onclick="fecharCatalogo()">✕</span>
+    <div class="sheet">
+      <h3>⚙️ Cadastro de insumos</h3>
+      <div class="sub">a quantidade por caixa fica travada aqui — na hora do lançamento ninguém altera</div>
+      <div style="display:grid;grid-template-columns:1fr 92px 70px;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:2px;"><span>insumo</span><span>qtd/caixa</span><span></span></div>
+      <div id="cat-lista"></div>
+      <label style="margin-top:16px;">Adicionar insumo novo</label>
+      <div class="cat-linha">
+        <input type="text" id="cat-novo-nome" placeholder="ex: Coca-Cola lata">
+        <input type="number" min="1" inputmode="numeric" id="cat-novo-qtd" placeholder="qtd/cx">
+        <button type="button" class="btn-add" style="margin-top:0;padding:8px 4px;" onclick="adicionarInsumoCatalogo()">＋</button>
+      </div>
+      <div class="msg hidden" id="msg-catalogo"></div>
     </div>
   </div>
 </div>
@@ -296,7 +353,11 @@ initNavDrawerAccordion();
 
 let ME = null;
 let IS_MASTER = false;
+let TEM_PEDIDO = false;   // lado do carrinho (secao abastecimento-carrinho)
+let TEM_ENVIO = false;    // lado da loja (secao abastecimento-loja)
+let PODE_CATALOGO = false;
 let REGS = [];
+let CATALOGO_INSUMOS = [];
 let FILTRO = 'todos';
 let TIPO_FORM = 'PEDIDO';
 let INSUMOS = [];
@@ -361,6 +422,17 @@ function chipsQtd(r){
   return pizzas.join('');
 }
 
+// insumo estruturado (catalogo): "Coca-Cola Zero · 3 cx de 12 (36 un)";
+// registro antigo (texto livre): "coca zero · 6 caixas"
+function insumoTexto(i){
+  if(i.insumoId){
+    return i.embalagem==='caixa'
+      ? `${escapeHtml(i.nome)} <span>· ${i.quantidade} cx de ${i.qtdPorCaixa} (${i.totalUnidades} un)</span>`
+      : `${escapeHtml(i.nome)} <span>· ${i.quantidade} un</span>`;
+  }
+  return `${escapeHtml(i.descricao)}${i.quantidade?` <span>· ${escapeHtml(i.quantidade)}</span>`:''}`;
+}
+
 function regCardHtml(r){
   const porId = {};
   REGS.forEach(x=>{ porId[x.id]=x; });
@@ -373,8 +445,12 @@ function regCardHtml(r){
     const p = porId[r.atendePedidoId];
     statusBadge = `<span class="badge vinculo">→ atende pedido${p ? ' de '+fmtHora(p.criadoEm) : ''}</span>`;
   }
+  // pedido ja visto pela loja (OK do alarme) - quem pediu enxerga daqui
+  if(r.tipo==='PEDIDO' && r.vistoEm && !r.atendidoPorEnvioId){
+    statusBadge += ` <span class="badge visto">👁 visto pela loja ${fmtHora(r.vistoEm)}</span>`;
+  }
   const insumosHtml = (r.insumos||[]).length
-    ? `<div class="reg-insumos">${r.insumos.map(i=>`${escapeHtml(i.descricao)}${i.quantidade?` <span>· ${escapeHtml(i.quantidade)}</span>`:''}`).join(' &nbsp;•&nbsp; ')}</div>`
+    ? `<div class="reg-insumos">${r.insumos.map(insumoTexto).join(' &nbsp;•&nbsp; ')}</div>`
     : '';
   return `
     <div class="reg-card ${r.tipo}">
@@ -385,6 +461,7 @@ function regCardHtml(r){
       <div class="qtd-chips">${chipsQtd(r)}</div>
       ${insumosHtml}
       ${r.observacao ? `<div class="reg-obs">${escapeHtml(r.observacao)}</div>` : ''}
+      ${pendente(r) && TEM_ENVIO ? `<button type="button" class="btn-acao envio" style="margin-top:8px;padding:9px 10px;font-size:12.5px;min-width:0;width:100%;" onclick="envioRapido('${r.id}')">⚡ Envio rápido — mandar exatamente o que foi pedido</button>` : ''}
       <div class="reg-quem"><span>por ${escapeHtml(r.criadoPorNome||r.criadoPorEmail||'—')}</span>${IS_MASTER?`<button type="button" class="btn-excluir" onclick="excluir('${r.id}')">🗑 excluir</button>`:''}</div>
     </div>`;
 }
@@ -416,21 +493,77 @@ async function carregar(){
   REGS.sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||''));
   renderResumo();
   renderLista();
+  verificarAlarme();
 }
 
+async function carregarCatalogo(){
+  try{
+    CATALOGO_INSUMOS = await fetch('/api/abastecimento-insumos').then(r=>r.ok?r.json():[]);
+  }catch(e){ CATALOGO_INSUMOS = []; }
+}
+function insumosAtivos(){ return CATALOGO_INSUMOS.filter(i=>i.ativo!==false); }
+function insumoCadastro(id){ return CATALOGO_INSUMOS.find(i=>i.id===id) || null; }
+
 // ---------- formulario ----------
-function adicionarInsumo(descricao, quantidade){
-  INSUMOS.push({ id: ++SEQ, descricao: descricao||'', quantidade: quantidade||'' });
+// linha de insumo POR CATALOGO: escolhe o item, a embalagem (unidade sempre;
+// caixa so se o cadastro tiver qtd/caixa - que vem travada) e a quantidade
+function adicionarInsumo(insumoId, embalagem, quantidade){
+  const primeiro = insumosAtivos()[0];
+  INSUMOS.push({ id: ++SEQ, insumoId: insumoId || (primeiro ? primeiro.id : ''), embalagem: embalagem || 'unidade', quantidade: quantidade || '' });
   renderInsumos();
 }
 function removerInsumo(id){ INSUMOS = INSUMOS.filter(i=>i.id!==id); renderInsumos(); }
+function mudarInsumo(id, insumoId){
+  const it = INSUMOS.find(x=>x.id===id);
+  if(!it) return;
+  it.insumoId = insumoId;
+  const cad = insumoCadastro(insumoId);
+  if(it.embalagem==='caixa' && !(cad && cad.qtdPorCaixa)) it.embalagem = 'unidade';
+  renderInsumos();
+}
+function mudarEmbalagem(id, embalagem){
+  const it = INSUMOS.find(x=>x.id===id);
+  if(it){ it.embalagem = embalagem; renderInsumos(); }
+}
+function mudarQtdInsumo(id, quantidade){
+  const it = INSUMOS.find(x=>x.id===id);
+  if(it){ it.quantidade = quantidade; atualizarTotalInsumo(id); }
+}
+function totalInsumoTxt(it){
+  const cad = insumoCadastro(it.insumoId);
+  const q = Number(it.quantidade);
+  if(!cad || !Number.isFinite(q) || q<=0) return '';
+  return it.embalagem==='caixa' && cad.qtdPorCaixa
+    ? `= ${q} cx × ${cad.qtdPorCaixa} = ${q*cad.qtdPorCaixa} unidades`
+    : `= ${q} unidade${q===1?'':'s'}`;
+}
+function atualizarTotalInsumo(id){
+  const it = INSUMOS.find(x=>x.id===id);
+  const el = document.getElementById('insumo-total-'+id);
+  if(it && el) el.textContent = totalInsumoTxt(it);
+}
 function renderInsumos(){
-  document.getElementById('f-insumos').innerHTML = INSUMOS.map(i=>`
+  if(!insumosAtivos().length){
+    document.getElementById('f-insumos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Nenhum insumo no cadastro ainda.</div>';
+    return;
+  }
+  document.getElementById('f-insumos').innerHTML = INSUMOS.map(it=>{
+    const cad = insumoCadastro(it.insumoId);
+    const podeCaixa = !!(cad && cad.qtdPorCaixa);
+    return `
     <div class="linha-item">
-      <input type="text" value="${escapeHtml(i.descricao)}" oninput="INSUMOS.find(x=>x.id===${i.id}).descricao=this.value" placeholder="ex: coca zero">
-      <input type="text" value="${escapeHtml(i.quantidade)}" oninput="INSUMOS.find(x=>x.id===${i.id}).quantidade=this.value" placeholder="ex: 6 caixas">
-      <button type="button" class="btn-remover" onclick="removerInsumo(${i.id})">✕</button>
-    </div>`).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum insumo adicionado.</div>';
+      <select onchange="mudarInsumo(${it.id}, this.value)">
+        ${insumosAtivos().map(c=>`<option value="${c.id}" ${c.id===it.insumoId?'selected':''}>${escapeHtml(c.nome)}</option>`).join('')}
+      </select>
+      <select onchange="mudarEmbalagem(${it.id}, this.value)" title="${podeCaixa?'':'esse insumo não tem qtd/caixa cadastrada'}">
+        <option value="unidade" ${it.embalagem!=='caixa'?'selected':''}>Unidade</option>
+        ${podeCaixa?`<option value="caixa" ${it.embalagem==='caixa'?'selected':''}>Caixa de ${cad.qtdPorCaixa}</option>`:''}
+      </select>
+      <input type="number" min="1" inputmode="numeric" value="${escapeHtml(it.quantidade)}" oninput="mudarQtdInsumo(${it.id}, this.value)" placeholder="qtde">
+      <button type="button" class="btn-remover" onclick="removerInsumo(${it.id})">✕</button>
+      <div class="insumo-total" id="insumo-total-${it.id}">${totalInsumoTxt(it)}</div>
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:12px;">Nenhum insumo adicionado.</div>';
 }
 
 function abrirForm(tipo){
@@ -466,7 +599,9 @@ function prefillDoPedido(){
   document.getElementById('f-pepperoni').value = p.pizzas?.pepperoni || '';
   document.getElementById('f-mussarela').value = p.pizzas?.mussarela || '';
   INSUMOS = [];
-  (p.insumos||[]).forEach(i=>adicionarInsumo(i.descricao, i.quantidade));
+  (p.insumos||[]).forEach(i=>{
+    if(i.insumoId && insumoCadastro(i.insumoId)) adicionarInsumo(i.insumoId, i.embalagem, i.quantidade);
+  });
   renderInsumos();
 }
 
@@ -483,7 +618,7 @@ async function salvar(){
         pepperoni: document.getElementById('f-pepperoni').value,
         mussarela: document.getElementById('f-mussarela').value,
       },
-      insumos: INSUMOS.map(i=>({ descricao: i.descricao, quantidade: i.quantidade })),
+      insumos: INSUMOS.filter(i=>i.insumoId && i.quantidade).map(i=>({ insumoId: i.insumoId, embalagem: i.embalagem, quantidade: i.quantidade })),
       observacao: document.getElementById('f-obs').value,
       atendePedidoId: TIPO_FORM==='ENVIO' ? (document.getElementById('f-atende').value || null) : null,
     };
@@ -499,6 +634,173 @@ async function salvar(){
   }
 }
 
+// ---------- envio rapido: 1 clique manda exatamente o que o pedido pediu ----------
+async function envioRapido(pedidoId){
+  const p = REGS.find(x=>x.id===pedidoId);
+  if(!p) return;
+  const resumo = SABORES.filter(s=>Number(p.pizzas?.[s])>0).map(s=>`${p.pizzas[s]} ${SABOR_LABEL[s]}`)
+    .concat((p.insumos||[]).map(i=>i.insumoId ? `${i.nome} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : i.descricao));
+  if(!confirm(`⚡ Envio rápido: registrar o envio de\n\n${resumo.join(', ')}\n\nexatamente como pedido?`)) return;
+  try{
+    const body = {
+      tipo: 'ENVIO',
+      pizzas: p.pizzas || {},
+      // repassa como veio: itens de catalogo re-resolvidos pelo backend,
+      // texto livre antigo segue como texto
+      insumos: (p.insumos||[]).map(i=>i.insumoId ? ({ insumoId: i.insumoId, embalagem: i.embalagem, quantidade: i.quantidade }) : ({ descricao: i.descricao, quantidade: i.quantidade })),
+      observacao: 'Envio rápido (igual ao pedido)',
+      atendePedidoId: p.id,
+    };
+    const resp = await fetch('/api/abastecimento', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro no envio rápido.');
+    await carregar();
+  }catch(err){ alert(err.message); }
+}
+
+// ---------- ALARME de pedido novo (lado da loja) ----------
+// pedido sem OK: popup em cima de tudo + som alto repetindo ate alguem
+// apertar OK. O relogio conta 5:00 regressivos a partir da criacao do
+// pedido; estourou, fica vermelho e o som continua - so o OK encerra.
+let ALARME_PEDIDO = null;
+let ALARME_TIMER = null;
+let ALARME_AUDIO_CTX = null;
+let ALARME_SOM_TIMER = null;
+
+function pedidoPrecisaAlarme(r){ return pendente(r) && !r.vistoEm; }
+
+function verificarAlarme(){
+  if(!TEM_ENVIO) return;
+  const pendentes = REGS.filter(pedidoPrecisaAlarme).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
+  if(!pendentes.length){ fecharAlarme(); return; }
+  const alvo = pendentes[0];
+  if(ALARME_PEDIDO && ALARME_PEDIDO.id === alvo.id) return; // ja esta tocando pra esse
+  ALARME_PEDIDO = alvo;
+  const resumo = SABORES.filter(s=>Number(alvo.pizzas?.[s])>0).map(s=>`<b>${alvo.pizzas[s]}</b> ${SABOR_LABEL[s]}`)
+    .concat((alvo.insumos||[]).map(i=>i.insumoId ? `${escapeHtml(i.nome)} (${i.quantidade} ${i.embalagem==='caixa'?'cx':'un'})` : escapeHtml(i.descricao)));
+  document.getElementById('al-sub').textContent = `${fmtHora(alvo.criadoEm)} · por ${alvo.criadoPorNome||alvo.criadoPorEmail||'—'}`;
+  document.getElementById('al-itens').innerHTML = resumo.join(' · ') || '—';
+  document.getElementById('alarme-overlay').classList.remove('hidden');
+  atualizarTimerAlarme();
+  if(ALARME_TIMER) clearInterval(ALARME_TIMER);
+  ALARME_TIMER = setInterval(atualizarTimerAlarme, 1000);
+  iniciarSomAlarme();
+}
+
+function atualizarTimerAlarme(){
+  if(!ALARME_PEDIDO) return;
+  const fim = new Date(ALARME_PEDIDO.criadoEm).getTime() + 5*60*1000;
+  const resta = Math.round((fim - Date.now())/1000);
+  const el = document.getElementById('al-timer');
+  const lbl = document.getElementById('al-timer-label');
+  if(resta >= 0){
+    el.textContent = `${Math.floor(resta/60)}:${String(resta%60).padStart(2,'0')}`;
+    el.className = 'alarme-timer ok';
+    lbl.textContent = 'pra confirmar que a loja viu';
+  } else {
+    const passou = -resta;
+    el.textContent = `-${Math.floor(passou/60)}:${String(passou%60).padStart(2,'0')}`;
+    el.className = 'alarme-timer estourado';
+    lbl.textContent = '⚠️ tempo esgotado — confirme AGORA';
+  }
+}
+
+// som: bips agudos em rajada, repetindo - WebAudio (sem arquivo). Navegador
+// pode exigir 1 interacao na pagina antes de liberar audio; o clique em
+// qualquer lugar destrava (listener abaixo)
+function tocarRajada(){
+  try{
+    if(!ALARME_AUDIO_CTX) ALARME_AUDIO_CTX = new (window.AudioContext||window.webkitAudioContext)();
+    const ctx = ALARME_AUDIO_CTX;
+    if(ctx.state === 'suspended') ctx.resume();
+    for(let i=0;i<3;i++){
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 950;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + i*0.28);
+      gain.gain.exponentialRampToValueAtTime(0.8, ctx.currentTime + i*0.28 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i*0.28 + 0.22);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i*0.28);
+      osc.stop(ctx.currentTime + i*0.28 + 0.24);
+    }
+  }catch(e){ /* audio bloqueado - o popup visual continua */ }
+}
+function iniciarSomAlarme(){
+  if(ALARME_SOM_TIMER) return;
+  tocarRajada();
+  ALARME_SOM_TIMER = setInterval(tocarRajada, 2000);
+}
+function pararSomAlarme(){
+  if(ALARME_SOM_TIMER){ clearInterval(ALARME_SOM_TIMER); ALARME_SOM_TIMER = null; }
+}
+document.addEventListener('click', ()=>{ if(ALARME_AUDIO_CTX && ALARME_AUDIO_CTX.state==='suspended') ALARME_AUDIO_CTX.resume(); });
+
+function fecharAlarme(){
+  pararSomAlarme();
+  if(ALARME_TIMER){ clearInterval(ALARME_TIMER); ALARME_TIMER = null; }
+  ALARME_PEDIDO = null;
+  document.getElementById('alarme-overlay').classList.add('hidden');
+}
+
+async function confirmarVisto(){
+  if(!ALARME_PEDIDO) return;
+  const id = ALARME_PEDIDO.id;
+  fecharAlarme();
+  try{
+    const resp = await fetch(`/api/abastecimento/${id}/visto`, { method:'POST' });
+    if(!resp.ok){ const d = await resp.json(); throw new Error(d.error||'Erro ao confirmar.'); }
+  }catch(err){ alert(err.message); }
+  await carregar(); // proximo pedido nao-visto (se houver) reabre o alarme
+}
+
+// ---------- gestao do catalogo de insumos ----------
+function renderCatalogo(){
+  document.getElementById('cat-lista').innerHTML = CATALOGO_INSUMOS.map(i=>`
+    <div class="cat-linha" style="${i.ativo===false?'opacity:.45;':''}">
+      <input type="text" value="${escapeHtml(i.nome)}" onchange="salvarInsumoCatalogo('${i.id}', { nome: this.value })">
+      <input type="number" min="1" inputmode="numeric" value="${i.qtdPorCaixa||''}" placeholder="só un" title="quantidade por caixa - vazio = item só sai em unidade" onchange="salvarInsumoCatalogo('${i.id}', { qtdPorCaixa: this.value || null })">
+      <button type="button" class="cat-toggle ${i.ativo===false?'off':'on'}" onclick="salvarInsumoCatalogo('${i.id}', { ativo: ${i.ativo===false} })">${i.ativo===false?'inativo':'ativo'}</button>
+    </div>`).join('') || '<div class="empty">Catálogo vazio.</div>';
+}
+function abrirCatalogo(){
+  document.getElementById('msg-catalogo').classList.add('hidden');
+  document.getElementById('cat-novo-nome').value = '';
+  document.getElementById('cat-novo-qtd').value = '';
+  renderCatalogo();
+  document.getElementById('overlay-catalogo').classList.remove('hidden');
+}
+function fecharCatalogo(){ document.getElementById('overlay-catalogo').classList.add('hidden'); }
+function erroCatalogo(texto){
+  const msg = document.getElementById('msg-catalogo');
+  msg.textContent = texto; msg.className = 'msg err'; msg.classList.remove('hidden');
+}
+async function salvarInsumoCatalogo(id, patch){
+  try{
+    const resp = await fetch(`/api/abastecimento-insumos/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao salvar insumo.');
+    await carregarCatalogo();
+    renderCatalogo();
+    renderInsumos();
+  }catch(err){ erroCatalogo(err.message); }
+}
+async function adicionarInsumoCatalogo(){
+  try{
+    const nome = document.getElementById('cat-novo-nome').value;
+    const qtdPorCaixa = document.getElementById('cat-novo-qtd').value || null;
+    const resp = await fetch('/api/abastecimento-insumos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome, qtdPorCaixa }) });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao adicionar insumo.');
+    document.getElementById('cat-novo-nome').value = '';
+    document.getElementById('cat-novo-qtd').value = '';
+    await carregarCatalogo();
+    renderCatalogo();
+    renderInsumos();
+  }catch(err){ erroCatalogo(err.message); }
+}
+
 async function excluir(id){
   if(!confirm('Excluir esse registro? (se for um envio vinculado, o pedido volta pra fila)')) return;
   const resp = await fetch(`/api/abastecimento/${id}`, { method:'DELETE' });
@@ -510,7 +812,12 @@ async function boot(){
   if(!res.ok){ logout(); return; }
   ME = await res.json();
   IS_MASTER = ME.role==='master';
-  const secoes = IS_MASTER ? ['abastecimento-carrinho'] : (ME.permissions?.sections||[]);
+  const secoes = ME.permissions?.sections||[];
+  // permissao POR PONTA: quem PEDE (carrinho) x quem ENVIA (loja) -
+  // Master/Admin fazem os dois. O catalogo de insumos tem permissao propria
+  TEM_PEDIDO = IS_MASTER || !!ME.isAdmin || secoes.includes('abastecimento-carrinho');
+  TEM_ENVIO = IS_MASTER || !!ME.isAdmin || secoes.includes('abastecimento-loja');
+  PODE_CATALOGO = IS_MASTER || !!ME.isAdmin || !!ME.podeCatalogoInsumos;
 
   // menu sempre visivel (politica do app) - so administracao continua restrita
   ['nav-monitor','nav-lancamento','nav-fechamentos','nav-entregas','nav-entrega-lancamento','nav-cofre','nav-relatorios','nav-ifood','nav-parque','nav-mensalistas','nav-grupo-saltiverso','nav-solicitacoes','nav-historico','nav-tecnico','nav-manutencao','nav-inventario','nav-parque-checkin','nav-festas'].forEach(id=>{
@@ -522,19 +829,26 @@ async function boot(){
   document.getElementById('nav-entregas-regras').classList.toggle('hidden', !IS_MASTER);
   document.getElementById('nav-reset-senha').classList.toggle('hidden', !(IS_MASTER || ME.isAdmin));
 
-  if(!secoes.includes('abastecimento-carrinho')){
+  if(!TEM_PEDIDO && !TEM_ENVIO){
     document.getElementById('sem-acesso').classList.remove('hidden');
     return;
   }
+  // cada ponta so ve o proprio botao de lancamento
+  document.querySelector('.btn-acao.pedido').classList.toggle('hidden', !TEM_PEDIDO);
+  document.querySelector('.acoes-topo .btn-acao.envio').classList.toggle('hidden', !TEM_ENVIO);
+  document.getElementById('btn-catalogo').classList.toggle('hidden', !PODE_CATALOGO);
   document.getElementById('root').classList.remove('hidden');
+  await carregarCatalogo();
   await carregar();
   iniciarStream();
 }
 
-// ao vivo: pedido novo do carrinho aparece na loja sem F5 (e vice-versa)
+// ao vivo: pedido novo do carrinho aparece na loja sem F5 (e vice-versa),
+// e o alarme dispara na hora do lado de quem envia
 function iniciarStream(){
   const es = new EventSource('/api/stream?token='+encodeURIComponent(AUTH_TOKEN));
   es.addEventListener('abastecimento-atualizado', ()=>{ carregar(); });
+  es.addEventListener('abastecimento-insumos-atualizado', async ()=>{ await carregarCatalogo(); renderInsumos(); });
 }
 
 boot();
