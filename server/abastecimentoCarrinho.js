@@ -342,7 +342,7 @@ async function resolverInsumos(lista) {
   return resultado;
 }
 
-async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criadoPorId, criadoPorEmail, criadoPorNome, operador }) {
+async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, jaRecebido, criadoPorId, criadoPorEmail, criadoPorNome, operador }) {
   if (!TIPOS.includes(tipo)) throw new Error('Tipo inválido (use PEDIDO ou ENVIO).');
   const pizzasLimpas = sanitizarPizzas(pizzas);
   const insumosLimpos = await resolverInsumos(insumos);
@@ -393,12 +393,30 @@ async function criar({ tipo, pizzas, insumos, observacao, atendePedidoId, criado
     // operador local (login de balcao de 4 letras) que assinou o lancamento
     operadorUsuario: operador ? operador.usuario : null,
     operadorNome: operador ? operador.nome : null,
+    // PEDIDO retroativo: o carrinho JA recebeu o material fisicamente (a
+    // comunicacao/internet/sistema falhou na hora) e esta so registrando
+    // depois - a loja nao precisa preparar nada, so dar baixa (um envio
+    // vinculado, assinado pela senha do operador, que ja nasce recebido)
+    jaRecebido: tipo === 'PEDIDO' ? !!jaRecebido : false,
     // ENVIO: confirmacao de recebimento pelo carrinho (o ciclo so fecha
     // quando o carrinho confere o que chegou - ver confirmarRecebimento)
     recebidoEm: null,
     recebimento: null,
     criadoEm: agora,
   };
+  // baixa retroativa: o envio que atende um pedido "ja recebido" fecha o
+  // ciclo na hora - nao faz sentido o carrinho confirmar recebimento de um
+  // material que ele mesmo declarou ja ter em maos
+  if (pedidoAtendido && pedidoAtendido.jaRecebido) {
+    registro.recebidoEm = agora;
+    registro.recebimento = {
+      confere: true,
+      baixaRetroativa: true,
+      faltas: [],
+      extras: [],
+      confirmadoPorNome: registro.operadorNome || registro.criadoPorNome || null,
+    };
+  }
   await doc.set(registro);
   if (pedidoAtendido) {
     await COLLECTION.doc(pedidoAtendido.id).update({ atendidoPorEnvioId: registro.id });
