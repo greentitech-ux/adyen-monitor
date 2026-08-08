@@ -606,7 +606,14 @@ function envioAguardandoConfirmacao(r){
   return r.tipo==='ENVIO' && !r.recebidoEm && (RECEB_SNOOZE[r.id]||0) <= Date.now()
     && (Date.now() - new Date(r.criadoEm).getTime()) >= SETE_MIN;
 }
+let RECEB_MANUAL = false; // aberto pelo toque no badge (nao fecha/troca sozinho)
 function verificarRecebimento(){
+  // popup aberto na mao (badge "aguardando confirmação"): o ciclo automatico
+  // nao mexe nele; quando fechar por qualquer caminho, volta ao normal
+  if(RECEB_MANUAL){
+    if(!document.getElementById('receb-overlay').classList.contains('hidden')) return;
+    RECEB_MANUAL = false; RECEB_ENVIO = null;
+  }
   if(!TEM_PEDIDO || !SOU_OPERADOR_PONTA) return;
   if(document.getElementById('alarme-overlay') && !document.getElementById('alarme-overlay').classList.contains('hidden')) return;
   const fila = REGS.filter(envioAguardandoConfirmacao).sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||''));
@@ -617,6 +624,23 @@ function verificarRecebimento(){
   const alvo = fila[0];
   if(RECEB_ENVIO && RECEB_ENVIO.id === alvo.id){ RECEB_ENVIO = alvo; return; }
   RECEB_ENVIO = alvo;
+  montarPopupRecebimento(alvo, { som: true });
+}
+
+// abre o popup de recebimento pelo toque no badge "aguardando confirmação"
+// do feed - vale mesmo antes dos 7 minutos (o envio chegou rapido e o
+// carrinho quer confirmar logo) e tambem pra Master/Admin, que nao recebem
+// o popup automatico mas podem confirmar por acao explicita
+function abrirRecebimentoManual(id){
+  if(!TEM_PEDIDO) return;
+  const r = REGS.find(x=>x.id===id);
+  if(!r || r.tipo!=='ENVIO' || r.recebidoEm) return;
+  RECEB_MANUAL = true;
+  RECEB_ENVIO = r;
+  montarPopupRecebimento(r, { som: false });
+}
+
+function montarPopupRecebimento(alvo, { som = true } = {}){
   const porId = {}; REGS.forEach(x=>{ porId[x.id]=x; });
   const pedido = alvo.atendePedidoId ? porId[alvo.atendePedidoId] : null;
   document.getElementById('rc-sub').textContent = `envio de ${fmtHora(alvo.criadoEm)} · por ${alvo.operadorNome||alvo.criadoPorNome||'—'} — o que chegou:`;
@@ -661,7 +685,7 @@ function verificarRecebimento(){
   document.getElementById('msg-receb').classList.add('hidden');
   rcEtapa('inicio');
   document.getElementById('receb-overlay').classList.remove('hidden');
-  iniciarSomAlarme();
+  if(som) iniciarSomAlarme();
 }
 
 // etapas do popup de recebimento; quantidades so editaveis em "faltou"
@@ -833,8 +857,12 @@ function regCardHtml(r){
       const p = porId[r.atendePedidoId];
       statusBadge = `<span class="badge vinculo">→ atende pedido${p ? ' de '+fmtHora(p.criadoEm) : ''}</span>`;
     }
-    // ciclo do envio so fecha com a confirmacao do carrinho
-    if(!r.recebidoEm) statusBadge += ' <span class="badge aguardando">📦 aguardando confirmação do carrinho</span>';
+    // ciclo do envio so fecha com a confirmacao do carrinho. Pra quem pode
+    // confirmar, o badge vira botao: abre o popup de recebimento na hora
+    // (util se o material chegou antes do popup automatico aparecer)
+    if(!r.recebidoEm) statusBadge += TEM_PEDIDO
+      ? ` <span class="badge aguardando" style="cursor:pointer;text-decoration:underline;" title="Toque pra confirmar o recebimento agora" onclick="abrirRecebimentoManual('${r.id}')">📦 aguardando confirmação do carrinho — confirmar</span>`
+      : ' <span class="badge aguardando">📦 aguardando confirmação do carrinho</span>';
     else if(r.recebimento && r.recebimento.divergencia) statusBadge += ` <span class="badge" style="background:var(--bad-dim);color:var(--bad);">🎫 em análise${r.recebimento.numeroTicket ? ' · Ticket #'+r.recebimento.numeroTicket : ''}</span>`;
     else if(r.recebimento && !r.recebimento.confere) statusBadge += ` <span class="badge" style="background:var(--bad-dim);color:var(--bad);">⚠️ recebido com falta ${fmtHora(r.recebidoEm)}</span>`;
     else statusBadge += ` <span class="badge atendido">✅ recebido ${fmtHora(r.recebidoEm)}</span>`;
