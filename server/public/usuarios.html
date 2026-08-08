@@ -121,6 +121,12 @@
   .legend-actions button{font-family:var(--sans);font-size:10.5px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;}
   .legend-actions button:hover{border-color:var(--accent);color:var(--text);}
 
+  .users-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .users-toolbar input[type=search]{flex:1;min-width:200px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12.5px;}
+  .users-filtros{display:flex;gap:6px;flex-wrap:wrap;}
+  .users-filtros button.back{cursor:pointer;}
+  .users-filtros button.back span{opacity:.65;font-family:var(--mono);margin-left:3px;}
+  .users-contagem{font-size:11px;color:var(--muted);margin-bottom:10px;}
   .users-list{display:flex;flex-direction:column;}
   .user-row{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid #1a1f26;}
   .users-list .user-row:last-child{border-bottom:none;}
@@ -208,6 +214,11 @@
         <button type="button" class="back" style="cursor:pointer;" onclick="baixarRelatorioUsuarios('pdf')">📄 PDF</button>
       </span>
     </h2>
+    <div class="users-toolbar">
+      <input type="search" id="users-busca" placeholder="🔍 pesquisar por email, usuário, cargo, seção, unidade..." oninput="filtrarBuscaUsuarios()">
+      <div class="users-filtros" id="users-filtros"></div>
+    </div>
+    <div class="users-contagem" id="users-contagem"></div>
     <div class="users-list" id="users-list"></div>
   </div>
 
@@ -827,9 +838,56 @@ function tagList(items, labelFn, limite = 2){
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// ---------- lista de usuarios: busca por palavra + filtro por status - a
+// lista crescendo (varias dezenas de acessos) tornava dificil achar alguem
+// so rolando a tela; a barra de baixo do titulo resolve isso ----------
+const CARGO_LABEL = { loja:'🏬 loja', gerente:'👔 gerente', tecnico:'🔧 técnico', suporte:'🎧 suporte', manutencao:'🛠️ manutenção' };
+let FILTRO_USERS_BUSCA = '';
+let FILTRO_USERS_STATUS = ''; // '' = todos, 'ativos', 'desativados', 'bloqueados'
+
+function statusUsuario(u){
+  if(u.role==='master') return 'ativos'; // Master nao tem active/locked - sempre ativo
+  if(u.locked) return 'bloqueados';
+  return u.active ? 'ativos' : 'desativados';
+}
+// busca em email, usuario, cargo, tags e nomes de secao/unidade liberadas -
+// mesmo criterio "todas as palavras precisam aparecer" usado na Central
+function passaBuscaUsuario(u){
+  if(!FILTRO_USERS_BUSCA) return true;
+  const perms = u.permissions || {sections:[],unidades:[]};
+  const secoesLabels = (perms.sections||[]).map(s=>(SECTIONS.find(o=>o[0]===s)||[s,s])[1]);
+  const unidadesLabels = (perms.unidades||[]).map(c=>UNIDADES_NOMES[c]||c);
+  const tags = [
+    u.role==='master' ? 'master' : 'user',
+    u.cargo, u.isAdmin?'admin':'', u.podeCatalogoEstoque?'catálogo estoque':'',
+    u.podeCatalogoInsumos?'insumos':'', u.podeCadastrarOperadores?'operadores':'',
+  ];
+  const alvo = [u.email, u.username, ...tags, ...(perms.sections||[]), ...secoesLabels, ...(perms.unidades||[]), ...unidadesLabels]
+    .filter(Boolean).join(' ').toLowerCase();
+  return FILTRO_USERS_BUSCA.split(/\s+/).every(p=>alvo.includes(p));
+}
+function filtrarBuscaUsuarios(){
+  FILTRO_USERS_BUSCA = document.getElementById('users-busca').value.trim().toLowerCase();
+  renderUsers();
+}
+function filtrarStatusUsuarios(v){ FILTRO_USERS_STATUS = v; renderUsers(); }
+function renderFiltroStatusUsuarios(apósBusca){
+  const contagens = { '':apósBusca.length, ativos:0, desativados:0, bloqueados:0 };
+  apósBusca.forEach(u=>{ contagens[statusUsuario(u)]++; });
+  const opts = [['','Todos'], ['ativos','🟢 Ativos'], ['desativados','⚪ Desativados'], ['bloqueados','🔴 Bloqueados']];
+  document.getElementById('users-filtros').innerHTML = opts.map(([v,l])=>
+    `<button type="button" class="back${FILTRO_USERS_STATUS===v?' active':''}" onclick="filtrarStatusUsuarios('${v}')">${l} <span>${contagens[v]}</span></button>`
+  ).join('');
+}
+
 function renderUsers(){
   const container = document.getElementById('users-list');
-  const ordenados = [...USERS].sort((a,b)=>a.email.localeCompare(b.email,'pt-BR',{sensitivity:'base'}));
+  const todosOrdenados = [...USERS].sort((a,b)=>a.email.localeCompare(b.email,'pt-BR',{sensitivity:'base'}));
+  const apósBusca = todosOrdenados.filter(passaBuscaUsuario);
+  renderFiltroStatusUsuarios(apósBusca);
+  const ordenados = FILTRO_USERS_STATUS ? apósBusca.filter(u=>statusUsuario(u)===FILTRO_USERS_STATUS) : apósBusca;
+  document.getElementById('users-contagem').textContent =
+    `Mostrando ${ordenados.length} de ${USERS.length} acesso${USERS.length===1?'':'s'}`;
   container.innerHTML = ordenados.map(u=>{
     const perms = u.permissions || {sections:[],unidades:[],vaultSubgroups:[],tiposSolicitacao:[]};
     const subgroupNames = (perms.vaultSubgroups||[]).map(caminhoSubgrupo);
@@ -868,7 +926,7 @@ function renderUsers(){
       ${isMaster ? '' : `<button type="button" class="btn-acoes" onclick="abrirAcoes('${u.id}')">⚙️ Ações</button>`}
     </div>
     <div class="user-detail hidden" id="detalhe-${u.id}">${detalhe}</div>`;
-  }).join('') || `<div style="color:var(--muted);text-align:center;padding:20px;">Nenhum acesso criado ainda.</div>`;
+  }).join('') || `<div style="color:var(--muted);text-align:center;padding:20px;">${USERS.length ? 'Nenhum acesso encontrado com esse filtro.' : 'Nenhum acesso criado ainda.'}</div>`;
 }
 function toggleDetalheUsuario(id){
   const el = document.getElementById('detalhe-'+id);
