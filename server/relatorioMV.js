@@ -85,15 +85,41 @@ function htmlBotoesAcao(card) {
   return `<div>${btn('✓ Aprovar', '#1a7f37', 'aprovar')}${btn('✗ Recusar', '#c62828', 'recusar')}</div>`;
 }
 
+// pill colorida do status no topo de cada card
+const STATUS_LABEL_SINGULAR = { PENDENTE: 'Pendente', APROVADO: 'Aprovada', REJEITADO: 'Recusada' };
+function htmlPillStatus(status) {
+  const cor = STATUS_COR[status];
+  if (!cor) return '';
+  return `<span style="display:inline-block;background:${cor};color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:bold;vertical-align:middle;">${STATUS_LABEL_SINGULAR[status] || status}</span>`;
+}
+
+// lista de itens de uma Compra (descricao + qtd) num bloco proprio, em vez
+// de perdida no meio do texto
+function htmlItens(card) {
+  if (!Array.isArray(card.itens) || !card.itens.length) return '';
+  return `
+    <div style="margin-top:10px;background:#f6f8fa;border:1px solid #e6e9ee;border-radius:8px;padding:10px 14px;">
+      <div style="font-size:10.5px;color:#8a93a2;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;">Itens do pedido</div>
+      ${card.itens.map((i) => `<div style="font-size:13px;color:#2c3340;padding:2px 0;">• ${escapeHtml(i.descricao)}${i.quantidade != null && i.quantidade !== '' ? ` <span style="color:#8a93a2;">· qtd. ${escapeHtml(String(i.quantidade))}</span>` : ''}</div>`).join('')}
+    </div>`;
+}
+
 function htmlCard(card) {
   const linhas = [
-    `<b>#${card.numeroTicket ?? '—'} - ${escapeHtml(card.titulo || '')}</b>`,
-    `<div style="color:#555;font-size:12.5px;margin-top:2px;">${escapeHtml(TIPOS_LABEL[card.tipo] || card.tipo)} · ${escapeHtml(card.unidadeNome || card.unidade || '—')} · ${fmtDataHora(card.criadoEm)}</div>`,
+    `<div style="margin-bottom:4px;">
+      <span style="display:inline-block;background:#eef1f5;color:#5b6470;border-radius:5px;padding:2px 8px;font-size:11.5px;font-family:monospace;vertical-align:middle;">#${card.numeroTicket ?? '—'}</span>
+      <span style="display:inline-block;background:#e8f0fe;color:#1a56db;border-radius:5px;padding:2px 8px;font-size:11.5px;font-weight:bold;vertical-align:middle;">${escapeHtml(TIPOS_LABEL[card.tipo] || card.tipo)}</span>
+      ${htmlPillStatus(card.status)}
+    </div>`,
+    `<div style="font-size:15px;font-weight:bold;color:#1c212b;">${escapeHtml(card.titulo || '')}</div>`,
+    `<div style="color:#8a93a2;font-size:12px;margin-top:3px;">${escapeHtml(card.unidadeNome || card.unidade || '—')} · ${fmtDataHora(card.criadoEm)}</div>`,
   ];
-  if (card.valorEstimado != null) linhas.push(`<div style="font-size:12.5px;margin-top:2px;">Valor estimado: ${fmtMoney(card.valorEstimado)}</div>`);
-  if (card.observacao) linhas.push(`<div style="font-size:12.5px;color:#333;margin-top:4px;white-space:pre-wrap;">${escapeHtml(card.observacao)}</div>`);
-  if (card.motivoDecisao) linhas.push(`<div style="font-size:12px;color:#777;margin-top:4px;">Motivo: ${escapeHtml(card.motivoDecisao)}</div>`);
-  return `<div style="padding:12px 0;border-bottom:1px solid #eee;">${linhas.join('')}${htmlBotoesAcao(card)}</div>`;
+  if (card.valorEstimado != null && card.valorEstimado > 0) linhas.push(`<div style="font-size:13px;color:#2c3340;margin-top:6px;">Valor estimado: <b>${fmtMoney(card.valorEstimado)}</b></div>`);
+  if (card.fornecedor) linhas.push(`<div style="font-size:13px;color:#2c3340;margin-top:4px;">Fornecedor: <b>${escapeHtml(card.fornecedor)}</b></div>`);
+  linhas.push(htmlItens(card));
+  if (card.observacao) linhas.push(`<div style="font-size:12.5px;color:#5b6470;margin-top:8px;white-space:pre-wrap;border-left:3px solid #e6e9ee;padding-left:10px;">${escapeHtml(card.observacao)}</div>`);
+  if (card.motivoDecisao) linhas.push(`<div style="font-size:12px;color:#8a93a2;margin-top:6px;">Motivo da decisão: ${escapeHtml(card.motivoDecisao)}</div>`);
+  return `<div style="border:1px solid #e6e9ee;border-radius:10px;padding:14px 16px;margin-top:12px;background:#fff;">${linhas.join('')}${htmlBotoesAcao(card)}</div>`;
 }
 
 function htmlSecao(status, lista) {
@@ -149,20 +175,16 @@ function montarHtmlCardUnico(card, titulo) {
 // html de N cards (1 ou varios) - usado no envio manual sob demanda (botao
 // "enviar por e-mail" no detalhe de um card, ou selecionar varios na lista),
 // diferente de notificarCardMV/enviarRelatorio que sao fluxos automaticos
-// pro MV. Aqui NUNCA gera token de decisao nem botoes Aprovar/Recusar - o
-// destinatario pode ser qualquer e-mail digitado na hora (fornecedor,
-// gerente etc.), entao dar poder de decisao por link seria arriscado demais
-// pra um envio ad-hoc
+// pro MV
 function montarHtmlCards(cards, titulo) {
-  const semBotoesDecisao = cards.map((c) => ({ ...c, tokenAcao: null }));
   return `
   <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
-    <div style="background:#1a56db;color:#fff;padding:18px 22px;border-radius:8px 8px 0 0;">
+    <div style="background:#1a56db;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0;">
       <div style="font-size:17px;font-weight:bold;">${escapeHtml(titulo)}</div>
       <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${dataHojeBR()} · ${cards.length} ticket${cards.length === 1 ? '' : 's'}</div>
     </div>
-    <div style="border:1px solid #e5e5e5;border-top:none;padding:18px 22px;border-radius:0 0 8px 8px;">
-      ${semBotoesDecisao.map(htmlCard).join('')}
+    <div style="border:1px solid #e6e9ee;border-top:none;padding:8px 18px 18px;border-radius:0 0 10px 10px;background:#f9fafb;">
+      ${cards.map(htmlCard).join('')}
     </div>
     <div style="font-family:Arial,sans-serif;font-size:11px;color:#999;text-align:center;margin-top:14px;">
       Zenith Ops · enviado manualmente
@@ -171,10 +193,24 @@ function montarHtmlCards(cards, titulo) {
 }
 
 // envio manual (Master/Admin escolhe o destinatario na hora) de 1 ou mais
-// cards - ver rota POST /api/central/enviar-email em index.js
+// cards - ver rota POST /api/central/enviar-email em index.js. Tickets
+// PENDENTES de tipo com fluxo de decisao por e-mail vao COM os botoes
+// Aprovar/Recusar (mesmo token de uso unico do relatorio do MV) - quem envia
+// e Master/Admin e escolhe o destinatario de proposito, entao o link de
+// decisao e parte do que se espera do envio (pedido do usuario; antes ia
+// sem botao nenhum e o destinatario nao tinha como decidir)
 async function enviarCardsPorEmail(cards, destinatario) {
   if (!destinatario) throw new Error('Informe o e-mail de destino.');
   if (!cards || !cards.length) throw new Error('Nenhum ticket selecionado.');
+  const cardsParaEnvio = [];
+  for (const c of cards) {
+    const copia = { ...c, tokenAcao: null };
+    if (c.status === 'PENDENTE' && TIPOS_COM_ACAO_POR_EMAIL.has(c.tipo)) {
+      const { tokenAcao } = await solicitacoes.gerarTokenAcao(c.id);
+      copia.tokenAcao = tokenAcao;
+    }
+    cardsParaEnvio.push(copia);
+  }
   const titulo = cards.length === 1
     ? `Ticket #${cards[0].numeroTicket ?? '—'} · ${cards[0].titulo || ''}`
     : `${cards.length} tickets · Zenith Ops`;
@@ -182,7 +218,7 @@ async function enviarCardsPorEmail(cards, destinatario) {
     from: `Zenith Ops <${process.env.RELATORIO_EMAIL_USER}>`,
     to: destinatario,
     subject: titulo,
-    html: montarHtmlCards(cards, titulo),
+    html: montarHtmlCards(cardsParaEnvio, titulo),
   });
 }
 
