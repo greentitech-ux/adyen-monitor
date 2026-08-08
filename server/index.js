@@ -371,6 +371,7 @@ app.get('/api/me', (req, res) => {
     isAdmin: req.isAdmin,
     podeCatalogoEstoque: req.podeCatalogoEstoque,
     podeCatalogoInsumos: req.podeCatalogoInsumos,
+    podeCadastrarOperadores: req.podeCadastrarOperadores,
     precisaTrocarSenha: !!req.user.precisaTrocarSenha,
   });
 });
@@ -1662,6 +1663,17 @@ app.put('/api/users/:id/catalogo-estoque', auth.requireMaster, async (req, res) 
 app.put('/api/users/:id/catalogo-insumos', auth.requireMaster, async (req, res) => {
   try {
     res.json(await users.updatePodeCatalogoInsumos(req.params.id, req.body.podeCatalogoInsumos));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// tag "cadastrar Operadores" do Abastecimento: quem tem ve o botao 👥 e
+// cadastra logins locais de balcao (ativar/desativar/remover/desbloquear
+// continuam so do Master)
+app.put('/api/users/:id/cadastrar-operadores', auth.requireMaster, async (req, res) => {
+  try {
+    res.json(await users.updatePodeCadastrarOperadores(req.params.id, req.body.podeCadastrarOperadores));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -3902,7 +3914,12 @@ app.put('/api/abastecimento-config', auth.requireMaster, async (req, res) => {
 // cadastro: Master/Admin, na propria pagina; ativar/desativar, remover e
 // DESBLOQUEIO: SO Master. A senha so muda no desbloqueio (opcional - da pra
 // manter a mesma); o proprio operador troca o papel autenticando a senha
-app.get('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req, res) => {
+function podeCadastrarOperadores(req) {
+  return req.isMaster || req.isAdmin || req.podeCadastrarOperadores;
+}
+
+app.get('/api/abastecimento-operadores', auth.requireAuth, async (req, res) => {
+  if (!podeCadastrarOperadores(req)) return res.status(403).json({ error: 'Você não tem a permissão de cadastrar operadores.' });
   res.json(await abastecimentoCarrinho.listarOperadores());
 });
 
@@ -3924,8 +3941,9 @@ app.post('/api/abastecimento-operadores/trocar-papel', auth.requireAuth, async (
   }
 });
 
-app.post('/api/abastecimento-operadores', auth.requireMasterOrAdmin, async (req, res) => {
+app.post('/api/abastecimento-operadores', auth.requireAuth, async (req, res) => {
   try {
+    if (!podeCadastrarOperadores(req)) return res.status(403).json({ error: 'Você não tem a permissão de cadastrar operadores.' });
     const registro = await abastecimentoCarrinho.criarOperador({
       usuario: req.body.usuario,
       senha: req.body.senha,

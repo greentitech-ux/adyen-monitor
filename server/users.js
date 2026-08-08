@@ -219,6 +219,20 @@ async function updatePodeCatalogoInsumos(id, valor) {
   return toPublic(await ref.get());
 }
 
+// tag "cadastrar Operadores" do Abastecimento do Carrinho: quem tem ve o
+// botao 👥 Operadores e CADASTRA logins locais de balcao (4 letras + 4
+// numeros). Ativar/desativar, remover e desbloquear continuam SO do Master
+async function updatePodeCadastrarOperadores(id, valor) {
+  const ref = usersRef.doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Acesso não encontrado.');
+  if (snap.data().role === 'master') throw new Error('O acesso Master já pode tudo, não precisa dessa permissão.');
+  await ref.update({ podeCadastrarOperadores: !!valor });
+  invalidarUsuario(id);
+  usersCache.invalidar();
+  return toPublic(await ref.get());
+}
+
 // tag de cargo/funcao (Loja, Gerente, Tecnico, Manutencao). Alem de rotulo
 // na tela de Usuarios, algumas tem efeito real: Gerente aprova check-out do
 // Parque, e a tag define a TELA INICIAL da pessoa ao entrar no app (ver
@@ -306,6 +320,7 @@ function toPublic(doc) {
     isAdmin: data.role === 'master' ? null : !!data.isAdmin,
     podeCatalogoEstoque: data.role === 'master' ? null : !!data.podeCatalogoEstoque,
     podeCatalogoInsumos: data.role === 'master' ? null : !!data.podeCatalogoInsumos,
+    podeCadastrarOperadores: data.role === 'master' ? null : !!data.podeCadastrarOperadores,
     cargo: data.role === 'master' ? null : data.cargo || null,
     createdAt: data.createdAt,
   };
@@ -323,6 +338,7 @@ module.exports = {
   updateIsAdmin,
   updatePodeCatalogoEstoque,
   updatePodeCatalogoInsumos,
+  updatePodeCadastrarOperadores,
   updateCargo,
   updateUsername,
   updateUsernamesEmMassa,
